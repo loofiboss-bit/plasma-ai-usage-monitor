@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "2026.05.06",
-  "release": "8.0.0",
+  "release": "8.0.1",
   "lastReviewed": "2026-05-06",
   "runtimeScraping": false,
   "notes": "Static local metadata for shipped subscription defaults. Browser sync may override with actual account data. Do not scrape vendor pages at runtime.",
@@ -91,8 +91,9 @@
       "needsManualReview": false,
       "sourceConflict": false,
       "sourceRefs": [
-        { "label": "Using Codex with your ChatGPT plan", "url": "https://help.openai.com/en/articles/11369540-codex-in-chatgpt", "reviewedAt": "2026-05-06" },
-        { "label": "ChatGPT pricing", "url": "https://chatgpt.com/pricing", "reviewedAt": "2026-05-06" }
+        { "label": "Using Codex with your ChatGPT plan", "url": "https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan", "reviewedAt": "2026-05-06" },
+        { "label": "About ChatGPT Pro tiers", "url": "https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers", "reviewedAt": "2026-05-06" },
+        { "label": "Using Credits for Flexible Usage in ChatGPT", "url": "https://help.openai.com/en/articles/12642688-using-credits-for-flexible-usage-in-chatgpt-freegopluspro", "reviewedAt": "2026-05-06" }
       ],
       "plans": [
         {
@@ -124,16 +125,28 @@
           "notes": ["2x Codex rate limits are temporary for non-Free/Go plans."]
         },
         {
-          "id": "pro",
-          "label": "Pro",
-          "price": { "status": "plan_pricing", "precision": "official_qualitative" },
+          "id": "pro_100",
+          "label": "Pro $100",
+          "price": { "amount": 100, "currency": "USD", "period": "month", "precision": "official_exact" },
           "quotaWindows": [
-            { "kind": "local_messages", "label": "Higher Codex local usage", "unit": "messages", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true },
-            { "kind": "cloud_tasks", "label": "Maximum Codex tasks", "unit": "tasks", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true },
+            { "kind": "usage_multiplier", "label": "General usage vs Plus", "unit": "usage_multiplier", "limit": 5, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true },
+            { "kind": "codex_usage_multiplier", "label": "Codex usage vs Plus", "unit": "usage_multiplier", "limit": 10, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true, "notes": ["OpenAI describes this as a limited-time Codex allowance promotion."] },
             { "kind": "code_review", "label": "Code review", "unit": "reviews", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false },
             { "kind": "ai_credits", "label": "Remaining credits", "unit": "credits", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false }
           ],
-          "notes": ["ChatGPT pricing currently describes Pro Codex usage as 10x or 20x more usage, with maximum tasks."]
+          "notes": ["For Pro $100, OpenAI describes 5x higher limits than Plus and 10x Codex usage vs Plus for a limited time."]
+        },
+        {
+          "id": "pro",
+          "label": "Pro",
+          "price": { "amount": 200, "currency": "USD", "period": "month", "precision": "official_exact" },
+          "quotaWindows": [
+            { "kind": "usage_multiplier", "label": "General usage vs Plus", "unit": "usage_multiplier", "limit": 20, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true },
+            { "kind": "codex_5h_multiplier", "label": "Codex 5-hour allowance vs Plus", "unit": "usage_multiplier", "limit": 25, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true, "notes": ["OpenAI describes this as a limited-time higher 5-hour Codex allowance."] },
+            { "kind": "code_review", "label": "Code review", "unit": "reviews", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false },
+            { "kind": "ai_credits", "label": "Remaining credits", "unit": "credits", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false }
+          ],
+          "notes": ["OpenAI describes the $200 Pro plan as the highest usage tier, with 20x higher usage than Plus."]
         },
         {
           "id": "business_codex",
@@ -170,15 +183,16 @@
       "needsManualReview": false,
       "sourceConflict": false,
       "sourceRefs": [
-        { "label": "GitHub Copilot models and pricing", "url": "https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing", "reviewedAt": "2026-05-06" },
-        { "label": "GitHub Copilot premium requests", "url": "https://docs.github.com/en/billing/concepts/product-billing/github-copilot-premium-requests", "reviewedAt": "2026-05-06" }
+        { "label": "Plans for GitHub Copilot", "url": "https://docs.github.com/en/copilot/get-started/plans", "reviewedAt": "2026-05-06" },
+        { "label": "Requests in GitHub Copilot", "url": "https://docs.github.com/en/copilot/concepts/billing/copilot-requests", "reviewedAt": "2026-05-06" },
+        { "label": "About billing for individual GitHub Copilot plans", "url": "https://docs.github.com/en/copilot/concepts/billing/billing-for-individuals", "reviewedAt": "2026-05-06" }
       ],
       "plans": [
-        { "id": "free", "label": "Free", "price": { "amount": 0, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [] },
-        { "id": "pro", "label": "Pro", "price": { "status": "plan_pricing", "precision": "official_qualitative" }, "quotaWindows": [] },
-        { "id": "pro_plus", "label": "Pro+", "price": { "status": "plan_pricing", "precision": "official_qualitative" }, "quotaWindows": [] },
-        { "id": "business", "label": "Business", "price": { "status": "plan_pricing", "precision": "official_qualitative" }, "quotaWindows": [] },
-        { "id": "enterprise", "label": "Enterprise", "price": { "status": "plan_pricing", "precision": "official_qualitative" }, "quotaWindows": [] }
+        { "id": "free", "label": "Free", "price": { "amount": 0, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 50, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
+        { "id": "pro", "label": "Pro", "price": { "amount": 10, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 300, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
+        { "id": "pro_plus", "label": "Pro+", "price": { "amount": 39, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 1500, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
+        { "id": "business", "label": "Business", "price": { "amount": 19, "currency": "USD", "period": "user_month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 300, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
+        { "id": "enterprise", "label": "Enterprise", "price": { "amount": 39, "currency": "USD", "period": "user_month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 1000, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] }
       ],
       "billingModes": [
         {
@@ -190,9 +204,9 @@
               "label": "Monthly premium requests",
               "unit": "requests",
               "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" },
-              "precision": "official_qualitative",
+              "precision": "official_exact",
               "source": "official_preset",
-              "visibleByDefault": true,
+              "visibleByDefault": false,
               "notes": ["Premium request allowances vary by plan. Use a custom limit or synced organization data for numeric caps."]
             },
             {

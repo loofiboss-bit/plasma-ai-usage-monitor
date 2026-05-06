@@ -2,7 +2,10 @@
 
 #include <QDir>
 #include <QFile>
+#include <QHostAddress>
 #include <QSignalSpy>
+#include <QTcpServer>
+#include <QTcpSocket>
 #include <QTemporaryDir>
 
 #include "claudecodemonitor.h"
@@ -45,6 +48,7 @@ private Q_SLOTS:
     void copilotDetectActivityIncrementsUsage();
     void browserSyncEmptyCookieDiagnostics();
     void browserSyncChromeEmptyCookieDiagnostics();
+    void codexSyncWithoutLiveQuotaKeepsConfiguredPro();
     void copilotBillingModeLabels();
 };
 
@@ -60,12 +64,19 @@ void SubscriptionToolsTest::planDefaults()
     CodexCliMonitor codex;
     QCOMPARE(codex.defaultLimitForPlan(QStringLiteral("Plus")), 0);
     QCOMPARE(codex.defaultSecondaryLimitForPlan(QStringLiteral("Pro")), 0);
-    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro")), 0.0);
+    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro $100")), 100.0);
+    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro")), 200.0);
+    codex.setPlanTier(QStringLiteral("pro"));
+    QVERIFY(!codex.quotaWindows().isEmpty());
 
     CopilotMonitor copilot;
-    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Free")), 0);
-    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Pro+")), 0);
-    QCOMPARE(copilot.defaultCostForPlan(QStringLiteral("Business")), 0.0);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Free")), 50);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Pro")), 300);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Pro+")), 1500);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Business")), 300);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Enterprise")), 1000);
+    QCOMPARE(copilot.defaultCostForPlan(QStringLiteral("Pro+")), 39.0);
+    QCOMPARE(copilot.defaultCostForPlan(QStringLiteral("Business")), 19.0);
 }
 
 void SubscriptionToolsTest::installDetectionWithTemporaryHome()
@@ -242,6 +253,47 @@ void SubscriptionToolsTest::browserSyncChromeEmptyCookieDiagnostics()
     const QList<QVariant> codexDiagnosticArgs = codexDiagnosticSpy.takeFirst();
     QCOMPARE(codexDiagnosticArgs.at(0).toString(), QStringLiteral("Codex CLI"));
     QCOMPARE(codexDiagnosticArgs.at(1).toString(), QStringLiteral("not_logged_in"));
+}
+
+void SubscriptionToolsTest::codexSyncWithoutLiveQuotaKeepsConfiguredPro()
+{
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost, 0));
+
+    connect(&server, &QTcpServer::newConnection, this, [&server]() {
+        QTcpSocket *socket = server.nextPendingConnection();
+        QObject::connect(socket, &QTcpSocket::readyRead, socket, [socket]() {
+            socket->readAll();
+            const QByteArray body = R"JSON({"accounts":{"default":{"entitlement":"plus"}}})JSON";
+            socket->write("HTTP/1.1 200 OK\r\n");
+            socket->write("Content-Type: application/json\r\n");
+            socket->write("Content-Length: " + QByteArray::number(body.size()) + "\r\n");
+            socket->write("Connection: close\r\n\r\n");
+            socket->write(body);
+            socket->disconnectFromHost();
+        });
+        QObject::connect(socket, &QTcpSocket::disconnected, socket, &QTcpSocket::deleteLater);
+    });
+
+    EnvVarGuard demoGuard("PLASMA_AI_MONITOR_DEMO");
+    EnvVarGuard demoBaseGuard("PLASMA_AI_MONITOR_DEMO_BASE_URL");
+    qputenv("PLASMA_AI_MONITOR_DEMO", QByteArray("1"));
+    qputenv("PLASMA_AI_MONITOR_DEMO_BASE_URL", QStringLiteral("http://127.0.0.1:%1").arg(server.serverPort()).toUtf8());
+
+    CodexCliMonitor codex;
+    codex.setPlanTier(QStringLiteral("pro"));
+
+    QSignalSpy completedSpy(&codex, &SubscriptionToolBackend::syncCompleted);
+    QSignalSpy diagnosticSpy(&codex, &SubscriptionToolBackend::syncDiagnostic);
+
+    codex.syncFromBrowser(QStringLiteral("session=test"), 0);
+
+    QTRY_VERIFY_WITH_TIMEOUT(completedSpy.count() >= 1, 3000);
+    QCOMPARE(codex.planTier(), QStringLiteral("pro"));
+    QCOMPARE(codex.syncStatus(), QStringLiteral("Catalog fallback"));
+    QVERIFY(diagnosticSpy.count() >= 1);
+    QCOMPARE(diagnosticSpy.takeFirst().at(1).toString(), QStringLiteral("no_live_quota"));
+    QVERIFY(completedSpy.takeFirst().at(0).toBool());
 }
 
 void SubscriptionToolsTest::copilotBillingModeLabels()

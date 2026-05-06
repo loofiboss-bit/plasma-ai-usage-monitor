@@ -22,7 +22,7 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current release:** `v8.0.0` "Source Of Truth" moves provider/model pricing, subscription plans, quota windows, source refs, review dates, and precision metadata into shipped local JSON catalogs. Browser Sync Labs remains optional and only overrides visible rows with source and timestamp context.
+> **Current release:** `v8.0.1` fixes subscription-plan defaults for GitHub Copilot Pro+ and current ChatGPT Pro Codex tiers, while preserving catalog-backed source and precision metadata from v8.0.0.
 
 ## Quick Links
 

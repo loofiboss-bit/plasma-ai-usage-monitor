@@ -75,8 +75,14 @@ void CatalogsTest::subscriptionCatalogLoads()
     QVERIFY(catalog.sourceConflictCount() > 0);
 
     QCOMPARE(catalog.planIdForLabel(QStringLiteral("claude-code"), QStringLiteral("Max 20x")), QStringLiteral("max_20x"));
+    QCOMPARE(catalog.planIdForLabel(QStringLiteral("codex-cli"), QStringLiteral("Pro $100")), QStringLiteral("pro_100"));
+    QCOMPARE(catalog.planLabelForId(QStringLiteral("github-copilot"), QStringLiteral("pro_plus")), QStringLiteral("Pro+"));
     QCOMPARE(catalog.planLabelForId(QStringLiteral("cursor"), QStringLiteral("pro_plus")), QStringLiteral("Pro+"));
     QVERIFY(!catalog.quotaWindows(QStringLiteral("claude-code"), QStringLiteral("pro")).isEmpty());
+
+    const QVariantList copilotProPlusRows = catalog.quotaWindows(QStringLiteral("github-copilot"), QStringLiteral("pro_plus"));
+    QVERIFY(!copilotProPlusRows.isEmpty());
+    QCOMPARE(copilotProPlusRows.first().toMap().value(QStringLiteral("limit")).toInt(), 1500);
 
     const QVariantList creditsRows = catalog.billingModeQuotaWindows(QStringLiteral("github-copilot"), QStringLiteral("ai_credits_usage_based"));
     QVERIFY(!creditsRows.isEmpty());

@@ -150,6 +150,7 @@ void CodexCliMonitor::fetchAccountCheck(const QString &cookieHeader)
         if (rateLimits.isEmpty()) {
             qWarning() << "CodexCliMonitor: No rate_limits found in response";
         }
+        bool foundLiveQuota = false;
         if (!rateLimits.isEmpty()) {
             // Primary: 5-hour usage limit
             QJsonObject fiveHour = rateLimits.value(QStringLiteral("message_cap")).toObject();
@@ -170,6 +171,7 @@ void CodexCliMonitor::fetchAccountCheck(const QString &cookieHeader)
                 int limit = fiveHour.value(QStringLiteral("limit")).toInt(0);
                 if (limit > 0) {
                     setUsageLimit(limit);
+                    foundLiveQuota = true;
                     if (remaining >= 0) setUsageCount(limit - remaining);
                 }
                 // Parse resets_at for primary period
@@ -198,6 +200,7 @@ void CodexCliMonitor::fetchAccountCheck(const QString &cookieHeader)
                 int limit = weekly.value(QStringLiteral("limit")).toInt(0);
                 if (limit > 0) {
                     setSecondaryUsageLimit(limit);
+                    foundLiveQuota = true;
                     if (remaining >= 0) setSecondaryUsageCount(limit - remaining);
                 }
                 // Parse resets_at for secondary period
@@ -225,6 +228,7 @@ void CodexCliMonitor::fetchAccountCheck(const QString &cookieHeader)
                 int remaining = codeReview.value(QStringLiteral("remaining")).toInt(-1);
                 int limit = codeReview.value(QStringLiteral("limit")).toInt(0);
                 if (limit > 0 && remaining >= 0) {
+                    foundLiveQuota = true;
                     double pctRemaining = (static_cast<double>(remaining) / limit) * 100.0;
                     setTertiaryPercentRemaining(pctRemaining);
                     m_hasTertiary = true;
@@ -247,21 +251,31 @@ void CodexCliMonitor::fetchAccountCheck(const QString &cookieHeader)
         if (credits >= 0) {
             setRemainingCredits(credits);
             m_hasCreditsData = true;
+            foundLiveQuota = true;
         }
 
         // Detect plan from entitlement
-        QString entitlement = accountData.value(QStringLiteral("entitlement")).toString();
-        if (entitlement.contains(QStringLiteral("pro"), Qt::CaseInsensitive)) {
-            setPlanTier(QStringLiteral("Pro"));
-        } else if (entitlement.contains(QStringLiteral("plus"), Qt::CaseInsensitive)) {
-            setPlanTier(QStringLiteral("Plus"));
+        const QString entitlement = accountData.value(QStringLiteral("entitlement")).toString().toLower();
+        const QString currentPlan = planIdForLabel(planTier()).toLower();
+        if (entitlement.contains(QStringLiteral("pro"))) {
+            setPlanTier(QStringLiteral("pro"));
+        } else if (entitlement.contains(QStringLiteral("plus"))
+                   && (currentPlan.isEmpty() || currentPlan == QLatin1String("free") || currentPlan == QLatin1String("go") || currentPlan == QLatin1String("plus"))) {
+            setPlanTier(QStringLiteral("plus"));
         }
 
         // Sync complete
         setSyncing(false);
         setLastSyncTime(QDateTime::currentDateTimeUtc());
-        setSyncStatus(i18n("Synced"));
-        Q_EMIT syncCompleted(true, i18n("Codex usage data synced successfully"));
+        if (foundLiveQuota) {
+            setSyncStatus(i18n("Synced"));
+            Q_EMIT syncCompleted(true, i18n("Codex usage data synced successfully"));
+        } else {
+            setSyncStatus(i18n("Catalog fallback"));
+            const QString message = i18n("ChatGPT did not return live quota fields; showing configured plan presets.");
+            Q_EMIT syncDiagnostic(toolName(), QStringLiteral("no_live_quota"), message);
+            Q_EMIT syncCompleted(true, message);
+        }
         Q_EMIT usageUpdated();
     });
 }

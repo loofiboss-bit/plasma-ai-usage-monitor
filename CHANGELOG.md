@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [8.0.1] — 2026-05-06
+
+### Fixed
+- Add official GitHub Copilot premium-request defaults for Free, Pro, Pro+, Business, and Enterprise so configured Copilot Pro+ shows its plan and monthly limit instead of falling back to Free with a zero cap.
+- Add current ChatGPT Pro $100 and Pro $200 Codex usage metadata, including official usage multipliers where OpenAI publishes ratios instead of exact message counts.
+- Keep configured Codex Pro tiers when ChatGPT browser sync returns an entitlement but no live quota fields, and surface a catalog-fallback sync status instead of silently downgrading to Plus.
+
 ## [8.0.0] — 2026-05-06
 
 ### Added
@@ -598,7 +605,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.1...HEAD
+[8.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.0...v8.0.1
 [8.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v7.0.0...v8.0.0
 [7.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v6.0.1...v7.0.0
 [6.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v6.0.0...v6.0.1
