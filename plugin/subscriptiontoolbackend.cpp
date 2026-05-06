@@ -67,6 +67,39 @@ bool isNumericQuotaUnit(const QString &unit)
         || unit == QLatin1String("reviews");
 }
 
+int localActivityFallbackLimit(const QString &toolKey, const QString &planId)
+{
+    if (toolKey == QLatin1String("claude-code")) {
+        if (planId == QLatin1String("max_20x")) return 2000;
+        if (planId == QLatin1String("max_5x")) return 500;
+        return 100;
+    }
+    if (toolKey == QLatin1String("codex-cli")) {
+        if (planId == QLatin1String("pro")) return 1000;
+        if (planId == QLatin1String("pro_100")) return 500;
+        if (planId == QLatin1String("plus")) return 100;
+        if (planId == QLatin1String("free") || planId == QLatin1String("go")) return 25;
+        return 500;
+    }
+    if (toolKey == QLatin1String("cursor")) {
+        if (planId == QLatin1String("ultra")) return 10000;
+        if (planId == QLatin1String("pro_plus")) return 1500;
+        if (planId == QLatin1String("hobby")) return 50;
+        return 500;
+    }
+    if (toolKey == QLatin1String("windsurf")) {
+        if (planId == QLatin1String("max")) return 5000;
+        if (planId == QLatin1String("free")) return 25;
+        return 500;
+    }
+    if (toolKey == QLatin1String("jetbrains-ai")) {
+        if (planId == QLatin1String("ai_ultimate") || planId == QLatin1String("ai_enterprise")) return 70;
+        if (planId == QLatin1String("ai_pro")) return 20;
+        return 3;
+    }
+    return 0;
+}
+
 QVariantMap usageRow(const QString &kind,
                      const QString &label,
                      const QString &unit,
@@ -598,7 +631,9 @@ int SubscriptionToolBackend::catalogDefaultLimitForPlan(const QString &plan) con
             return row.value(QStringLiteral("limit")).toInt();
         }
     }
-    return 0;
+
+    const QString planId = SubscriptionPlanCatalog::instance()->planIdForLabel(key, plan);
+    return localActivityFallbackLimit(key, planId.isEmpty() ? plan : planId);
 }
 
 int SubscriptionToolBackend::catalogDefaultSecondaryLimitForPlan(const QString &plan) const

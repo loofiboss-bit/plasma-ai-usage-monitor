@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [8.0.3] — 2026-05-06
+
+### Fixed
+- Add automatic self-tracked fallback limits for subscription tools whose vendors expose plan allowances qualitatively or as multipliers but do not return live used/limit fields.
+- Show Codex and similar local-activity monitors with progress bars while keeping the data source distinct from official live quota sync.
+
 ## [8.0.2] — 2026-05-06
 
 ### Fixed
@@ -610,7 +616,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.2...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.3...HEAD
+[8.0.3]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.2...v8.0.3
 [8.0.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.1...v8.0.2
 [8.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.0...v8.0.1
 [8.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v7.0.0...v8.0.0

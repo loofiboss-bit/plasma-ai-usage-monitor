@@ -55,14 +55,16 @@ private Q_SLOTS:
 void SubscriptionToolsTest::planDefaults()
 {
     ClaudeCodeMonitor claude;
-    QCOMPARE(claude.defaultLimitForPlan(QStringLiteral("Pro")), 0);
+    QCOMPARE(claude.defaultLimitForPlan(QStringLiteral("Pro")), 100);
+    QCOMPARE(claude.defaultLimitForPlan(QStringLiteral("Max 5x")), 500);
     QCOMPARE(claude.defaultSecondaryLimitForPlan(QStringLiteral("Max 5x")), 0);
     QCOMPARE(claude.defaultCostForPlan(QStringLiteral("Max 20x")), 200.0);
     claude.setPlanTier(QStringLiteral("max_20x"));
     QVERIFY(!claude.quotaWindows().isEmpty());
 
     CodexCliMonitor codex;
-    QCOMPARE(codex.defaultLimitForPlan(QStringLiteral("Plus")), 0);
+    QCOMPARE(codex.defaultLimitForPlan(QStringLiteral("Plus")), 100);
+    QCOMPARE(codex.defaultLimitForPlan(QStringLiteral("Pro")), 1000);
     QCOMPARE(codex.defaultSecondaryLimitForPlan(QStringLiteral("Pro")), 0);
     QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro $100")), 100.0);
     QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro")), 200.0);

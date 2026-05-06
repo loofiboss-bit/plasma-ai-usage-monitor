@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        8.0.2
+Version:        8.0.3
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
 License:        GPL-3.0-or-later
@@ -70,6 +70,10 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Wed May 06 2026 Loofi <loofi@github.com> - 8.0.3-1
+- Add self-tracked fallback limits for qualitative subscription-tool plans
+- Show Codex and similar local activity monitors with progress bars when live quota fields are unavailable
+
 * Wed May 06 2026 Loofi <loofi@github.com> - 8.0.2-1
 - Preserve legacy Codex Pro plan index after adding Pro $100 metadata
 - Fix zero-usage quota progress bars so they render empty instead of full

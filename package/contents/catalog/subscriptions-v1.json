@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "2026.05.06",
-  "release": "8.0.2",
+  "release": "8.0.3",
   "lastReviewed": "2026-05-06",
   "runtimeScraping": false,
   "notes": "Static local metadata for shipped subscription defaults. Browser sync may override with actual account data. Do not scrape vendor pages at runtime.",
