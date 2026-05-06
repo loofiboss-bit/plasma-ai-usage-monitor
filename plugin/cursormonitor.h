@@ -24,6 +24,7 @@ public:
 
 protected:
     UsagePeriod primaryPeriodType() const override { return Monthly; }
+    QString catalogToolKey() const override { return QStringLiteral("cursor"); }
 };
 
 #endif // CURSORMONITOR_H

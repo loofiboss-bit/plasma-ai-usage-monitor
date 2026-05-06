@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 3,
+  "catalogVersion": "2026.05.06",
+  "release": "8.0.0",
+  "lastReviewed": "2026-05-06",
+  "runtimeScraping": false,
+  "providers": [
+    {
+      "key": "openai",
+      "label": "OpenAI",
+      "needsManualReview": false,
+      "sourceConflict": false,
+      "models": [
+        {
+          "id": "gpt-5.4",
+          "displayName": "GPT-5.4",
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.5,
+            "cachedInput": 0.25,
+            "output": 15.0,
+            "precision": "official_exact"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenAI API pricing",
+              "url": "https://openai.com/api/pricing/",
+              "reviewedAt": "2026-05-06"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

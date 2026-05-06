@@ -13,22 +13,17 @@ CursorMonitor::CursorMonitor(QObject *parent)
 
 QStringList CursorMonitor::availablePlans() const
 {
-    return {
-        QStringLiteral("Pro"),
-        QStringLiteral("Business")
-    };
+    return catalogPlanLabels();
 }
 
 int CursorMonitor::defaultLimitForPlan(const QString &plan) const
 {
-    if (plan == QStringLiteral("Business")) return 2000;
-    return 500;
+    return catalogDefaultLimitForPlan(plan);
 }
 
 double CursorMonitor::defaultCostForPlan(const QString &plan) const
 {
-    if (plan == QStringLiteral("Business")) return 40.0;
-    return 20.0;
+    return catalogDefaultCostForPlan(plan);
 }
 
 double CursorMonitor::subscriptionCost() const

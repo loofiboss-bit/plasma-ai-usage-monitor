@@ -1,25 +1,15 @@
 import QtQuick
+import com.github.loofi.aiusagemonitor 1.0
 
 QtObject {
     id: catalog
 
-    readonly property int schemaVersion: 2
-    readonly property string catalogVersion: "2026.04.30"
-    readonly property string lastReviewed: "2026-04-30"
-    readonly property bool runtimeScraping: false
+    readonly property int schemaVersion: ProviderPricingCatalog.schemaVersion
+    readonly property string catalogVersion: ProviderPricingCatalog.catalogVersion
+    readonly property string lastReviewed: ProviderPricingCatalog.lastReviewed
+    readonly property bool runtimeScraping: ProviderPricingCatalog.runtimeScraping
 
     readonly property var providers: [
-        {
-            name: "Loofi Server",
-            label: i18n("Loofi Server"),
-            dbName: "LoofiServer",
-            configKey: "loofi",
-            color: "#FF6B35",
-            requiresApiKey: false,
-            supportsBudget: false,
-            refreshConfigKey: "loofiRefreshInterval",
-            notificationsConfigKey: "loofiNotificationsEnabled"
-        },
         {
             name: "OpenAI",
             label: i18n("OpenAI"),

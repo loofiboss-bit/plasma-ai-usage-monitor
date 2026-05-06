@@ -27,7 +27,6 @@ KCM.SimpleKCM {
     property int cfg_googleveoRefreshInterval: plasmoid.configuration.googleveoRefreshInterval
     property int cfg_azureRefreshInterval: plasmoid.configuration.azureRefreshInterval
     property int cfg_bedrockRefreshInterval: plasmoid.configuration.bedrockRefreshInterval
-    property int cfg_loofiRefreshInterval: plasmoid.configuration.loofiRefreshInterval
 
     property ProviderCatalog providerCatalog: ProviderCatalog {}
 
@@ -67,8 +66,7 @@ KCM.SimpleKCM {
                     { text: i18n("Solo Developer"), value: "solo" },
                     { text: i18n("Multi-Provider"), value: "multi" },
                     { text: i18n("Local-First"), value: "local" },
-                    { text: i18n("Budget Watch"), value: "budget" },
-                    { text: i18n("Loofi Operator"), value: "loofi" }
+                    { text: i18n("Budget Watch"), value: "budget" }
                 ]
                 textRole: "text"
                 valueRole: "value"
@@ -87,19 +85,15 @@ KCM.SimpleKCM {
                         generalPage.cfg_compactDisplayMode = "count";
                         plasmoid.configuration.advancedSettingsMode = true;
                     } else if (preset === "local") {
-                        generalPage.cfg_compactDisplayMode = "loofi";
+                        generalPage.cfg_compactDisplayMode = "count";
                         plasmoid.configuration.openaiEnabled = false;
                         plasmoid.configuration.anthropicEnabled = false;
                         plasmoid.configuration.googleEnabled = false;
-                        plasmoid.configuration.loofiEnabled = true;
                         plasmoid.configuration.ollamaEnabled = true;
                     } else if (preset === "budget") {
                         generalPage.cfg_compactDisplayMode = "dailycost";
                         plasmoid.configuration.budgetWarningPercent = 75;
                         plasmoid.configuration.notifyOnBudgetWarning = true;
-                    } else if (preset === "loofi") {
-                        generalPage.cfg_compactDisplayMode = "loofi";
-                        plasmoid.configuration.loofiEnabled = true;
                     }
                     presetCombo.currentIndex = 0;
                 }
@@ -150,7 +144,6 @@ KCM.SimpleKCM {
                 i18n("Icon only"),
                 i18n("Total cost"),
                 i18n("Active providers count"),
-                i18n("Loofi server KPIs"),
                 i18n("Daily cost"),
                 i18n("Remaining requests"),
                 i18n("Most critical provider")
@@ -162,10 +155,9 @@ KCM.SimpleKCM {
                 switch (generalPage.cfg_compactDisplayMode) {
                 case "cost": return 1;
                 case "count": return 2;
-                case "loofi": return 3;
-                case "dailycost": return 4;
-                case "requests": return 5;
-                case "critical": return 6;
+                case "dailycost": return 3;
+                case "requests": return 4;
+                case "critical": return 5;
                 default: return 0;
                 }
             }
@@ -173,10 +165,9 @@ KCM.SimpleKCM {
                 switch (currentIndex) {
                 case 1: generalPage.cfg_compactDisplayMode = "cost"; break;
                 case 2: generalPage.cfg_compactDisplayMode = "count"; break;
-                case 3: generalPage.cfg_compactDisplayMode = "loofi"; break;
-                case 4: generalPage.cfg_compactDisplayMode = "dailycost"; break;
-                case 5: generalPage.cfg_compactDisplayMode = "requests"; break;
-                case 6: generalPage.cfg_compactDisplayMode = "critical"; break;
+                case 3: generalPage.cfg_compactDisplayMode = "dailycost"; break;
+                case 4: generalPage.cfg_compactDisplayMode = "requests"; break;
+                case 5: generalPage.cfg_compactDisplayMode = "critical"; break;
                 default: generalPage.cfg_compactDisplayMode = "icon"; break;
                 }
             }

@@ -1,4 +1,5 @@
 #include "providerbackend.h"
+#include "providerpricingcatalog.h"
 #include <QDate>
 #include <QUrl>
 #include <QRandomGenerator>
@@ -569,6 +570,21 @@ void ProviderBackend::retryRequest(QNetworkReply *reply,
 void ProviderBackend::registerModelPricing(const QString &modelName, double inputPricePerMToken, double outputPricePerMToken)
 {
     m_modelPricing.insert(modelName, ModelPricing{inputPricePerMToken, outputPricePerMToken});
+}
+
+void ProviderBackend::registerCatalogPricing(const QString &providerKey)
+{
+    const QVariantList rows = ProviderPricingCatalog::instance()->tokenModelsForProvider(providerKey);
+    for (const QVariant &rowValue : rows) {
+        const QVariantMap row = rowValue.toMap();
+        const QString id = row.value(QStringLiteral("id")).toString();
+        if (id.isEmpty()) {
+            continue;
+        }
+        registerModelPricing(id,
+                             row.value(QStringLiteral("input")).toDouble(),
+                             row.value(QStringLiteral("output")).toDouble());
+    }
 }
 
 void ProviderBackend::updateEstimatedCost(const QString &currentModel)

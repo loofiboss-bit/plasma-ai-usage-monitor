@@ -176,11 +176,5 @@
         "active_this_cycle": 7
       }
     }
-  },
-  "loofi": {
-    "model": "Qwen3.5-9B",
-    "training_stage": "canary_eval",
-    "gpu_memory_pct": 83.5,
-    "inference_count_24h": 142
   }
 }

@@ -69,6 +69,7 @@ private Q_SLOTS:
     void testCheckAndResetPeriod();
     void testDefaultLimitForPlan();
     void testTimeUntilResetFormat();
+    void testQuotaWindowsAndNotify();
 };
 
 void SubscriptionToolBackendTest::testIncrementUsage()
@@ -294,6 +295,25 @@ void SubscriptionToolBackendTest::testTimeUntilResetFormat()
     QString timeStr = t.timeUntilReset();
     // Should contain hours and minutes
     QVERIFY(timeStr.contains(QLatin1Char('h')));
+}
+
+void SubscriptionToolBackendTest::testQuotaWindowsAndNotify()
+{
+    TestToolBackend t;
+    t.setPeriodStart(QDateTime::currentDateTimeUtc());
+
+    QSignalSpy quotaSpy(&t, &SubscriptionToolBackend::quotaWindowsChanged);
+    t.setUsageLimit(10);
+    t.setUsageCount(4);
+
+    QVERIFY(quotaSpy.count() >= 2);
+    const QVariantList rows = t.quotaWindows();
+    QVERIFY(!rows.isEmpty());
+    const QVariantMap first = rows.first().toMap();
+    QCOMPARE(first.value(QStringLiteral("source")).toString(), QStringLiteral("user_config"));
+    QCOMPARE(first.value(QStringLiteral("badge")).toString(), QStringLiteral("Custom"));
+    QCOMPARE(first.value(QStringLiteral("used")).toInt(), 4);
+    QCOMPARE(first.value(QStringLiteral("limit")).toInt(), 10);
 }
 
 QTEST_MAIN(SubscriptionToolBackendTest)

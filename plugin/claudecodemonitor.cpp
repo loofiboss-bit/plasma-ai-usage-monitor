@@ -42,29 +42,17 @@ QString ClaudeCodeMonitor::claudeConfigDir() const
 
 QStringList ClaudeCodeMonitor::availablePlans() const
 {
-    return {
-        QStringLiteral("Pro"),
-        QStringLiteral("Max 5x"),
-        QStringLiteral("Max 20x")
-    };
+    return catalogPlanLabels();
 }
 
 int ClaudeCodeMonitor::defaultLimitForPlan(const QString &plan) const
 {
-    // 5-hour session limits (approximate, vary by message complexity)
-    if (plan == QStringLiteral("Pro")) return 45;
-    if (plan == QStringLiteral("Max 5x")) return 225;
-    if (plan == QStringLiteral("Max 20x")) return 900;
-    return 45;
+    return catalogDefaultLimitForPlan(plan);
 }
 
 int ClaudeCodeMonitor::defaultSecondaryLimitForPlan(const QString &plan) const
 {
-    // Weekly limits
-    if (plan == QStringLiteral("Pro")) return 225;
-    if (plan == QStringLiteral("Max 5x")) return 1125;
-    if (plan == QStringLiteral("Max 20x")) return 4500;
-    return 225;
+    return catalogDefaultSecondaryLimitForPlan(plan);
 }
 
 double ClaudeCodeMonitor::subscriptionCost() const
@@ -74,10 +62,7 @@ double ClaudeCodeMonitor::subscriptionCost() const
 
 double ClaudeCodeMonitor::defaultCostForPlan(const QString &plan) const
 {
-    if (plan == QStringLiteral("Pro")) return 20.0;
-    if (plan == QStringLiteral("Max 5x")) return 100.0;
-    if (plan == QStringLiteral("Max 20x")) return 200.0;
-    return 20.0;
+    return catalogDefaultCostForPlan(plan);
 }
 
 // --- Browser Sync ---

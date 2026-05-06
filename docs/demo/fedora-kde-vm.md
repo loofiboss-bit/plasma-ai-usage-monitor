@@ -175,7 +175,6 @@ If you want deterministic provider cards without relying solely on the demo flag
 | Cohere        | `http://127.0.0.1:8080/mock/cohere`           |
 | Google Veo    | `http://127.0.0.1:8080/mock/googleveo/v1beta` |
 | Azure OpenAI  | `http://127.0.0.1:8080/mock/azure`            |
-| Loofi Server  | `http://127.0.0.1:8080/mock/loofi`            |
 
 ## Canonical demo preset
 
@@ -183,7 +182,6 @@ The mocked preset is designed for media capture rather than exhaustive functiona
 
 - multiple connected providers with visible cost, request, and quota bars
 - one richer card with balance or credits data
-- a Loofi card with active model, training stage, and GPU memory percentage
 - subscription cards can use the built-in demo-mode mock endpoints instead of live browser sessions
 - a clean history/compare scene populated by manual refreshes during the session
 

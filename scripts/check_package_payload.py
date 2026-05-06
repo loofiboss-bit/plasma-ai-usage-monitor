@@ -13,7 +13,7 @@ def expected_version_from_cmake():
                 return match.group(1)
     except OSError:
         pass
-    return "7.0.0"
+    return "8.0.0"
 
 def main():
     expected_version = expected_version_from_cmake()
@@ -22,7 +22,8 @@ def main():
         "package/metadata.json",
         "package/contents/ui/main.qml",
         "package/contents/ui/SetupWizard.qml",
-        "package/contents/catalog/providers-v2.json",
+        "package/contents/catalog/providers-v3.json",
+        "package/contents/catalog/subscriptions-v1.json",
         "package/contents/icons/providers/openai.svg",
         "package/contents/icons/tools/copilot.svg",
         "plugin/qmldir",
@@ -65,7 +66,8 @@ def main():
                 # Check for key files in the tarball
                 tar_expected = [
                     f"plasma-ai-usage-monitor-{expected_version}/package/metadata.json",
-                    f"plasma-ai-usage-monitor-{expected_version}/package/contents/catalog/providers-v2.json",
+                    f"plasma-ai-usage-monitor-{expected_version}/package/contents/catalog/providers-v3.json",
+                    f"plasma-ai-usage-monitor-{expected_version}/package/contents/catalog/subscriptions-v1.json",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/icons/providers/openai.svg",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/icons/tools/copilot.svg",
                     f"plasma-ai-usage-monitor-{expected_version}/plugin/qmldir",

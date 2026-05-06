@@ -227,13 +227,6 @@ Item {
         function onGoogleveoEnabledChanged() { runtime.loadApiKeys(); }
         function onAzureEnabledChanged() { runtime.loadApiKeys(); }
         function onBedrockEnabledChanged() { runtime.loadApiKeys(); }
-        function onLoofiEnabledChanged() { runtime.scheduler.refreshAll(); }
-        function onLoofiServerUrlChanged() {
-            var loofiProvider = runtime.registry.providerByConfigKey("loofi");
-            if (runtime.configuration.loofiEnabled && loofiProvider && loofiProvider.backend) {
-                loofiProvider.backend.refresh();
-            }
-        }
 
         function onClaudeCodeEnabledChanged() {
             if (runtime.claudeCodeMonitor.enabled) {

@@ -1,7 +1,7 @@
 # Roadmap — Plasma AI Usage Monitor
 
-> **Current version:** v7.0.0 (Beacon)
-> **Last updated:** 2026-04-30
+> **Current version:** v8.0.0 (Source Of Truth)
+> **Last updated:** 2026-05-06
 > **Direction:** Keep the widget desktop-native and local-first. Prefer export, notifications, and loopback integrations over backend/server expansion.
 
 ## Analyst's Note on Feasibility
@@ -22,7 +22,20 @@ Chrome/Chromium cookie decryption and AWS Bedrock support remain in scope, but b
 | v5.4.1 | **Link** | Advanced sync and enterprise API | Released |
 | v6.0.0 | **Nexus (Light)** | UI Redesign and integration | Released |
 | v6.0.1 | **Ground Truth** | Stabilization, trust, and metadata | Released |
-| v7.0.0 | **Beacon** | Fedora KDE 44 reliability, trust, and UX | Current |
+| v7.0.0 | **Beacon** | Fedora KDE 44 reliability, trust, and UX | Released |
+| v8.0.0 | **Source Of Truth** | Local catalogs for pricing, plans, and quota windows | Current |
+
+## v8.0.0 — "Source Of Truth"
+
+**Goal:** make shipped JSON catalogs the local source of truth for provider pricing, subscription plans, quota windows, source metadata, and precision labels while keeping Browser Sync Labs optional and visibly sourced.
+
+| Feature | Description | Technical Risk |
+| ------- | ----------- | -------------- |
+| **Provider Catalog v3** | Static provider/model pricing with source refs, reviewed dates, cached input pricing, context metadata, and non-token pricing status. | Medium |
+| **Subscription Catalog v1** | Stable plan IDs, subscription prices, quota windows, Copilot billing modes, and manual-review/source-conflict markers. | Medium |
+| **Quota source UI** | Subscription cards render normalized quota rows with readable source and precision badges. | Medium |
+| **Trust Center catalog status** | Diagnostics expose provider/subscription catalog versions, review dates, stale state, runtime scraping disabled, and review/conflict counts. | Low |
+| **Release gates** | Validation checks prevent missing source refs, stale catalogs, fake non-token pricing, and hardcoded subscription pricing. | Low |
 
 ## v7.0.0 — "Beacon"
 

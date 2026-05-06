@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [8.0.0] — 2026-05-06
+
+### Added
+- Add Provider Catalog v3 and Subscription Catalog v1 as local source-of-truth JSON catalogs for model pricing, subscription plans, quota windows, source refs, review dates, precision, and manual-review/source-conflict states.
+- Add `CatalogLoader`, `ProviderPricingCatalog`, and `SubscriptionPlanCatalog` plus QML catalog status for schema, catalog version, review date, runtime-scraping state, stale/valid state, and review/conflict counts.
+- Add quota-window UI rows with readable source badges for synced, official, official range/approx/note, self-tracked, custom, estimated, needs-review, and unknown data.
+- Add subscription catalog and hardcoded-pricing validation scripts and wire them into CTest, `just check`, `just release-check`, and `just fedora44-check`.
+
+### Changed
+- Move subscription plan defaults, quota presets, Copilot billing modes, and provider/model token pricing out of C++/QML defaults and into shipped catalogs.
+- Add stable string plan ID config keys while keeping old integer plan indexes as migration fallbacks.
+- Switch Copilot billing mode to `auto`, `premium_requests_legacy`, and `ai_credits_usage_based` with a date-aware 2026-06-01 helper.
+- Replace fake token pricing for non-token Veo cost estimation with explicit video-second pricing metadata.
+
+### Removed
+- Remove the private server/API provider, compact KPI mode, demo endpoint, catalog row, and QML/C++ backend registration from the public app.
+
 ## [7.0.0] — 2026-04-30
 
 ### Added
@@ -38,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Data Trust & Confidence Labeling:** Provider cards now clearly indicate the type of data being displayed (Actual, Estimated, Rate-limit only, Local, Subscription-plan derived) and health status (Healthy, Degraded, Disconnected).
 - **Diagnostics Center:** A dedicated config tab showing KWallet health, Browser Sync readiness, installed CLI tools, and quick access to run the deep system doctor script.
 - **Config Portability:** Export and import non-secret configurations to share presets or backup UI settings safely.
-- **Configuration Presets:** Quick one-click setups for common scenarios: Solo Developer, Multi-Provider, Local-First, Budget Watch, and Loofi Operator.
+- **Configuration Presets:** Quick one-click setups for common scenarios: Solo Developer, Multi-Provider, Local-First, Budget Watch, and Local Operator.
 - **Compact Panel Upgrades:** Pin new key metrics directly in the compact Plasma panel view: Daily Cost, Remaining Requests, or Most Critical Provider.
 - **Analyst & History Redesign:** Refined history controls, updated compare mode to look like a first-class view, and improved ranking panels in TrendSummary.
 - **Config Screen Polish:** Updated all configuration screens to follow the new v6 visual language with improved spacing, grouping, and context hints.
@@ -191,7 +208,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Clean up full popup history-state handling so detail/compare empty states are owned by the parent view instead of rendering duplicate fallback messages from child widgets
 - Improve live dashboard responsiveness by splitting dense provider/subscription card headers into title + metadata rows and tightening live/history narrow-width behavior
 - Refresh README and roadmap references to reflect the shipped `3.8.0` version and current provider surface
-- Fix provider backend build regressions by restoring the missing `setEstimatedCost()` declaration and correcting the Loofi Server URL environment fallback call
+- Fix provider backend build regressions by restoring the missing `setEstimatedCost()` declaration and correcting the custom server URL environment fallback call
 - Fix the generated `.plasmoid` archive layout so Plasma/KDE Store installs see `metadata.json` and `contents/` at archive root instead of inside a nested `package/` directory
 - Refresh release-facing repository URLs and RPM metadata for the current GitHub repository
 
@@ -581,7 +598,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.3.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.0...HEAD
+[8.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v7.0.0...v8.0.0
+[7.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v6.0.1...v7.0.0
+[6.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v6.0.0...v6.0.1
+[6.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.4.1...v6.0.0
+[5.4.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.4.0...v5.4.1
+[5.4.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.3.0...v5.4.0
 [5.3.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.2.0...v5.3.0
 [5.2.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.1.4...v5.2.0
 [5.1.4]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.1.3...v5.1.4

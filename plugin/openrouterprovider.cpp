@@ -6,32 +6,8 @@
 OpenRouterProvider::OpenRouterProvider(QObject *parent)
     : OpenAICompatibleProvider(parent)
 {
-    // Set default model (OpenRouter uses provider/model format)
     setModel(QStringLiteral("openai/gpt-5.4-pro"));
-
-    // Register model pricing ($ per 1M tokens) — OpenRouter pricing as of 2026
-    // OpenRouter adds a small margin; these are approximate pass-through prices
-    registerModelPricing(QStringLiteral("openai/gpt-5.4-pro"), 3.00, 12.00);
-    registerModelPricing(QStringLiteral("openai/gpt-5.4-thinking"), 4.00, 16.00);
-    registerModelPricing(QStringLiteral("openai/gpt-5.4-mini"), 0.15, 0.60);
-    registerModelPricing(QStringLiteral("openai/gpt-5.4-cyber"), 5.00, 20.00);
-    registerModelPricing(QStringLiteral("openai/o3"), 2.00, 8.00);
-    registerModelPricing(QStringLiteral("openai/o4-mini"), 1.10, 4.40);
-    registerModelPricing(QStringLiteral("anthropic/claude-opus-4.7"), 15.00, 75.00);
-    registerModelPricing(QStringLiteral("anthropic/claude-sonnet-4.8"), 3.00, 15.00);
-    registerModelPricing(QStringLiteral("anthropic/claude-mythos-preview"), 20.00, 100.00);
-    registerModelPricing(QStringLiteral("google/gemini-2.5-pro"), 1.25, 10.00);
-    registerModelPricing(QStringLiteral("google/gemini-2.5-flash"), 0.15, 0.60);
-    registerModelPricing(QStringLiteral("google/gemini-2.0-flash"), 0.10, 0.40);
-    registerModelPricing(QStringLiteral("meta-llama/llama-3.3-70b-instruct"), 0.39, 0.39);
-    registerModelPricing(QStringLiteral("meta-llama/llama-4-maverick"), 0.20, 0.60);
-    registerModelPricing(QStringLiteral("meta-llama/llama-4-scout"), 0.15, 0.35);
-    registerModelPricing(QStringLiteral("deepseek/deepseek-chat-v3"), 0.14, 0.28);
-    registerModelPricing(QStringLiteral("deepseek/deepseek-r1"), 0.55, 2.19);
-    registerModelPricing(QStringLiteral("mistralai/mistral-large"), 2.00, 6.00);
-    registerModelPricing(QStringLiteral("qwen/qwen-2.5-72b-instruct"), 0.36, 0.36);
-    registerModelPricing(QStringLiteral("x-ai/grok-3"), 3.00, 15.00);
-    registerModelPricing(QStringLiteral("x-ai/grok-3-mini"), 0.30, 0.50);
+    registerCatalogPricing(QStringLiteral("openrouter"));
 }
 
 double OpenRouterProvider::credits() const { return m_credits; }

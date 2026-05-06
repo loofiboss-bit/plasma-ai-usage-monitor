@@ -16,10 +16,7 @@
  * - GET /api/organizations/{uuid}/usage → session %, weekly limits
  * - GET /api/organizations/{uuid}/settings/billing → extra usage spend
  *
- * Plans and approximate limits (messages vary by complexity):
- * - Pro ($20/mo):    ~45 messages/5h session, ~225/week
- * - Max 5x ($100/mo): ~225 messages/5h session, ~1125/week
- * - Max 20x ($200/mo): ~900 messages/5h session, ~4500/week
+ * Pricing and quota presets live in subscriptions-v1.json.
  */
 class ClaudeCodeMonitor : public LocalActivityMonitorBase
 {
@@ -54,6 +51,7 @@ public:
 protected:
     UsagePeriod primaryPeriodType() const override { return FiveHour; }
     UsagePeriod secondaryPeriodType() const override { return Weekly; }
+    QString catalogToolKey() const override { return QStringLiteral("claude-code"); }
 
 private:
     QString claudeConfigDir() const;

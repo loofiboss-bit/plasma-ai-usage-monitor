@@ -51,19 +51,21 @@ private Q_SLOTS:
 void SubscriptionToolsTest::planDefaults()
 {
     ClaudeCodeMonitor claude;
-    QCOMPARE(claude.defaultLimitForPlan(QStringLiteral("Pro")), 45);
-    QCOMPARE(claude.defaultSecondaryLimitForPlan(QStringLiteral("Max 5x")), 1125);
+    QCOMPARE(claude.defaultLimitForPlan(QStringLiteral("Pro")), 0);
+    QCOMPARE(claude.defaultSecondaryLimitForPlan(QStringLiteral("Max 5x")), 0);
     QCOMPARE(claude.defaultCostForPlan(QStringLiteral("Max 20x")), 200.0);
+    claude.setPlanTier(QStringLiteral("max_20x"));
+    QVERIFY(!claude.quotaWindows().isEmpty());
 
     CodexCliMonitor codex;
-    QCOMPARE(codex.defaultLimitForPlan(QStringLiteral("Plus")), 45);
-    QCOMPARE(codex.defaultSecondaryLimitForPlan(QStringLiteral("Pro")), 500);
-    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro")), 200.0);
+    QCOMPARE(codex.defaultLimitForPlan(QStringLiteral("Plus")), 0);
+    QCOMPARE(codex.defaultSecondaryLimitForPlan(QStringLiteral("Pro")), 0);
+    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro")), 0.0);
 
     CopilotMonitor copilot;
-    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Free")), 50);
-    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Pro+")), 1500);
-    QCOMPARE(copilot.defaultCostForPlan(QStringLiteral("Business")), 19.0);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Free")), 0);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Pro+")), 0);
+    QCOMPARE(copilot.defaultCostForPlan(QStringLiteral("Business")), 0.0);
 }
 
 void SubscriptionToolsTest::installDetectionWithTemporaryHome()
@@ -245,16 +247,18 @@ void SubscriptionToolsTest::browserSyncChromeEmptyCookieDiagnostics()
 void SubscriptionToolsTest::copilotBillingModeLabels()
 {
     CopilotMonitor copilot;
-    QCOMPARE(copilot.billingMode(), QStringLiteral("premium_requests"));
+    QCOMPARE(copilot.billingMode(), QStringLiteral("auto"));
+    QCOMPARE(copilot.billingModeForDate(QStringLiteral("2026-05-31")), QStringLiteral("premium_requests_legacy"));
+    QCOMPARE(copilot.billingModeForDate(QStringLiteral("2026-06-01")), QStringLiteral("ai_credits_usage_based"));
+    QVERIFY(copilot.usageSourceLabel().contains(QStringLiteral("Auto")));
+
+    copilot.setBillingMode(QStringLiteral("premium_requests"));
+    QCOMPARE(copilot.billingMode(), QStringLiteral("premium_requests_legacy"));
     QVERIFY(copilot.usageSourceLabel().contains(QStringLiteral("Premium request")));
 
-    copilot.setBillingMode(QStringLiteral("usage_based"));
-    QCOMPARE(copilot.billingMode(), QStringLiteral("usage_based"));
-    QVERIFY(copilot.usageSourceLabel().contains(QStringLiteral("Usage-based")));
-
     copilot.setBillingMode(QStringLiteral("credits"));
-    QCOMPARE(copilot.billingMode(), QStringLiteral("credits"));
-    QVERIFY(copilot.usageSourceLabel().contains(QStringLiteral("Credits")));
+    QCOMPARE(copilot.billingMode(), QStringLiteral("ai_credits_usage_based"));
+    QVERIFY(copilot.usageSourceLabel().contains(QStringLiteral("AI credits")));
 }
 
 QTEST_MAIN(SubscriptionToolsTest)

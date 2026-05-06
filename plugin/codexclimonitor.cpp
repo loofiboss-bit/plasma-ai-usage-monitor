@@ -28,29 +28,17 @@ QString CodexCliMonitor::codexConfigDir() const
 
 QStringList CodexCliMonitor::availablePlans() const
 {
-    return {
-        QStringLiteral("Plus"),
-        QStringLiteral("Pro"),
-        QStringLiteral("Business")
-    };
+    return catalogPlanLabels();
 }
 
 int CodexCliMonitor::defaultLimitForPlan(const QString &plan) const
 {
-    // Lower bound of 5-hour window for local messages
-    if (plan == QStringLiteral("Plus")) return 45;
-    if (plan == QStringLiteral("Pro")) return 300;
-    if (plan == QStringLiteral("Business")) return 45;
-    return 45;
+    return catalogDefaultLimitForPlan(plan);
 }
 
 int CodexCliMonitor::defaultSecondaryLimitForPlan(const QString &plan) const
 {
-    // Weekly usage limits
-    if (plan == QStringLiteral("Plus")) return 100;
-    if (plan == QStringLiteral("Pro")) return 500;
-    if (plan == QStringLiteral("Business")) return 100;
-    return 100;
+    return catalogDefaultSecondaryLimitForPlan(plan);
 }
 
 double CodexCliMonitor::subscriptionCost() const
@@ -60,10 +48,7 @@ double CodexCliMonitor::subscriptionCost() const
 
 double CodexCliMonitor::defaultCostForPlan(const QString &plan) const
 {
-    if (plan == QStringLiteral("Plus")) return 20.0;
-    if (plan == QStringLiteral("Pro")) return 200.0;
-    if (plan == QStringLiteral("Business")) return 30.0;
-    return 20.0;
+    return catalogDefaultCostForPlan(plan);
 }
 
 // --- Browser Sync ---

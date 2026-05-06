@@ -263,6 +263,9 @@ protected:
     /// Register pricing for a model name. Used for cost estimation when no billing API is available.
     void registerModelPricing(const QString &modelName, double inputPricePerMToken, double outputPricePerMToken);
 
+    /// Register all token pricing rows for a provider from the shipped local catalog.
+    void registerCatalogPricing(const QString &providerKey);
+
     /// Calculate and set estimated cost from accumulated tokens using registered pricing.
     /// Call this after updating token counts. Only sets cost if no real cost has been set.
     void updateEstimatedCost(const QString &currentModel);

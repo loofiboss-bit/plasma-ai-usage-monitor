@@ -1,5 +1,7 @@
 #include "aiusageplugin.h"
 #include "appinfo.h"
+#include "providerpricingcatalog.h"
+#include "subscriptionplancatalog.h"
 #include "secretsmanager.h"
 #include "providerbackend.h"
 #include "openaiprovider.h"
@@ -26,7 +28,6 @@
 #include "windsurfmonitor.h"
 #include "jetbrainsaimonitor.h"
 #include "browsercookieextractor.h"
-#include "loofiserverprovider.h"
 #include "bedrockprovider.h"
 #include "localmetricsserver.h"
 #include "webhooknotifier.h"
@@ -41,6 +42,14 @@ void AiUsagePlugin::registerTypes(const char *uri)
     qmlRegisterSingletonType<AppInfo>(uri, 1, 0, "AppInfo",
         [](QQmlEngine *, QJSEngine *) -> QObject * {
             return new AppInfo();
+        });
+    qmlRegisterSingletonType<ProviderPricingCatalog>(uri, 1, 0, "ProviderPricingCatalog",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new ProviderPricingCatalog();
+        });
+    qmlRegisterSingletonType<SubscriptionPlanCatalog>(uri, 1, 0, "SubscriptionPlanCatalog",
+        [](QQmlEngine *, QJSEngine *) -> QObject * {
+            return new SubscriptionPlanCatalog();
         });
 
     // Register C++ types for use in QML
@@ -73,8 +82,6 @@ void AiUsagePlugin::registerTypes(const char *uri)
     // Browser cookie extraction for sync
     qmlRegisterType<BrowserCookieExtractor>(uri, 1, 0, "BrowserCookieExtractor");
 
-    // Self-hosted Loofi AI server
-    qmlRegisterType<LoofiServerProvider>(uri, 1, 0, "LoofiServerProvider");
     qmlRegisterType<BedrockProvider>(uri, 1, 0, "BedrockProvider");
     qmlRegisterType<LocalMetricsServer>(uri, 1, 0, "LocalMetricsServer");
     qmlRegisterType<WebhookNotifier>(uri, 1, 0, "WebhookNotifier");

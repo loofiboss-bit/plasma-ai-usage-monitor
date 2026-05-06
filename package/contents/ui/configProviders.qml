@@ -21,9 +21,6 @@ KCM.SimpleKCM {
         return !lower.startsWith("https://") && !lower.startsWith("http://");
     }
 
-    property alias cfg_loofiEnabled: loofiSwitch.checked
-    property alias cfg_loofiServerUrl: loofiServerUrlField.text
-
     property alias cfg_openaiEnabled: openaiSwitch.checked
     property alias cfg_openaiModel: openaiModelField.text
     property alias cfg_openaiProjectId: openaiProjectField.text
@@ -211,69 +208,6 @@ KCM.SimpleKCM {
             QQC2.ToolTip.visible: hovered
         }
         
-
-        // ══════════════════════════════════════════════
-        // ── Loofi Server ──
-        // ══════════════════════════════════════════════
-
-        Kirigami.Separator {
-            Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Loofi Server")
-        }
-
-        QQC2.Switch {
-            id: loofiSwitch
-            Kirigami.FormData.label: i18n("Enable:")
-            checked: plasmoid.configuration.loofiEnabled
-        }
-
-        QQC2.Label {
-            visible: loofiSwitch.checked
-            text: i18n("Connects to your self-hosted Loofi server and shows the active model, training stage, GPU usage, and 24-hour request volume.")
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            color: Kirigami.Theme.disabledTextColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-        }
-
-        QQC2.TextField {
-            id: loofiServerUrlField
-            Kirigami.FormData.label: i18n("Server URL:")
-            enabled: loofiSwitch.checked
-            text: plasmoid.configuration.loofiServerUrl
-            placeholderText: i18n("Leave empty for LOOFI_SERVER_URL or built-in default")
-            Layout.fillWidth: true
-            QQC2.ToolTip.text: i18n("Base URL for the Loofi server. The widget will poll /api/v2/metrics-summary.")
-            QQC2.ToolTip.visible: hovered
-            QQC2.ToolTip.delay: 500
-        }
-
-        QQC2.Label {
-            visible: providersPage.isInvalidUrl(loofiServerUrlField.text)
-            text: i18n("⚠ URL must start with https:// or http://")
-            color: Kirigami.Theme.negativeTextColor
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-        }
-
-        QQC2.Label {
-            visible: loofiServerUrlField.text.toLowerCase().startsWith("http://")
-            text: i18n("⚠ Using HTTP is insecure. Prefer HTTPS unless you are polling a trusted local network host.")
-            color: Kirigami.Theme.negativeTextColor
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-        }
-
-        QQC2.Label {
-            visible: loofiSwitch.checked
-            text: i18n("Authentication stays environment-based via LOOFI_SERVER_TOKEN when your server requires it.")
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            color: Kirigami.Theme.disabledTextColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-        }
 
         // ══════════════════════════════════════════════
         // ── OpenAI ──

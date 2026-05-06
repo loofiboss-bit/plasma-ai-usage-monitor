@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        7.0.0
+Version:        8.0.0
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
 License:        GPL-3.0-or-later
@@ -29,13 +29,14 @@ Requires:       qt6-qtbase
 %description
 A native KDE Plasma 6 plasmoid that monitors AI API token usage,
 rate limits, costs, and budgets across multiple providers including
-OpenAI, Anthropic (Claude), Google (Gemini), Mistral AI, DeepSeek,
-Groq, xAI (Grok), Ollama Cloud, OpenRouter, Together AI, and Cohere.
+OpenAI, Azure OpenAI, AWS Bedrock, Anthropic (Claude), Google Gemini,
+Mistral AI, DeepSeek, Groq, xAI (Grok), Ollama Cloud, OpenRouter,
+Together AI, Cohere, and Google Veo.
 
 Features:
 - Real-time rate limit monitoring for all providers
 - Usage and cost tracking with historical trends
-- Token-based cost estimation (~30 models with pricing tables)
+- Catalog-backed cost estimation with local JSON metadata
 - Budget management with daily/monthly limits
 - SQLite-based usage history with chart visualization
 - Secure API key storage via KDE Wallet
@@ -69,6 +70,11 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Wed May 06 2026 Loofi <loofi@github.com> - 8.0.0-1
+- Ship Source Of Truth catalogs for provider pricing and subscription plans
+- Add catalog validation, hardcoded-pricing checks, and quota-window UI badges
+- Keep browser sync optional and local-first with visible source and precision metadata
+
 * Thu Apr 30 2026 Loofi <loofi@github.com> - 7.0.0-1
 - Prepare Beacon as the Fedora KDE 44 native reliability release
 - Add Fedora 44 validation, Provider Catalog v2 checks, and Trust Center UX

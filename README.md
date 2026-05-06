@@ -20,9 +20,9 @@
 
 ---
 
-A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, and GitHub Copilot.
+A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current release:** `v7.0.0` "Beacon" is a Fedora KDE 44 / Plasma 6.6 reliability, trust, and UX release. It makes Fedora 44 the primary CI, demo, validation, and release target; adds a strict `just fedora44-check` gate; expands Diagnostics into a Trust Center; adds Provider Catalog v2 validation; improves Browser Sync Labs readiness; and keeps the widget KDE Plasma native, local-first, and desktop-focused.
+> **Current release:** `v8.0.0` "Source Of Truth" moves provider/model pricing, subscription plans, quota windows, source refs, review dates, and precision metadata into shipped local JSON catalogs. Browser Sync Labs remains optional and only overrides visible rows with source and timestamp context.
 
 ## Quick Links
 
@@ -34,22 +34,22 @@ A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, an
 > **VS Code note:** use **Remote - SSH** for the real Fedora KDE 44 VM workflow, or **Dev Containers** for a headless Fedora 44 build/test environment. The container is useful for build/test/mock-server work, but real Plasma UI validation still requires a Linux desktop session.
 > **Demo Mode:** Contributors can run the widget in a deterministic offline mode for testing and screenshots. In the Fedora KDE 44 guest, run `bash scripts/demo/setup_fedora_kde_test_env.sh --fedora 44 --install-missing`, then start `python scripts/demo/mock_ai_usage_server.py` and launch with `PLASMA_AI_MONITOR_DEMO=1 plasmawindowed com.github.loofi.aiusagemonitor`. If port 8080 is occupied, run the mock server with `--port 18080` and set `PLASMA_AI_MONITOR_DEMO_BASE_URL=http://127.0.0.1:18080`.
 
-**Supported providers:** Loofi Server, OpenAI, Azure OpenAI, AWS Bedrock, Anthropic (Claude), Google Gemini, Mistral AI, DeepSeek, Groq, xAI (Grok), Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo
+**Supported providers:** OpenAI, Azure OpenAI, AWS Bedrock, Anthropic (Claude), Google Gemini, Mistral AI, DeepSeek, Groq, xAI (Grok), Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo
 
 **Supported subscription tools:** Claude Code, OpenAI Codex CLI, GitHub Copilot, Cursor, Windsurf, JetBrains AI
 
 ## Features
 
 - **Real-time monitoring** — Periodic background polling with configurable per-provider refresh intervals (default 5 min) and manual refresh
-- **15 AI providers** — Loofi Server, OpenAI, Azure OpenAI, AWS Bedrock, Anthropic, Google Gemini, Mistral AI, DeepSeek, Groq, xAI/Grok, Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo
+- **14 AI providers** — OpenAI, Azure OpenAI, AWS Bedrock, Anthropic, Google Gemini, Mistral AI, DeepSeek, Groq, xAI/Grok, Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo
 - **Token usage tracking** — Input/output tokens used, requests made, quota/tier limits
-- **Cost tracking** — Dollar spending with daily and monthly cost breakdowns; automatic token-based cost estimation for providers without billing APIs (~30 models with pricing tables)
+- **Cost tracking** — Dollar spending with daily and monthly cost breakdowns; catalog-backed token and non-token cost estimation for providers without billing APIs
 - **Budget management** — Per-provider daily/monthly budgets with configurable warning thresholds and notifications when budgets are exceeded
 - **Usage history** — SQLite-backed persistence with configurable retention (7-365 days, default 90)
 - **Interactive charts** — Canvas-based line/area charts showing cost, tokens, requests, and rate limit trends over 24h/7d/30d
 - **Compare analytics mode** — Multi-series history comparison across providers or subscription tools with ranking, delta trends, compact legend chips, and hover crosshair/tooltip
 - **Analyst view** — Yearly heatmap, week-over-week spend, volatility, anomaly detection, and top driver/model ranking in one operator-focused tab
-- **Trust Center and provider diagnostics** — Auth/config health, endpoint visibility, refresh freshness, failure counts, cost-source quality, KWallet state, Browser Sync Labs readiness, and Provider Catalog freshness
+- **Trust Center and provider diagnostics** — Auth/config health, endpoint visibility, refresh freshness, failure counts, cost-source quality, KWallet state, Browser Sync Labs readiness, and provider/subscription catalog freshness
 - **Copyable reports** — Generate weekly or monthly Analyst summaries directly to the clipboard
 - **Trend summaries** — Total cost, average daily cost, peak usage, and snapshot counts per time range
 - **Rate limit visualization** — Progress bars with color-coded thresholds (green/yellow/red)
@@ -191,7 +191,7 @@ sudo dnf install just   # Fedora
 | `just build`              | Configure + build (Release)                                    |
 | `just build-debug`        | Configure + build (Debug, enables tests)                       |
 | `just test`               | Build debug + run unit tests via ctest                         |
-| `just check`              | Version consistency + no-hardcoded-versions checks             |
+| `just check`              | Version, catalog, hardcoded-pricing, and QML registration checks |
 | `just doctor`             | Validate install/build prerequisites                           |
 | `just doctor-fix`         | Validate and auto-install missing Fedora deps                  |
 | `just versions`           | Show repo / user-local / system installed versions             |
@@ -519,7 +519,7 @@ plasma-ai-usage-monitor/
 └── plugin/                         # C++ QML plugin
     ├── CMakeLists.txt
     ├── qmldir                      # QML module registration
-    ├── aiusageplugin.{h,cpp}       # QQmlExtensionPlugin (23 creatable/singleton types)
+    ├── aiusageplugin.{h,cpp}       # QQmlExtensionPlugin provider, catalog, tool, and integration types
     ├── appinfo.{h,cpp}             # App version singleton for QML (build-version source of truth)
     ├── secretsmanager.{h,cpp}      # KWallet wrapper
     ├── clipboardhelper.h            # Clipboard copy/paste helper
@@ -548,7 +548,7 @@ plasma-ai-usage-monitor/
 
 ### C++ Plugin
 
-The QML plugin (`com.github.loofi.aiusagemonitor`) provides 23 creatable/singleton types:
+The QML plugin (`com.github.loofi.aiusagemonitor`) provides provider, catalog, tool-monitor, and integration helper types:
 
 - **`AppInfo`** — QML singleton exposing the build version (`AppInfo.version`) so update checks and About pages stay in sync with CMake/package metadata.
 - **`SecretsManager`** — Wraps KWallet for secure API key storage. Uses wallet folder `"ai-usage-monitor"` with async open and a pending operations queue.
@@ -576,7 +576,7 @@ The QML plugin (`com.github.loofi.aiusagemonitor`) provides 23 creatable/singlet
 ### QML Frontend
 
 - **`main.qml`** — Instantiates provider backends and tool monitors, then delegates provider metadata, refresh scheduling, notification routing, and startup orchestration to focused helper components.
-- **`CompactRepresentation.qml`** — Panel icon with 3 display modes (icon with status badge, cost display, provider count), smooth animations, and screen reader accessibility
+- **`CompactRepresentation.qml`** — Panel icon with status badge, cost display, provider count, daily cost, remaining requests, and critical-provider modes
 - **`ProviderCatalog.qml`** — Central source of provider labels, config keys, refresh keys, notification keys, and budget mappings for the KCM and runtime helpers.
 - **`ProviderRegistry.qml`** — Builds `allProviders` and `allSubscriptionTools` from the shared catalog and current runtime backend/monitor instances.
 - **`NotificationController.qml`** — Owns KDE notification objects plus cooldown, DND, and provider/tool notification gating.

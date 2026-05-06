@@ -1,0 +1,16 @@
+{
+  "source": "browser_sync",
+  "schemaVersion": 1,
+  "syncedAt": "2026-05-06T12:00:00Z",
+  "quotaWindows": [
+    {
+      "kind": "rolling_5h",
+      "label": "5-hour session",
+      "unit": "percent",
+      "percentUsed": 42,
+      "resetAt": "2026-05-06T17:00:00Z",
+      "precision": "browser_sync_actual",
+      "source": "browser_sync"
+    }
+  ]
+}

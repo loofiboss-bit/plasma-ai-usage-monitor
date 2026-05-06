@@ -1,4 +1,5 @@
 #include "googleveoprovider.h"
+#include "providerpricingcatalog.h"
 #include <KLocalizedString>
 #include <QNetworkRequest>
 #include <QUrlQuery>
@@ -38,20 +39,13 @@ double extractDurationSeconds(const QJsonObject &payload)
 
 double modelCostPerSecond(const QString &model)
 {
-    return model.contains(QStringLiteral("veo-2")) ? 0.35 : 0.50;
+    return ProviderPricingCatalog::instance()->amountForModelUnit(QStringLiteral("googleveo"), model, QStringLiteral("video_second"));
 }
 } // namespace
 
 GoogleVeoProvider::GoogleVeoProvider(QObject *parent)
     : ProviderBackend(parent)
 {
-    // Veo pricing — per-video cost mapped to per-1M-token equivalents
-    // for the cost estimation framework.
-    // Veo 3: ~$0.50/sec generated video
-    // Veo 2: ~$0.35/sec generated video
-    // We register token-based placeholders; actual cost depends on video duration.
-    registerModelPricing(QStringLiteral("veo-3"), 50.0, 50.0);
-    registerModelPricing(QStringLiteral("veo-2"), 35.0, 35.0);
 }
 
 QString GoogleVeoProvider::model() const { return m_model; }
@@ -175,7 +169,6 @@ void GoogleVeoProvider::onModelInfoReply(QNetworkReply *reply)
                 setEstimatedCost(durationSeconds * modelCostPerSecond(m_model));
             } else {
                 setCost(0.0);
-                updateEstimatedCost(m_model);
                 setDailyCost(cost());
                 setMonthlyCost(cost());
             }

@@ -85,7 +85,7 @@ ColumnLayout {
                             let parts = [];
                             if (toolCard.monitor.limitReached) parts.push(i18n("Limit Reached"));
                             else parts.push(i18n("Active"));
-                            if (toolCard.monitor.planTier) parts.push(toolCard.monitor.planTier);
+                            if (toolCard.monitor.planTier) parts.push(toolCard.displayPlanTier());
                             return parts.join(" • ");
                         }
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -95,10 +95,10 @@ ColumnLayout {
                 }
 
                 RowLayout {
-                    visible: toolCard.collapsed && (toolCard.monitor?.usageLimit ?? 0) > 0
+                    visible: toolCard.collapsed && quotaStack.summaryText().length > 0
                     spacing: Kirigami.Units.smallSpacing
                     PlasmaComponents.Label {
-                        text: (toolCard.monitor?.usageCount ?? 0) + "/" + (toolCard.monitor?.usageLimit ?? 0)
+                        text: quotaStack.summaryText()
                         font.bold: true
                         color: Kirigami.Theme.textColor
                     }
@@ -120,46 +120,13 @@ ColumnLayout {
                 visible: !toolCard.collapsed && (toolCard.monitor?.installed ?? false)
             }
 
-            // Primary usage bar
-            ColumnLayout {
+            QuotaStack {
+                id: quotaStack
                 Layout.fillWidth: true
-                visible: !toolCard.collapsed && (toolCard.monitor?.installed ?? false) && (toolCard.monitor?.usageLimit ?? 0) > 0
-                spacing: 2
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    PlasmaComponents.Label {
-                        text: toolCard.monitor?.periodLabel ?? i18n("Usage")
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        opacity: 0.7
-                    }
-                    Item { Layout.fillWidth: true }
-                    PlasmaComponents.Label {
-                        text: (toolCard.monitor?.usageCount ?? 0) + " / " + (toolCard.monitor?.usageLimit ?? 0)
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        font.bold: true
-                    }
-                }
-
-                QQC2.ProgressBar {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 6
-                    from: 0; to: toolCard.monitor?.usageLimit ?? 1
-                    value: Math.min(toolCard.monitor?.usageCount ?? 0, toolCard.monitor?.usageLimit ?? 1)
-                    background: Rectangle { implicitHeight: 6; radius: 3; color: Qt.alpha(Kirigami.Theme.textColor, 0.1) }
-                    contentItem: Rectangle {
-                        width: parent.visualPosition * parent.width
-                        height: 6; radius: 3
-                        color: usageColor(toolCard.monitor?.percentUsed ?? 0)
-                        Behavior on width { NumberAnimation { duration: 300 } }
-                        Behavior on color { ColorAnimation { duration: 300 } }
-                    }
-                }
-                PlasmaComponents.Label {
-                    text: i18n("Resets in %1", toolCard.monitor?.timeUntilReset ?? "N/A")
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    opacity: 0.5
-                }
+                visible: (toolCard.monitor?.installed ?? false)
+                monitor: toolCard.monitor
+                accentColor: toolCard.toolColor
+                collapsed: toolCard.collapsed
             }
 
             // Organization metrics (Copilot)
@@ -226,5 +193,15 @@ ColumnLayout {
 
     signal syncRequested()
     function triggerSync() { syncRequested(); }
+    function displayPlanTier() {
+        if (!toolCard.monitor || !toolCard.monitor.planTier) return "";
+        var labels = toolCard.monitor.availablePlans ? toolCard.monitor.availablePlans() : [];
+        for (var i = 0; i < labels.length; i++) {
+            if (toolCard.monitor.planIdForLabel && toolCard.monitor.planIdForLabel(labels[i]) === toolCard.monitor.planTier) {
+                return labels[i];
+            }
+        }
+        return toolCard.monitor.planTier;
+    }
     function usageColor(percent) { return Utils.usageColor(percent, Kirigami.Theme); }
 }

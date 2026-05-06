@@ -20,22 +20,15 @@ PlasmoidItem {
             var provider = providers[i];
             if (provider.enabled && provider.backend && provider.backend.connected) {
                 var info = provider.name + ": ";
-                if (provider.configKey === "loofi") {
-                    info += (provider.backend.activeModel || i18n("No model")) + " | ";
-                    info += (provider.backend.trainingStage || i18n("idle")) + " | ";
-                    info += i18n("GPU %1%", Math.round(Math.max(0, provider.backend.gpuMemoryPct || 0))) + " | ";
-                    info += i18n("%1 req/24h", root.formatCompactMetric(provider.backend.requestCount || 0));
+                if (provider.backend.cost > 0) {
+                    info += "$" + provider.backend.cost.toFixed(2) + " | ";
+                }
+                if ((provider.backend.rateLimitRequestsRemaining || 0) > 0) {
+                    info += provider.backend.rateLimitRequestsRemaining + " req left";
+                } else if ((provider.backend.rateLimitTokensRemaining || 0) > 0) {
+                    info += provider.backend.rateLimitTokensRemaining + " tokens left";
                 } else {
-                    if (provider.backend.cost > 0) {
-                        info += "$" + provider.backend.cost.toFixed(2) + " | ";
-                    }
-                    if ((provider.backend.rateLimitRequestsRemaining || 0) > 0) {
-                        info += provider.backend.rateLimitRequestsRemaining + " req left";
-                    } else if ((provider.backend.rateLimitTokensRemaining || 0) > 0) {
-                        info += provider.backend.rateLimitTokensRemaining + " tokens left";
-                    } else {
-                        info += i18n("Healthy");
-                    }
+                    info += i18n("Healthy");
                 }
                 lines.push(info);
             } else if (provider.enabled && provider.backend && provider.backend.error) {
@@ -74,7 +67,6 @@ PlasmoidItem {
     property alias googleveo: googleveoBackend
     property alias azure: azureBackend
     property alias bedrock: bedrockBackend
-    property alias loofi: loofiBackend
     property alias usageDb: usageDatabase
 
     property alias claudeCode: claudeCodeMonitor
@@ -93,6 +85,17 @@ PlasmoidItem {
 
     function formatCompactMetric(value) {
         return providerRegistry.formatCompactMetric(value);
+    }
+
+    function selectedPlanTier(monitor, planId, legacyIndex) {
+        if (planId && planId.length > 0) {
+            return planId;
+        }
+        var plans = monitor.availablePlans();
+        if (legacyIndex >= 0 && legacyIndex < plans.length) {
+            return monitor.planIdForLabel(plans[legacyIndex]);
+        }
+        return plans.length > 0 ? monitor.planIdForLabel(plans[0]) : "";
     }
 
     function refreshAll() {
@@ -256,11 +259,6 @@ PlasmoidItem {
         budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
     }
 
-    LoofiServerProvider {
-        id: loofiBackend
-        customBaseUrl: plasmoid.configuration.loofiServerUrl
-    }
-
     BrowserCookieExtractor {
         id: browserCookies
         browserType: plasmoid.configuration.browserSyncBrowser
@@ -275,16 +273,12 @@ PlasmoidItem {
         Component.onCompleted: {
             checkToolInstalled();
             syncEnabled = Qt.binding(function() { return plasmoid.configuration.browserSyncEnabled; });
-            var plans = availablePlans();
-            var idx = plasmoid.configuration.claudeCodePlan;
-            if (idx >= 0 && idx < plans.length) {
-                planTier = plans[idx];
-                if (usageLimit === 0) {
-                    usageLimit = defaultLimitForPlan(plans[idx]);
-                }
-                if (hasSecondaryLimit) {
-                    secondaryUsageLimit = defaultSecondaryLimitForPlan(plans[idx]);
-                }
+            planTier = root.selectedPlanTier(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan);
+            if (usageLimit === 0) {
+                usageLimit = defaultLimitForPlan(planTier);
+            }
+            if (hasSecondaryLimit) {
+                secondaryUsageLimit = defaultSecondaryLimitForPlan(planTier);
             }
         }
     }
@@ -297,16 +291,12 @@ PlasmoidItem {
         Component.onCompleted: {
             checkToolInstalled();
             syncEnabled = Qt.binding(function() { return plasmoid.configuration.browserSyncEnabled; });
-            var plans = availablePlans();
-            var idx = plasmoid.configuration.codexPlan;
-            if (idx >= 0 && idx < plans.length) {
-                planTier = plans[idx];
-                if (usageLimit === 0) {
-                    usageLimit = defaultLimitForPlan(plans[idx]);
-                }
-                if (hasSecondaryLimit) {
-                    secondaryUsageLimit = defaultSecondaryLimitForPlan(plans[idx]);
-                }
+            planTier = root.selectedPlanTier(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan);
+            if (usageLimit === 0) {
+                usageLimit = defaultLimitForPlan(planTier);
+            }
+            if (hasSecondaryLimit) {
+                secondaryUsageLimit = defaultSecondaryLimitForPlan(planTier);
             }
         }
     }
@@ -316,18 +306,14 @@ PlasmoidItem {
         enabled: plasmoid.configuration.copilotEnabled
         usageLimit: plasmoid.configuration.copilotCustomLimit
         orgName: plasmoid.configuration.copilotOrgName
-        billingMode: plasmoid.configuration.copilotBillingMode || "premium_requests"
+        billingMode: plasmoid.configuration.copilotBillingMode || "auto"
         monthlyResetDay: plasmoid.configuration.copilotResetDay || 1
 
         Component.onCompleted: {
             checkToolInstalled();
-            var plans = availablePlans();
-            var idx = plasmoid.configuration.copilotPlan;
-            if (idx >= 0 && idx < plans.length) {
-                planTier = plans[idx];
-                if (usageLimit === 0) {
-                    usageLimit = defaultLimitForPlan(plans[idx]);
-                }
+            planTier = root.selectedPlanTier(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan);
+            if (usageLimit === 0) {
+                usageLimit = defaultLimitForPlan(planTier);
             }
             if (secrets.walletOpen && secrets.hasKey("copilot_github")) {
                 githubToken = secrets.getKey("copilot_github");
@@ -343,13 +329,9 @@ PlasmoidItem {
 
         Component.onCompleted: {
             checkToolInstalled();
-            var plans = availablePlans();
-            var idx = plasmoid.configuration.cursorPlan;
-            if (idx >= 0 && idx < plans.length) {
-                planTier = plans[idx];
-                if (usageLimit === 0) {
-                    usageLimit = defaultLimitForPlan(plans[idx]);
-                }
+            planTier = root.selectedPlanTier(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan);
+            if (usageLimit === 0) {
+                usageLimit = defaultLimitForPlan(planTier);
             }
         }
     }
@@ -361,13 +343,9 @@ PlasmoidItem {
 
         Component.onCompleted: {
             checkToolInstalled();
-            var plans = availablePlans();
-            var idx = plasmoid.configuration.windsurfPlan;
-            if (idx >= 0 && idx < plans.length) {
-                planTier = plans[idx];
-                if (usageLimit === 0) {
-                    usageLimit = defaultLimitForPlan(plans[idx]);
-                }
+            planTier = root.selectedPlanTier(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan);
+            if (usageLimit === 0) {
+                usageLimit = defaultLimitForPlan(planTier);
             }
         }
     }
@@ -379,13 +357,9 @@ PlasmoidItem {
 
         Component.onCompleted: {
             checkToolInstalled();
-            var plans = availablePlans();
-            var idx = plasmoid.configuration.jetbrainsAiPlan;
-            if (idx >= 0 && idx < plans.length) {
-                planTier = plans[idx];
-                if (usageLimit === 0) {
-                    usageLimit = defaultLimitForPlan(plans[idx]);
-                }
+            planTier = root.selectedPlanTier(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan);
+            if (usageLimit === 0) {
+                usageLimit = defaultLimitForPlan(planTier);
             }
         }
     }
@@ -421,7 +395,6 @@ PlasmoidItem {
         googleveoBackend: googleveoBackend
         azureBackend: azureBackend
         bedrockBackend: bedrockBackend
-        loofiBackend: loofiBackend
 
         claudeCodeMonitor: claudeCodeMonitor
         codexCliMonitor: codexCliMonitor

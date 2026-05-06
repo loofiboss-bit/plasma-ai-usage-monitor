@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "catalogVersion": "2026.05.06",
+  "release": "8.0.0",
+  "lastReviewed": "2026-05-06",
+  "runtimeScraping": false,
+  "tools": [
+    {
+      "key": "github-copilot",
+      "label": "GitHub Copilot",
+      "needsManualReview": false,
+      "sourceConflict": false,
+      "sourceRefs": [
+        {
+          "label": "GitHub Copilot billing",
+          "url": "https://docs.github.com/en/copilot/reference/copilot-billing/models-and-pricing",
+          "reviewedAt": "2026-05-06"
+        }
+      ],
+      "plans": [
+        {
+          "id": "free",
+          "label": "Free",
+          "price": {
+            "amount": 0,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": []
+        }
+      ],
+      "billingModes": [
+        {
+          "id": "ai_credits_usage_based",
+          "validFrom": "2026-06-01",
+          "quotaWindows": [
+            {
+              "kind": "ai_credits",
+              "label": "GitHub AI Credits",
+              "unit": "credits",
+              "creditUsdValue": 0.01,
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -8,6 +8,7 @@
 #include <QNetworkRequest>
 #include <QDirIterator>
 #include <QDebug>
+#include <QDate>
 
 CopilotMonitor::CopilotMonitor(QObject *parent)
     : LocalActivityMonitorBase(parent)
@@ -101,26 +102,65 @@ QString CopilotMonitor::billingMode() const
     return m_billingMode;
 }
 
+static QString normalizedCopilotBillingMode(const QString &mode)
+{
+    const QString normalized = mode.trimmed().toLower();
+    if (normalized.isEmpty()
+        || normalized == QLatin1String("auto")) {
+        return QStringLiteral("auto");
+    }
+    if (normalized == QLatin1String("premium_requests")
+        || normalized == QLatin1String("premium_requests_legacy")) {
+        return QStringLiteral("premium_requests_legacy");
+    }
+    if (normalized == QLatin1String("usage_based")
+        || normalized == QLatin1String("credits")
+        || normalized == QLatin1String("ai_credits_usage_based")) {
+        return QStringLiteral("ai_credits_usage_based");
+    }
+    return QStringLiteral("auto");
+}
+
 void CopilotMonitor::setBillingMode(const QString &mode)
 {
-    const QString normalized = mode.trimmed().isEmpty()
-        ? QStringLiteral("premium_requests")
-        : mode.trimmed();
+    const QString normalized = normalizedCopilotBillingMode(mode);
     if (m_billingMode != normalized) {
         m_billingMode = normalized;
         Q_EMIT billingModeChanged();
+        Q_EMIT usageUpdated();
     }
+}
+
+QString CopilotMonitor::effectiveBillingMode() const
+{
+    return billingModeForDate(QDate::currentDate().toString(Qt::ISODate));
+}
+
+QString CopilotMonitor::billingModeForDate(const QString &isoDate) const
+{
+    const QString normalized = normalizedCopilotBillingMode(m_billingMode);
+    if (normalized != QLatin1String("auto")) {
+        return normalized;
+    }
+
+    const QDate date = QDate::fromString(isoDate, Qt::ISODate);
+    const QDate transitionDate(2026, 6, 1);
+    if (!date.isValid() || date < transitionDate) {
+        return QStringLiteral("premium_requests_legacy");
+    }
+    return QStringLiteral("ai_credits_usage_based");
 }
 
 QString CopilotMonitor::usageSourceLabel() const
 {
-    if (m_billingMode == QStringLiteral("usage_based")) {
-        return QStringLiteral("Usage-based billing mode: local activity is an estimate unless GitHub org metrics are configured.");
+    const QString effective = effectiveBillingMode();
+    if (effective == QStringLiteral("ai_credits_usage_based")) {
+        return QStringLiteral("AI credits mode: local activity is self-tracked unless GitHub org metrics are configured.");
     }
-    if (m_billingMode == QStringLiteral("credits")) {
-        return QStringLiteral("Credits mode: local activity is self-tracked and does not claim exact billing credits.");
+    if (m_billingMode == QStringLiteral("auto")) {
+        return QStringLiteral("Auto mode: premium request tracking is used before the 2026-06-01 AI credits transition.");
     }
-    return QStringLiteral("Premium request mode: local activity is self-tracked against plan assumptions.");
+    return QStringLiteral("Premium request mode: local activity is self-tracked unless GitHub org metrics are configured.");
 }
 
 bool CopilotMonitor::hasOrgMetrics() const { return m_hasOrgMetrics; }
@@ -189,24 +229,12 @@ void CopilotMonitor::onBillingReply(QNetworkReply *reply)
 
 QStringList CopilotMonitor::availablePlans() const
 {
-    return {
-        QStringLiteral("Free"),
-        QStringLiteral("Pro"),
-        QStringLiteral("Pro+"),
-        QStringLiteral("Business"),
-        QStringLiteral("Enterprise")
-    };
+    return catalogPlanLabels();
 }
 
 int CopilotMonitor::defaultLimitForPlan(const QString &plan) const
 {
-    // Monthly premium request limits
-    if (plan == QStringLiteral("Free")) return 50;
-    if (plan == QStringLiteral("Pro")) return 300;
-    if (plan == QStringLiteral("Pro+")) return 1500;
-    if (plan == QStringLiteral("Business")) return 300;
-    if (plan == QStringLiteral("Enterprise")) return 1000;
-    return 50;
+    return catalogDefaultLimitForPlan(plan);
 }
 
 double CopilotMonitor::subscriptionCost() const
@@ -216,10 +244,5 @@ double CopilotMonitor::subscriptionCost() const
 
 double CopilotMonitor::defaultCostForPlan(const QString &plan) const
 {
-    if (plan == QStringLiteral("Free")) return 0.0;
-    if (plan == QStringLiteral("Pro")) return 10.0;
-    if (plan == QStringLiteral("Pro+")) return 39.0;
-    if (plan == QStringLiteral("Business")) return 19.0;
-    if (plan == QStringLiteral("Enterprise")) return 39.0;
-    return 0.0;
+    return catalogDefaultCostForPlan(plan);
 }

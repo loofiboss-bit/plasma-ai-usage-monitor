@@ -2,7 +2,14 @@ set(TEST_USAGE_DB_SRC
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
 )
 
+set(TEST_CATALOG_SRC
+    ${CMAKE_SOURCE_DIR}/plugin/catalogloader.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/providerpricingcatalog.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/subscriptionplancatalog.cpp
+)
+
 set(TEST_PROVIDER_SRC
+    ${TEST_CATALOG_SRC}
     ${CMAKE_SOURCE_DIR}/plugin/providerbackend.cpp
     ${CMAKE_SOURCE_DIR}/plugin/openaicompatibleprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/openaiprovider.cpp
@@ -13,7 +20,6 @@ set(TEST_PROVIDER_SRC
     ${CMAKE_SOURCE_DIR}/plugin/googleprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/googleveoprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/groqprovider.cpp
-    ${CMAKE_SOURCE_DIR}/plugin/loofiserverprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/mistralprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/ollamacloudprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/openrouterprovider.cpp
@@ -22,6 +28,7 @@ set(TEST_PROVIDER_SRC
 )
 
 set(TEST_SUBSCRIPTION_SRC
+    ${TEST_CATALOG_SRC}
     ${CMAKE_SOURCE_DIR}/plugin/subscriptiontoolbackend.cpp
     ${CMAKE_SOURCE_DIR}/plugin/localactivitymonitorbase.cpp
     ${CMAKE_SOURCE_DIR}/plugin/claudecodemonitor.cpp
@@ -33,10 +40,12 @@ set(TEST_SUBSCRIPTION_SRC
 )
 
 set(TEST_PROVIDER_BACKEND_ONLY_SRC
+    ${TEST_CATALOG_SRC}
     ${CMAKE_SOURCE_DIR}/plugin/providerbackend.cpp
 )
 
 set(TEST_SUBTOOL_ONLY_SRC
+    ${TEST_CATALOG_SRC}
     ${CMAKE_SOURCE_DIR}/plugin/subscriptiontoolbackend.cpp
     ${CMAKE_SOURCE_DIR}/plugin/localactivitymonitorbase.cpp
 )
@@ -148,6 +157,22 @@ target_link_libraries(test_subscriptiontoolbackend
 
 add_test(NAME subscriptiontoolbackend COMMAND test_subscriptiontoolbackend)
 
+# --- Catalog loader tests ---
+add_executable(test_catalogs
+    test_catalogs.cpp
+    ${TEST_CATALOG_SRC}
+)
+
+target_include_directories(test_catalogs
+    PRIVATE ${CMAKE_SOURCE_DIR}/plugin
+)
+
+target_link_libraries(test_catalogs
+    PRIVATE Qt6::Core Qt6::Test
+)
+
+add_test(NAME catalogs COMMAND test_catalogs)
+
 # --- Local integrations / signer tests ---
 add_executable(test_local_integrations
     test_local_integrations.cpp
@@ -216,3 +241,5 @@ add_test(NAME usagedatabase_analyst COMMAND test_usagedatabase_analyst)
 add_test(NAME version_consistency COMMAND ${CMAKE_SOURCE_DIR}/scripts/check_version_consistency.sh)
 add_test(NAME no_hardcoded_versions COMMAND ${CMAKE_SOURCE_DIR}/scripts/check_no_hardcoded_versions.sh)
 add_test(NAME provider_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_provider_catalog.py)
+add_test(NAME subscription_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_subscription_catalog.py)
+add_test(NAME no_hardcoded_pricing COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_no_hardcoded_pricing.py)

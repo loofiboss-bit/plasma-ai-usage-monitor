@@ -1,6 +1,9 @@
 set(aiusagemonitor_SRCS
     aiusageplugin.cpp
     appinfo.cpp
+    catalogloader.cpp
+    providerpricingcatalog.cpp
+    subscriptionplancatalog.cpp
     secretsmanager.cpp
     providerbackend.cpp
     openaicompatibleprovider.cpp
@@ -28,7 +31,6 @@ set(aiusagemonitor_SRCS
     windsurfmonitor.cpp
     jetbrainsaimonitor.cpp
     browsercookieextractor.cpp
-    loofiserverprovider.cpp
     awssigv4signer.cpp
     bedrockprovider.cpp
     localmetricsserver.cpp
@@ -38,6 +40,9 @@ set(aiusagemonitor_SRCS
 set(aiusagemonitor_HDRS
     aiusageplugin.h
     appinfo.h
+    catalogloader.h
+    providerpricingcatalog.h
+    subscriptionplancatalog.h
     secretsmanager.h
     providerbackend.h
     openaicompatibleprovider.h
@@ -66,7 +71,6 @@ set(aiusagemonitor_HDRS
     windsurfmonitor.h
     jetbrainsaimonitor.h
     browsercookieextractor.h
-    loofiserverprovider.h
     awssigv4signer.h
     bedrockprovider.h
     localmetricsserver.h

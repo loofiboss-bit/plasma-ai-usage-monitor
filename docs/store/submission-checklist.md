@@ -18,7 +18,7 @@ Prepare the same assets for the manual GitHub release pack:
 - `com.github.loofi.aiusagemonitor.plasmoid`
 - updated README screenshots
 - changelog section for the release
-- release notes that call out the stabilization, demo workflow, and screenshot refresh
+- release notes that call out the source-backed catalogs, quota-window UI, and public-provider packaging model
 - confirm the COPR package still points at GitHub SCM on `main` with auto-rebuild enabled
 
 ## KDE Store listing notes
@@ -33,7 +33,7 @@ Native KDE Plasma widget for monitoring AI provider usage, costs, limits, and su
 
 - multi-provider AI cost and rate-limit visibility without a proxy or SaaS gateway
 - local history, export, compare analytics, budgets, and notifications
-- subscription-tool tracking for Claude Code, Codex CLI, and GitHub Copilot
+- subscription-tool tracking for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI
 - privacy-conscious local workflow with secure key storage in KWallet
 
 ## Screenshot inventory

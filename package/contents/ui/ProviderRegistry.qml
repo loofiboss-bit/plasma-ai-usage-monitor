@@ -20,7 +20,6 @@ QtObject {
     required property var googleveoBackend
     required property var azureBackend
     required property var bedrockBackend
-    required property var loofiBackend
 
     required property var claudeCodeMonitor
     required property var codexCliMonitor
@@ -34,8 +33,6 @@ QtObject {
 
     function backendForConfigKey(configKey) {
         switch (configKey) {
-        case "loofi":
-            return loofiBackend;
         case "openai":
             return openaiBackend;
         case "anthropic":
@@ -75,8 +72,6 @@ QtObject {
         }
 
         switch (configKey) {
-        case "loofi":
-            return configuration.loofiEnabled;
         case "openai":
             return configuration.openaiEnabled;
         case "anthropic":
@@ -112,8 +107,6 @@ QtObject {
 
     function providerRefreshInterval(configKey) {
         switch (configKey) {
-        case "loofi":
-            return configuration.loofiRefreshInterval;
         case "openai":
             return configuration.openaiRefreshInterval;
         case "anthropic":
@@ -149,8 +142,6 @@ QtObject {
 
     function providerNotificationsEnabled(configKey) {
         switch (configKey) {
-        case "loofi":
-            return configuration.loofiNotificationsEnabled;
         case "openai":
             return configuration.openaiNotificationsEnabled;
         case "anthropic":

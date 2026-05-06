@@ -23,20 +23,23 @@ KCM.SimpleKCM {
     // ── Claude Code ──
     property alias cfg_claudeCodeEnabled: claudeCodeSwitch.checked
     property alias cfg_claudeCodePlan: claudeCodePlanCombo.currentIndex
+    property string cfg_claudeCodePlanId: plasmoid.configuration.claudeCodePlanId || "pro"
     property alias cfg_claudeCodeCustomLimit: claudeCodeLimitSpin.value
     property alias cfg_claudeCodeNotifications: claudeCodeNotifySwitch.checked
 
     // ── Codex CLI ──
     property alias cfg_codexEnabled: codexSwitch.checked
     property alias cfg_codexPlan: codexPlanCombo.currentIndex
+    property string cfg_codexPlanId: plasmoid.configuration.codexPlanId || "plus"
     property alias cfg_codexCustomLimit: codexLimitSpin.value
     property alias cfg_codexNotifications: codexNotifySwitch.checked
 
     // ── GitHub Copilot ──
     property alias cfg_copilotEnabled: copilotSwitch.checked
     property alias cfg_copilotPlan: copilotPlanCombo.currentIndex
+    property string cfg_copilotPlanId: plasmoid.configuration.copilotPlanId || "free"
     property alias cfg_copilotCustomLimit: copilotLimitSpin.value
-    property string cfg_copilotBillingMode: plasmoid.configuration.copilotBillingMode || "premium_requests"
+    property string cfg_copilotBillingMode: normalizeCopilotBillingMode(plasmoid.configuration.copilotBillingMode || "auto")
     property alias cfg_copilotResetDay: copilotResetDaySpin.value
     property alias cfg_copilotNotifications: copilotNotifySwitch.checked
     property alias cfg_copilotOrgName: copilotOrgField.text
@@ -44,18 +47,21 @@ KCM.SimpleKCM {
     // ── Cursor ──
     property alias cfg_cursorEnabled: cursorSwitch.checked
     property alias cfg_cursorPlan: cursorPlanCombo.currentIndex
+    property string cfg_cursorPlanId: plasmoid.configuration.cursorPlanId || "pro"
     property alias cfg_cursorCustomLimit: cursorLimitSpin.value
     property alias cfg_cursorNotifications: cursorNotifySwitch.checked
 
     // ── Windsurf ──
     property alias cfg_windsurfEnabled: windsurfSwitch.checked
     property alias cfg_windsurfPlan: windsurfPlanCombo.currentIndex
+    property string cfg_windsurfPlanId: plasmoid.configuration.windsurfPlanId || "pro"
     property alias cfg_windsurfCustomLimit: windsurfLimitSpin.value
     property alias cfg_windsurfNotifications: windsurfNotifySwitch.checked
 
     // ── JetBrains AI ──
     property alias cfg_jetbrainsAiEnabled: jetbrainsAiSwitch.checked
     property alias cfg_jetbrainsAiPlan: jetbrainsAiPlanCombo.currentIndex
+    property string cfg_jetbrainsAiPlanId: plasmoid.configuration.jetbrainsAiPlanId || "ai_free"
     property alias cfg_jetbrainsAiCustomLimit: jetbrainsAiLimitSpin.value
     property alias cfg_jetbrainsAiNotifications: jetbrainsAiNotifySwitch.checked
 
@@ -66,6 +72,13 @@ KCM.SimpleKCM {
         if (code === "not_found") return "cookies_not_found";
         if (code === "expired") return "session_missing_or_expired";
         return code;
+    }
+
+    function normalizeCopilotBillingMode(mode) {
+        if (!mode || mode === "auto") return "auto";
+        if (mode === "premium_requests" || mode === "premium_requests_legacy") return "premium_requests_legacy";
+        if (mode === "usage_based" || mode === "credits" || mode === "ai_credits_usage_based") return "ai_credits_usage_based";
+        return "auto";
     }
 
     function syncStatusColor(code) {
@@ -84,6 +97,31 @@ KCM.SimpleKCM {
         if (normalized === "session_missing_or_expired") return i18n("Log in to %1 again in Firefox, then retry.", serviceLabel);
         if (normalized === "unsupported_browser") return i18n("The selected browser profile is not supported for sync.");
         return i18n("Check your browser session and retry.");
+    }
+
+    function planIndexFor(detector, planId, legacyIndex) {
+        var plans = detector.availablePlans();
+        if (planId && detector.planIdForLabel) {
+            for (var i = 0; i < plans.length; i++) {
+                if (detector.planIdForLabel(plans[i]) === planId) {
+                    return i;
+                }
+            }
+        }
+        if (legacyIndex >= 0 && legacyIndex < plans.length) {
+            return legacyIndex;
+        }
+        return 0;
+    }
+
+    function persistPlanId(detector, combo, cfgProperty, configKey) {
+        var plans = detector.availablePlans();
+        if (combo.currentIndex < 0 || combo.currentIndex >= plans.length) {
+            return;
+        }
+        var id = detector.planIdForLabel(plans[combo.currentIndex]);
+        subscriptionsPage[cfgProperty] = id;
+        plasmoid.configuration[configKey] = id;
     }
 
     function reloadBrowserProfiles() {
@@ -259,7 +297,8 @@ KCM.SimpleKCM {
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
             model: claudeDetector.availablePlans()
-            currentIndex: plasmoid.configuration.claudeCodePlan
+            currentIndex: subscriptionsPage.planIndexFor(claudeDetector, subscriptionsPage.cfg_claudeCodePlanId, plasmoid.configuration.claudeCodePlan)
+            onActivated: subscriptionsPage.persistPlanId(claudeDetector, claudeCodePlanCombo, "cfg_claudeCodePlanId", "claudeCodePlanId")
             onCurrentIndexChanged: {
                 // Auto-fill default limit when plan changes
                 var plans = claudeDetector.availablePlans();
@@ -360,7 +399,8 @@ KCM.SimpleKCM {
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
             model: codexDetector.availablePlans()
-            currentIndex: plasmoid.configuration.codexPlan
+            currentIndex: subscriptionsPage.planIndexFor(codexDetector, subscriptionsPage.cfg_codexPlanId, plasmoid.configuration.codexPlan)
+            onActivated: subscriptionsPage.persistPlanId(codexDetector, codexPlanCombo, "cfg_codexPlanId", "codexPlanId")
             onCurrentIndexChanged: {
                 var plans = codexDetector.availablePlans();
                 if (currentIndex >= 0 && currentIndex < plans.length) {
@@ -449,7 +489,8 @@ KCM.SimpleKCM {
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
             model: copilotDetector.availablePlans()
-            currentIndex: plasmoid.configuration.copilotPlan
+            currentIndex: subscriptionsPage.planIndexFor(copilotDetector, subscriptionsPage.cfg_copilotPlanId, plasmoid.configuration.copilotPlan)
+            onActivated: subscriptionsPage.persistPlanId(copilotDetector, copilotPlanCombo, "cfg_copilotPlanId", "copilotPlanId")
             onCurrentIndexChanged: {
                 var plans = copilotDetector.availablePlans();
                 if (currentIndex >= 0 && currentIndex < plans.length) {
@@ -501,9 +542,9 @@ KCM.SimpleKCM {
             textRole: "text"
             valueRole: "value"
             model: [
-                { text: i18n("Premium requests"), value: "premium_requests" },
-                { text: i18n("Usage-based billing"), value: "usage_based" },
-                { text: i18n("Credits"), value: "credits" }
+                { text: i18n("Auto"), value: "auto" },
+                { text: i18n("Premium requests legacy"), value: "premium_requests_legacy" },
+                { text: i18n("AI credits usage-based"), value: "ai_credits_usage_based" }
             ]
             Component.onCompleted: {
                 for (var i = 0; i < model.length; i++) {
@@ -516,6 +557,7 @@ KCM.SimpleKCM {
             }
             onActivated: {
                 subscriptionsPage.cfg_copilotBillingMode = currentValue;
+                plasmoid.configuration.copilotBillingMode = currentValue;
             }
         }
 
@@ -535,13 +577,13 @@ KCM.SimpleKCM {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
             text: {
-                if (subscriptionsPage.cfg_copilotBillingMode === "usage_based") {
-                    return i18n("Usage-based billing mode keeps local activity estimates separate from exact GitHub billing data.");
+                if (subscriptionsPage.cfg_copilotBillingMode === "ai_credits_usage_based") {
+                    return i18n("AI credits mode keeps local activity estimates separate from exact GitHub billing data.");
                 }
-                if (subscriptionsPage.cfg_copilotBillingMode === "credits") {
-                    return i18n("Credits mode tracks local activity against your configured assumptions and does not claim exact credit balances.");
+                if (subscriptionsPage.cfg_copilotBillingMode === "auto") {
+                    return i18n("Auto switches from premium requests to AI credits on the GitHub transition date.");
                 }
-                return i18n("Premium request mode keeps the legacy monthly request counter and configurable reset day.");
+                return i18n("Premium request legacy mode keeps the monthly request counter and configurable reset day.");
             }
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
@@ -649,7 +691,8 @@ KCM.SimpleKCM {
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
             model: cursorDetector.availablePlans()
-            currentIndex: plasmoid.configuration.cursorPlan
+            currentIndex: subscriptionsPage.planIndexFor(cursorDetector, subscriptionsPage.cfg_cursorPlanId, plasmoid.configuration.cursorPlan)
+            onActivated: subscriptionsPage.persistPlanId(cursorDetector, cursorPlanCombo, "cfg_cursorPlanId", "cursorPlanId")
         }
 
         QQC2.SpinBox {
@@ -705,7 +748,8 @@ KCM.SimpleKCM {
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
             model: windsurfDetector.availablePlans()
-            currentIndex: plasmoid.configuration.windsurfPlan
+            currentIndex: subscriptionsPage.planIndexFor(windsurfDetector, subscriptionsPage.cfg_windsurfPlanId, plasmoid.configuration.windsurfPlan)
+            onActivated: subscriptionsPage.persistPlanId(windsurfDetector, windsurfPlanCombo, "cfg_windsurfPlanId", "windsurfPlanId")
         }
 
         QQC2.SpinBox {
@@ -761,7 +805,8 @@ KCM.SimpleKCM {
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
             model: jetbrainsAiDetector.availablePlans()
-            currentIndex: plasmoid.configuration.jetbrainsAiPlan
+            currentIndex: subscriptionsPage.planIndexFor(jetbrainsAiDetector, subscriptionsPage.cfg_jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan)
+            onActivated: subscriptionsPage.persistPlanId(jetbrainsAiDetector, jetbrainsAiPlanCombo, "cfg_jetbrainsAiPlanId", "jetbrainsAiPlanId")
         }
 
         QQC2.SpinBox {

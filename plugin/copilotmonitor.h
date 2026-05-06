@@ -15,12 +15,7 @@
  * Optionally, if the user provides a GitHub PAT with appropriate scopes,
  * the monitor can query the GitHub REST API for organization-level metrics.
  *
- * Plans and monthly premium request limits:
- * - Free:       50 premium requests/month
- * - Pro ($10/mo):   300 premium requests/month
- * - Pro+ ($39/mo):  1500 premium requests/month
- * - Business ($19/user/mo): 300 premium requests/user/month
- * - Enterprise ($39/user/mo): 1000 premium requests/user/month
+ * Pricing, premium request, and AI credit mode metadata live in subscriptions-v1.json.
  */
 class CopilotMonitor : public LocalActivityMonitorBase
 {
@@ -65,6 +60,8 @@ public:
     void setOrgName(const QString &name);
     QString billingMode() const;
     void setBillingMode(const QString &mode);
+    Q_INVOKABLE QString effectiveBillingMode() const;
+    Q_INVOKABLE QString billingModeForDate(const QString &isoDate) const;
     QString usageSourceLabel() const;
     bool hasOrgMetrics() const;
     int orgActiveUsers() const;
@@ -80,6 +77,8 @@ Q_SIGNALS:
 
 protected:
     UsagePeriod primaryPeriodType() const override { return Monthly; }
+    QString catalogToolKey() const override { return QStringLiteral("github-copilot"); }
+    QString catalogBillingMode() const override { return effectiveBillingMode(); }
 
 private Q_SLOTS:
     void onBillingReply(QNetworkReply *reply);
@@ -87,7 +86,7 @@ private Q_SLOTS:
 private:
     QString m_githubToken;
     QString m_orgName;
-    QString m_billingMode = QStringLiteral("premium_requests");
+    QString m_billingMode = QStringLiteral("auto");
     bool m_loggedDetectionFallback = false;
 
     bool m_hasOrgMetrics = false;

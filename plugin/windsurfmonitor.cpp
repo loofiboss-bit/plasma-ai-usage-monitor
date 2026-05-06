@@ -13,22 +13,17 @@ WindsurfMonitor::WindsurfMonitor(QObject *parent)
 
 QStringList WindsurfMonitor::availablePlans() const
 {
-    return {
-        QStringLiteral("Pro"),
-        QStringLiteral("Teams")
-    };
+    return catalogPlanLabels();
 }
 
 int WindsurfMonitor::defaultLimitForPlan(const QString &plan) const
 {
-    if (plan == QStringLiteral("Teams")) return 2000;
-    return 500;
+    return catalogDefaultLimitForPlan(plan);
 }
 
 double WindsurfMonitor::defaultCostForPlan(const QString &plan) const
 {
-    if (plan == QStringLiteral("Teams")) return 30.0;
-    return 15.0;
+    return catalogDefaultCostForPlan(plan);
 }
 
 double WindsurfMonitor::subscriptionCost() const

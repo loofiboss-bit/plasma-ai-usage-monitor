@@ -13,7 +13,7 @@ Item {
     property int currentStep: 0
     // 0: Welcome
     // 1: Choose Path (Recommended / Custom)
-    // 2: Provider Setup (OpenAI/Anthropic/Google/OpenRouter/Bedrock/Loofi)
+    // 2: Provider Setup (OpenAI/Anthropic/Google/OpenRouter/Bedrock)
     // 3: Subscription Setup (Claude Code/Codex CLI/Copilot)
     // 4: Completion
 

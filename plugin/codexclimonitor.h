@@ -16,12 +16,7 @@
  * 4. Lets users set their plan tier to auto-fill limits
  * 5. (Optional) Syncs from browser cookies to get real-time data
  *
- * Plans and approximate limits (5-hour window):
- * - Plus ($20/mo):    45–225 local messages, 10–60 cloud tasks
- * - Pro ($200/mo):    300–1500 local messages, 50–400 cloud tasks
- * - Business ($30/user/mo): 45–225 local messages
- *
- * Ranges depend on task complexity. We use the lower bound as default.
+ * Pricing and quota presets live in subscriptions-v1.json.
  *
  * Browser sync fetches from ChatGPT internal API:
  * - 5-hour usage limit (primary)
@@ -67,6 +62,7 @@ public:
 protected:
     UsagePeriod primaryPeriodType() const override { return FiveHour; }
     UsagePeriod secondaryPeriodType() const override { return Weekly; }
+    QString catalogToolKey() const override { return QStringLiteral("codex-cli"); }
 
 private:
     QString codexConfigDir() const;

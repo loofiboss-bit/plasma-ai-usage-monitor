@@ -38,7 +38,6 @@ KCM.SimpleKCM {
                 anthropicModel: plasmoid.configuration.anthropicModel,
                 googleEnabled: plasmoid.configuration.googleEnabled,
                 googleModel: plasmoid.configuration.googleModel,
-                loofiEnabled: plasmoid.configuration.loofiEnabled,
                 ollamaEnabled: plasmoid.configuration.ollamaEnabled
             };
             var jsonStr = JSON.stringify(configData, null, 2);
@@ -66,7 +65,6 @@ KCM.SimpleKCM {
                     if (configData.anthropicModel !== undefined) plasmoid.configuration.anthropicModel = configData.anthropicModel;
                     if (configData.googleEnabled !== undefined) plasmoid.configuration.googleEnabled = configData.googleEnabled;
                     if (configData.googleModel !== undefined) plasmoid.configuration.googleModel = configData.googleModel;
-                    if (configData.loofiEnabled !== undefined) plasmoid.configuration.loofiEnabled = configData.loofiEnabled;
                     if (configData.ollamaEnabled !== undefined) plasmoid.configuration.ollamaEnabled = configData.ollamaEnabled;
                 } catch (e) {
                     console.error("Failed to parse imported config:", e);
@@ -118,22 +116,9 @@ KCM.SimpleKCM {
             Layout.fillWidth: true
         }
 
-        RowLayout {
-            Kirigami.FormData.label: i18n("Catalog:")
-            spacing: Kirigami.Units.smallSpacing
-
-            Kirigami.Icon {
-                source: providerCatalog.runtimeScraping ? "dialog-warning" : "dialog-ok"
-                Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                color: providerCatalog.runtimeScraping ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.positiveTextColor
-            }
-
-            QQC2.Label {
-                Layout.fillWidth: true
-                text: i18n("Provider Catalog v%1, reviewed %2, static local metadata", providerCatalog.schemaVersion, providerCatalog.lastReviewed)
-                wrapMode: Text.WordWrap
-            }
+        CatalogTrustPanel {
+            Kirigami.FormData.label: i18n("Catalogs:")
+            Layout.fillWidth: true
         }
 
         QQC2.Label {
@@ -300,7 +285,7 @@ KCM.SimpleKCM {
 
     function enabledProviderCount() {
         var keys = [
-            "loofiEnabled", "openaiEnabled", "anthropicEnabled", "googleEnabled",
+            "openaiEnabled", "anthropicEnabled", "googleEnabled",
             "mistralEnabled", "deepseekEnabled", "groqEnabled", "xaiEnabled",
             "ollamaEnabled", "openrouterEnabled", "togetherEnabled", "cohereEnabled",
             "googleveoEnabled", "azureEnabled", "bedrockEnabled"

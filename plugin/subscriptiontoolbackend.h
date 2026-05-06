@@ -3,9 +3,11 @@
 
 #include <QObject>
 #include <QString>
+#include <QStringList>
 #include <QDateTime>
 #include <QTimer>
 #include <QJsonObject>
+#include <QVariantList>
 
 class QNetworkAccessManager;
 class QNetworkReply;
@@ -52,6 +54,7 @@ class SubscriptionToolBackend : public QObject
     Q_PROPERTY(bool secondaryLimitReached READ isSecondaryLimitReached NOTIFY usageUpdated)
     Q_PROPERTY(QString secondaryPeriodLabel READ secondaryPeriodLabel CONSTANT)
     Q_PROPERTY(bool hasSecondaryLimit READ hasSecondaryLimit CONSTANT)
+    Q_PROPERTY(QVariantList quotaWindows READ quotaWindows NOTIFY quotaWindowsChanged)
 
     // Time tracking
     Q_PROPERTY(QDateTime periodStart READ periodStart NOTIFY usageUpdated)
@@ -78,7 +81,7 @@ class SubscriptionToolBackend : public QObject
 
     // Subscription cost
     Q_PROPERTY(double subscriptionCost READ subscriptionCost NOTIFY usageUpdated)
-    Q_PROPERTY(bool hasSubscriptionCost READ hasSubscriptionCost CONSTANT)
+    Q_PROPERTY(bool hasSubscriptionCost READ hasSubscriptionCost NOTIFY usageUpdated)
 
     // Browser sync
     Q_PROPERTY(bool syncEnabled READ isSyncEnabled WRITE setSyncEnabled NOTIFY syncEnabledChanged)
@@ -87,14 +90,14 @@ class SubscriptionToolBackend : public QObject
     Q_PROPERTY(bool syncing READ isSyncing NOTIFY syncStatusChanged)
 
     // Tertiary usage (e.g., Codex code‐review cap)
-    Q_PROPERTY(bool hasTertiaryLimit READ hasTertiaryLimit CONSTANT)
+    Q_PROPERTY(bool hasTertiaryLimit READ hasTertiaryLimit NOTIFY usageUpdated)
     Q_PROPERTY(QString tertiaryPeriodLabel READ tertiaryPeriodLabel CONSTANT)
     Q_PROPERTY(double tertiaryPercentRemaining READ tertiaryPercentRemaining NOTIFY usageUpdated)
     Q_PROPERTY(QDateTime tertiaryResetDate READ tertiaryResetDate NOTIFY usageUpdated)
 
     // Credits (e.g., Codex remaining credits)
     Q_PROPERTY(int remainingCredits READ remainingCredits NOTIFY usageUpdated)
-    Q_PROPERTY(bool hasCredits READ hasCredits CONSTANT)
+    Q_PROPERTY(bool hasCredits READ hasCredits NOTIFY usageUpdated)
 
 public:
     enum UsagePeriod {
@@ -184,6 +187,8 @@ public:
     virtual bool hasCredits() const;
     int remainingCredits() const;
 
+    QVariantList quotaWindows() const;
+
     // Actions
     Q_INVOKABLE void incrementUsage();
     Q_INVOKABLE void resetUsage();
@@ -196,6 +201,7 @@ public:
     Q_INVOKABLE virtual int defaultLimitForPlan(const QString &plan) const = 0;
     Q_INVOKABLE virtual int defaultSecondaryLimitForPlan(const QString &plan) const;
     Q_INVOKABLE virtual double defaultCostForPlan(const QString &plan) const;
+    Q_INVOKABLE QString planIdForLabel(const QString &planLabelOrId) const;
 
 Q_SIGNALS:
     void enabledChanged();
@@ -207,6 +213,7 @@ Q_SIGNALS:
     void syncStatusChanged();
     void syncCompleted(bool success, const QString &message);
     void syncDiagnostic(const QString &toolName, const QString &code, const QString &message);
+    void quotaWindowsChanged();
     void limitWarning(const QString &tool, int percentUsed);
     void usageLimitReached(const QString &tool);
     void activityDetected(const QString &tool);
@@ -238,6 +245,12 @@ protected:
     // Period management
     virtual UsagePeriod primaryPeriodType() const = 0;
     virtual UsagePeriod secondaryPeriodType() const;
+    virtual QString catalogToolKey() const;
+    virtual QString catalogBillingMode() const;
+    QStringList catalogPlanLabels() const;
+    int catalogDefaultLimitForPlan(const QString &plan) const;
+    int catalogDefaultSecondaryLimitForPlan(const QString &plan) const;
+    double catalogDefaultCostForPlan(const QString &plan) const;
     void checkAndResetPeriod();
     QDateTime calculatePeriodEnd(UsagePeriod period, const QDateTime &start) const;
 

@@ -1175,8 +1175,7 @@ PlasmaExtras.Representation {
         if (AppInfo.demoMode) {
             return true;
         }
-        return plasmoid.configuration.loofiEnabled
-            || plasmoid.configuration.openaiEnabled
+        return plasmoid.configuration.openaiEnabled
             || plasmoid.configuration.anthropicEnabled
             || plasmoid.configuration.googleEnabled
             || plasmoid.configuration.mistralEnabled

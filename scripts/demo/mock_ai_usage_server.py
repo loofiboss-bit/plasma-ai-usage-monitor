@@ -245,10 +245,6 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"data": {"label": "demo-key", "usage": credits.get("usage", 0.0), "limit": credits.get("limit", 0.0)}})
             return
 
-        if path in {"/api/v2/metrics-summary", "/mock/loofi/api/v2/metrics-summary"}:
-            self._send_json(self._provider("loofi"))
-            return
-
         if path == "/claude/api/bootstrap":
             self._send_json(self._claude_bootstrap_payload())
             return
@@ -383,7 +379,6 @@ def main() -> None:
     print(f"Google base URL:      {base_url}/mock/google/v1beta")
     print(f"Google Veo base URL:  {base_url}/mock/googleveo/v1beta")
     print(f"Azure base URL:       {base_url}/mock/azure")
-    print(f"Loofi Server URL:     {base_url}/mock/loofi")
     print("OpenAI-compatible providers can point to /mock/<provider> or rely on demo-mode defaults.")
 
     try:

@@ -1,0 +1,6 @@
+{
+  "source": "browser_sync",
+  "schemaVersion": 99,
+  "syncedAt": "2026-05-06T12:00:00Z",
+  "message": "Fixture for exercising fallback when vendor response shape changes."
+}

@@ -12,25 +12,17 @@ JetBrainsAiMonitor::JetBrainsAiMonitor(QObject *parent)
 
 QStringList JetBrainsAiMonitor::availablePlans() const
 {
-    return {
-        QStringLiteral("AI Free"),
-        QStringLiteral("AI Pro"),
-        QStringLiteral("All Products + AI")
-    };
+    return catalogPlanLabels();
 }
 
 int JetBrainsAiMonitor::defaultLimitForPlan(const QString &plan) const
 {
-    if (plan == QStringLiteral("AI Pro")) return 1500;
-    if (plan == QStringLiteral("All Products + AI")) return 3000;
-    return 100;
+    return catalogDefaultLimitForPlan(plan);
 }
 
 double JetBrainsAiMonitor::defaultCostForPlan(const QString &plan) const
 {
-    if (plan == QStringLiteral("AI Pro")) return 10.0;
-    if (plan == QStringLiteral("All Products + AI")) return 29.0;
-    return 0.0;
+    return catalogDefaultCostForPlan(plan);
 }
 
 double JetBrainsAiMonitor::subscriptionCost() const

@@ -11,13 +11,7 @@
 AzureOpenAIProvider::AzureOpenAIProvider(QObject *parent)
     : ProviderBackend(parent)
 {
-    // Approximate Azure OpenAI pricing parity with OpenAI list pricing (2026 baseline).
-    registerModelPricing(QStringLiteral("gpt-5.4-pro"), 3.00, 12.00);
-    registerModelPricing(QStringLiteral("gpt-5.4-thinking"), 4.00, 16.00);
-    registerModelPricing(QStringLiteral("gpt-5.4-mini"), 0.15, 0.60);
-    registerModelPricing(QStringLiteral("gpt-5.4-cyber"), 5.00, 20.00);
-    registerModelPricing(QStringLiteral("o3"), 2.00, 8.00);
-    registerModelPricing(QStringLiteral("o4-mini"), 1.10, 4.40);
+    registerCatalogPricing(QStringLiteral("azure"));
 }
 
 QString AzureOpenAIProvider::model() const

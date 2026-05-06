@@ -35,7 +35,6 @@ KCM.SimpleKCM {
     property bool cfg_googleveoNotificationsEnabled: plasmoid.configuration.googleveoNotificationsEnabled
     property bool cfg_azureNotificationsEnabled: plasmoid.configuration.azureNotificationsEnabled
     property bool cfg_bedrockNotificationsEnabled: plasmoid.configuration.bedrockNotificationsEnabled
-    property bool cfg_loofiNotificationsEnabled: plasmoid.configuration.loofiNotificationsEnabled
     property alias cfg_slackWebhookEnabled: slackWebhookSwitch.checked
     property alias cfg_discordWebhookEnabled: discordWebhookSwitch.checked
     property alias cfg_webhookCooldownMinutes: webhookCooldownSlider.value

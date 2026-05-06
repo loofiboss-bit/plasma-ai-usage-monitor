@@ -1,8 +1,105 @@
 #include "subscriptiontoolbackend.h"
+#include "subscriptionplancatalog.h"
 #include <QDate>
 #include <QDebug>
 #include <QTimeZone>
 #include <QNetworkAccessManager>
+#include <QVariantMap>
+
+namespace {
+QString sourceBadge(const QVariantMap &row)
+{
+    const QString precision = row.value(QStringLiteral("precision")).toString();
+    const QString source = row.value(QStringLiteral("source")).toString();
+
+    if (row.value(QStringLiteral("needsManualReview"), false).toBool()
+        || row.value(QStringLiteral("sourceConflict"), false).toBool()
+        || precision == QLatin1String("needs_manual_review")) {
+        return QStringLiteral("Needs review");
+    }
+    if (source == QLatin1String("browser_sync") || precision == QLatin1String("browser_sync_actual")) {
+        return QStringLiteral("Synced");
+    }
+    if (source == QLatin1String("user_config")) {
+        return QStringLiteral("Custom");
+    }
+    if (source == QLatin1String("local_activity") || precision == QLatin1String("self_tracked_local")) {
+        return QStringLiteral("Self-tracked");
+    }
+    if (precision == QLatin1String("official_exact")) {
+        return QStringLiteral("Official");
+    }
+    if (precision == QLatin1String("official_range")) {
+        return QStringLiteral("Official range");
+    }
+    if (precision == QLatin1String("official_approx")) {
+        return QStringLiteral("Official approx");
+    }
+    if (precision == QLatin1String("official_qualitative")) {
+        return QStringLiteral("Official note");
+    }
+    if (precision == QLatin1String("estimated")) {
+        return QStringLiteral("Estimated");
+    }
+    return QStringLiteral("Unknown");
+}
+
+QString periodKind(SubscriptionToolBackend::UsagePeriod period)
+{
+    switch (period) {
+    case SubscriptionToolBackend::FiveHour:
+        return QStringLiteral("rolling_5h");
+    case SubscriptionToolBackend::Daily:
+        return QStringLiteral("daily_budget");
+    case SubscriptionToolBackend::Weekly:
+        return QStringLiteral("rolling_weekly");
+    case SubscriptionToolBackend::Monthly:
+        return QStringLiteral("monthly_utc");
+    }
+    return QStringLiteral("custom");
+}
+
+bool isNumericQuotaUnit(const QString &unit)
+{
+    return unit == QLatin1String("messages")
+        || unit == QLatin1String("requests")
+        || unit == QLatin1String("tasks")
+        || unit == QLatin1String("reviews");
+}
+
+QVariantMap usageRow(const QString &kind,
+                     const QString &label,
+                     const QString &unit,
+                     int used,
+                     int limit,
+                     const QDateTime &resetAt,
+                     const QString &timeUntilReset,
+                     const QString &source,
+                     const QString &precision)
+{
+    QVariantMap row;
+    row.insert(QStringLiteral("kind"), kind);
+    row.insert(QStringLiteral("label"), label);
+    row.insert(QStringLiteral("unit"), unit);
+    row.insert(QStringLiteral("used"), qMax(0, used));
+    if (limit > 0) {
+        row.insert(QStringLiteral("limit"), limit);
+        row.insert(QStringLiteral("remaining"), qMax(0, limit - used));
+        row.insert(QStringLiteral("percentUsed"), qBound(0.0, (static_cast<double>(used) / limit) * 100.0, 999.0));
+    }
+    if (resetAt.isValid()) {
+        row.insert(QStringLiteral("resetAt"), resetAt.toUTC().toString(Qt::ISODate));
+    }
+    if (!timeUntilReset.isEmpty()) {
+        row.insert(QStringLiteral("timeUntilReset"), timeUntilReset);
+    }
+    row.insert(QStringLiteral("source"), source);
+    row.insert(QStringLiteral("precision"), precision);
+    row.insert(QStringLiteral("visibleByDefault"), true);
+    row.insert(QStringLiteral("badge"), sourceBadge(row));
+    return row;
+}
+} // namespace
 
 SubscriptionToolBackend::SubscriptionToolBackend(QObject *parent)
     : QObject(parent)
@@ -11,6 +108,10 @@ SubscriptionToolBackend::SubscriptionToolBackend(QObject *parent)
     // Check for period resets every 60 seconds
     m_resetCheckTimer->setInterval(60 * 1000);
     connect(m_resetCheckTimer, &QTimer::timeout, this, &SubscriptionToolBackend::checkAndResetPeriod);
+    connect(this, &SubscriptionToolBackend::usageUpdated, this, &SubscriptionToolBackend::quotaWindowsChanged);
+    connect(this, &SubscriptionToolBackend::usageLimitChanged, this, &SubscriptionToolBackend::quotaWindowsChanged);
+    connect(this, &SubscriptionToolBackend::planTierChanged, this, &SubscriptionToolBackend::quotaWindowsChanged);
+    connect(this, &SubscriptionToolBackend::syncStatusChanged, this, &SubscriptionToolBackend::quotaWindowsChanged);
 }
 
 SubscriptionToolBackend::~SubscriptionToolBackend() = default;
@@ -51,6 +152,7 @@ void SubscriptionToolBackend::setPlanTier(const QString &tier)
     if (m_planTier != tier) {
         m_planTier = tier;
         Q_EMIT planTierChanged();
+        Q_EMIT usageUpdated();
     }
 }
 
@@ -59,7 +161,11 @@ void SubscriptionToolBackend::setPlanTier(const QString &tier)
 int SubscriptionToolBackend::usageCount() const { return m_usageCount; }
 void SubscriptionToolBackend::setUsageCount(int count)
 {
-    m_usageCount = count;
+    const int normalized = qMax(0, count);
+    if (m_usageCount != normalized) {
+        m_usageCount = normalized;
+        Q_EMIT usageUpdated();
+    }
 }
 
 int SubscriptionToolBackend::usageLimit() const { return m_usageLimit; }
@@ -68,6 +174,7 @@ void SubscriptionToolBackend::setUsageLimit(int limit)
     if (m_usageLimit != limit) {
         m_usageLimit = limit;
         Q_EMIT usageLimitChanged();
+        Q_EMIT usageUpdated();
     }
 }
 
@@ -87,7 +194,11 @@ bool SubscriptionToolBackend::isLimitReached() const
 int SubscriptionToolBackend::secondaryUsageCount() const { return m_secondaryUsageCount; }
 void SubscriptionToolBackend::setSecondaryUsageCount(int count)
 {
-    m_secondaryUsageCount = count;
+    const int normalized = qMax(0, count);
+    if (m_secondaryUsageCount != normalized) {
+        m_secondaryUsageCount = normalized;
+        Q_EMIT usageUpdated();
+    }
 }
 
 int SubscriptionToolBackend::secondaryUsageLimit() const { return m_secondaryUsageLimit; }
@@ -96,6 +207,7 @@ void SubscriptionToolBackend::setSecondaryUsageLimit(int limit)
     if (m_secondaryUsageLimit != limit) {
         m_secondaryUsageLimit = limit;
         Q_EMIT usageLimitChanged();
+        Q_EMIT usageUpdated();
     }
 }
 
@@ -118,8 +230,20 @@ int SubscriptionToolBackend::defaultSecondaryLimitForPlan(const QString &) const
 // --- Time ---
 
 QDateTime SubscriptionToolBackend::periodStart() const { return m_periodStart; }
-void SubscriptionToolBackend::setPeriodStart(const QDateTime &start) { m_periodStart = start; }
-void SubscriptionToolBackend::setSecondaryPeriodStart(const QDateTime &start) { m_secondaryPeriodStart = start; }
+void SubscriptionToolBackend::setPeriodStart(const QDateTime &start)
+{
+    if (m_periodStart != start) {
+        m_periodStart = start;
+        Q_EMIT usageUpdated();
+    }
+}
+void SubscriptionToolBackend::setSecondaryPeriodStart(const QDateTime &start)
+{
+    if (m_secondaryPeriodStart != start) {
+        m_secondaryPeriodStart = start;
+        Q_EMIT usageUpdated();
+    }
+}
 
 QDateTime SubscriptionToolBackend::periodEnd() const
 {
@@ -168,7 +292,13 @@ QString SubscriptionToolBackend::timeUntilReset() const
 }
 
 QDateTime SubscriptionToolBackend::lastActivity() const { return m_lastActivity; }
-void SubscriptionToolBackend::setLastActivity(const QDateTime &time) { m_lastActivity = time; }
+void SubscriptionToolBackend::setLastActivity(const QDateTime &time)
+{
+    if (m_lastActivity != time) {
+        m_lastActivity = time;
+        Q_EMIT usageUpdated();
+    }
+}
 
 // --- Actions ---
 
@@ -305,13 +435,18 @@ double SubscriptionToolBackend::sessionPercentUsed() const { return m_sessionPer
 bool SubscriptionToolBackend::hasSessionInfo() const { return m_hasSessionInfo; }
 void SubscriptionToolBackend::setSessionPercentUsed(double pct)
 {
-    m_sessionPercentUsed = pct;
-    Q_EMIT usageUpdated();
+    const double normalized = qBound(0.0, pct, 100.0);
+    if (!qFuzzyCompare(m_sessionPercentUsed + 1.0, normalized + 1.0)) {
+        m_sessionPercentUsed = normalized;
+        Q_EMIT usageUpdated();
+    }
 }
 void SubscriptionToolBackend::setHasSessionInfo(bool has)
 {
-    m_hasSessionInfo = has;
-    Q_EMIT usageUpdated();
+    if (m_hasSessionInfo != has) {
+        m_hasSessionInfo = has;
+        Q_EMIT usageUpdated();
+    }
 }
 
 // --- Extra / Metered Usage ---
@@ -327,18 +462,57 @@ double SubscriptionToolBackend::extraUsagePercent() const
 QDateTime SubscriptionToolBackend::extraUsageResetDate() const { return m_extraUsageResetDate; }
 QString SubscriptionToolBackend::currencySymbol() const { return m_currencySymbol; }
 
-void SubscriptionToolBackend::setExtraUsageSpent(double spent) { m_extraUsageSpent = spent; }
-void SubscriptionToolBackend::setExtraUsageLimit(double limit) { m_extraUsageLimit = limit; }
-void SubscriptionToolBackend::setExtraUsageResetDate(const QDateTime &date) { m_extraUsageResetDate = date; }
-void SubscriptionToolBackend::setCurrencySymbol(const QString &symbol) { m_currencySymbol = symbol; }
-void SubscriptionToolBackend::setHasExtraUsage(bool has) { m_hasExtraUsage = has; }
+void SubscriptionToolBackend::setExtraUsageSpent(double spent)
+{
+    const double normalized = qMax(0.0, spent);
+    if (!qFuzzyCompare(m_extraUsageSpent + 1.0, normalized + 1.0)) {
+        m_extraUsageSpent = normalized;
+        Q_EMIT usageUpdated();
+    }
+}
+void SubscriptionToolBackend::setExtraUsageLimit(double limit)
+{
+    const double normalized = qMax(0.0, limit);
+    if (!qFuzzyCompare(m_extraUsageLimit + 1.0, normalized + 1.0)) {
+        m_extraUsageLimit = normalized;
+        Q_EMIT usageUpdated();
+    }
+}
+void SubscriptionToolBackend::setExtraUsageResetDate(const QDateTime &date)
+{
+    if (m_extraUsageResetDate != date) {
+        m_extraUsageResetDate = date;
+        Q_EMIT usageUpdated();
+    }
+}
+void SubscriptionToolBackend::setCurrencySymbol(const QString &symbol)
+{
+    if (m_currencySymbol != symbol) {
+        m_currencySymbol = symbol;
+        Q_EMIT usageUpdated();
+    }
+}
+void SubscriptionToolBackend::setHasExtraUsage(bool has)
+{
+    if (m_hasExtraUsage != has) {
+        m_hasExtraUsage = has;
+        Q_EMIT usageUpdated();
+    }
+}
 
 // --- Subscription Cost ---
 
 double SubscriptionToolBackend::subscriptionCost() const { return m_subscriptionCost; }
 bool SubscriptionToolBackend::hasSubscriptionCost() const { return false; }
-void SubscriptionToolBackend::setSubscriptionCostValue(double cost) { m_subscriptionCost = cost; }
-double SubscriptionToolBackend::defaultCostForPlan(const QString &) const { return 0.0; }
+void SubscriptionToolBackend::setSubscriptionCostValue(double cost)
+{
+    const double normalized = qMax(0.0, cost);
+    if (!qFuzzyCompare(m_subscriptionCost + 1.0, normalized + 1.0)) {
+        m_subscriptionCost = normalized;
+        Q_EMIT usageUpdated();
+    }
+}
+double SubscriptionToolBackend::defaultCostForPlan(const QString &plan) const { return catalogDefaultCostForPlan(plan); }
 
 // --- Tertiary Usage ---
 
@@ -346,14 +520,245 @@ bool SubscriptionToolBackend::hasTertiaryLimit() const { return false; }
 QString SubscriptionToolBackend::tertiaryPeriodLabel() const { return QString(); }
 double SubscriptionToolBackend::tertiaryPercentRemaining() const { return m_tertiaryPercentRemaining; }
 QDateTime SubscriptionToolBackend::tertiaryResetDate() const { return m_tertiaryResetDate; }
-void SubscriptionToolBackend::setTertiaryPercentRemaining(double pct) { m_tertiaryPercentRemaining = pct; }
-void SubscriptionToolBackend::setTertiaryResetDate(const QDateTime &date) { m_tertiaryResetDate = date; }
+void SubscriptionToolBackend::setTertiaryPercentRemaining(double pct)
+{
+    const double normalized = qBound(0.0, pct, 100.0);
+    if (!qFuzzyCompare(m_tertiaryPercentRemaining + 1.0, normalized + 1.0)) {
+        m_tertiaryPercentRemaining = normalized;
+        Q_EMIT usageUpdated();
+    }
+}
+void SubscriptionToolBackend::setTertiaryResetDate(const QDateTime &date)
+{
+    if (m_tertiaryResetDate != date) {
+        m_tertiaryResetDate = date;
+        Q_EMIT usageUpdated();
+    }
+}
 
 // --- Credits ---
 
 bool SubscriptionToolBackend::hasCredits() const { return false; }
 int SubscriptionToolBackend::remainingCredits() const { return m_remainingCredits; }
-void SubscriptionToolBackend::setRemainingCredits(int credits) { m_remainingCredits = credits; }
+void SubscriptionToolBackend::setRemainingCredits(int credits)
+{
+    const int normalized = qMax(0, credits);
+    if (m_remainingCredits != normalized) {
+        m_remainingCredits = normalized;
+        Q_EMIT usageUpdated();
+    }
+}
+
+// --- Catalog-backed quota windows ---
+
+QString SubscriptionToolBackend::catalogToolKey() const
+{
+    return QString();
+}
+
+QString SubscriptionToolBackend::catalogBillingMode() const
+{
+    return QString();
+}
+
+QStringList SubscriptionToolBackend::catalogPlanLabels() const
+{
+    const QString key = catalogToolKey();
+    if (key.isEmpty()) {
+        return QStringList();
+    }
+    return SubscriptionPlanCatalog::instance()->planLabelsForTool(key);
+}
+
+QString SubscriptionToolBackend::planIdForLabel(const QString &planLabelOrId) const
+{
+    const QString key = catalogToolKey();
+    if (key.isEmpty()) {
+        return planLabelOrId;
+    }
+
+    const QString id = SubscriptionPlanCatalog::instance()->planIdForLabel(key, planLabelOrId);
+    return id.isEmpty() ? planLabelOrId : id;
+}
+
+int SubscriptionToolBackend::catalogDefaultLimitForPlan(const QString &plan) const
+{
+    const QString key = catalogToolKey();
+    if (key.isEmpty()) {
+        return 0;
+    }
+
+    const QVariantList windows = SubscriptionPlanCatalog::instance()->quotaWindows(key, plan);
+    for (const QVariant &value : windows) {
+        const QVariantMap row = value.toMap();
+        if (!isNumericQuotaUnit(row.value(QStringLiteral("unit")).toString())) {
+            continue;
+        }
+        if (row.contains(QStringLiteral("limit"))) {
+            return row.value(QStringLiteral("limit")).toInt();
+        }
+    }
+    return 0;
+}
+
+int SubscriptionToolBackend::catalogDefaultSecondaryLimitForPlan(const QString &plan) const
+{
+    const QString key = catalogToolKey();
+    if (key.isEmpty()) {
+        return 0;
+    }
+
+    const QVariantList windows = SubscriptionPlanCatalog::instance()->quotaWindows(key, plan);
+    for (const QVariant &value : windows) {
+        const QVariantMap row = value.toMap();
+        if (!row.value(QStringLiteral("kind")).toString().contains(QStringLiteral("weekly"))
+            || !isNumericQuotaUnit(row.value(QStringLiteral("unit")).toString())) {
+            continue;
+        }
+        if (row.contains(QStringLiteral("limit"))) {
+            return row.value(QStringLiteral("limit")).toInt();
+        }
+    }
+    return 0;
+}
+
+double SubscriptionToolBackend::catalogDefaultCostForPlan(const QString &plan) const
+{
+    const QString key = catalogToolKey();
+    if (key.isEmpty()) {
+        return 0.0;
+    }
+
+    const QVariantMap price = SubscriptionPlanCatalog::instance()->price(key, plan);
+    if (price.contains(QStringLiteral("amount"))) {
+        return price.value(QStringLiteral("amount")).toDouble();
+    }
+    if (price.value(QStringLiteral("precision")).toString() == QLatin1String("official_range")
+        && price.contains(QStringLiteral("rangeMin"))) {
+        return price.value(QStringLiteral("rangeMin")).toDouble();
+    }
+    return 0.0;
+}
+
+QVariantList SubscriptionToolBackend::quotaWindows() const
+{
+    QVariantList rows;
+    const QString key = catalogToolKey();
+    const auto appendRow = [&rows](QVariantMap row) {
+        if (!row.contains(QStringLiteral("badge"))) {
+            row.insert(QStringLiteral("badge"), sourceBadge(row));
+        }
+        rows << row;
+    };
+
+    if (m_hasSessionInfo) {
+        QVariantMap row;
+        row.insert(QStringLiteral("kind"), QStringLiteral("browser_session"));
+        row.insert(QStringLiteral("label"), QStringLiteral("Current session"));
+        row.insert(QStringLiteral("unit"), QStringLiteral("percent"));
+        row.insert(QStringLiteral("percentUsed"), m_sessionPercentUsed);
+        row.insert(QStringLiteral("source"), QStringLiteral("browser_sync"));
+        row.insert(QStringLiteral("precision"), QStringLiteral("browser_sync_actual"));
+        row.insert(QStringLiteral("visibleByDefault"), true);
+        appendRow(row);
+    }
+
+    if (m_hasExtraUsage) {
+        QVariantMap row;
+        row.insert(QStringLiteral("kind"), QStringLiteral("extra_spend"));
+        row.insert(QStringLiteral("label"), QStringLiteral("Extra usage"));
+        row.insert(QStringLiteral("unit"), QStringLiteral("usd"));
+        row.insert(QStringLiteral("used"), m_extraUsageSpent);
+        row.insert(QStringLiteral("limit"), m_extraUsageLimit);
+        if (m_extraUsageLimit > 0.0) {
+            row.insert(QStringLiteral("remaining"), qMax(0.0, m_extraUsageLimit - m_extraUsageSpent));
+            row.insert(QStringLiteral("percentUsed"), qBound(0.0, extraUsagePercent(), 999.0));
+        }
+        if (m_extraUsageResetDate.isValid()) {
+            row.insert(QStringLiteral("resetAt"), m_extraUsageResetDate.toUTC().toString(Qt::ISODate));
+        }
+        row.insert(QStringLiteral("source"), QStringLiteral("browser_sync"));
+        row.insert(QStringLiteral("precision"), QStringLiteral("browser_sync_actual"));
+        row.insert(QStringLiteral("visibleByDefault"), true);
+        appendRow(row);
+    }
+
+    if (hasTertiaryLimit()) {
+        QVariantMap row;
+        row.insert(QStringLiteral("kind"), QStringLiteral("code_review"));
+        row.insert(QStringLiteral("label"), tertiaryPeriodLabel().isEmpty() ? QStringLiteral("Tertiary quota") : tertiaryPeriodLabel());
+        row.insert(QStringLiteral("unit"), QStringLiteral("percent_remaining"));
+        row.insert(QStringLiteral("percentRemaining"), m_tertiaryPercentRemaining);
+        row.insert(QStringLiteral("percentUsed"), qBound(0.0, 100.0 - m_tertiaryPercentRemaining, 100.0));
+        if (m_tertiaryResetDate.isValid()) {
+            row.insert(QStringLiteral("resetAt"), m_tertiaryResetDate.toUTC().toString(Qt::ISODate));
+        }
+        row.insert(QStringLiteral("source"), QStringLiteral("browser_sync"));
+        row.insert(QStringLiteral("precision"), QStringLiteral("browser_sync_actual"));
+        row.insert(QStringLiteral("visibleByDefault"), true);
+        appendRow(row);
+    }
+
+    if (hasCredits()) {
+        QVariantMap row;
+        row.insert(QStringLiteral("kind"), QStringLiteral("ai_credits"));
+        row.insert(QStringLiteral("label"), QStringLiteral("Remaining credits"));
+        row.insert(QStringLiteral("unit"), QStringLiteral("credits"));
+        row.insert(QStringLiteral("remaining"), m_remainingCredits);
+        row.insert(QStringLiteral("source"), QStringLiteral("browser_sync"));
+        row.insert(QStringLiteral("precision"), QStringLiteral("browser_sync_actual"));
+        row.insert(QStringLiteral("visibleByDefault"), true);
+        appendRow(row);
+    }
+
+    if (!key.isEmpty()) {
+        const QVariantMap tool = SubscriptionPlanCatalog::instance()->tool(key);
+        const bool needsReview = tool.value(QStringLiteral("needsManualReview"), false).toBool();
+        const bool sourceConflict = tool.value(QStringLiteral("sourceConflict"), false).toBool();
+
+        const QVariantList billingRows = SubscriptionPlanCatalog::instance()->billingModeQuotaWindows(key, catalogBillingMode());
+        for (const QVariant &value : billingRows) {
+            QVariantMap row = value.toMap();
+            row.insert(QStringLiteral("needsManualReview"), row.value(QStringLiteral("needsManualReview"), false).toBool() || needsReview);
+            row.insert(QStringLiteral("sourceConflict"), row.value(QStringLiteral("sourceConflict"), false).toBool() || sourceConflict);
+            appendRow(row);
+        }
+
+        const QVariantList catalogRows = SubscriptionPlanCatalog::instance()->quotaWindows(key, m_planTier);
+        for (const QVariant &value : catalogRows) {
+            QVariantMap row = value.toMap();
+            row.insert(QStringLiteral("needsManualReview"), row.value(QStringLiteral("needsManualReview"), false).toBool() || needsReview);
+            row.insert(QStringLiteral("sourceConflict"), row.value(QStringLiteral("sourceConflict"), false).toBool() || sourceConflict);
+            appendRow(row);
+        }
+    }
+
+    if (m_usageLimit > 0 || m_usageCount > 0) {
+        appendRow(usageRow(periodKind(primaryPeriodType()),
+                           periodLabel().isEmpty() ? QStringLiteral("Primary quota") : periodLabel(),
+                           primaryPeriodType() == Monthly ? QStringLiteral("requests") : QStringLiteral("messages"),
+                           m_usageCount,
+                           m_usageLimit,
+                           periodEnd(),
+                           timeUntilReset(),
+                           m_usageLimit > 0 ? QStringLiteral("user_config") : QStringLiteral("local_activity"),
+                           m_usageLimit > 0 ? QStringLiteral("self_tracked_local") : QStringLiteral("estimated")));
+    }
+
+    if (hasSecondaryLimit() && (m_secondaryUsageLimit > 0 || m_secondaryUsageCount > 0)) {
+        appendRow(usageRow(periodKind(secondaryPeriodType()),
+                           secondaryPeriodLabel().isEmpty() ? QStringLiteral("Secondary quota") : secondaryPeriodLabel(),
+                           QStringLiteral("messages"),
+                           m_secondaryUsageCount,
+                           m_secondaryUsageLimit,
+                           secondaryPeriodEnd(),
+                           secondaryTimeUntilReset(),
+                           m_secondaryUsageLimit > 0 ? QStringLiteral("user_config") : QStringLiteral("local_activity"),
+                           m_secondaryUsageLimit > 0 ? QStringLiteral("self_tracked_local") : QStringLiteral("estimated")));
+    }
+
+    return rows;
+}
 
 // --- Browser Sync ---
 

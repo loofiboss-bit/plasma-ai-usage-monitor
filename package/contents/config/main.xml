@@ -12,7 +12,7 @@
         </entry>
         <entry name="compactDisplayMode" type="String">
             <default>icon</default>
-            <label>What to show in compact mode: icon, cost, count, loofi, dailycost, requests, critical</label>
+            <label>What to show in compact mode: icon, cost, count, dailycost, requests, critical</label>
         </entry>
         <entry name="setupWizardCompleted" type="Bool">
             <default>false</default>
@@ -78,20 +78,9 @@
         <entry name="bedrockRefreshInterval" type="Int">
             <default>0</default>
         </entry>
-        <entry name="loofiRefreshInterval" type="Int">
-            <default>0</default>
-        </entry>
     </group>
 
     <group name="Providers">
-        <!-- Loofi Server -->
-        <entry name="loofiEnabled" type="Bool">
-            <default>false</default>
-        </entry>
-        <entry name="loofiServerUrl" type="String">
-            <default></default>
-        </entry>
-
         <!-- OpenAI -->
         <entry name="openaiEnabled" type="Bool">
             <default>false</default>
@@ -342,10 +331,6 @@
         <entry name="bedrockNotificationsEnabled" type="Bool">
             <default>true</default>
         </entry>
-        <entry name="loofiNotificationsEnabled" type="Bool">
-            <default>true</default>
-        </entry>
-
         <!-- Update notifications -->
         <entry name="notifyOnUpdate" type="Bool">
             <default>true</default>
@@ -522,6 +507,10 @@
             <default>0</default>
             <label>Plan index: 0=Pro, 1=Max 5x, 2=Max 20x</label>
         </entry>
+        <entry name="claudeCodePlanId" type="String">
+            <default>pro</default>
+            <label>Stable Claude Code plan ID from subscriptions-v1.json</label>
+        </entry>
         <entry name="claudeCodeCustomLimit" type="Int">
             <default>0</default>
             <label>Custom usage limit per 5h period (0 = use plan default)</label>
@@ -537,6 +526,10 @@
         <entry name="codexPlan" type="Int">
             <default>0</default>
             <label>Plan index: 0=Plus, 1=Pro, 2=Business</label>
+        </entry>
+        <entry name="codexPlanId" type="String">
+            <default>plus</default>
+            <label>Stable Codex CLI plan ID from subscriptions-v1.json</label>
         </entry>
         <entry name="codexCustomLimit" type="Int">
             <default>0</default>
@@ -554,13 +547,17 @@
             <default>0</default>
             <label>Plan index: 0=Free, 1=Pro, 2=Pro+, 3=Business, 4=Enterprise</label>
         </entry>
+        <entry name="copilotPlanId" type="String">
+            <default>free</default>
+            <label>Stable GitHub Copilot plan ID from subscriptions-v1.json</label>
+        </entry>
         <entry name="copilotCustomLimit" type="Int">
             <default>0</default>
             <label>Custom monthly premium request limit (0 = use plan default)</label>
         </entry>
         <entry name="copilotBillingMode" type="String">
-            <default>premium_requests</default>
-            <label>Copilot billing mode: premium_requests, usage_based, or credits</label>
+            <default>auto</default>
+            <label>Copilot billing mode: auto, premium_requests_legacy, or ai_credits_usage_based</label>
         </entry>
         <entry name="copilotResetDay" type="Int">
             <default>1</default>
@@ -581,6 +578,10 @@
         <entry name="cursorPlan" type="Int">
             <default>0</default>
         </entry>
+        <entry name="cursorPlanId" type="String">
+            <default>pro</default>
+            <label>Stable Cursor plan ID from subscriptions-v1.json</label>
+        </entry>
         <entry name="cursorCustomLimit" type="Int">
             <default>0</default>
         </entry>
@@ -595,6 +596,10 @@
         <entry name="windsurfPlan" type="Int">
             <default>0</default>
         </entry>
+        <entry name="windsurfPlanId" type="String">
+            <default>pro</default>
+            <label>Stable Windsurf plan ID from subscriptions-v1.json</label>
+        </entry>
         <entry name="windsurfCustomLimit" type="Int">
             <default>0</default>
         </entry>
@@ -608,6 +613,10 @@
         </entry>
         <entry name="jetbrainsAiPlan" type="Int">
             <default>0</default>
+        </entry>
+        <entry name="jetbrainsAiPlanId" type="String">
+            <default>ai_free</default>
+            <label>Stable JetBrains AI plan ID from subscriptions-v1.json</label>
         </entry>
         <entry name="jetbrainsAiCustomLimit" type="Int">
             <default>0</default>

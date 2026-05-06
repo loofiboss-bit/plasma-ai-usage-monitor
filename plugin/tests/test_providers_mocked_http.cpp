@@ -15,7 +15,6 @@
 #include "googleprovider.h"
 #include "googleveoprovider.h"
 #include "azureopenaiprovider.h"
-#include "loofiserverprovider.h"
 #include "groqprovider.h"
 #include "mistralprovider.h"
 #include "ollamacloudprovider.h"
@@ -175,8 +174,6 @@ private Q_SLOTS:
     void azureProviderAuthError();
     void azureNormalizeHappyPath();
     void azureNormalizeFailurePath();
-    void loofiServerSummarySuccess();
-    void loofiServerAuthError();
 };
 
 void ProvidersMockedHttpTest::openAiSuccessAndHeaders()
@@ -542,8 +539,8 @@ void ProvidersMockedHttpTest::googleVeoUsagePayloadEstimatedCost()
     QCOMPARE(provider.inputTokens(), 120000);
     QCOMPARE(provider.outputTokens(), 30000);
     QCOMPARE(provider.requestCount(), 1);
-    QVERIFY(provider.cost() > 0.0);
-    QVERIFY(provider.isEstimatedCost());
+    QCOMPARE(provider.cost(), 0.0);
+    QVERIFY(!provider.isEstimatedCost());
     QCOMPARE(provider.rateLimitRequests(), 44);
     QCOMPARE(provider.rateLimitRequestsRemaining(), 40);
     QVERIFY(provider.isConnected());
@@ -1140,68 +1137,6 @@ void ProvidersMockedHttpTest::azureNormalizeFailurePath()
     QCOMPARE(normalized.cost, 0.0);
     QCOMPARE(normalized.dailyCost, 0.0);
     QCOMPARE(normalized.monthlyCost, 0.0);
-}
-
-void ProvidersMockedHttpTest::loofiServerSummarySuccess()
-{
-    HttpStubServer server;
-    QVERIFY(server.listen());
-
-    const QByteArray summaryBody = R"JSON({
-        "model": "Qwen3.5-9B",
-        "training_stage": "canary_eval",
-        "gpu_memory_pct": 83.5,
-        "inference_count_24h": 142
-    })JSON";
-
-    server.setResponse(
-        QStringLiteral("GET"),
-        QStringLiteral("/api/v2/metrics-summary"),
-        200,
-        summaryBody);
-
-    LoofiServerProvider provider;
-    provider.setCustomBaseUrl(server.baseUrl());
-
-    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    QSignalSpy serverDataSpy(&provider, &LoofiServerProvider::serverDataUpdated);
-    provider.refresh();
-
-    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
-    QTRY_VERIFY_WITH_TIMEOUT(serverDataSpy.count() >= 1, 3000);
-
-    QCOMPARE(provider.activeModel(), QStringLiteral("Qwen3.5-9B"));
-    QCOMPARE(provider.trainingStage(), QStringLiteral("canary_eval"));
-    QCOMPARE(provider.gpuMemoryPct(), 83.5);
-    QCOMPARE(provider.requestCount(), 142);
-    QVERIFY(provider.isConnected());
-
-    QVERIFY(server.hitCount(QStringLiteral("/api/v2/metrics-summary")) >= 1);
-}
-
-void ProvidersMockedHttpTest::loofiServerAuthError()
-{
-    HttpStubServer server;
-    QVERIFY(server.listen());
-
-    const QByteArray authError = R"JSON({"error":"unauthorized"})JSON";
-    server.setResponse(
-        QStringLiteral("GET"),
-        QStringLiteral("/api/v2/metrics-summary"),
-        401,
-        authError);
-
-    LoofiServerProvider provider;
-    provider.setCustomBaseUrl(server.baseUrl());
-
-    QSignalSpy errorSpy(&provider, &ProviderBackend::errorChanged);
-    provider.refresh();
-
-    QTRY_VERIFY_WITH_TIMEOUT(errorSpy.count() >= 1, 3000);
-
-    QVERIFY(provider.errorCount() >= 1);
-    QVERIFY(!provider.errorString().isEmpty());
-    QVERIFY(!provider.isConnected());
 }
 
 QTEST_MAIN(ProvidersMockedHttpTest)

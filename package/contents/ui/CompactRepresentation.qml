@@ -11,14 +11,6 @@ MouseArea {
 
     readonly property var providers: root.allProviders ?? []
     readonly property var subscriptionTools: root.allSubscriptionTools ?? []
-    readonly property var loofiProvider: {
-        for (var i = 0; i < providers.length; i++) {
-            if (providers[i] && providers[i].configKey === "loofi")
-                return providers[i];
-        }
-        return null;
-    }
-    readonly property bool loofiConnected: !!(loofiProvider && loofiProvider.enabled && loofiProvider.backend && loofiProvider.backend.connected)
     readonly property double compactTotalCost: {
         var total = 0;
         for (var i = 0; i < providers.length; i++) {
@@ -35,16 +27,7 @@ MouseArea {
     }
 
     Accessible.role: Accessible.Button
-    Accessible.name: {
-        if (compactRoot.displayMode === "loofi" && compactRoot.loofiConnected) {
-            return i18n("Loofi Server: %1, %2, GPU %3 percent, %4 requests in 24 hours",
-                        compactRoot.loofiProvider.backend.activeModel || i18n("No model"),
-                        compactRoot.loofiProvider.backend.trainingStage || i18n("idle"),
-                        Math.round(Math.max(0, compactRoot.loofiProvider.backend.gpuMemoryPct || 0)),
-                        compactRoot.formatMetric(compactRoot.loofiProvider.backend.requestCount || 0));
-        }
-        return i18n("AI Usage Monitor: %1 providers connected", root.connectedCount ?? 0);
-    }
+    Accessible.name: i18n("AI Usage Monitor: %1 providers connected", root.connectedCount ?? 0)
 
     readonly property bool hasWarning: {
         for (var i = 0; i < providers.length; i++) {
@@ -93,7 +76,10 @@ MouseArea {
         return false;
     }
 
-    readonly property string displayMode: plasmoid.configuration.compactDisplayMode
+    readonly property string displayMode: {
+        var mode = plasmoid.configuration.compactDisplayMode;
+        return ["cost", "count", "dailycost", "requests", "critical"].indexOf(mode) >= 0 ? mode : "icon";
+    }
 
     hoverEnabled: true
     onClicked: plasmoid.activated()
@@ -167,56 +153,6 @@ MouseArea {
             Layout.alignment: Qt.AlignVCenter
         }
     }
-
-    ColumnLayout {
-        anchors.fill: parent
-        anchors.margins: Kirigami.Units.smallSpacing
-        visible: compactRoot.displayMode === "loofi"
-        spacing: 1
-
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: Kirigami.Units.smallSpacing / 2
-
-            Kirigami.Icon {
-                source: compactRoot.brandedIconSource
-                Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                Layout.preferredHeight: Kirigami.Units.iconSizes.small
-            }
-
-            PlasmaComponents.Label {
-                Layout.fillWidth: true
-                text: compactRoot.loofiConnected
-                    ? (compactRoot.loofiProvider.backend.activeModel || i18n("No model"))
-                    : i18n("Loofi offline")
-                font.bold: true
-                elide: Text.ElideRight
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-            }
-
-            PlasmaComponents.Label {
-                visible: compactRoot.loofiConnected
-                text: compactRoot.loofiProvider.backend.trainingStage || i18n("idle")
-                opacity: 0.7
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                elide: Text.ElideRight
-            }
-        }
-
-        PlasmaComponents.Label {
-            Layout.fillWidth: true
-            text: compactRoot.loofiConnected
-                ? i18n("GPU %1%  Req %2/24h",
-                       Math.round(Math.max(0, compactRoot.loofiProvider.backend.gpuMemoryPct || 0)),
-                       compactRoot.formatMetric(compactRoot.loofiProvider.backend.requestCount || 0))
-                : i18n("Enable the Loofi provider to show server KPIs.")
-            opacity: compactRoot.loofiConnected ? 0.75 : 0.6
-            wrapMode: Text.NoWrap
-            elide: Text.ElideRight
-            font.pointSize: Kirigami.Theme.smallFont.pointSize * 0.92
-        }
-    }
-
 
     readonly property double compactDailyCost: {
         var total = 0;

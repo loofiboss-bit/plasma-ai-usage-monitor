@@ -6,13 +6,8 @@
 DeepSeekProvider::DeepSeekProvider(QObject *parent)
     : OpenAICompatibleProvider(parent)
 {
-    // Set default model
     setModel(QStringLiteral("deepseek-chat"));
-
-    // Register model pricing ($ per 1M tokens) — DeepSeek pricing as of 2026
-    registerModelPricing(QStringLiteral("deepseek-chat"), 0.14, 0.28);
-    registerModelPricing(QStringLiteral("deepseek-coder"), 0.14, 0.28);
-    registerModelPricing(QStringLiteral("deepseek-reasoner"), 0.55, 2.19);
+    registerCatalogPricing(QStringLiteral("deepseek"));
 }
 
 double DeepSeekProvider::balance() const { return m_balance; }

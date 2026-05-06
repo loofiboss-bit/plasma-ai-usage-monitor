@@ -19,7 +19,6 @@ ColumnLayout {
     property bool collapsed: false
     readonly property bool narrowCard: card.width < Kirigami.Units.gridUnit * 14
     readonly property bool compactDetails: card.width < Kirigami.Units.gridUnit * 13
-    readonly property bool isLoofiServer: card.providerName === "Loofi Server"
 
     spacing: 0
 
@@ -103,7 +102,7 @@ ColumnLayout {
 
                 // Collapsed Summary
                 RowLayout {
-                    visible: card.collapsed && card.showCost && !card.isLoofiServer && (card.backend?.connected ?? false)
+                    visible: card.collapsed && card.showCost && (card.backend?.connected ?? false)
                     spacing: Kirigami.Units.smallSpacing
 
                     PlasmaComponents.Label {
@@ -171,7 +170,7 @@ ColumnLayout {
             // Metrics & Usage Grid
             GridLayout {
                 Layout.fillWidth: true
-                visible: !card.collapsed && card.showUsage && !card.isLoofiServer && (card.backend?.connected ?? false)
+                visible: !card.collapsed && card.showUsage && (card.backend?.connected ?? false)
                 columns: card.narrowCard ? 1 : 3
                 columnSpacing: Kirigami.Units.largeSpacing
                 rowSpacing: Kirigami.Units.smallSpacing
@@ -216,35 +215,10 @@ ColumnLayout {
                 }
             }
 
-            // Server KPIs
-            GridLayout {
-                Layout.fillWidth: true
-                visible: !card.collapsed && card.isLoofiServer && (card.backend?.connected ?? false)
-                columns: card.narrowCard ? 1 : 2
-                columnSpacing: Kirigami.Units.largeSpacing
-                rowSpacing: Kirigami.Units.smallSpacing
-
-                ColumnLayout {
-                    spacing: 0
-                    PlasmaComponents.Label { text: i18n("Training Stage"); font.pointSize: Kirigami.Theme.smallFont.pointSize; opacity: 0.7 }
-                    PlasmaComponents.Label { text: card.backend?.trainingStage || i18n("idle"); font.bold: true }
-                }
-                ColumnLayout {
-                    spacing: 0
-                    PlasmaComponents.Label { text: i18n("GPU Memory"); font.pointSize: Kirigami.Theme.smallFont.pointSize; opacity: 0.7 }
-                    PlasmaComponents.Label { text: formatPercent(card.backend?.gpuMemoryPct ?? -1); font.bold: true }
-                }
-                ColumnLayout {
-                    spacing: 0
-                    PlasmaComponents.Label { text: i18n("Requests (24h)"); font.pointSize: Kirigami.Theme.smallFont.pointSize; opacity: 0.7 }
-                    PlasmaComponents.Label { text: formatNumber(card.backend?.requestCount ?? 0); font.bold: true }
-                }
-            }
-
             // Cost & Budgets
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: !card.collapsed && card.showCost && !card.isLoofiServer && (card.backend?.connected ?? false)
+                visible: !card.collapsed && card.showCost && (card.backend?.connected ?? false)
                 spacing: Kirigami.Units.smallSpacing
 
                 RowLayout {
@@ -439,6 +413,5 @@ ColumnLayout {
     function rateLimitColor(remaining, total) { return Utils.rateLimitColor(remaining, total, Kirigami.Theme); }
     function budgetColor(spent, budget) { return Utils.budgetColor(spent, budget, Kirigami.Theme); }
     function formatNumber(n) { return Utils.formatNumber(n); }
-    function formatPercent(value) { return value < 0 ? i18n("Unknown") : Math.round(value) + "%"; }
     function formatRelativeTime(dateTime) { return Utils.formatRelativeTime(dateTime, Qt, i18n); }
 }
