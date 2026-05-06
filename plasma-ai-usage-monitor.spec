@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        8.0.1
+Version:        8.0.2
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
 License:        GPL-3.0-or-later
@@ -70,6 +70,10 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Wed May 06 2026 Loofi <loofi@github.com> - 8.0.2-1
+- Preserve legacy Codex Pro plan index after adding Pro $100 metadata
+- Fix zero-usage quota progress bars so they render empty instead of full
+
 * Wed May 06 2026 Loofi <loofi@github.com> - 8.0.1-1
 - Add official Copilot premium-request defaults for Free, Pro, Pro+, Business, and Enterprise
 - Add current ChatGPT Pro tier Codex metadata and protect configured Pro from quota-less sync downgrades

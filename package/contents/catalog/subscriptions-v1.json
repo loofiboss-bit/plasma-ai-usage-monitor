@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "2026.05.06",
-  "release": "8.0.1",
+  "release": "8.0.2",
   "lastReviewed": "2026-05-06",
   "runtimeScraping": false,
   "notes": "Static local metadata for shipped subscription defaults. Browser sync may override with actual account data. Do not scrape vendor pages at runtime.",
@@ -125,18 +125,6 @@
           "notes": ["2x Codex rate limits are temporary for non-Free/Go plans."]
         },
         {
-          "id": "pro_100",
-          "label": "Pro $100",
-          "price": { "amount": 100, "currency": "USD", "period": "month", "precision": "official_exact" },
-          "quotaWindows": [
-            { "kind": "usage_multiplier", "label": "General usage vs Plus", "unit": "usage_multiplier", "limit": 5, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true },
-            { "kind": "codex_usage_multiplier", "label": "Codex usage vs Plus", "unit": "usage_multiplier", "limit": 10, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true, "notes": ["OpenAI describes this as a limited-time Codex allowance promotion."] },
-            { "kind": "code_review", "label": "Code review", "unit": "reviews", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false },
-            { "kind": "ai_credits", "label": "Remaining credits", "unit": "credits", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false }
-          ],
-          "notes": ["For Pro $100, OpenAI describes 5x higher limits than Plus and 10x Codex usage vs Plus for a limited time."]
-        },
-        {
           "id": "pro",
           "label": "Pro",
           "price": { "amount": 200, "currency": "USD", "period": "month", "precision": "official_exact" },
@@ -147,6 +135,18 @@
             { "kind": "ai_credits", "label": "Remaining credits", "unit": "credits", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false }
           ],
           "notes": ["OpenAI describes the $200 Pro plan as the highest usage tier, with 20x higher usage than Plus."]
+        },
+        {
+          "id": "pro_100",
+          "label": "Pro $100",
+          "price": { "amount": 100, "currency": "USD", "period": "month", "precision": "official_exact" },
+          "quotaWindows": [
+            { "kind": "usage_multiplier", "label": "General usage vs Plus", "unit": "usage_multiplier", "limit": 5, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true },
+            { "kind": "codex_usage_multiplier", "label": "Codex usage vs Plus", "unit": "usage_multiplier", "limit": 10, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true, "notes": ["OpenAI describes this as a limited-time Codex allowance promotion."] },
+            { "kind": "code_review", "label": "Code review", "unit": "reviews", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false },
+            { "kind": "ai_credits", "label": "Remaining credits", "unit": "credits", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false }
+          ],
+          "notes": ["For Pro $100, OpenAI describes 5x higher limits than Plus and 10x Codex usage vs Plus for a limited time."]
         },
         {
           "id": "business_codex",

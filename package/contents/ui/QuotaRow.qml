@@ -50,12 +50,18 @@ ColumnLayout {
             radius: 3
             color: Qt.alpha(Kirigami.Theme.textColor, 0.1)
         }
-        contentItem: Rectangle {
-            width: quotaProgress.visualPosition * quotaProgress.width
-            height: 6
-            radius: 3
-            color: Utils.usageColor(quotaRow.rowData?.percentUsed || 0, Kirigami.Theme)
-            Behavior on width { NumberAnimation { duration: 180 } }
+        contentItem: Item {
+            implicitHeight: 6
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.verticalCenter: parent.verticalCenter
+                width: quotaProgress.visualPosition * parent.width
+                height: 6
+                radius: 3
+                color: Utils.usageColor(quotaRow.rowData?.percentUsed || 0, Kirigami.Theme)
+                Behavior on width { NumberAnimation { duration: 180 } }
+            }
         }
     }
 

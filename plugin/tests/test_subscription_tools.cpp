@@ -66,6 +66,9 @@ void SubscriptionToolsTest::planDefaults()
     QCOMPARE(codex.defaultSecondaryLimitForPlan(QStringLiteral("Pro")), 0);
     QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro $100")), 100.0);
     QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro")), 200.0);
+    QVERIFY(codex.availablePlans().size() > 4);
+    QCOMPARE(codex.availablePlans().at(3), QStringLiteral("Pro"));
+    QCOMPARE(codex.availablePlans().at(4), QStringLiteral("Pro $100"));
     codex.setPlanTier(QStringLiteral("pro"));
     QVERIFY(!codex.quotaWindows().isEmpty());
 

@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [8.0.2] — 2026-05-06
+
+### Fixed
+- Preserve the existing Codex `Pro` plan position so legacy plan index `3` continues to resolve to ChatGPT Pro rather than the newly added Pro $100 tier.
+
 ## [8.0.1] — 2026-05-06
 
 ### Fixed
@@ -605,7 +610,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.1...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.2...HEAD
+[8.0.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.1...v8.0.2
 [8.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.0...v8.0.1
 [8.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v7.0.0...v8.0.0
 [7.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v6.0.1...v7.0.0
