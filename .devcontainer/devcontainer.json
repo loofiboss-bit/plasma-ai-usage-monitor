@@ -3,6 +3,10 @@
   "build": {
     "dockerfile": "Dockerfile"
   },
+  "runArgs": [
+    "--security-opt",
+    "label=disable"
+  ],
   "customizations": {
     "vscode": {
       "extensions": [
@@ -12,5 +16,5 @@
       ]
     }
   },
-  "postCreateCommand": "just check || true"
+  "postCreateCommand": "bash .devcontainer/setup.sh"
 }
