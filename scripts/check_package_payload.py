@@ -26,6 +26,7 @@ def main():
         "package/contents/catalog/subscriptions-v1.json",
         "package/contents/icons/providers/openai.svg",
         "package/contents/icons/tools/copilot.svg",
+        "assets/logo.svg",
         "plugin/qmldir",
         "com.github.loofi.aiusagemonitor.metainfo.xml"
     ]
@@ -70,6 +71,7 @@ def main():
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/catalog/subscriptions-v1.json",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/icons/providers/openai.svg",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/icons/tools/copilot.svg",
+                    f"plasma-ai-usage-monitor-{expected_version}/assets/logo.svg",
                     f"plasma-ai-usage-monitor-{expected_version}/plugin/qmldir",
                     f"plasma-ai-usage-monitor-{expected_version}/CMakeLists.txt"
                 ]

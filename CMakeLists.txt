@@ -33,6 +33,12 @@ plasma_install_package(package com.github.loofi.aiusagemonitor)
 install(FILES plasma_applet_com.github.loofi.aiusagemonitor.notifyrc
         DESTINATION ${KDE_INSTALL_KNOTIFYRCDIR})
 
+# Install the metadata icon into the icon theme so Plasma's widget explorer can
+# resolve KPlugin.Icon without falling back to a generic document icon.
+install(FILES assets/logo.svg
+        RENAME com.github.loofi.aiusagemonitor.svg
+        DESTINATION ${KDE_INSTALL_ICONDIR}/hicolor/scalable/apps)
+
 # Install AppStream metainfo for Discover / AppStream catalogs
 install(FILES com.github.loofi.aiusagemonitor.metainfo.xml
         DESTINATION ${KDE_INSTALL_METAINFODIR})

@@ -29,6 +29,8 @@ PlasmaExtras.Representation {
     readonly property bool compactHistoryControls: width < Kirigami.Units.gridUnit * 15
     readonly property bool compactSectionHeaders: width < Kirigami.Units.gridUnit * 16
     readonly property bool compactCompareRanking: width < Kirigami.Units.gridUnit * 17
+    readonly property bool compactOnboarding: width < Kirigami.Units.gridUnit * 20
+        || height < Kirigami.Units.gridUnit * 18
     readonly property int enabledProviderCount: {
         var providers = root.allProviders ?? [];
         var count = 0;
@@ -143,8 +145,11 @@ PlasmaExtras.Representation {
             }
 
             Rectangle {
+                id: onboardingCard
                 anchors.centerIn: parent
                 width: Math.min(parent.width - Kirigami.Units.largeSpacing * 2, Kirigami.Units.gridUnit * 20)
+                height: Math.min(parent.height - Kirigami.Units.largeSpacing * 2,
+                                 onboardingColumn.implicitHeight + Kirigami.Units.largeSpacing * 2)
                 radius: Kirigami.Units.smallSpacing
                 color: Kirigami.Theme.backgroundColor
                 border.width: 1
@@ -152,14 +157,16 @@ PlasmaExtras.Representation {
                 visible: fullRoot.onboardingVisible
 
                 ColumnLayout {
+                    id: onboardingColumn
                     anchors.fill: parent
                     anchors.margins: Kirigami.Units.largeSpacing
-                    spacing: Kirigami.Units.mediumSpacing
+                    spacing: fullRoot.compactOnboarding ? Kirigami.Units.smallSpacing : Kirigami.Units.mediumSpacing
 
                     PlasmaExtras.Heading {
                         level: 4
                         text: i18n("Set Up AI Usage Monitor")
                         Layout.fillWidth: true
+                        elide: Text.ElideRight
                     }
 
                     PlasmaComponents.Label {
@@ -170,6 +177,8 @@ PlasmaExtras.Representation {
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
+                        maximumLineCount: fullRoot.compactOnboarding ? 4 : 6
+                        elide: Text.ElideRight
                         text: {
                             if (fullRoot.onboardingStep === 0) {
                                 return i18n("Choose at least one provider in Configure > Providers. OpenAI, Anthropic, Google, and OpenAI-compatible providers are supported.");
@@ -186,6 +195,7 @@ PlasmaExtras.Representation {
 
                     RowLayout {
                         Layout.fillWidth: true
+                        visible: !fullRoot.compactOnboarding
                         spacing: Kirigami.Units.smallSpacing
 
                         PlasmaComponents.Button {
@@ -199,6 +209,29 @@ PlasmaExtras.Representation {
 
                         PlasmaComponents.Button {
                             activeFocusOnTab: true
+                            text: i18n("Not now")
+                            onClicked: {
+                                plasmoid.configuration.setupWizardDismissed = true;
+                            }
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        visible: fullRoot.compactOnboarding
+                        spacing: Kirigami.Units.smallSpacing
+
+                        PlasmaComponents.Button {
+                            activeFocusOnTab: true
+                            Layout.fillWidth: true
+                            text: i18n("Open Provider Settings")
+                            icon.name: "configure"
+                            onClicked: plasmoid.internalAction("configure").trigger()
+                        }
+
+                        PlasmaComponents.Button {
+                            activeFocusOnTab: true
+                            Layout.fillWidth: true
                             text: i18n("Not now")
                             onClicked: {
                                 plasmoid.configuration.setupWizardDismissed = true;
@@ -1236,7 +1269,11 @@ PlasmaExtras.Representation {
         if ((monitor.percentUsed ?? 0) >= 80) return i18n("Primary usage at %1%", Math.round(monitor.percentUsed));
         if ((monitor.secondaryPercentUsed ?? 0) >= 80) return i18n("Secondary usage at %1%", Math.round(monitor.secondaryPercentUsed));
         var syncStatus = monitor.syncStatus ?? "";
-        if (syncStatus !== "" && syncStatus !== "idle" && syncStatus !== "OK") {
+        if (syncStatus !== ""
+            && syncStatus !== "idle"
+            && syncStatus !== "OK"
+            && syncStatus !== i18n("Synced")
+            && syncStatus !== i18n("Plan presets")) {
             return syncStatus;
         }
         return "";

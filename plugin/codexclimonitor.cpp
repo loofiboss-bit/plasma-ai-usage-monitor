@@ -271,7 +271,7 @@ void CodexCliMonitor::fetchAccountCheck(const QString &cookieHeader)
             setSyncStatus(i18n("Synced"));
             Q_EMIT syncCompleted(true, i18n("Codex usage data synced successfully"));
         } else {
-            setSyncStatus(i18n("Catalog fallback"));
+            setSyncStatus(i18n("Plan presets"));
             const QString message = i18n("ChatGPT did not return live quota fields; showing configured plan presets.");
             Q_EMIT syncDiagnostic(toolName(), QStringLiteral("no_live_quota"), message);
             Q_EMIT syncCompleted(true, message);

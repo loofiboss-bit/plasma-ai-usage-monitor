@@ -295,7 +295,7 @@ void SubscriptionToolsTest::codexSyncWithoutLiveQuotaKeepsConfiguredPro()
 
     QTRY_VERIFY_WITH_TIMEOUT(completedSpy.count() >= 1, 3000);
     QCOMPARE(codex.planTier(), QStringLiteral("pro"));
-    QCOMPARE(codex.syncStatus(), QStringLiteral("Catalog fallback"));
+    QCOMPARE(codex.syncStatus(), QStringLiteral("Plan presets"));
     QVERIFY(diagnosticSpy.count() >= 1);
     QCOMPARE(diagnosticSpy.takeFirst().at(1).toString(), QStringLiteral("no_live_quota"));
     QVERIFY(completedSpy.takeFirst().at(0).toBool());

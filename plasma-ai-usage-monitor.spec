@@ -66,6 +66,7 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %doc README.md CHANGELOG.md
 %{_datadir}/plasma/plasmoids/com.github.loofi.aiusagemonitor/
 %{_libdir}/qt6/qml/com/github/loofi/aiusagemonitor/
+%{_datadir}/icons/hicolor/scalable/apps/com.github.loofi.aiusagemonitor.svg
 %{_datadir}/knotifications6/plasma_applet_com.github.loofi.aiusagemonitor.notifyrc
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
