@@ -79,8 +79,12 @@ def main() -> None:
                 fail(f"{key} missing {field}")
         if provider.get("needsManualReview") is True:
             manual_review += 1
+            if not provider.get("reviewReason"):
+                fail(f"{key} needsManualReview entries must include reviewReason")
         if provider.get("sourceConflict") is True:
             source_conflict += 1
+            if not provider.get("sourceConflictReason"):
+                fail(f"{key} sourceConflict entries must include sourceConflictReason")
 
         models = provider.get("models")
         if not isinstance(models, list) or not models:

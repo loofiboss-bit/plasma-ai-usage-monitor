@@ -18,7 +18,44 @@ KCM.SimpleKCM {
     CodexCliMonitor { id: codexDetector; Component.onCompleted: checkToolInstalled() }
     CopilotMonitor { id: copilotDetector; Component.onCompleted: checkToolInstalled() }
 
-    
+    readonly property var portableConfigKeys: [
+        "refreshInterval", "compactDisplayMode", "setupWizardCompleted", "setupWizardDismissed", "advancedSettingsMode",
+        "dashboardMode", "showOnlyProblems", "openaiRefreshInterval", "anthropicRefreshInterval", "googleRefreshInterval",
+        "mistralRefreshInterval", "deepseekRefreshInterval", "groqRefreshInterval", "xaiRefreshInterval", "ollamaRefreshInterval",
+        "openrouterRefreshInterval", "togetherRefreshInterval", "cohereRefreshInterval", "googleveoRefreshInterval", "azureRefreshInterval",
+        "bedrockRefreshInterval", "openaiEnabled", "openaiModel", "openaiProjectId", "openaiCustomBaseUrl",
+        "azureEnabled", "azureModel", "azureDeploymentId", "azureCustomBaseUrl", "bedrockEnabled",
+        "bedrockRegion", "bedrockModel", "bedrockCustomBaseUrl", "anthropicEnabled", "anthropicModel",
+        "anthropicCustomBaseUrl", "googleEnabled", "googleModel", "googleTier", "googleCustomBaseUrl",
+        "mistralEnabled", "mistralModel", "mistralCustomBaseUrl", "deepseekEnabled", "deepseekModel",
+        "deepseekCustomBaseUrl", "groqEnabled", "groqModel", "groqCustomBaseUrl", "xaiEnabled",
+        "xaiModel", "xaiCustomBaseUrl", "ollamaEnabled", "ollamaModel", "ollamaCustomBaseUrl",
+        "openrouterEnabled", "openrouterModel", "openrouterCustomBaseUrl", "togetherEnabled", "togetherModel",
+        "togetherCustomBaseUrl", "cohereEnabled", "cohereModel", "cohereCustomBaseUrl", "googleveoEnabled",
+        "googleveoModel", "googleveoTier", "googleveoCustomBaseUrl", "alertsEnabled", "warningThreshold",
+        "criticalThreshold", "notifyOnError", "notifyOnBudgetWarning", "notifyOnDisconnect", "notifyOnReconnect",
+        "notificationCooldownMinutes", "dndStartHour", "dndEndHour", "openaiNotificationsEnabled", "anthropicNotificationsEnabled",
+        "googleNotificationsEnabled", "mistralNotificationsEnabled", "deepseekNotificationsEnabled", "groqNotificationsEnabled", "xaiNotificationsEnabled",
+        "ollamaNotificationsEnabled", "openrouterNotificationsEnabled", "togetherNotificationsEnabled", "cohereNotificationsEnabled", "googleveoNotificationsEnabled",
+        "azureNotificationsEnabled", "bedrockNotificationsEnabled", "notifyOnUpdate", "updateCheckInterval", "slackWebhookEnabled",
+        "discordWebhookEnabled", "webhookCooldownMinutes", "openaiDailyBudget", "openaiMonthlyBudget", "anthropicDailyBudget",
+        "anthropicMonthlyBudget", "googleDailyBudget", "googleMonthlyBudget", "mistralDailyBudget", "mistralMonthlyBudget",
+        "deepseekDailyBudget", "deepseekMonthlyBudget", "groqDailyBudget", "groqMonthlyBudget", "xaiDailyBudget",
+        "xaiMonthlyBudget", "ollamaDailyBudget", "ollamaMonthlyBudget", "openrouterDailyBudget", "openrouterMonthlyBudget",
+        "togetherDailyBudget", "togetherMonthlyBudget", "cohereDailyBudget", "cohereMonthlyBudget", "googleveoDailyBudget",
+        "googleveoMonthlyBudget", "azureDailyBudget", "azureMonthlyBudget", "bedrockDailyBudget", "bedrockMonthlyBudget",
+        "budgetWarningPercent", "historyEnabled", "historyRetentionDays", "analystIntensityMode", "analystNormalization",
+        "prometheusEnabled", "prometheusPort", "autoExportEnabled", "autoExportDirectory", "autoExportIntervalMinutes",
+        "autoExportFormat", "browserSyncEnabled", "browserSyncBrowser", "browserSyncProfile", "browserSyncInterval",
+        "claudeCodeEnabled", "claudeCodePlan", "claudeCodePlanId", "claudeCodeCustomLimit", "claudeCodeNotifications",
+        "codexEnabled", "codexPlan", "codexPlanId", "codexCustomLimit", "codexNotifications",
+        "copilotEnabled", "copilotPlan", "copilotPlanId", "copilotCustomLimit", "copilotBillingMode",
+        "copilotResetDay", "copilotNotifications", "copilotOrgName", "cursorEnabled", "cursorPlan",
+        "cursorPlanId", "cursorCustomLimit", "cursorNotifications", "windsurfEnabled", "windsurfPlan",
+        "windsurfPlanId", "windsurfCustomLimit", "windsurfNotifications", "jetbrainsAiEnabled", "jetbrainsAiPlan",
+        "jetbrainsAiPlanId", "jetbrainsAiCustomLimit", "jetbrainsAiNotifications"
+    ]
+
     Dialogs.FileDialog {
         id: exportDialog
         title: i18n("Export Configuration")
@@ -26,22 +63,7 @@ KCM.SimpleKCM {
         nameFilters: ["JSON Files (*.json)"]
         currentFile: "ai-usage-monitor-config.json"
         onAccepted: {
-            var configData = {
-                version: AppInfo.version,
-                general: {
-                    refreshInterval: plasmoid.configuration.refreshInterval,
-                    compactDisplayMode: plasmoid.configuration.compactDisplayMode
-                },
-                openaiEnabled: plasmoid.configuration.openaiEnabled,
-                openaiModel: plasmoid.configuration.openaiModel,
-                anthropicEnabled: plasmoid.configuration.anthropicEnabled,
-                anthropicModel: plasmoid.configuration.anthropicModel,
-                googleEnabled: plasmoid.configuration.googleEnabled,
-                googleModel: plasmoid.configuration.googleModel,
-                ollamaEnabled: plasmoid.configuration.ollamaEnabled
-            };
-            var jsonStr = JSON.stringify(configData, null, 2);
-            AppInfo.exportConfig(jsonStr, selectedFile.toString());
+            AppInfo.exportConfig(JSON.stringify(exportConfigData(), null, 2), selectedFile.toString());
         }
     }
 
@@ -55,17 +77,7 @@ KCM.SimpleKCM {
             if (jsonStr.length > 0) {
                 try {
                     var configData = JSON.parse(jsonStr);
-                    if (configData.general) {
-                        if (configData.general.refreshInterval !== undefined) plasmoid.configuration.refreshInterval = configData.general.refreshInterval;
-                        if (configData.general.compactDisplayMode !== undefined) plasmoid.configuration.compactDisplayMode = configData.general.compactDisplayMode;
-                    }
-                    if (configData.openaiEnabled !== undefined) plasmoid.configuration.openaiEnabled = configData.openaiEnabled;
-                    if (configData.openaiModel !== undefined) plasmoid.configuration.openaiModel = configData.openaiModel;
-                    if (configData.anthropicEnabled !== undefined) plasmoid.configuration.anthropicEnabled = configData.anthropicEnabled;
-                    if (configData.anthropicModel !== undefined) plasmoid.configuration.anthropicModel = configData.anthropicModel;
-                    if (configData.googleEnabled !== undefined) plasmoid.configuration.googleEnabled = configData.googleEnabled;
-                    if (configData.googleModel !== undefined) plasmoid.configuration.googleModel = configData.googleModel;
-                    if (configData.ollamaEnabled !== undefined) plasmoid.configuration.ollamaEnabled = configData.ollamaEnabled;
+                    importConfigData(configData);
                 } catch (e) {
                     console.error("Failed to parse imported config:", e);
                 }
@@ -235,7 +247,7 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            text: i18n("Export your configuration (excluding secrets) to a file. Safe to share.")
+            text: i18n("Exports schema v2 non-secret settings only. API keys, tokens, cookies, PATs, and webhook URLs remain in KWallet and are never written to the file.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             opacity: 0.6
             wrapMode: Text.WordWrap
@@ -273,12 +285,73 @@ KCM.SimpleKCM {
             text: AppInfo.version
         }
 
-        QQC2.Button {
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Loaded plugin:")
+            text: AppInfo.pluginPath
+            wrapMode: Text.WrapAnywhere
+            Layout.fillWidth: true
+        }
+
+        RowLayout {
             Kirigami.FormData.label: i18n("Actions:")
-            text: i18n("Run install_doctor.sh in terminal")
-            icon.name: "utilities-terminal"
-            onClicked: {
-                Qt.openUrlExternally("konsole --hold -e sh -c 'cd " + AppInfo.pluginPath + "/../scripts && ./install_doctor.sh'");
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Button {
+                text: i18n("Run install doctor")
+                icon.name: "utilities-terminal"
+                onClicked: {
+                    Qt.openUrlExternally("konsole --hold -e sh -c 'cd " + AppInfo.pluginPath + "/../scripts && ./install_doctor.sh'");
+                }
+            }
+
+            QQC2.Button {
+                text: i18n("Show installed versions")
+                icon.name: "view-list-details"
+                onClicked: {
+                    Qt.openUrlExternally("konsole --hold -e sh -c 'cd " + AppInfo.pluginPath + "/../scripts && ./show_installed_versions.sh'");
+                }
+            }
+        }
+    }
+
+    function exportConfigData() {
+        var settings = {};
+        for (var i = 0; i < portableConfigKeys.length; i++) {
+            var key = portableConfigKeys[i];
+            settings[key] = plasmoid.configuration[key];
+        }
+        return {
+            schemaVersion: 2,
+            app: "com.github.loofi.aiusagemonitor",
+            exportedByVersion: AppInfo.version,
+            includesSecrets: false,
+            settings: settings
+        };
+    }
+
+    function importConfigData(configData) {
+        if (configData.schemaVersion === 2 && configData.settings) {
+            for (var i = 0; i < portableConfigKeys.length; i++) {
+                var key = portableConfigKeys[i];
+                if (configData.settings[key] !== undefined) {
+                    plasmoid.configuration[key] = configData.settings[key];
+                }
+            }
+            return;
+        }
+
+        if (configData.general) {
+            if (configData.general.refreshInterval !== undefined) plasmoid.configuration.refreshInterval = configData.general.refreshInterval;
+            if (configData.general.compactDisplayMode !== undefined) plasmoid.configuration.compactDisplayMode = configData.general.compactDisplayMode;
+        }
+        var legacyKeys = [
+            "openaiEnabled", "openaiModel", "anthropicEnabled", "anthropicModel",
+            "googleEnabled", "googleModel", "ollamaEnabled"
+        ];
+        for (var j = 0; j < legacyKeys.length; j++) {
+            var legacyKey = legacyKeys[j];
+            if (configData[legacyKey] !== undefined) {
+                plasmoid.configuration[legacyKey] = configData[legacyKey];
             }
         }
     }

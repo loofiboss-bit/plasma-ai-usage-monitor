@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        8.0.3
+Version:        9.0.0
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
 License:        GPL-3.0-or-later
@@ -43,7 +43,8 @@ Features:
 - Configurable alerts with KDE notifications
 - Per-provider refresh intervals and notification controls
 - Collapsible provider cards with accessibility support
-- Data export (CSV/JSON)
+- Data export (CSV/JSON) and non-secret configuration portability
+- Trust Center diagnostics for catalog review, KWallet, and local readiness
 - Panel icon with status badge indicator
 - HTTPS security warnings for custom base URLs
 
@@ -71,6 +72,12 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Fri May 08 2026 Loofi <loofi@github.com> - 9.0.0-1
+- Ship Confidence as a setup, diagnostics, catalog trust, and validation hardening release
+- Add schema-v2 non-secret config export/import coverage for all KConfig keys
+- Expose catalog review/source-conflict reasons in Diagnostics and validation gates
+- Remove the stale standalone setup wizard from the shipped plasmoid payload
+
 * Wed May 06 2026 Loofi <loofi@github.com> - 8.0.3-1
 - Add self-tracked fallback limits for qualitative subscription-tool plans
 - Show Codex and similar local activity monitors with progress bars when live quota fields are unavailable

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
-  "catalogVersion": "2026.05.06",
-  "release": "8.0.0",
-  "lastReviewed": "2026-05-06",
+  "catalogVersion": "2026.05.08",
+  "release": "9.0.0",
+  "lastReviewed": "2026-05-08",
   "runtimeScraping": false,
-  "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries with provider_catalog precision are carried forward from the repo catalog and must be reviewed before being presented as exact.",
+  "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries with manual-review flags now include user-visible reasons in Diagnostics.",
   "providers": [
     {
       "key": "openai",
@@ -17,7 +17,9 @@
         {
           "id": "gpt-5.5",
           "displayName": "GPT-5.5",
-          "modalities": ["text"],
+          "modalities": [
+            "text"
+          ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
@@ -36,14 +38,16 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://openai.com/api/pricing/",
-              "reviewedAt": "2026-05-06"
+              "reviewedAt": "2026-05-08"
             }
           ]
         },
         {
           "id": "gpt-5.4",
           "displayName": "GPT-5.4",
-          "modalities": ["text"],
+          "modalities": [
+            "text"
+          ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
@@ -62,14 +66,16 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://openai.com/api/pricing/",
-              "reviewedAt": "2026-05-06"
+              "reviewedAt": "2026-05-08"
             }
           ]
         },
         {
           "id": "gpt-5.4-mini",
           "displayName": "GPT-5.4 mini",
-          "modalities": ["text"],
+          "modalities": [
+            "text"
+          ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
@@ -88,7 +94,7 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://openai.com/api/pricing/",
-              "reviewedAt": "2026-05-06"
+              "reviewedAt": "2026-05-08"
             }
           ]
         }
@@ -102,11 +108,92 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "claude-opus-4.7", "displayName": "Claude Opus 4.7", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 15.0, "output": 75.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Anthropic API pricing", "url": "https://www.anthropic.com/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "claude-sonnet-4.8", "displayName": "Claude Sonnet 4.8", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 3.0, "output": 15.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Anthropic API pricing", "url": "https://www.anthropic.com/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "claude-sonnet-4-20250514", "displayName": "Claude Sonnet 4", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 3.0, "output": 15.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Anthropic API pricing", "url": "https://www.anthropic.com/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "claude-haiku-4-20250514", "displayName": "Claude Haiku 4", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.8, "output": 4.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Anthropic API pricing", "url": "https://www.anthropic.com/pricing", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "claude-opus-4.7",
+          "displayName": "Claude Opus 4.7",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 15.0,
+            "output": 75.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Anthropic API pricing",
+              "url": "https://www.anthropic.com/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "claude-sonnet-4.8",
+          "displayName": "Claude Sonnet 4.8",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Anthropic API pricing",
+              "url": "https://www.anthropic.com/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "claude-sonnet-4-20250514",
+          "displayName": "Claude Sonnet 4",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Anthropic API pricing",
+              "url": "https://www.anthropic.com/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "claude-haiku-4-20250514",
+          "displayName": "Claude Haiku 4",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.8,
+            "output": 4.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Anthropic API pricing",
+              "url": "https://www.anthropic.com/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed official Anthropic pricing on 2026-05-08; kept manual review because the shipped model IDs include aliases/newer naming that need a deliberate model-list refresh before exact pricing labels."
     },
     {
       "key": "google",
@@ -116,11 +203,92 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "gemini-3.1-flash-live", "displayName": "Gemini 3.1 Flash Live", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.15, "output": 0.60, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Google AI pricing", "url": "https://ai.google.dev/gemini-api/docs/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "gemini-2.5-pro", "displayName": "Gemini 2.5 Pro", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 1.25, "output": 10.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Google AI pricing", "url": "https://ai.google.dev/gemini-api/docs/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "gemini-2.5-flash", "displayName": "Gemini 2.5 Flash", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.15, "output": 0.60, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Google AI pricing", "url": "https://ai.google.dev/gemini-api/docs/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "gemini-2.0-flash", "displayName": "Gemini 2.0 Flash", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.10, "output": 0.40, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Google AI pricing", "url": "https://ai.google.dev/gemini-api/docs/pricing", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "gemini-3.1-flash-live",
+          "displayName": "Gemini 3.1 Flash Live",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.15,
+            "output": 0.6,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Google AI pricing",
+              "url": "https://ai.google.dev/gemini-api/docs/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "gemini-2.5-pro",
+          "displayName": "Gemini 2.5 Pro",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 1.25,
+            "output": 10.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Google AI pricing",
+              "url": "https://ai.google.dev/gemini-api/docs/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "gemini-2.5-flash",
+          "displayName": "Gemini 2.5 Flash",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.15,
+            "output": 0.6,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Google AI pricing",
+              "url": "https://ai.google.dev/gemini-api/docs/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "gemini-2.0-flash",
+          "displayName": "Gemini 2.0 Flash",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.1,
+            "output": 0.4,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Google AI pricing",
+              "url": "https://ai.google.dev/gemini-api/docs/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed Google AI pricing on 2026-05-08; kept manual review because Gemini and Veo pricing varies by model, tier, and media unit and the catalog needs a model-by-model refresh."
     },
     {
       "key": "mistral",
@@ -130,11 +298,92 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "mistral-large", "displayName": "Mistral Large", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 2.0, "output": 6.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Mistral pricing", "url": "https://mistral.ai/products/la-plateforme#pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "mistral-large-latest", "displayName": "Mistral Large latest", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 2.0, "output": 6.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Mistral pricing", "url": "https://mistral.ai/products/la-plateforme#pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "mistral-medium", "displayName": "Mistral Medium", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 2.7, "output": 8.1, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Mistral pricing", "url": "https://mistral.ai/products/la-plateforme#pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "mistral-small", "displayName": "Mistral Small", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.2, "output": 0.6, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Mistral pricing", "url": "https://mistral.ai/products/la-plateforme#pricing", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "mistral-large",
+          "displayName": "Mistral Large",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.0,
+            "output": 6.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Mistral pricing",
+              "url": "https://mistral.ai/products/la-plateforme#pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "mistral-large-latest",
+          "displayName": "Mistral Large latest",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.0,
+            "output": 6.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Mistral pricing",
+              "url": "https://mistral.ai/products/la-plateforme#pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "mistral-medium",
+          "displayName": "Mistral Medium",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.7,
+            "output": 8.1,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Mistral pricing",
+              "url": "https://mistral.ai/products/la-plateforme#pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "mistral-small",
+          "displayName": "Mistral Small",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.2,
+            "output": 0.6,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Mistral pricing",
+              "url": "https://mistral.ai/products/la-plateforme#pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed Mistral pricing on 2026-05-08; kept manual review because carried-forward provider_catalog values need model-by-model reconciliation against the current pricing page."
     },
     {
       "key": "deepseek",
@@ -144,9 +393,50 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "deepseek-chat", "displayName": "DeepSeek Chat", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.14, "output": 0.28, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "DeepSeek API docs", "url": "https://api-docs.deepseek.com/quick_start/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "deepseek-reasoner", "displayName": "DeepSeek Reasoner", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.55, "output": 2.19, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "DeepSeek API docs", "url": "https://api-docs.deepseek.com/quick_start/pricing", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "deepseek-chat",
+          "displayName": "DeepSeek Chat",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.14,
+            "output": 0.28,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "DeepSeek API docs",
+              "url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "deepseek-reasoner",
+          "displayName": "DeepSeek Reasoner",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.55,
+            "output": 2.19,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "DeepSeek API docs",
+              "url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed DeepSeek pricing on 2026-05-08; kept manual review because official input pricing distinguishes cache-hit and cache-miss rates while the current catalog stores one input value."
     },
     {
       "key": "groq",
@@ -156,9 +446,50 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "llama-3.3-70b-versatile", "displayName": "Llama 3.3 70B Versatile", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.59, "output": 0.79, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Groq pricing", "url": "https://groq.com/pricing/", "reviewedAt": "2026-05-06" }] },
-        { "id": "gemma-4-31b-it", "displayName": "Gemma 4 31B IT", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.30, "output": 0.30, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Groq pricing", "url": "https://groq.com/pricing/", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "llama-3.3-70b-versatile",
+          "displayName": "Llama 3.3 70B Versatile",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.59,
+            "output": 0.79,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Groq pricing",
+              "url": "https://groq.com/pricing/",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "gemma-4-31b-it",
+          "displayName": "Gemma 4 31B IT",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.3,
+            "output": 0.3,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Groq pricing",
+              "url": "https://groq.com/pricing/",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed Groq pricing on 2026-05-08; kept manual review until the current model lineup and carried-forward provider_catalog values are reconciled."
     },
     {
       "key": "xai",
@@ -168,9 +499,50 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "grok-3", "displayName": "Grok 3", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 3.0, "output": 15.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "xAI API docs", "url": "https://docs.x.ai/docs/models", "reviewedAt": "2026-05-06" }] },
-        { "id": "grok-3-mini", "displayName": "Grok 3 mini", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.30, "output": 0.50, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "xAI API docs", "url": "https://docs.x.ai/docs/models", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "grok-3",
+          "displayName": "Grok 3",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "xAI API docs",
+              "url": "https://docs.x.ai/docs/models",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "grok-3-mini",
+          "displayName": "Grok 3 mini",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.3,
+            "output": 0.5,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "xAI API docs",
+              "url": "https://docs.x.ai/docs/models",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed xAI model docs on 2026-05-08; kept manual review until Grok model pricing and model-retirement state are reconciled with the shipped defaults."
     },
     {
       "key": "ollama",
@@ -180,8 +552,27 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "gpt-oss:120b", "displayName": "GPT OSS 120B", "modalities": ["text"], "pricing": { "status": "unknown", "unit": "unknown", "precision": "unknown" }, "sourceRefs": [{ "label": "Ollama Cloud", "url": "https://ollama.com/pricing", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "gpt-oss:120b",
+          "displayName": "GPT OSS 120B",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "status": "unknown",
+            "unit": "unknown",
+            "precision": "unknown"
+          },
+          "sourceRefs": [
+            {
+              "label": "Ollama Cloud",
+              "url": "https://ollama.com/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed Ollama Cloud docs on 2026-05-08; no stable public unit pricing was confirmed for the shipped cloud model, so pricing remains unknown."
     },
     {
       "key": "openrouter",
@@ -191,11 +582,93 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "openai/gpt-5.4", "displayName": "OpenAI GPT-5.4 via OpenRouter", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 2.5, "cachedInput": 0.25, "output": 15.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "OpenRouter model catalog", "url": "https://openrouter.ai/models", "reviewedAt": "2026-05-06" }] },
-        { "id": "openai/gpt-5.4-pro", "displayName": "OpenAI GPT-5.4 Pro via OpenRouter", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 3.0, "output": 12.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "OpenRouter model catalog", "url": "https://openrouter.ai/models", "reviewedAt": "2026-05-06" }] },
-        { "id": "anthropic/claude-sonnet-4.8", "displayName": "Claude Sonnet 4.8 via OpenRouter", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 3.0, "output": 15.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "OpenRouter model catalog", "url": "https://openrouter.ai/models", "reviewedAt": "2026-05-06" }] },
-        { "id": "google/gemini-2.5-pro", "displayName": "Gemini 2.5 Pro via OpenRouter", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 1.25, "output": 10.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "OpenRouter model catalog", "url": "https://openrouter.ai/models", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "openai/gpt-5.4",
+          "displayName": "OpenAI GPT-5.4 via OpenRouter",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.5,
+            "cachedInput": 0.25,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenRouter model catalog",
+              "url": "https://openrouter.ai/models",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "openai/gpt-5.4-pro",
+          "displayName": "OpenAI GPT-5.4 Pro via OpenRouter",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 12.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenRouter model catalog",
+              "url": "https://openrouter.ai/models",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "anthropic/claude-sonnet-4.8",
+          "displayName": "Claude Sonnet 4.8 via OpenRouter",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenRouter model catalog",
+              "url": "https://openrouter.ai/models",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "google/gemini-2.5-pro",
+          "displayName": "Gemini 2.5 Pro via OpenRouter",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 1.25,
+            "output": 10.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenRouter model catalog",
+              "url": "https://openrouter.ai/models",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed OpenRouter pricing on 2026-05-08; kept manual review because prices are provider-routed and can vary by selected route/model provider."
     },
     {
       "key": "together",
@@ -205,9 +678,50 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo", "displayName": "Llama 3.3 70B Instruct Turbo", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.88, "output": 0.88, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Together AI pricing", "url": "https://www.together.ai/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", "displayName": "Llama 3.1 8B Instruct Turbo", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.18, "output": 0.18, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Together AI pricing", "url": "https://www.together.ai/pricing", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+          "displayName": "Llama 3.3 70B Instruct Turbo",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.88,
+            "output": 0.88,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Together AI pricing",
+              "url": "https://www.together.ai/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+          "displayName": "Llama 3.1 8B Instruct Turbo",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.18,
+            "output": 0.18,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Together AI pricing",
+              "url": "https://www.together.ai/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed Together AI pricing on 2026-05-08; kept manual review because official pricing is model/category-specific and the shipped values need reconciliation."
     },
     {
       "key": "cohere",
@@ -217,9 +731,50 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "command-a-03-2025", "displayName": "Command A", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 2.50, "output": 10.00, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Cohere pricing", "url": "https://cohere.com/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "command-r-plus", "displayName": "Command R+", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 3.00, "output": 15.00, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Cohere pricing", "url": "https://cohere.com/pricing", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "command-a-03-2025",
+          "displayName": "Command A",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.5,
+            "output": 10.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Cohere pricing",
+              "url": "https://cohere.com/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "command-r-plus",
+          "displayName": "Command R+",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Cohere pricing",
+              "url": "https://cohere.com/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed Cohere docs on 2026-05-08; kept manual review because current Command model pricing needs reconciliation with the shipped model aliases."
     },
     {
       "key": "googleveo",
@@ -229,9 +784,48 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "veo-3", "displayName": "Veo 3", "modalities": ["video"], "pricing": { "currency": "USD", "unit": "video_second", "amount": 0.50, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Google AI pricing", "url": "https://ai.google.dev/gemini-api/docs/pricing", "reviewedAt": "2026-05-06" }] },
-        { "id": "veo-2", "displayName": "Veo 2", "modalities": ["video"], "pricing": { "currency": "USD", "unit": "video_second", "amount": 0.35, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "Google AI pricing", "url": "https://ai.google.dev/gemini-api/docs/pricing", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "veo-3",
+          "displayName": "Veo 3",
+          "modalities": [
+            "video"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "video_second",
+            "amount": 0.5,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Google AI pricing",
+              "url": "https://ai.google.dev/gemini-api/docs/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "veo-2",
+          "displayName": "Veo 2",
+          "modalities": [
+            "video"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "video_second",
+            "amount": 0.35,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "Google AI pricing",
+              "url": "https://ai.google.dev/gemini-api/docs/pricing",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed Google AI pricing on 2026-05-08; kept manual review because video-generation pricing depends on API/product surface and unit semantics."
     },
     {
       "key": "azure",
@@ -241,9 +835,72 @@
       "needsManualReview": false,
       "sourceConflict": false,
       "models": [
-        { "id": "gpt-5.4", "displayName": "GPT-5.4", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 2.5, "cachedInput": 0.25, "output": 15.0, "precision": "official_exact" }, "sourceRefs": [{ "label": "OpenAI API pricing", "url": "https://openai.com/api/pricing/", "reviewedAt": "2026-05-06" }] },
-        { "id": "gpt-5.4-pro", "displayName": "GPT-5.4 Pro compatibility alias", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 2.5, "cachedInput": 0.25, "output": 15.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "OpenAI API pricing", "url": "https://openai.com/api/pricing/", "reviewedAt": "2026-05-06" }] },
-        { "id": "gpt-5.4-mini", "displayName": "GPT-5.4 mini", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 0.75, "cachedInput": 0.075, "output": 4.5, "precision": "official_exact" }, "sourceRefs": [{ "label": "OpenAI API pricing", "url": "https://openai.com/api/pricing/", "reviewedAt": "2026-05-06" }] }
+        {
+          "id": "gpt-5.4",
+          "displayName": "GPT-5.4",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.5,
+            "cachedInput": 0.25,
+            "output": 15.0,
+            "precision": "official_exact"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenAI API pricing",
+              "url": "https://openai.com/api/pricing/",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.4-pro",
+          "displayName": "GPT-5.4 Pro compatibility alias",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.5,
+            "cachedInput": 0.25,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenAI API pricing",
+              "url": "https://openai.com/api/pricing/",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.4-mini",
+          "displayName": "GPT-5.4 mini",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.75,
+            "cachedInput": 0.075,
+            "output": 4.5,
+            "precision": "official_exact"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenAI API pricing",
+              "url": "https://openai.com/api/pricing/",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
       ]
     },
     {
@@ -254,8 +911,29 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
-        { "id": "anthropic.claude-3-5-sonnet-20241022-v2:0", "displayName": "Claude 3.5 Sonnet on Bedrock", "modalities": ["text"], "pricing": { "currency": "USD", "unit": "1M_tokens", "input": 3.0, "output": 15.0, "precision": "provider_catalog" }, "sourceRefs": [{ "label": "AWS Bedrock pricing", "url": "https://aws.amazon.com/bedrock/pricing/", "reviewedAt": "2026-05-06" }] }
-      ]
+        {
+          "id": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+          "displayName": "Claude 3.5 Sonnet on Bedrock",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "AWS Bedrock pricing",
+              "url": "https://aws.amazon.com/bedrock/pricing/",
+              "reviewedAt": "2026-05-08"
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed Amazon Bedrock pricing on 2026-05-08; kept manual review because Bedrock pricing is region, provider, and model specific."
     }
   ]
 }

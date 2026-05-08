@@ -4,6 +4,7 @@
 #include <QJsonObject>
 #include <QObject>
 #include <QStringList>
+#include <QVariantList>
 
 class CatalogLoader : public QObject
 {
@@ -16,6 +17,7 @@ class CatalogLoader : public QObject
     Q_PROPERTY(bool runtimeScraping READ runtimeScraping NOTIFY statusChanged)
     Q_PROPERTY(int manualReviewCount READ manualReviewCount NOTIFY statusChanged)
     Q_PROPERTY(int sourceConflictCount READ sourceConflictCount NOTIFY statusChanged)
+    Q_PROPERTY(QVariantList reviewItems READ reviewItems NOTIFY statusChanged)
     Q_PROPERTY(QString catalogPath READ catalogPath NOTIFY statusChanged)
     Q_PROPERTY(QStringList diagnostics READ diagnostics NOTIFY statusChanged)
 
@@ -33,6 +35,7 @@ public:
     bool runtimeScraping() const;
     int manualReviewCount() const;
     int sourceConflictCount() const;
+    QVariantList reviewItems() const;
     QString catalogPath() const;
     QStringList diagnostics() const;
 
@@ -57,6 +60,7 @@ private:
     bool m_runtimeScraping = false;
     int m_manualReviewCount = 0;
     int m_sourceConflictCount = 0;
+    QVariantList m_reviewItems;
     QString m_catalogPath;
     QStringList m_diagnostics;
     QJsonObject m_root;

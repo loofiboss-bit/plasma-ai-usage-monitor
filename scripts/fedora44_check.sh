@@ -149,6 +149,7 @@ if python3 scripts/check_qml_registered_types.py; then ok "QML registered types"
 if python3 scripts/check_provider_catalog.py; then ok "Provider Catalog v3"; else fail "Provider Catalog v3 invalid" "Update package/contents/catalog/providers-v3.json."; fi
 if python3 scripts/check_subscription_catalog.py; then ok "Subscription Catalog v1"; else fail "Subscription Catalog v1 invalid" "Update package/contents/catalog/subscriptions-v1.json."; fi
 if python3 scripts/check_no_hardcoded_pricing.py; then ok "No hardcoded subscription pricing"; else fail "Hardcoded subscription pricing found" "Move subscription prices and quotas into subscriptions-v1.json."; fi
+if python3 scripts/check_config_portability.py; then ok "Config portability schema"; else fail "Config portability schema invalid" "Keep configDiagnostics.qml portableConfigKeys aligned with package/contents/config/main.xml."; fi
 if command -v appstreamcli >/dev/null 2>&1 && appstreamcli validate com.github.loofi.aiusagemonitor.metainfo.xml; then ok "AppStream metadata"; else fail "AppStream validation failed" "Install appstream and fix com.github.loofi.aiusagemonitor.metainfo.xml."; fi
 if command -v rpmlint >/dev/null 2>&1 && rpmlint plasma-ai-usage-monitor.spec; then ok "rpmlint spec validation"; else fail "rpmlint failed" "Install rpmlint and fix plasma-ai-usage-monitor.spec findings."; fi
 if bash scripts/package_source_tarball.sh --check; then ok "Source tarball check"; else fail "Source tarball check failed" "Fix scripts/package_source_tarball.sh --check findings."; fi

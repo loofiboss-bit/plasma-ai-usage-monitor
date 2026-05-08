@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.0.0] — 2026-05-08
+
+### Added
+- Add schema-v2 configuration export/import that covers every non-secret KConfig key while keeping API keys, browser cookies, PATs, and webhook URLs in KWallet.
+- Add catalog review items to `CatalogLoader` so Diagnostics can show the provider or subscription entries that need manual review or have source conflicts.
+- Add config-portability validation and stricter catalog-review reason checks to local, CTest, Fedora 44, and CI validation.
+
+### Changed
+- Refresh Provider Catalog v3 and Subscription Catalog v1 for the Confidence release with 2026-05-08 review dates and user-visible review/conflict reasons.
+- Resolve JetBrains AI subscription metadata from source-conflict to official range-based pricing and quota labels.
+- Expand Diagnostics with loaded plugin path, richer Trust Center catalog details, and clearer config portability copy.
+- Refresh the roadmap, README, AppStream, and RPM metadata around v9.0.0 Confidence.
+
+### Removed
+- Remove the stale standalone `SetupWizard.qml` path so first-run activation has one maintained inline onboarding path.
+
 ## [8.0.3] — 2026-05-06
 
 ### Fixed
@@ -616,7 +632,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.3...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v9.0.0...HEAD
+[9.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.3...v9.0.0
 [8.0.3]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.2...v8.0.3
 [8.0.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.1...v8.0.2
 [8.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.0...v8.0.1

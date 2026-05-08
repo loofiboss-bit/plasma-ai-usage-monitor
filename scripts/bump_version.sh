@@ -38,8 +38,8 @@ sed -i "s/^Version:[[:space:]]*.*/Version:        ${NEW_VERSION}/" \
     "${ROOT_DIR}/plasma-ai-usage-monitor.spec"
 echo "  [OK] plasma-ai-usage-monitor.spec"
 
-# 4. metainfo.xml — <release version="X.Y.Z" date="YYYY-MM-DD"/>
-sed -i "s/<release version=\"[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\" date=\"[0-9-]*\"\/>/<release version=\"${NEW_VERSION}\" date=\"${TODAY}\"\/>/" \
+# 4. metainfo.xml — update the newest release entry only.
+perl -0pi -e "s/<release version=\"[0-9]+\\.[0-9]+\\.[0-9]+\" date=\"[0-9-]+\"\\/>/<release version=\"${NEW_VERSION}\" date=\"${TODAY}\"\\/>/" \
     "${ROOT_DIR}/com.github.loofi.aiusagemonitor.metainfo.xml"
 echo "  [OK] com.github.loofi.aiusagemonitor.metainfo.xml"
 

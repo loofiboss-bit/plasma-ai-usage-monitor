@@ -13,7 +13,7 @@ def expected_version_from_cmake():
                 return match.group(1)
     except OSError:
         pass
-    return "8.0.0"
+    return "9.0.0"
 
 def main():
     expected_version = expected_version_from_cmake()
@@ -21,7 +21,6 @@ def main():
     expected_files_in_source = [
         "package/metadata.json",
         "package/contents/ui/main.qml",
-        "package/contents/ui/SetupWizard.qml",
         "package/contents/catalog/providers-v3.json",
         "package/contents/catalog/subscriptions-v1.json",
         "package/contents/icons/providers/openai.svg",
@@ -30,12 +29,21 @@ def main():
         "plugin/qmldir",
         "com.github.loofi.aiusagemonitor.metainfo.xml"
     ]
+
+    retired_files = [
+        "package/contents/ui/SetupWizard.qml",
+    ]
     
     missing = False
     
     for f in expected_files_in_source:
         if not os.path.exists(f):
             print(f"Error: Missing expected source file {f}")
+            missing = True
+
+    for f in retired_files:
+        if os.path.exists(f):
+            print(f"Error: Retired setup file still ships: {f}")
             missing = True
 
     if missing:
@@ -79,6 +87,11 @@ def main():
                 for expected in tar_expected:
                     if expected not in names:
                         print(f"Error: Tarball is missing {expected}")
+                        missing = True
+                for retired in retired_files:
+                    retired_name = f"plasma-ai-usage-monitor-{expected_version}/{retired}"
+                    if retired_name in names:
+                        print(f"Error: Tarball includes retired setup file {retired_name}")
                         missing = True
         except Exception as e:
             print(f"Error reading tarball: {e}")

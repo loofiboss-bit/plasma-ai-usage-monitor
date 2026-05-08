@@ -8,6 +8,7 @@
 #include <QJsonDocument>
 #include <QJsonValue>
 #include <QStandardPaths>
+#include <QVariantMap>
 #include <QDebug>
 
 #include <utility>
@@ -43,6 +44,56 @@ void countFlagsInValue(const QJsonValue &value, int &manualReview, int &sourceCo
         }
     }
 }
+
+QString firstSourceRef(const QJsonObject &object)
+{
+    const QJsonArray refs = object.value(QStringLiteral("sourceRefs")).toArray();
+    if (refs.isEmpty()) {
+        return QString();
+    }
+    const QJsonObject ref = refs.first().toObject();
+    const QString label = ref.value(QStringLiteral("label")).toString();
+    const QString reviewedAt = ref.value(QStringLiteral("reviewedAt")).toString();
+    if (label.isEmpty()) {
+        return reviewedAt;
+    }
+    if (reviewedAt.isEmpty()) {
+        return label;
+    }
+    return QStringLiteral("%1 (%2)").arg(label, reviewedAt);
+}
+
+QVariantList collectReviewItems(const QJsonObject &root)
+{
+    QVariantList result;
+    const QString collectionKey = root.contains(QStringLiteral("providers"))
+        ? QStringLiteral("providers")
+        : QStringLiteral("tools");
+    const QJsonArray entries = root.value(collectionKey).toArray();
+
+    for (const QJsonValue &entryValue : entries) {
+        const QJsonObject entry = entryValue.toObject();
+        const bool needsReview = entry.value(QStringLiteral("needsManualReview")).toBool(false);
+        const bool sourceConflict = entry.value(QStringLiteral("sourceConflict")).toBool(false);
+        if (!needsReview && !sourceConflict) {
+            continue;
+        }
+
+        QVariantMap row;
+        row.insert(QStringLiteral("key"), entry.value(QStringLiteral("key")).toString());
+        row.insert(QStringLiteral("label"), entry.value(QStringLiteral("label")).toString());
+        row.insert(QStringLiteral("needsManualReview"), needsReview);
+        row.insert(QStringLiteral("sourceConflict"), sourceConflict);
+        row.insert(QStringLiteral("dataQuality"), entry.value(QStringLiteral("dataQuality")).toString());
+        row.insert(QStringLiteral("pricingFreshness"), entry.value(QStringLiteral("pricingFreshness")).toString());
+        row.insert(QStringLiteral("reviewReason"), entry.value(QStringLiteral("reviewReason")).toString());
+        row.insert(QStringLiteral("sourceConflictReason"), entry.value(QStringLiteral("sourceConflictReason")).toString());
+        row.insert(QStringLiteral("source"), firstSourceRef(entry));
+        result << row;
+    }
+
+    return result;
+}
 } // namespace
 
 CatalogLoader::CatalogLoader(QString fileName, int expectedSchemaVersion, QObject *parent)
@@ -62,6 +113,7 @@ bool CatalogLoader::load()
     m_runtimeScraping = false;
     m_manualReviewCount = 0;
     m_sourceConflictCount = 0;
+    m_reviewItems.clear();
     m_catalogPath.clear();
     m_diagnostics.clear();
     m_root = QJsonObject();
@@ -187,6 +239,12 @@ int CatalogLoader::sourceConflictCount() const
     return m_sourceConflictCount;
 }
 
+QVariantList CatalogLoader::reviewItems() const
+{
+    ensureLoaded();
+    return m_reviewItems;
+}
+
 QString CatalogLoader::catalogPath() const
 {
     ensureLoaded();
@@ -252,4 +310,5 @@ void CatalogLoader::countReviewFlags()
     m_manualReviewCount = 0;
     m_sourceConflictCount = 0;
     countFlagsInValue(QJsonValue(m_root), m_manualReviewCount, m_sourceConflictCount);
+    m_reviewItems = collectReviewItems(m_root);
 }

@@ -50,9 +50,11 @@ void CatalogsTest::providerCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 3);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.06"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.08"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
+    QVERIFY(!catalog.reviewItems().isEmpty());
+    QVERIFY(catalog.reviewItems().first().toMap().contains(QStringLiteral("reviewReason")));
 
     const QVariantList openAiModels = catalog.tokenModelsForProvider(QStringLiteral("openai"));
     QVERIFY(openAiModels.size() >= 3);
@@ -69,10 +71,13 @@ void CatalogsTest::subscriptionCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 1);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.06"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.08"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(catalog.sourceConflictCount() > 0);
+    QVERIFY(!catalog.reviewItems().isEmpty());
+    QCOMPARE(catalog.reviewItems().first().toMap().value(QStringLiteral("key")).toString(), QStringLiteral("windsurf"));
+    QVERIFY(catalog.reviewItems().first().toMap().value(QStringLiteral("sourceConflictReason")).toString().contains(QStringLiteral("Windsurf")));
 
     QCOMPARE(catalog.planIdForLabel(QStringLiteral("claude-code"), QStringLiteral("Max 20x")), QStringLiteral("max_20x"));
     QCOMPARE(catalog.planIdForLabel(QStringLiteral("codex-cli"), QStringLiteral("Pro $100")), QStringLiteral("pro_100"));

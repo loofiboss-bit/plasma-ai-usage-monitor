@@ -1,29 +1,43 @@
 # Roadmap — Plasma AI Usage Monitor
 
-> **Current version:** v8.0.0 (Source Of Truth)
-> **Last updated:** 2026-05-06
-> **Direction:** Keep the widget desktop-native and local-first. Prefer export, notifications, and loopback integrations over backend/server expansion.
+> **Current version:** v9.0.0 (Confidence)
+> **Last updated:** 2026-05-08
+> **Direction:** Keep the widget desktop-native, local-first, and honest about data quality. Prefer setup clarity, diagnostics, export, notifications, and loopback integrations over backend/server expansion.
 
-## Analyst's Note on Feasibility
+## Product Direction
 
-The earlier Horizon/Nexus direction pushed toward web dashboards, PostgreSQL, and multi-user infrastructure. That is not a good fit for a KDE Plasma widget. The project now stays focused on:
+The app is a KDE Plasma widget, not a cloud control plane. The strongest path is to make local monitoring reliable, explain what each data source can and cannot prove, and keep validation strict enough that stale metadata cannot silently ship.
 
-- local monitoring and distribution
-- browser sync where technically realistic on Linux
+The project stays focused on:
+
+- local provider and subscription-tool monitoring
+- optional Browser Sync Labs where technically realistic on Linux
+- catalog-backed source and precision labels
 - local integrations such as Prometheus, webhooks, and scheduled exports
-
-Chrome/Chromium cookie decryption and AWS Bedrock support remain in scope, but both are explicitly higher-risk Linux desktop integrations.
+- Fedora KDE 44 validation and package trust
 
 ## Version Summary
 
 | Version | Codename | Theme | Status |
 | ------- | -------- | ----- | ------ |
-| v5.3.0 | **Vanguard** | Distribution and local tools | Released |
-| v5.4.1 | **Link** | Advanced sync and enterprise API | Released |
-| v6.0.0 | **Nexus (Light)** | UI Redesign and integration | Released |
-| v6.0.1 | **Ground Truth** | Stabilization, trust, and metadata | Released |
+| v9.0.0 | **Confidence** | Setup, diagnostics, catalog trust, and release hardening | Current |
+| v8.0.0 | **Source Of Truth** | Local catalogs for pricing, plans, and quota windows | Released |
 | v7.0.0 | **Beacon** | Fedora KDE 44 reliability, trust, and UX | Released |
-| v8.0.0 | **Source Of Truth** | Local catalogs for pricing, plans, and quota windows | Current |
+| v6.0.1 | **Ground Truth** | Stabilization, trust, and metadata | Released |
+| v6.0.0 | **Nexus (Light)** | UI redesign and local integrations | Released |
+| v5.3.0 | **Vanguard** | Distribution and local tools | Released |
+
+## v9.0.0 — "Confidence"
+
+**Goal:** finish the product loop around first-run setup, Diagnostics, catalog review visibility, config portability, and release validation without adding provider sprawl.
+
+| Feature | Description | Technical Risk |
+| ------- | ----------- | -------------- |
+| **Single setup path** | Remove the stale standalone setup wizard and keep the maintained inline onboarding path in the popup. | Low |
+| **Config portability v2** | Export/import every non-secret KConfig key while keeping API keys, browser cookies, PATs, and webhook URLs in KWallet. | Medium |
+| **Actionable Trust Center** | Diagnostics show catalog review reasons, source conflicts, wallet state, Browser Sync readiness, local tool status, version, and loaded plugin path. | Medium |
+| **Catalog review reasons** | Provider and subscription catalogs include user-visible reasons for manual-review and source-conflict flags. | Low |
+| **Validation hardening** | Gates catch stale QML version strings, retired setup files, config export drift, catalog review gaps, and missing payload assets. | Low |
 
 ## v8.0.0 — "Source Of Truth"
 
@@ -47,50 +61,7 @@ Chrome/Chromium cookie decryption and AWS Bedrock support remain in scope, but b
 | **Trust Center** | Diagnostics explain actual API usage, estimated cost, rate-limit-only data, local tool data, Browser Sync Labs, catalog freshness, KWallet, and provider health. | Low |
 | **Provider Catalog v2** | Static local provider/model/pricing metadata plus validation; no runtime website scraping. | Medium |
 | **Copilot 2026 billing scaffolding** | Premium request tracking remains, with usage-based/credits mode labels and configurable reset assumptions. | Medium |
-| **Browser Sync Labs readiness** | Clear profile, cookie DB, safe-storage, and service-probe states for Firefox, Chrome, Chromium, and Brave. | Medium |
 | **Adaptive polling** | Slower closed-popup refresh, open-popup/manual refresh, jitter, and error backoff diagnostics. | Medium |
-
-## v6.0.1 — "Ground Truth"
-
-**Goal:** A focused stabilization update to fix version drift, build/runtime consistency, plugin wiring, docs drift, and packaging trust.
-
-| Feature | Description | Technical Risk |
-| ------- | ----------- | -------------- |
-| **Consistency** | Single source of truth for versions across the repository. | Low |
-| **Plugin Wiring** | Ensure all QML registered C++ types are properly compiled and linked. | Low |
-| **Metadata** | Update RPM spec, AppStream/metainfo, and package metadata. | Low |
-
-## v6.0.0 — "Nexus (Light)"
-
-**Goal:** extend browser sync beyond Firefox on Linux and add AWS Bedrock without turning the widget into a cloud control plane. Includes 5.4.1 hotfix for COPR test environments.
-
-| Feature | Description | Technical Risk |
-| ------- | ----------- | -------------- |
-| **Chrome/Chromium sync** | Linux-only profile discovery plus cookie reads/decryption when safe-storage secrets are available via Secret Service or KWallet-compatible paths. | Medium |
-| **AWS Bedrock** | Add a Bedrock provider using AWS Signature Version 4 and region/model-aware connectivity checks, with estimated cost where direct spend data is unavailable. | Medium/High |
-| **JetBrains AI** | Track local JetBrains AI activity from `~/.config/JetBrains/`. | Low |
-
-## v5.3.0 — "Vanguard"
-
-**Goal:** complete distribution work and cover the fast-growing AI coding tool surface using local filesystem-backed monitoring.
-
-| Feature | Description | Technical Risk |
-| ------- | ----------- | -------------- |
-| **Flatpak package** | Finalize the existing Flatpak scaffold and add CI validation for manifest consistency, build, and test coverage. | Low |
-| **Cursor** | Track local activity and self-managed limits from `~/.cursor/`. | Low |
-| **Windsurf (Codeium)** | Track local activity and self-managed limits from `~/.codeium/`. | Low |
-| **Shared local monitor base** | Consolidate install detection, recursive watching, debounce, and self-tracked usage increments for local subscription tools. | Low |
-
-## v6.0.0 — "Nexus (Light)"
-
-**Goal:** add practical team-adjacent integrations without building a custom backend.
-
-| Feature | Description | Technical Risk |
-| ------- | ----------- | -------------- |
-| **Prometheus exporter** | Expose a local loopback-only `/metrics` endpoint for Grafana/Prometheus pipelines. | Medium |
-| **Slack & Discord webhooks** | Send budget, quota, and connectivity alerts to incoming webhooks using the existing notification pipeline as the event source. | Low |
-| **JSON/CSV auto-export** | Write timestamped JSON and CSV exports from local SQLite history to user-selected directories, including network-mounted paths. | Low |
-| **Removal of PostgreSQL/team backend work** | Explicitly drop PostgreSQL, multi-user database, login, and web dashboard plans from the widget itself. | N/A |
 
 ## Explicit Non-Goals
 

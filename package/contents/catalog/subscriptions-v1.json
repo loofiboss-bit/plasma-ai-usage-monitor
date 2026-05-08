@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026.05.06",
-  "release": "8.0.3",
-  "lastReviewed": "2026-05-06",
+  "catalogVersion": "2026.05.08",
+  "release": "9.0.0",
+  "lastReviewed": "2026-05-08",
   "runtimeScraping": false,
-  "notes": "Static local metadata for shipped subscription defaults. Browser sync may override with actual account data. Do not scrape vendor pages at runtime.",
+  "notes": "Static local metadata for shipped subscription defaults. Browser sync may override with actual account data. Do not scrape vendor pages at runtime. Review/conflict flags include user-visible reasons in Diagnostics.",
   "tools": [
     {
       "key": "claude-code",
@@ -15,36 +15,66 @@
       "needsManualReview": false,
       "sourceConflict": false,
       "sourceRefs": [
-        { "label": "Claude pricing", "url": "https://claude.com/pricing", "reviewedAt": "2026-05-06" },
-        { "label": "Use Claude Code with Pro or Max", "url": "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan", "reviewedAt": "2026-05-06" },
-        { "label": "Claude Pro usage limits", "url": "https://support.claude.com/en/articles/8325606-what-is-the-pro-plan", "reviewedAt": "2026-05-06" },
-        { "label": "Claude Max usage limits", "url": "https://support.claude.com/en/articles/11049741-what-is-the-max-plan", "reviewedAt": "2026-05-06" }
+        {
+          "label": "Claude pricing",
+          "url": "https://claude.com/pricing",
+          "reviewedAt": "2026-05-08"
+        },
+        {
+          "label": "Use Claude Code with Pro or Max",
+          "url": "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan",
+          "reviewedAt": "2026-05-08"
+        },
+        {
+          "label": "Claude Pro usage limits",
+          "url": "https://support.claude.com/en/articles/8325606-what-is-the-pro-plan",
+          "reviewedAt": "2026-05-08"
+        },
+        {
+          "label": "Claude Max usage limits",
+          "url": "https://support.claude.com/en/articles/11049741-what-is-the-max-plan",
+          "reviewedAt": "2026-05-08"
+        }
       ],
       "plans": [
         {
           "id": "pro",
           "label": "Pro",
-          "price": { "amount": 20, "currency": "USD", "period": "month", "precision": "official_exact" },
+          "price": {
+            "amount": 20,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
           "quotaWindows": [
             {
               "kind": "rolling_5h",
               "label": "5-hour session",
               "unit": "messages",
-              "reset": { "type": "rolling_duration", "durationHours": 5 },
+              "reset": {
+                "type": "rolling_duration",
+                "durationHours": 5
+              },
               "precision": "official_qualitative",
               "source": "official_preset",
               "visibleByDefault": true,
-              "notes": ["Exact message counts vary by prompt length, attachments, conversation length, model, feature, and capacity."]
+              "notes": [
+                "Exact message counts vary by prompt length, attachments, conversation length, model, feature, and capacity."
+              ]
             },
             {
               "kind": "rolling_weekly",
               "label": "Weekly all-model usage",
               "unit": "usage",
-              "reset": { "type": "rolling_7d_from_session_start" },
+              "reset": {
+                "type": "rolling_7d_from_session_start"
+              },
               "precision": "official_qualitative",
               "source": "official_preset",
               "visibleByDefault": true,
-              "notes": ["Pro weekly usage applies across all models and resets seven days after the session starts."]
+              "notes": [
+                "Pro weekly usage applies across all models and resets seven days after the session starts."
+              ]
             },
             {
               "kind": "extra_spend",
@@ -53,32 +83,120 @@
               "precision": "browser_sync_actual",
               "source": "browser_sync",
               "visibleByDefault": false,
-              "notes": ["Shown when browser sync returns account extra-usage data."]
+              "notes": [
+                "Shown when browser sync returns account extra-usage data."
+              ]
             }
           ],
-          "notes": ["Claude and Claude Code share the same usage allocation."]
+          "notes": [
+            "Claude and Claude Code share the same usage allocation."
+          ]
         },
         {
           "id": "max_5x",
           "label": "Max 5x",
-          "price": { "amount": 100, "currency": "USD", "period": "month", "precision": "official_exact" },
+          "price": {
+            "amount": 100,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
           "quotaWindows": [
-            { "kind": "rolling_5h", "label": "5-hour session", "unit": "usage_multiplier", "limit": 5, "reset": { "type": "rolling_duration", "durationHours": 5 }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true, "notes": ["5x more usage per session than Pro."] },
-            { "kind": "rolling_weekly", "label": "Weekly all-model usage", "unit": "usage", "reset": { "type": "rolling_7d_from_session_start" }, "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true },
-            { "kind": "rolling_weekly", "label": "Weekly Sonnet usage", "unit": "usage", "reset": { "type": "rolling_7d_from_session_start" }, "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }
+            {
+              "kind": "rolling_5h",
+              "label": "5-hour session",
+              "unit": "usage_multiplier",
+              "limit": 5,
+              "reset": {
+                "type": "rolling_duration",
+                "durationHours": 5
+              },
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "5x more usage per session than Pro."
+              ]
+            },
+            {
+              "kind": "rolling_weekly",
+              "label": "Weekly all-model usage",
+              "unit": "usage",
+              "reset": {
+                "type": "rolling_7d_from_session_start"
+              },
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            },
+            {
+              "kind": "rolling_weekly",
+              "label": "Weekly Sonnet usage",
+              "unit": "usage",
+              "reset": {
+                "type": "rolling_7d_from_session_start"
+              },
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
           ],
-          "notes": ["Claude and Claude Code share the same usage allocation."]
+          "notes": [
+            "Claude and Claude Code share the same usage allocation."
+          ]
         },
         {
           "id": "max_20x",
           "label": "Max 20x",
-          "price": { "amount": 200, "currency": "USD", "period": "month", "precision": "official_exact" },
+          "price": {
+            "amount": 200,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
           "quotaWindows": [
-            { "kind": "rolling_5h", "label": "5-hour session", "unit": "usage_multiplier", "limit": 20, "reset": { "type": "rolling_duration", "durationHours": 5 }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true, "notes": ["20x more usage per session than Pro."] },
-            { "kind": "rolling_weekly", "label": "Weekly all-model usage", "unit": "usage", "reset": { "type": "rolling_7d_from_session_start" }, "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true },
-            { "kind": "rolling_weekly", "label": "Weekly Sonnet usage", "unit": "usage", "reset": { "type": "rolling_7d_from_session_start" }, "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }
+            {
+              "kind": "rolling_5h",
+              "label": "5-hour session",
+              "unit": "usage_multiplier",
+              "limit": 20,
+              "reset": {
+                "type": "rolling_duration",
+                "durationHours": 5
+              },
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "20x more usage per session than Pro."
+              ]
+            },
+            {
+              "kind": "rolling_weekly",
+              "label": "Weekly all-model usage",
+              "unit": "usage",
+              "reset": {
+                "type": "rolling_7d_from_session_start"
+              },
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            },
+            {
+              "kind": "rolling_weekly",
+              "label": "Weekly Sonnet usage",
+              "unit": "usage",
+              "reset": {
+                "type": "rolling_7d_from_session_start"
+              },
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
           ],
-          "notes": ["Claude and Claude Code share the same usage allocation."]
+          "notes": [
+            "Claude and Claude Code share the same usage allocation."
+          ]
         }
       ]
     },
@@ -91,85 +209,278 @@
       "needsManualReview": false,
       "sourceConflict": false,
       "sourceRefs": [
-        { "label": "Using Codex with your ChatGPT plan", "url": "https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan", "reviewedAt": "2026-05-06" },
-        { "label": "About ChatGPT Pro tiers", "url": "https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers", "reviewedAt": "2026-05-06" },
-        { "label": "Using Credits for Flexible Usage in ChatGPT", "url": "https://help.openai.com/en/articles/12642688-using-credits-for-flexible-usage-in-chatgpt-freegopluspro", "reviewedAt": "2026-05-06" }
+        {
+          "label": "Using Codex with your ChatGPT plan",
+          "url": "https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan",
+          "reviewedAt": "2026-05-08"
+        },
+        {
+          "label": "About ChatGPT Pro tiers",
+          "url": "https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers",
+          "reviewedAt": "2026-05-08"
+        },
+        {
+          "label": "Using Credits for Flexible Usage in ChatGPT",
+          "url": "https://help.openai.com/en/articles/12642688-using-credits-for-flexible-usage-in-chatgpt-freegopluspro",
+          "reviewedAt": "2026-05-08"
+        }
       ],
       "plans": [
         {
           "id": "free",
           "label": "Free",
-          "price": { "status": "included", "precision": "official_qualitative" },
+          "price": {
+            "status": "included",
+            "precision": "official_qualitative"
+          },
           "quotaWindows": [
-            { "kind": "cloud_tasks", "label": "Limited Codex access", "unit": "tasks", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true, "notes": ["Included for a limited time. Exact limits are dynamic."] }
+            {
+              "kind": "cloud_tasks",
+              "label": "Limited Codex access",
+              "unit": "tasks",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "Included for a limited time. Exact limits are dynamic."
+              ]
+            }
           ]
         },
         {
           "id": "go",
           "label": "Go",
-          "price": { "status": "varies_by_region", "precision": "official_qualitative" },
+          "price": {
+            "status": "varies_by_region",
+            "precision": "official_qualitative"
+          },
           "quotaWindows": [
-            { "kind": "cloud_tasks", "label": "Limited Codex access", "unit": "tasks", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true, "notes": ["Included for a limited time. Exact limits are dynamic."] }
+            {
+              "kind": "cloud_tasks",
+              "label": "Limited Codex access",
+              "unit": "tasks",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "Included for a limited time. Exact limits are dynamic."
+              ]
+            }
           ]
         },
         {
           "id": "plus",
           "label": "Plus",
-          "price": { "status": "plan_pricing", "precision": "official_qualitative" },
+          "price": {
+            "status": "plan_pricing",
+            "precision": "official_qualitative"
+          },
           "quotaWindows": [
-            { "kind": "local_messages", "label": "Codex local messages", "unit": "messages", "reset": { "type": "vendor_provided_reset_at" }, "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true, "notes": ["Usage depends on task complexity and local versus cloud execution."] },
-            { "kind": "cloud_tasks", "label": "Codex cloud tasks", "unit": "tasks", "reset": { "type": "vendor_provided_reset_at" }, "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true },
-            { "kind": "code_review", "label": "Code review", "unit": "reviews", "reset": { "type": "vendor_provided_reset_at" }, "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false },
-            { "kind": "ai_credits", "label": "Remaining credits", "unit": "credits", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false }
+            {
+              "kind": "local_messages",
+              "label": "Codex local messages",
+              "unit": "messages",
+              "reset": {
+                "type": "vendor_provided_reset_at"
+              },
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "Usage depends on task complexity and local versus cloud execution."
+              ]
+            },
+            {
+              "kind": "cloud_tasks",
+              "label": "Codex cloud tasks",
+              "unit": "tasks",
+              "reset": {
+                "type": "vendor_provided_reset_at"
+              },
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            },
+            {
+              "kind": "code_review",
+              "label": "Code review",
+              "unit": "reviews",
+              "reset": {
+                "type": "vendor_provided_reset_at"
+              },
+              "precision": "browser_sync_actual",
+              "source": "browser_sync",
+              "visibleByDefault": false
+            },
+            {
+              "kind": "ai_credits",
+              "label": "Remaining credits",
+              "unit": "credits",
+              "precision": "browser_sync_actual",
+              "source": "browser_sync",
+              "visibleByDefault": false
+            }
           ],
-          "notes": ["2x Codex rate limits are temporary for non-Free/Go plans."]
+          "notes": [
+            "2x Codex rate limits are temporary for non-Free/Go plans."
+          ]
         },
         {
           "id": "pro",
           "label": "Pro",
-          "price": { "amount": 200, "currency": "USD", "period": "month", "precision": "official_exact" },
+          "price": {
+            "amount": 200,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
           "quotaWindows": [
-            { "kind": "usage_multiplier", "label": "General usage vs Plus", "unit": "usage_multiplier", "limit": 20, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true },
-            { "kind": "codex_5h_multiplier", "label": "Codex 5-hour allowance vs Plus", "unit": "usage_multiplier", "limit": 25, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true, "notes": ["OpenAI describes this as a limited-time higher 5-hour Codex allowance."] },
-            { "kind": "code_review", "label": "Code review", "unit": "reviews", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false },
-            { "kind": "ai_credits", "label": "Remaining credits", "unit": "credits", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false }
+            {
+              "kind": "usage_multiplier",
+              "label": "General usage vs Plus",
+              "unit": "usage_multiplier",
+              "limit": 20,
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            },
+            {
+              "kind": "codex_5h_multiplier",
+              "label": "Codex 5-hour allowance vs Plus",
+              "unit": "usage_multiplier",
+              "limit": 25,
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "OpenAI describes this as a limited-time higher 5-hour Codex allowance."
+              ]
+            },
+            {
+              "kind": "code_review",
+              "label": "Code review",
+              "unit": "reviews",
+              "precision": "browser_sync_actual",
+              "source": "browser_sync",
+              "visibleByDefault": false
+            },
+            {
+              "kind": "ai_credits",
+              "label": "Remaining credits",
+              "unit": "credits",
+              "precision": "browser_sync_actual",
+              "source": "browser_sync",
+              "visibleByDefault": false
+            }
           ],
-          "notes": ["OpenAI describes the $200 Pro plan as the highest usage tier, with 20x higher usage than Plus."]
+          "notes": [
+            "OpenAI describes the $200 Pro plan as the highest usage tier, with 20x higher usage than Plus."
+          ]
         },
         {
           "id": "pro_100",
           "label": "Pro $100",
-          "price": { "amount": 100, "currency": "USD", "period": "month", "precision": "official_exact" },
+          "price": {
+            "amount": 100,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
           "quotaWindows": [
-            { "kind": "usage_multiplier", "label": "General usage vs Plus", "unit": "usage_multiplier", "limit": 5, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true },
-            { "kind": "codex_usage_multiplier", "label": "Codex usage vs Plus", "unit": "usage_multiplier", "limit": 10, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true, "notes": ["OpenAI describes this as a limited-time Codex allowance promotion."] },
-            { "kind": "code_review", "label": "Code review", "unit": "reviews", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false },
-            { "kind": "ai_credits", "label": "Remaining credits", "unit": "credits", "precision": "browser_sync_actual", "source": "browser_sync", "visibleByDefault": false }
+            {
+              "kind": "usage_multiplier",
+              "label": "General usage vs Plus",
+              "unit": "usage_multiplier",
+              "limit": 5,
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            },
+            {
+              "kind": "codex_usage_multiplier",
+              "label": "Codex usage vs Plus",
+              "unit": "usage_multiplier",
+              "limit": 10,
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "OpenAI describes this as a limited-time Codex allowance promotion."
+              ]
+            },
+            {
+              "kind": "code_review",
+              "label": "Code review",
+              "unit": "reviews",
+              "precision": "browser_sync_actual",
+              "source": "browser_sync",
+              "visibleByDefault": false
+            },
+            {
+              "kind": "ai_credits",
+              "label": "Remaining credits",
+              "unit": "credits",
+              "precision": "browser_sync_actual",
+              "source": "browser_sync",
+              "visibleByDefault": false
+            }
           ],
-          "notes": ["For Pro $100, OpenAI describes 5x higher limits than Plus and 10x Codex usage vs Plus for a limited time."]
+          "notes": [
+            "For Pro $100, OpenAI describes 5x higher limits than Plus and 10x Codex usage vs Plus for a limited time."
+          ]
         },
         {
           "id": "business_codex",
           "label": "Business Codex",
-          "price": { "status": "usage_based", "precision": "official_qualitative" },
+          "price": {
+            "status": "usage_based",
+            "precision": "official_qualitative"
+          },
           "quotaWindows": [
-            { "kind": "api_usage_usd", "label": "Pay-as-you-go usage", "unit": "usd", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }
+            {
+              "kind": "api_usage_usd",
+              "label": "Pay-as-you-go usage",
+              "unit": "usd",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
           ]
         },
         {
           "id": "business",
           "label": "Business ChatGPT & Codex",
-          "price": { "status": "plan_pricing", "precision": "official_qualitative" },
+          "price": {
+            "status": "plan_pricing",
+            "precision": "official_qualitative"
+          },
           "quotaWindows": [
-            { "kind": "cloud_tasks", "label": "Flexible Codex usage", "unit": "tasks", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }
+            {
+              "kind": "cloud_tasks",
+              "label": "Flexible Codex usage",
+              "unit": "tasks",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
           ]
         },
         {
           "id": "enterprise",
           "label": "Enterprise/Edu",
-          "price": { "status": "custom", "precision": "official_qualitative" },
+          "price": {
+            "status": "custom",
+            "precision": "official_qualitative"
+          },
           "quotaWindows": [
-            { "kind": "cloud_tasks", "label": "Workspace-managed Codex usage", "unit": "tasks", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }
+            {
+              "kind": "cloud_tasks",
+              "label": "Workspace-managed Codex usage",
+              "unit": "tasks",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
           ]
         }
       ]
@@ -183,16 +494,153 @@
       "needsManualReview": false,
       "sourceConflict": false,
       "sourceRefs": [
-        { "label": "Plans for GitHub Copilot", "url": "https://docs.github.com/en/copilot/get-started/plans", "reviewedAt": "2026-05-06" },
-        { "label": "Requests in GitHub Copilot", "url": "https://docs.github.com/en/copilot/concepts/billing/copilot-requests", "reviewedAt": "2026-05-06" },
-        { "label": "About billing for individual GitHub Copilot plans", "url": "https://docs.github.com/en/copilot/concepts/billing/billing-for-individuals", "reviewedAt": "2026-05-06" }
+        {
+          "label": "Plans for GitHub Copilot",
+          "url": "https://docs.github.com/en/copilot/get-started/plans",
+          "reviewedAt": "2026-05-08"
+        },
+        {
+          "label": "Requests in GitHub Copilot",
+          "url": "https://docs.github.com/en/copilot/concepts/billing/copilot-requests",
+          "reviewedAt": "2026-05-08"
+        },
+        {
+          "label": "About billing for individual GitHub Copilot plans",
+          "url": "https://docs.github.com/en/copilot/concepts/billing/billing-for-individuals",
+          "reviewedAt": "2026-05-08"
+        }
       ],
       "plans": [
-        { "id": "free", "label": "Free", "price": { "amount": 0, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 50, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "pro", "label": "Pro", "price": { "amount": 10, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 300, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "pro_plus", "label": "Pro+", "price": { "amount": 39, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 1500, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "business", "label": "Business", "price": { "amount": 19, "currency": "USD", "period": "user_month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 300, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "enterprise", "label": "Enterprise", "price": { "amount": 39, "currency": "USD", "period": "user_month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "premium_requests", "label": "Monthly premium requests", "unit": "requests", "limit": 1000, "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] }
+        {
+          "id": "free",
+          "label": "Free",
+          "price": {
+            "amount": 0,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "premium_requests",
+              "label": "Monthly premium requests",
+              "unit": "requests",
+              "limit": 50,
+              "reset": {
+                "type": "monthly_utc",
+                "day": 1,
+                "time": "00:00:00"
+              },
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "pro",
+          "label": "Pro",
+          "price": {
+            "amount": 10,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "premium_requests",
+              "label": "Monthly premium requests",
+              "unit": "requests",
+              "limit": 300,
+              "reset": {
+                "type": "monthly_utc",
+                "day": 1,
+                "time": "00:00:00"
+              },
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "pro_plus",
+          "label": "Pro+",
+          "price": {
+            "amount": 39,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "premium_requests",
+              "label": "Monthly premium requests",
+              "unit": "requests",
+              "limit": 1500,
+              "reset": {
+                "type": "monthly_utc",
+                "day": 1,
+                "time": "00:00:00"
+              },
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "business",
+          "label": "Business",
+          "price": {
+            "amount": 19,
+            "currency": "USD",
+            "period": "user_month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "premium_requests",
+              "label": "Monthly premium requests",
+              "unit": "requests",
+              "limit": 300,
+              "reset": {
+                "type": "monthly_utc",
+                "day": 1,
+                "time": "00:00:00"
+              },
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "enterprise",
+          "label": "Enterprise",
+          "price": {
+            "amount": 39,
+            "currency": "USD",
+            "period": "user_month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "premium_requests",
+              "label": "Monthly premium requests",
+              "unit": "requests",
+              "limit": 1000,
+              "reset": {
+                "type": "monthly_utc",
+                "day": 1,
+                "time": "00:00:00"
+              },
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        }
       ],
       "billingModes": [
         {
@@ -203,11 +651,17 @@
               "kind": "premium_requests",
               "label": "Monthly premium requests",
               "unit": "requests",
-              "reset": { "type": "monthly_utc", "day": 1, "time": "00:00:00" },
+              "reset": {
+                "type": "monthly_utc",
+                "day": 1,
+                "time": "00:00:00"
+              },
               "precision": "official_exact",
               "source": "official_preset",
               "visibleByDefault": false,
-              "notes": ["Premium request allowances vary by plan. Use a custom limit or synced organization data for numeric caps."]
+              "notes": [
+                "Premium request allowances vary by plan. Use a custom limit or synced organization data for numeric caps."
+              ]
             },
             {
               "kind": "code_review",
@@ -216,7 +670,9 @@
               "precision": "official_qualitative",
               "source": "official_preset",
               "visibleByDefault": true,
-              "notes": ["Code Review is listed among premium-request features before usage-based billing."]
+              "notes": [
+                "Code Review is listed among premium-request features before usage-based billing."
+              ]
             }
           ]
         },
@@ -232,7 +688,9 @@
               "precision": "official_exact",
               "source": "official_preset",
               "visibleByDefault": true,
-              "notes": ["Token usage is converted to GitHub AI Credits."]
+              "notes": [
+                "Token usage is converted to GitHub AI Credits."
+              ]
             },
             {
               "kind": "code_review",
@@ -241,7 +699,9 @@
               "precision": "official_qualitative",
               "source": "official_preset",
               "visibleByDefault": true,
-              "notes": ["Code review consumes AI credits and GitHub Actions minutes."]
+              "notes": [
+                "Code review consumes AI credits and GitHub Actions minutes."
+              ]
             }
           ]
         }
@@ -256,15 +716,136 @@
       "needsManualReview": false,
       "sourceConflict": false,
       "sourceRefs": [
-        { "label": "Cursor pricing", "url": "https://cursor.com/pricing", "reviewedAt": "2026-05-06" }
+        {
+          "label": "Cursor pricing",
+          "url": "https://cursor.com/pricing",
+          "reviewedAt": "2026-05-08"
+        }
       ],
       "plans": [
-        { "id": "hobby", "label": "Hobby", "price": { "amount": 0, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "custom", "label": "Limited Agent requests and Tab completions", "unit": "usage", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "pro", "label": "Pro", "price": { "amount": 20, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "custom", "label": "Included model usage", "unit": "usage", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true, "notes": ["Vendor does not publish an exact request count on the reviewed pricing page."] }] },
-        { "id": "pro_plus", "label": "Pro+", "price": { "amount": 60, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "custom", "label": "3x usage on OpenAI, Claude, Gemini models", "unit": "usage_multiplier", "limit": 3, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "ultra", "label": "Ultra", "price": { "amount": 200, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "custom", "label": "20x usage on OpenAI, Claude, Gemini models", "unit": "usage_multiplier", "limit": 20, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "teams", "label": "Teams", "price": { "amount": 40, "currency": "USD", "period": "user_month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "custom", "label": "Team pooled usage and admin metrics", "unit": "usage", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "enterprise", "label": "Enterprise", "price": { "status": "custom", "precision": "official_qualitative" }, "quotaWindows": [{ "kind": "custom", "label": "Enterprise custom limits", "unit": "usage", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }] }
+        {
+          "id": "hobby",
+          "label": "Hobby",
+          "price": {
+            "amount": 0,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "custom",
+              "label": "Limited Agent requests and Tab completions",
+              "unit": "usage",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "pro",
+          "label": "Pro",
+          "price": {
+            "amount": 20,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "custom",
+              "label": "Included model usage",
+              "unit": "usage",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "Vendor does not publish an exact request count on the reviewed pricing page."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "pro_plus",
+          "label": "Pro+",
+          "price": {
+            "amount": 60,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "custom",
+              "label": "3x usage on OpenAI, Claude, Gemini models",
+              "unit": "usage_multiplier",
+              "limit": 3,
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "ultra",
+          "label": "Ultra",
+          "price": {
+            "amount": 200,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "custom",
+              "label": "20x usage on OpenAI, Claude, Gemini models",
+              "unit": "usage_multiplier",
+              "limit": 20,
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "teams",
+          "label": "Teams",
+          "price": {
+            "amount": 40,
+            "currency": "USD",
+            "period": "user_month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "custom",
+              "label": "Team pooled usage and admin metrics",
+              "unit": "usage",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "enterprise",
+          "label": "Enterprise",
+          "price": {
+            "status": "custom",
+            "precision": "official_qualitative"
+          },
+          "quotaWindows": [
+            {
+              "kind": "custom",
+              "label": "Enterprise custom limits",
+              "unit": "usage",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        }
       ]
     },
     {
@@ -276,17 +857,154 @@
       "needsManualReview": true,
       "sourceConflict": true,
       "sourceRefs": [
-        { "label": "Windsurf pricing", "url": "https://windsurf.com/pricing", "reviewedAt": "2026-05-06" },
-        { "label": "Windsurf usage docs", "url": "https://docs.windsurf.com/windsurf/accounts/usage", "reviewedAt": "2026-05-06" },
-        { "label": "Windsurf quota docs", "url": "https://docs.windsurf.com/windsurf/accounts/quota", "reviewedAt": "2026-05-06" }
+        {
+          "label": "Windsurf pricing",
+          "url": "https://windsurf.com/pricing",
+          "reviewedAt": "2026-05-08"
+        },
+        {
+          "label": "Windsurf usage docs",
+          "url": "https://docs.windsurf.com/windsurf/accounts/usage",
+          "reviewedAt": "2026-05-08"
+        },
+        {
+          "label": "Windsurf quota docs",
+          "url": "https://docs.windsurf.com/windsurf/accounts/quota",
+          "reviewedAt": "2026-05-08"
+        }
       ],
       "plans": [
-        { "id": "free", "label": "Free", "price": { "amount": 0, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "daily_budget", "label": "Light allowance", "unit": "usage", "precision": "needs_manual_review", "source": "official_preset", "visibleByDefault": true, "notes": ["Pricing page says usage allowance refreshes daily and weekly; docs also describe quota-based usage."] }] },
-        { "id": "pro", "label": "Pro", "price": { "amount": 20, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "weekly_budget", "label": "Standard allowance", "unit": "usage", "precision": "needs_manual_review", "source": "official_preset", "visibleByDefault": true, "notes": ["Source conflict: pricing page and quota docs require a manual review before exact limits are shown."] }, { "kind": "extra_spend", "label": "Extra usage at API price", "unit": "usd", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "max", "label": "Max", "price": { "amount": 200, "currency": "USD", "period": "month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "weekly_budget", "label": "Heavy allowance", "unit": "usage", "precision": "needs_manual_review", "source": "official_preset", "visibleByDefault": true }, { "kind": "extra_spend", "label": "Extra usage at API price", "unit": "usd", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "teams", "label": "Teams", "price": { "amount": 40, "currency": "USD", "period": "user_month", "precision": "official_exact" }, "quotaWindows": [{ "kind": "weekly_budget", "label": "Standard per-user/team allowance", "unit": "usage", "precision": "needs_manual_review", "source": "official_preset", "visibleByDefault": true }, { "kind": "extra_spend", "label": "Extra usage at API price", "unit": "usd", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "enterprise", "label": "Enterprise", "price": { "status": "custom", "precision": "official_qualitative" }, "quotaWindows": [{ "kind": "custom", "label": "Enterprise allowance", "unit": "usage", "precision": "needs_manual_review", "source": "official_preset", "visibleByDefault": true }] }
-      ]
+        {
+          "id": "free",
+          "label": "Free",
+          "price": {
+            "amount": 0,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "daily_budget",
+              "label": "Light allowance",
+              "unit": "usage",
+              "precision": "needs_manual_review",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "Pricing page says usage allowance refreshes daily and weekly; docs also describe quota-based usage."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "pro",
+          "label": "Pro",
+          "price": {
+            "amount": 20,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "weekly_budget",
+              "label": "Standard allowance",
+              "unit": "usage",
+              "precision": "needs_manual_review",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "Source conflict: pricing page and quota docs require a manual review before exact limits are shown."
+              ]
+            },
+            {
+              "kind": "extra_spend",
+              "label": "Extra usage at API price",
+              "unit": "usd",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "max",
+          "label": "Max",
+          "price": {
+            "amount": 200,
+            "currency": "USD",
+            "period": "month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "weekly_budget",
+              "label": "Heavy allowance",
+              "unit": "usage",
+              "precision": "needs_manual_review",
+              "source": "official_preset",
+              "visibleByDefault": true
+            },
+            {
+              "kind": "extra_spend",
+              "label": "Extra usage at API price",
+              "unit": "usd",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "teams",
+          "label": "Teams",
+          "price": {
+            "amount": 40,
+            "currency": "USD",
+            "period": "user_month",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "weekly_budget",
+              "label": "Standard per-user/team allowance",
+              "unit": "usage",
+              "precision": "needs_manual_review",
+              "source": "official_preset",
+              "visibleByDefault": true
+            },
+            {
+              "kind": "extra_spend",
+              "label": "Extra usage at API price",
+              "unit": "usd",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "enterprise",
+          "label": "Enterprise",
+          "price": {
+            "status": "custom",
+            "precision": "official_qualitative"
+          },
+          "quotaWindows": [
+            {
+              "kind": "custom",
+              "label": "Enterprise allowance",
+              "unit": "usage",
+              "precision": "needs_manual_review",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed Windsurf pricing and quota docs on 2026-05-08; exact limits remain manual-review because public sources describe both prompt-credit plans and quota-based budgets.",
+      "sourceConflictReason": "Windsurf pricing still advertises monthly prompt credits, while Windsurf quota docs say self-serve plans moved to daily and weekly quota budgets in March 2026."
     },
     {
       "key": "jetbrains-ai",
@@ -294,17 +1012,121 @@
       "vendor": "JetBrains",
       "dataQuality": "official-credit-based",
       "pricingFreshness": "reviewed",
-      "needsManualReview": true,
-      "sourceConflict": true,
+      "needsManualReview": false,
+      "sourceConflict": false,
       "sourceRefs": [
-        { "label": "JetBrains AI plans and usage", "url": "https://www.jetbrains.com/help/ai-assistant/licensing-and-subscriptions.html", "reviewedAt": "2026-05-06" }
+        {
+          "label": "JetBrains AI plans and usage",
+          "url": "https://www.jetbrains.com/help/ai-assistant/licensing-and-subscriptions.html",
+          "reviewedAt": "2026-05-08"
+        }
       ],
       "plans": [
-        { "id": "ai_free", "label": "AI Free", "price": { "amount": 0, "currency": "USD", "period": "30d", "precision": "official_exact" }, "quotaWindows": [{ "kind": "ai_credits", "label": "AI Credits per 30 days", "unit": "credits", "limit": 3, "reset": { "type": "rolling_30d_from_first_use" }, "precision": "official_exact", "source": "official_preset", "visibleByDefault": true }] },
-        { "id": "ai_pro", "label": "AI Pro", "price": { "rangeMin": 10, "rangeMax": 20, "currency": "USD", "period": "30d", "precision": "official_range" }, "quotaWindows": [{ "kind": "ai_credits", "label": "AI Credits per 30 days", "unit": "credits", "rangeMin": 10, "rangeMax": 20, "reset": { "type": "rolling_30d_from_first_use" }, "precision": "official_range", "source": "official_preset", "visibleByDefault": true, "notes": ["JetBrains source shows two tables with different AI Pro prices/credits."] }] },
-        { "id": "ai_ultimate", "label": "AI Ultimate", "price": { "rangeMin": 30, "rangeMax": 60, "currency": "USD", "period": "30d", "precision": "official_range" }, "quotaWindows": [{ "kind": "ai_credits", "label": "AI Credits per 30 days", "unit": "credits", "rangeMin": 35, "rangeMax": 70, "reset": { "type": "rolling_30d_from_first_use" }, "precision": "official_range", "source": "official_preset", "visibleByDefault": true, "notes": ["JetBrains source shows two tables with different AI Ultimate prices/credits."] }] },
-        { "id": "ai_enterprise", "label": "AI Enterprise", "price": { "status": "enterprise_pricing", "precision": "official_qualitative" }, "quotaWindows": [{ "kind": "ai_credits", "label": "Enterprise quota", "unit": "credits", "precision": "official_qualitative", "source": "official_preset", "visibleByDefault": true, "notes": ["Quota is described as on par with AI Ultimate or higher, not a single exact value."] }] }
-      ]
+        {
+          "id": "ai_free",
+          "label": "AI Free",
+          "price": {
+            "amount": 0,
+            "currency": "USD",
+            "period": "30d",
+            "precision": "official_exact"
+          },
+          "quotaWindows": [
+            {
+              "kind": "ai_credits",
+              "label": "AI Credits per 30 days",
+              "unit": "credits",
+              "limit": 3,
+              "reset": {
+                "type": "rolling_30d_from_first_use"
+              },
+              "precision": "official_exact",
+              "source": "official_preset",
+              "visibleByDefault": true
+            }
+          ]
+        },
+        {
+          "id": "ai_pro",
+          "label": "AI Pro",
+          "price": {
+            "rangeMin": 10,
+            "rangeMax": 20,
+            "currency": "USD",
+            "period": "30d",
+            "precision": "official_range"
+          },
+          "quotaWindows": [
+            {
+              "kind": "ai_credits",
+              "label": "AI Credits per 30 days",
+              "unit": "credits",
+              "rangeMin": 10,
+              "rangeMax": 20,
+              "reset": {
+                "type": "rolling_30d_from_first_use"
+              },
+              "precision": "official_range",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "JetBrains source shows two tables with different AI Pro prices/credits."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ai_ultimate",
+          "label": "AI Ultimate",
+          "price": {
+            "rangeMin": 30,
+            "rangeMax": 60,
+            "currency": "USD",
+            "period": "30d",
+            "precision": "official_range"
+          },
+          "quotaWindows": [
+            {
+              "kind": "ai_credits",
+              "label": "AI Credits per 30 days",
+              "unit": "credits",
+              "rangeMin": 35,
+              "rangeMax": 70,
+              "reset": {
+                "type": "rolling_30d_from_first_use"
+              },
+              "precision": "official_range",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "JetBrains source shows two tables with different AI Ultimate prices/credits."
+              ]
+            }
+          ]
+        },
+        {
+          "id": "ai_enterprise",
+          "label": "AI Enterprise",
+          "price": {
+            "status": "enterprise_pricing",
+            "precision": "official_qualitative"
+          },
+          "quotaWindows": [
+            {
+              "kind": "ai_credits",
+              "label": "Enterprise quota",
+              "unit": "credits",
+              "precision": "official_qualitative",
+              "source": "official_preset",
+              "visibleByDefault": true,
+              "notes": [
+                "Quota is described as on par with AI Ultimate or higher, not a single exact value."
+              ]
+            }
+          ]
+        }
+      ],
+      "reviewReason": "Reviewed JetBrains AI plans and usage docs on 2026-05-08; personal and commercial tables are represented as official ranges instead of a source conflict."
     }
   ]
 }

@@ -22,7 +22,7 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current release:** `v8.0.3` fixes subscription-plan defaults for GitHub Copilot Pro+ and current ChatGPT Pro Codex tiers, while preserving catalog-backed source and precision metadata from v8.0.0.
+> **Current release:** `v9.0.0 Confidence` focuses on first-run activation, actionable Diagnostics, catalog review transparency, safe config portability v2, and stricter release validation.
 
 ## Quick Links
 
@@ -49,7 +49,7 @@ A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, an
 - **Interactive charts** — Canvas-based line/area charts showing cost, tokens, requests, and rate limit trends over 24h/7d/30d
 - **Compare analytics mode** — Multi-series history comparison across providers or subscription tools with ranking, delta trends, compact legend chips, and hover crosshair/tooltip
 - **Analyst view** — Yearly heatmap, week-over-week spend, volatility, anomaly detection, and top driver/model ranking in one operator-focused tab
-- **Trust Center and provider diagnostics** — Auth/config health, endpoint visibility, refresh freshness, failure counts, cost-source quality, KWallet state, Browser Sync Labs readiness, and provider/subscription catalog freshness
+- **Trust Center and provider diagnostics** — Auth/config health, endpoint visibility, refresh freshness, failure counts, cost-source quality, KWallet state, Browser Sync Labs readiness, loaded plugin path, provider/subscription catalog freshness, and visible catalog review reasons
 - **Copyable reports** — Generate weekly or monthly Analyst summaries directly to the clipboard
 - **Trend summaries** — Total cost, average daily cost, peak usage, and snapshot counts per time range
 - **Rate limit visualization** — Progress bars with color-coded thresholds (green/yellow/red)
@@ -60,7 +60,7 @@ A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, an
 - **Secure key storage** — API keys stored in KWallet, never written to config files on disk
 - **Panel display modes** — Compact icon shows green/yellow/red status badge, or current cost, or active provider count
 - **Proxy support** — Custom base URLs per provider for API proxies/gateways, with inline HTTPS security warnings
-- **Data export** — Clipboard export plus scheduled JSON/CSV file export from local SQLite history
+- **Data export** — Clipboard export, scheduled JSON/CSV history export, and safe schema-v2 configuration export/import that excludes secrets
 - **Prometheus endpoint** — Optional loopback-only `/metrics` export for Grafana/Prometheus pipelines
 - **Accessibility** — Screen reader annotations on provider cards, cost summary, and panel icon
 - **Per-provider configuration** — Enable/disable providers independently, select models, set refresh intervals, configure budgets
@@ -686,11 +686,25 @@ Check that the History tab is enabled in configuration. Data is stored in `~/.lo
 | [SECURITY.md](SECURITY.md)                                               | Security policy, vulnerability reporting, and design decisions |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                                       | Development setup, coding standards, and contribution workflow |
 | [docs/demo/fedora-kde-vm.md](docs/demo/fedora-kde-vm.md)                 | Fedora KDE VM workflow for live testing and screenshot capture |
+| [docs/release/v9.0.0-checklist.md](docs/release/v9.0.0-checklist.md)     | Confidence release validation checklist                        |
 | [docs/store/submission-checklist.md](docs/store/submission-checklist.md) | Manual GitHub + KDE Store update checklist                     |
 | [assets/screenshots/README.md](assets/screenshots/README.md)             | Canonical shot list and screenshot quality guide               |
 | [docs/walkthrough.md](docs/walkthrough.md)                               | Current documentation map and historical walkthrough note      |
 
 ## Changelog
+
+### v9.0.0 — Confidence: Setup, Trust, and Validation
+
+- Remove the stale standalone setup wizard and keep a single maintained first-run onboarding path
+- Add schema-v2 config portability for every non-secret KConfig key while leaving all secrets in KWallet
+- Expand Diagnostics with catalog review reasons, source-conflict visibility, loaded plugin path, and stronger readiness signals
+- Harden release checks for config export drift, retired setup files, catalog review reasons, and stale QML version strings
+
+### v8.0.0 — Source Of Truth: Catalog-Backed Metadata
+
+- Move provider pricing, subscription plans, quota windows, source refs, and precision labels into shipped JSON catalogs
+- Add source and precision badges for subscription quota rows
+- Keep Browser Sync Labs optional and visibly distinct from official API truth or local self-tracked estimates
 
 ### v6.0.0 — April 2026 Models & Environment Hardening
 

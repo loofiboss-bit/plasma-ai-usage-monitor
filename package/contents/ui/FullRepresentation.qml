@@ -187,9 +187,9 @@ PlasmaExtras.Representation {
                                 return i18n("Add your API key for that provider. Keys are stored in KWallet and are never saved in plain text config files.");
                             }
                             if (fullRoot.onboardingStep === 2) {
-                                return i18n("Optional: configure subscription tools (Claude Code, Codex CLI, GitHub Copilot) in Configure > Subscriptions to track fixed plan usage and monthly cost.");
+                                return i18n("Optional: configure subscription tools in Configure > Subscriptions, then review Diagnostics for catalog trust, browser sync readiness, and local tool status.");
                             }
-                            return i18n("Return to this widget and use Refresh All. Once one provider is enabled, the live dashboard appears automatically.");
+                            return i18n("Apply a preset from Configure > General or return to this widget and use Refresh All. Once one provider or local tool is enabled, the dashboard appears automatically.");
                         }
                     }
 
@@ -200,8 +200,8 @@ PlasmaExtras.Representation {
 
                         PlasmaComponents.Button {
                             activeFocusOnTab: true
-                            text: i18n("Open Provider Settings")
-                            icon.name: "configure"
+                            text: fullRoot.onboardingActionText()
+                            icon.name: fullRoot.onboardingActionIcon()
                             onClicked: plasmoid.internalAction("configure").trigger()
                         }
 
@@ -224,8 +224,8 @@ PlasmaExtras.Representation {
                         PlasmaComponents.Button {
                             activeFocusOnTab: true
                             Layout.fillWidth: true
-                            text: i18n("Open Provider Settings")
-                            icon.name: "configure"
+                            text: fullRoot.onboardingActionText()
+                            icon.name: fullRoot.onboardingActionIcon()
                             onClicked: plasmoid.internalAction("configure").trigger()
                         }
 
@@ -1226,6 +1226,18 @@ PlasmaExtras.Representation {
             || plasmoid.configuration.cursorEnabled
             || plasmoid.configuration.windsurfEnabled
             || plasmoid.configuration.jetbrainsAiEnabled;
+    }
+
+    function onboardingActionText() {
+        if (fullRoot.onboardingStep === 2) return i18n("Open Subscriptions & Diagnostics");
+        if (fullRoot.onboardingStep === 3) return i18n("Open Presets");
+        return i18n("Open Provider Settings");
+    }
+
+    function onboardingActionIcon() {
+        if (fullRoot.onboardingStep === 2) return "tools-report-bug";
+        if (fullRoot.onboardingStep === 3) return "document-import";
+        return "configure";
     }
 
     function providerRateLimitPercent(backend) {

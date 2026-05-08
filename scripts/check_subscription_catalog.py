@@ -119,8 +119,12 @@ def main() -> None:
 
         if tool.get("needsManualReview") is True:
             manual_review += 1
+            if not tool.get("reviewReason"):
+                fail(f"{key} needsManualReview entries must include reviewReason")
         if tool.get("sourceConflict") is True:
             source_conflict += 1
+            if not tool.get("sourceConflictReason"):
+                fail(f"{key} sourceConflict entries must include sourceConflictReason")
 
         plans = tool.get("plans", [])
         modes = tool.get("billingModes", [])

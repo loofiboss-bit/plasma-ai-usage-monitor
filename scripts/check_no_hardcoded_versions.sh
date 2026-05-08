@@ -4,10 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+pattern='v[0-9]+\.[0-9]+\.[0-9]+|["'\''][0-9]+\.[0-9]+\.[0-9]+["'\'']'
+
 if command -v rg >/dev/null 2>&1; then
-  hardcoded="$(rg -n 'text:[[:space:]]*"([0-9]+\.[0-9]+\.[0-9]+)"' package/contents/ui || true)"
+  hardcoded="$(rg -n -e "$pattern" package/contents/ui package/contents/config || true)"
 else
-  hardcoded="$(grep -R -n -E 'text:[[:space:]]*"([0-9]+\.[0-9]+\.[0-9]+)"' package/contents/ui || true)"
+  hardcoded="$(grep -R -n -E "$pattern" package/contents/ui package/contents/config || true)"
 fi
 
 if [[ -n "$hardcoded" ]]; then
