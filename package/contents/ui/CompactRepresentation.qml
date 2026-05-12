@@ -11,13 +11,22 @@ MouseArea {
 
     readonly property var providers: root.allProviders ?? []
     readonly property var subscriptionTools: root.allSubscriptionTools ?? []
-    readonly property double compactTotalCost: {
+    readonly property int warningThreshold: plasmoid.configuration.warningThreshold || 80
+    readonly property int criticalThreshold: plasmoid.configuration.criticalThreshold || 95
+
+    readonly property double compactApiSpend: {
         var total = 0;
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
-            if (provider && provider.enabled && provider.backend && provider.backend.connected)
+            if (provider && provider.enabled && provider.backend && provider.backend.connected
+                && (provider.backend.costSource === "billing_api" || provider.backend.costSource === "actual_api"))
                 total += provider.backend.cost ?? 0;
         }
+        return total;
+    }
+
+    readonly property double compactSubscriptionFees: {
+        var total = 0;
         for (var j = 0; j < subscriptionTools.length; j++) {
             var tool = subscriptionTools[j];
             if (tool && tool.enabled && tool.monitor && tool.monitor.hasSubscriptionCost)
@@ -34,14 +43,14 @@ MouseArea {
             var p = providers[i];
             if (p && p.enabled && p.backend && p.backend.connected && p.backend.rateLimitRequests > 0) {
                 var usedPercent = ((p.backend.rateLimitRequests - p.backend.rateLimitRequestsRemaining) / p.backend.rateLimitRequests) * 100;
-                if (usedPercent >= plasmoid.configuration.warningThreshold) return true;
+                if (usedPercent >= compactRoot.warningThreshold) return true;
             }
         }
         // Also check subscription tools
         var tools = root.allSubscriptionTools ?? [];
         for (var j = 0; j < tools.length; j++) {
             var t = tools[j];
-            if (t && t.enabled && t.monitor && t.monitor.percentUsed >= 80) return true;
+            if (t && t.enabled && t.monitor && t.monitor.percentUsed >= compactRoot.warningThreshold) return true;
         }
         return false;
     }
@@ -50,14 +59,14 @@ MouseArea {
             var p = providers[i];
             if (p && p.enabled && p.backend && p.backend.connected && p.backend.rateLimitRequests > 0) {
                 var usedPercent = ((p.backend.rateLimitRequests - p.backend.rateLimitRequestsRemaining) / p.backend.rateLimitRequests) * 100;
-                if (usedPercent >= plasmoid.configuration.criticalThreshold) return true;
+                if (usedPercent >= compactRoot.criticalThreshold) return true;
             }
         }
         // Also check subscription tools
         var tools = root.allSubscriptionTools ?? [];
         for (var j = 0; j < tools.length; j++) {
             var t = tools[j];
-            if (t && t.enabled && t.monitor && (t.monitor.limitReached || t.monitor.percentUsed >= 95)) return true;
+            if (t && t.enabled && t.monitor && (t.monitor.limitReached || t.monitor.percentUsed >= compactRoot.criticalThreshold)) return true;
         }
         return false;
     }
@@ -120,7 +129,7 @@ MouseArea {
         id: costLabel
         anchors.fill: parent
         visible: compactRoot.displayMode === "cost"
-        text: "$" + compactRoot.compactTotalCost.toFixed(2)
+        text: "$" + compactRoot.compactApiSpend.toFixed(2)
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         font.bold: true
@@ -128,7 +137,7 @@ MouseArea {
         minimumPointSize: Kirigami.Theme.smallFont.pointSize
         fontSizeMode: Text.Fit
         color: {
-            var cost = compactRoot.compactTotalCost;
+            var cost = compactRoot.compactApiSpend;
             if (cost > 10) return Kirigami.Theme.negativeTextColor;
             if (cost > 5) return Kirigami.Theme.neutralTextColor;
             return Kirigami.Theme.textColor;

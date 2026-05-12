@@ -43,6 +43,18 @@ class ProviderBackend : public QObject
     Q_PROPERTY(int requestCount READ requestCount NOTIFY dataUpdated)
     Q_PROPERTY(double cost READ cost NOTIFY dataUpdated)
     Q_PROPERTY(bool isEstimatedCost READ isEstimatedCost NOTIFY dataUpdated)
+    Q_PROPERTY(qint64 actualInputTokens READ actualInputTokens NOTIFY dataUpdated)
+    Q_PROPERTY(qint64 actualOutputTokens READ actualOutputTokens NOTIFY dataUpdated)
+    Q_PROPERTY(qint64 actualTotalTokens READ actualTotalTokens NOTIFY dataUpdated)
+    Q_PROPERTY(int actualRequestCount READ actualRequestCount NOTIFY dataUpdated)
+    Q_PROPERTY(qint64 probeInputTokens READ probeInputTokens NOTIFY dataUpdated)
+    Q_PROPERTY(qint64 probeOutputTokens READ probeOutputTokens NOTIFY dataUpdated)
+    Q_PROPERTY(qint64 probeTotalTokens READ probeTotalTokens NOTIFY dataUpdated)
+    Q_PROPERTY(int probeRequestCount READ probeRequestCount NOTIFY dataUpdated)
+    Q_PROPERTY(QString costSource READ costSource NOTIFY dataUpdated)
+    Q_PROPERTY(QString usageSource READ usageSource NOTIFY dataUpdated)
+    Q_PROPERTY(QString currency READ currency NOTIFY dataUpdated)
+    Q_PROPERTY(QString dataQuality READ dataQuality NOTIFY dataUpdated)
 
     // Rate limits
     Q_PROPERTY(int rateLimitRequests READ rateLimitRequests NOTIFY dataUpdated)
@@ -138,6 +150,18 @@ public:
     int requestCount() const;
     double cost() const;
     bool isEstimatedCost() const;
+    qint64 actualInputTokens() const;
+    qint64 actualOutputTokens() const;
+    qint64 actualTotalTokens() const;
+    int actualRequestCount() const;
+    qint64 probeInputTokens() const;
+    qint64 probeOutputTokens() const;
+    qint64 probeTotalTokens() const;
+    int probeRequestCount() const;
+    QString costSource() const;
+    QString usageSource() const;
+    QString currency() const;
+    QString dataQuality() const;
 
     // Rate limits
     int rateLimitRequests() const;
@@ -240,6 +264,12 @@ protected:
     void setInputTokens(qint64 tokens);
     void setOutputTokens(qint64 tokens);
     void setRequestCount(int count);
+    void setActualUsage(qint64 inputTokens, qint64 outputTokens, int requestCount);
+    void setProbeUsage(qint64 inputTokens, qint64 outputTokens, int requestCount);
+    void setCostSource(const QString &source);
+    void setUsageSource(const QString &source);
+    void setCurrency(const QString &currency);
+    void setDataQuality(const QString &quality);
     void setCost(double cost);
     void setEstimatedCost(double cost);
     void setDailyCost(double cost);
@@ -284,9 +314,19 @@ private:
     qint64 m_inputTokens = 0;
     qint64 m_outputTokens = 0;
     int m_requestCount = 0;
+    qint64 m_actualInputTokens = 0;
+    qint64 m_actualOutputTokens = 0;
+    int m_actualRequestCount = 0;
+    qint64 m_probeInputTokens = 0;
+    qint64 m_probeOutputTokens = 0;
+    int m_probeRequestCount = 0;
     double m_cost = 0.0;
     double m_dailyCost = 0.0;
     double m_monthlyCost = 0.0;
+    QString m_costSource = QStringLiteral("unknown");
+    QString m_usageSource = QStringLiteral("unknown");
+    QString m_currency = QStringLiteral("USD");
+    QString m_dataQuality = QStringLiteral("unknown");
 
     double m_dailyBudget = 0.0;
     double m_monthlyBudget = 0.0;

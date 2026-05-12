@@ -182,7 +182,11 @@ void UsageDatabase::createTables()
         "  rl_requests INTEGER DEFAULT 0,"
         "  rl_requests_remaining INTEGER DEFAULT 0,"
         "  rl_tokens INTEGER DEFAULT 0,"
-        "  rl_tokens_remaining INTEGER DEFAULT 0"
+        "  rl_tokens_remaining INTEGER DEFAULT 0,"
+        "  cost_source TEXT NOT NULL DEFAULT 'unknown',"
+        "  usage_source TEXT NOT NULL DEFAULT 'unknown',"
+        "  currency TEXT DEFAULT 'USD',"
+        "  data_quality TEXT DEFAULT 'unknown'"
         ")"
     ));
 
@@ -234,6 +238,18 @@ void UsageDatabase::createTables()
     ensureColumnExists(QStringLiteral("usage_snapshots"),
                        QStringLiteral("is_estimated_cost"),
                        QStringLiteral("INTEGER DEFAULT 0"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"),
+                       QStringLiteral("cost_source"),
+                       QStringLiteral("TEXT NOT NULL DEFAULT 'unknown'"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"),
+                       QStringLiteral("usage_source"),
+                       QStringLiteral("TEXT NOT NULL DEFAULT 'unknown'"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"),
+                       QStringLiteral("currency"),
+                       QStringLiteral("TEXT DEFAULT 'USD'"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"),
+                       QStringLiteral("data_quality"),
+                       QStringLiteral("TEXT DEFAULT 'unknown'"));
 }
 
 void UsageDatabase::ensureColumnExists(const QString &table,
@@ -274,7 +290,11 @@ void UsageDatabase::recordSnapshot(const QString &provider,
                                     int rateLimitTokens,
                                     int rateLimitTokensRemaining,
                                     const QString &model,
-                                    bool isEstimatedCost)
+                                    bool isEstimatedCost,
+                                    const QString &costSource,
+                                    const QString &usageSource,
+                                    const QString &currency,
+                                    const QString &dataQuality)
 {
     if (!m_enabled)
         return;
@@ -298,8 +318,9 @@ void UsageDatabase::recordSnapshot(const QString &provider,
     query.prepare(QStringLiteral(
         "INSERT INTO usage_snapshots "
         "(provider, model, input_tokens, output_tokens, request_count, cost, is_estimated_cost, "
-        "daily_cost, monthly_cost, rl_requests, rl_requests_remaining, rl_tokens, rl_tokens_remaining) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        "daily_cost, monthly_cost, rl_requests, rl_requests_remaining, rl_tokens, rl_tokens_remaining, "
+        "cost_source, usage_source, currency, data_quality) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
     ));
     query.addBindValue(provider);
     query.addBindValue(model.trimmed());
@@ -314,6 +335,10 @@ void UsageDatabase::recordSnapshot(const QString &provider,
     query.addBindValue(rateLimitRequestsRemaining);
     query.addBindValue(rateLimitTokens);
     query.addBindValue(rateLimitTokensRemaining);
+    query.addBindValue(costSource.trimmed().isEmpty() ? QStringLiteral("unknown") : costSource.trimmed());
+    query.addBindValue(usageSource.trimmed().isEmpty() ? QStringLiteral("unknown") : usageSource.trimmed());
+    query.addBindValue(currency.trimmed().isEmpty() ? QStringLiteral("USD") : currency.trimmed().toUpper());
+    query.addBindValue(dataQuality.trimmed().isEmpty() ? QStringLiteral("unknown") : dataQuality.trimmed());
 
     if (!query.exec()) {
         qWarning() << "UsageDatabase: Failed to record snapshot:" << query.lastError().text();
@@ -407,7 +432,7 @@ QVariantList UsageDatabase::getSnapshots(const QString &provider,
     query.prepare(QStringLiteral(
         "SELECT timestamp, model, input_tokens, output_tokens, request_count, cost, "
         "is_estimated_cost, daily_cost, monthly_cost, rl_requests, rl_requests_remaining, "
-        "rl_tokens, rl_tokens_remaining "
+        "rl_tokens, rl_tokens_remaining, cost_source, usage_source, currency, data_quality "
         "FROM usage_snapshots "
         "WHERE provider = ? AND timestamp >= ? AND timestamp <= ? "
         "ORDER BY timestamp ASC"
@@ -436,6 +461,10 @@ QVariantList UsageDatabase::getSnapshots(const QString &provider,
         row[QStringLiteral("rlRequestsRemaining")] = query.value(10).toInt();
         row[QStringLiteral("rlTokens")] = query.value(11).toInt();
         row[QStringLiteral("rlTokensRemaining")] = query.value(12).toInt();
+        row[QStringLiteral("costSource")] = query.value(13).toString();
+        row[QStringLiteral("usageSource")] = query.value(14).toString();
+        row[QStringLiteral("currency")] = query.value(15).toString();
+        row[QStringLiteral("dataQuality")] = query.value(16).toString();
         results.append(row);
     }
 
@@ -813,7 +842,7 @@ QString UsageDatabase::exportCsv(const QString &provider,
     QString csv;
     csv += QStringLiteral("timestamp,provider,model,input_tokens,output_tokens,request_count,"
                           "cost,is_estimated_cost,daily_cost,monthly_cost,rl_requests,rl_requests_remaining,"
-                          "rl_tokens,rl_tokens_remaining\n");
+                          "rl_tokens,rl_tokens_remaining,cost_source,usage_source,currency,data_quality\n");
 
     QVariantList snapshots = getSnapshots(provider, from, to);
     for (const QVariant &snap : snapshots) {
@@ -832,7 +861,11 @@ QString UsageDatabase::exportCsv(const QString &provider,
             QString::number(row[QStringLiteral("rlRequests")].toInt()),
             QString::number(row[QStringLiteral("rlRequestsRemaining")].toInt()),
             QString::number(row[QStringLiteral("rlTokens")].toInt()),
-            QString::number(row[QStringLiteral("rlTokensRemaining")].toInt())
+            QString::number(row[QStringLiteral("rlTokensRemaining")].toInt()),
+            row[QStringLiteral("costSource")].toString(),
+            row[QStringLiteral("usageSource")].toString(),
+            row[QStringLiteral("currency")].toString(),
+            row[QStringLiteral("dataQuality")].toString()
         };
         csv += fields.join(QLatin1Char(',')) + QLatin1Char('\n');
     }
@@ -919,13 +952,14 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
     if (requestedFormats.contains(QStringLiteral("csv"))) {
         QString providerCsv = QStringLiteral(
             "provider,timestamp,model,input_tokens,output_tokens,request_count,cost,is_estimated_cost,"
-            "daily_cost,monthly_cost,rl_requests,rl_requests_remaining,rl_tokens,rl_tokens_remaining\n");
+            "daily_cost,monthly_cost,rl_requests,rl_requests_remaining,rl_tokens,rl_tokens_remaining,"
+            "cost_source,usage_source,currency,data_quality\n");
 
         for (const QString &provider : getProviders()) {
             const QVariantList snapshots = getSnapshots(provider, from, to);
             for (const QVariant &snap : snapshots) {
                 const QVariantMap row = snap.toMap();
-                providerCsv += QStringLiteral("%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14\n")
+                providerCsv += QStringLiteral("%1,%2,%3,%4,%5,%6,%7,%8,%9,%10,%11,%12,%13,%14,%15,%16,%17,%18\n")
                     .arg(provider,
                          row.value(QStringLiteral("timestamp")).toString(),
                          row.value(QStringLiteral("model")).toString().replace(',', ' '),
@@ -939,7 +973,11 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
                          row.value(QStringLiteral("rlRequests")).toString(),
                          row.value(QStringLiteral("rlRequestsRemaining")).toString(),
                          row.value(QStringLiteral("rlTokens")).toString(),
-                         row.value(QStringLiteral("rlTokensRemaining")).toString());
+                         row.value(QStringLiteral("rlTokensRemaining")).toString(),
+                         row.value(QStringLiteral("costSource")).toString(),
+                         row.value(QStringLiteral("usageSource")).toString(),
+                         row.value(QStringLiteral("currency")).toString(),
+                         row.value(QStringLiteral("dataQuality")).toString());
             }
         }
 
@@ -1172,6 +1210,8 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
     result[QStringLiteral("topDrivers")] = QVariantList{};
     result[QStringLiteral("topModels")] = QVariantList{};
     result[QStringLiteral("days")] = QVariantList{};
+    result[QStringLiteral("hasEstimatedData")] = false;
+    result[QStringLiteral("hasProbeOnlyData")] = false;
 
     if (!m_initialized) {
         return result;
@@ -1190,6 +1230,7 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
         "         MAX(input_tokens + output_tokens) as provider_tokens "
         "  FROM usage_snapshots "
         "  WHERE timestamp >= date('now', '-%1 days') "
+        "    AND cost_source != 'connectivity_probe' "
         "  GROUP BY day, provider"
         ") "
         "GROUP BY day "
@@ -1281,7 +1322,8 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
 
     QSqlQuery latestQuery(m_db);
     latestQuery.prepare(QStringLiteral(
-        "SELECT provider, model, cost, is_estimated_cost, daily_cost, monthly_cost "
+        "SELECT provider, model, cost, is_estimated_cost, daily_cost, monthly_cost, "
+        "       cost_source, usage_source, data_quality "
         "FROM usage_snapshots "
         "WHERE id IN ("
         "  SELECT MAX(id) FROM usage_snapshots "
@@ -1301,6 +1343,9 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
         QString model;
         double value = 0.0;
         bool estimated = false;
+        QString costSource;
+        QString usageSource;
+        QString dataQuality;
     };
 
     QList<DriverRow> drivers;
@@ -1316,6 +1361,17 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
         row.estimated = latestQuery.value(3).toBool();
         const double dailyCost = latestQuery.value(4).toDouble();
         const double monthlyCost = latestQuery.value(5).toDouble();
+        row.costSource = latestQuery.value(6).toString();
+        row.usageSource = latestQuery.value(7).toString();
+        row.dataQuality = latestQuery.value(8).toString();
+        if (row.estimated || row.costSource == QLatin1String("estimated_from_usage")) {
+            result[QStringLiteral("hasEstimatedData")] = true;
+        }
+        if (row.costSource == QLatin1String("connectivity_probe")
+            || row.usageSource == QLatin1String("connectivity_probe")) {
+            result[QStringLiteral("hasProbeOnlyData")] = true;
+            continue;
+        }
 
         row.value = monthlyCost > 0.0 ? monthlyCost
             : (dailyCost > 0.0 ? dailyCost * static_cast<double>(daysInMonth) : cost);
@@ -1329,7 +1385,9 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
 
         drivers.append(row);
         modelTotals[row.model] += row.value;
-        modelEstimated[row.model] = modelEstimated.value(row.model, false) || row.estimated;
+        modelEstimated[row.model] = modelEstimated.value(row.model, false)
+            || row.estimated
+            || row.costSource == QLatin1String("estimated_from_usage");
     }
 
     std::sort(drivers.begin(), drivers.end(), [](const DriverRow &lhs, const DriverRow &rhs) {
@@ -1345,6 +1403,9 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
         map[QStringLiteral("model")] = driver.model;
         map[QStringLiteral("value")] = driver.value;
         map[QStringLiteral("estimated")] = driver.estimated;
+        map[QStringLiteral("costSource")] = driver.costSource;
+        map[QStringLiteral("usageSource")] = driver.usageSource;
+        map[QStringLiteral("dataQuality")] = driver.dataQuality;
         topDrivers.append(map);
     }
     result[QStringLiteral("topDrivers")] = topDrivers;

@@ -3,6 +3,7 @@
 #include <QDate>
 #include <QUrl>
 #include <QRandomGenerator>
+#include <QSet>
 
 namespace {
 ProviderBackend::NormalizedUsageCost normalizeOpenAiLikeUsage(const QJsonObject &payload)
@@ -216,13 +217,100 @@ qint64 ProviderBackend::totalTokens() const { return m_inputTokens + m_outputTok
 int ProviderBackend::requestCount() const { return m_requestCount; }
 double ProviderBackend::cost() const { return m_cost; }
 bool ProviderBackend::isEstimatedCost() const { return m_isEstimatedCost; }
+qint64 ProviderBackend::actualInputTokens() const { return m_actualInputTokens; }
+qint64 ProviderBackend::actualOutputTokens() const { return m_actualOutputTokens; }
+qint64 ProviderBackend::actualTotalTokens() const { return m_actualInputTokens + m_actualOutputTokens; }
+int ProviderBackend::actualRequestCount() const { return m_actualRequestCount; }
+qint64 ProviderBackend::probeInputTokens() const { return m_probeInputTokens; }
+qint64 ProviderBackend::probeOutputTokens() const { return m_probeOutputTokens; }
+qint64 ProviderBackend::probeTotalTokens() const { return m_probeInputTokens + m_probeOutputTokens; }
+int ProviderBackend::probeRequestCount() const { return m_probeRequestCount; }
+QString ProviderBackend::costSource() const { return m_costSource; }
+QString ProviderBackend::usageSource() const { return m_usageSource; }
+QString ProviderBackend::currency() const { return m_currency; }
+QString ProviderBackend::dataQuality() const { return m_dataQuality; }
 
-void ProviderBackend::setInputTokens(qint64 tokens) { m_inputTokens = tokens; }
-void ProviderBackend::setOutputTokens(qint64 tokens) { m_outputTokens = tokens; }
-void ProviderBackend::setRequestCount(int count) { m_requestCount = count; }
+void ProviderBackend::setInputTokens(qint64 tokens)
+{
+    m_inputTokens = tokens;
+    m_actualInputTokens = tokens;
+}
+
+void ProviderBackend::setOutputTokens(qint64 tokens)
+{
+    m_outputTokens = tokens;
+    m_actualOutputTokens = tokens;
+}
+
+void ProviderBackend::setRequestCount(int count)
+{
+    m_requestCount = count;
+    m_actualRequestCount = count;
+}
+
+void ProviderBackend::setActualUsage(qint64 inputTokens, qint64 outputTokens, int requestCount)
+{
+    m_actualInputTokens = qMax<qint64>(0, inputTokens);
+    m_actualOutputTokens = qMax<qint64>(0, outputTokens);
+    m_actualRequestCount = qMax(0, requestCount);
+    m_inputTokens = m_actualInputTokens;
+    m_outputTokens = m_actualOutputTokens;
+    m_requestCount = m_actualRequestCount;
+}
+
+void ProviderBackend::setProbeUsage(qint64 inputTokens, qint64 outputTokens, int requestCount)
+{
+    m_probeInputTokens = qMax<qint64>(0, inputTokens);
+    m_probeOutputTokens = qMax<qint64>(0, outputTokens);
+    m_probeRequestCount = qMax(0, requestCount);
+}
+
+void ProviderBackend::setCostSource(const QString &source)
+{
+    static const QSet<QString> allowedSources = {
+        QStringLiteral("actual_api"),
+        QStringLiteral("billing_api"),
+        QStringLiteral("estimated_from_usage"),
+        QStringLiteral("connectivity_probe"),
+        QStringLiteral("self_tracked"),
+        QStringLiteral("browser_sync"),
+        QStringLiteral("unknown"),
+    };
+    const QString normalized = source.trimmed().isEmpty() ? QStringLiteral("unknown") : source.trimmed();
+    m_costSource = allowedSources.contains(normalized) ? normalized : QStringLiteral("unknown");
+}
+
+void ProviderBackend::setUsageSource(const QString &source)
+{
+    static const QSet<QString> allowedSources = {
+        QStringLiteral("actual_api"),
+        QStringLiteral("billing_api"),
+        QStringLiteral("estimated_from_usage"),
+        QStringLiteral("connectivity_probe"),
+        QStringLiteral("self_tracked"),
+        QStringLiteral("browser_sync"),
+        QStringLiteral("unknown"),
+    };
+    const QString normalized = source.trimmed().isEmpty() ? QStringLiteral("unknown") : source.trimmed();
+    m_usageSource = allowedSources.contains(normalized) ? normalized : QStringLiteral("unknown");
+}
+
+void ProviderBackend::setCurrency(const QString &currency)
+{
+    const QString normalized = currency.trimmed().toUpper();
+    m_currency = normalized.isEmpty() ? QStringLiteral("USD") : normalized;
+}
+
+void ProviderBackend::setDataQuality(const QString &quality)
+{
+    const QString normalized = quality.trimmed();
+    m_dataQuality = normalized.isEmpty() ? QStringLiteral("unknown") : normalized;
+}
+
 void ProviderBackend::setCost(double cost) {
     m_cost = cost;
     m_isEstimatedCost = false;
+    setCostSource(QStringLiteral("actual_api"));
     checkBudgetLimits();
 }
 
@@ -610,6 +698,7 @@ void ProviderBackend::updateEstimatedCost(const QString &currentModel)
 
     m_cost = estimatedTotal;
     m_isEstimatedCost = true;
+    setCostSource(QStringLiteral("estimated_from_usage"));
     m_dailyCost = estimatedTotal; // Best estimate for daily cost from accumulated tokens
     checkBudgetLimits();
 }
@@ -618,6 +707,7 @@ void ProviderBackend::setEstimatedCost(double cost)
 {
     m_cost = qMax(0.0, cost);
     m_isEstimatedCost = true;
+    setCostSource(QStringLiteral("estimated_from_usage"));
     m_dailyCost = m_cost;
     m_monthlyCost = m_cost;
     checkBudgetLimits();

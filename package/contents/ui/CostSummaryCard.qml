@@ -11,7 +11,7 @@ ColumnLayout {
     property var subscriptionTools: []
     readonly property bool narrowCard: costCard.width < Kirigami.Units.gridUnit * 14
 
-    readonly property double subscriptionTotalCost: {
+    readonly property double subscriptionFees: {
         var total = 0;
         for (var i = 0; i < subscriptionTools.length; i++) {
             var tool = subscriptionTools[i];
@@ -21,32 +21,52 @@ ColumnLayout {
         return total;
     }
 
-    readonly property double totalCost: {
+    readonly property double apiSpend: {
         var total = 0;
         for (var i = 0; i < providers.length; i++) {
-            if (providers[i].enabled && providers[i].backend && providers[i].backend.connected)
-                total += providers[i].backend.cost;
-        }
-        return total + subscriptionTotalCost;
-    }
-
-    readonly property double totalDailyCost: {
-        var total = 0;
-        for (var i = 0; i < providers.length; i++) {
-            if (providers[i].enabled && providers[i].backend && providers[i].backend.connected)
-                total += providers[i].backend.dailyCost;
+            var provider = providers[i];
+            if (provider.enabled && provider.backend && provider.backend.connected
+                && (provider.backend.costSource === "billing_api" || provider.backend.costSource === "actual_api"))
+                total += provider.backend.cost;
         }
         return total;
     }
 
-    readonly property double totalMonthlyCost: {
+    readonly property double apiSpendToday: {
         var total = 0;
         for (var i = 0; i < providers.length; i++) {
-            if (providers[i].enabled && providers[i].backend && providers[i].backend.connected)
-                total += providers[i].backend.monthlyCost;
+            var provider = providers[i];
+            if (provider.enabled && provider.backend && provider.backend.connected
+                && (provider.backend.costSource === "billing_api" || provider.backend.costSource === "actual_api"))
+                total += provider.backend.dailyCost;
         }
         return total;
     }
+
+    readonly property double apiSpendThisMonth: {
+        var total = 0;
+        for (var i = 0; i < providers.length; i++) {
+            var provider = providers[i];
+            if (provider.enabled && provider.backend && provider.backend.connected
+                && (provider.backend.costSource === "billing_api" || provider.backend.costSource === "actual_api"))
+                total += provider.backend.monthlyCost;
+        }
+        return total;
+    }
+
+    readonly property double estimatedBurn: {
+        var total = 0;
+        for (var i = 0; i < providers.length; i++) {
+            var provider = providers[i];
+            if (provider.enabled && provider.backend && provider.backend.connected
+                && (provider.backend.costSource === "estimated_from_usage" || provider.backend.isEstimatedCost))
+                total += provider.backend.estimatedMonthlyCost || provider.backend.monthlyCost || provider.backend.cost || 0;
+        }
+        return total;
+    }
+
+    readonly property double totalMonthlyExposure: apiSpendThisMonth + subscriptionFees + estimatedBurn
+    readonly property double totalCost: totalMonthlyExposure
 
     spacing: 0
     property int costViewMode: 0
@@ -88,9 +108,11 @@ ColumnLayout {
 
                     PlasmaExtras.Heading {
                         level: 4
-                        text: costCard.costViewMode === 0 ? i18n("Total Cost")
-                            : costCard.costViewMode === 1 ? i18n("Today's Cost")
-                            : i18n("Monthly Cost")
+                        text: costCard.costViewMode === 0 ? i18n("Total Monthly Exposure")
+                            : costCard.costViewMode === 1 ? i18n("API Spend Today")
+                            : costCard.costViewMode === 2 ? i18n("API Spend This Month")
+                            : costCard.costViewMode === 3 ? i18n("Subscription Fees / Month")
+                            : i18n("Estimated Monthly Burn")
                         Layout.fillWidth: true
                     }
 
@@ -98,9 +120,11 @@ ColumnLayout {
                         spacing: 2
                         Repeater {
                             model: [
-                                { label: i18n("All"), mode: 0 },
+                                { label: i18n("Exposure"), mode: 0 },
                                 { label: i18n("Day"), mode: 1 },
-                                { label: i18n("Month"), mode: 2 }
+                                { label: i18n("Month"), mode: 2 },
+                                { label: i18n("Fees"), mode: 3 },
+                                { label: i18n("Burn"), mode: 4 }
                             ]
 
                             PlasmaComponents.ToolButton {
@@ -118,8 +142,10 @@ ColumnLayout {
                     Layout.fillWidth: true
                     text: {
                         var val = costCard.costViewMode === 0 ? costCard.totalCost
-                                : costCard.costViewMode === 1 ? costCard.totalDailyCost
-                                : costCard.totalMonthlyCost;
+                                : costCard.costViewMode === 1 ? costCard.apiSpendToday
+                                : costCard.costViewMode === 2 ? costCard.apiSpendThisMonth
+                                : costCard.costViewMode === 3 ? costCard.subscriptionFees
+                                : costCard.estimatedBurn;
                         return "$" + val.toFixed(val < 1 ? 4 : 2);
                     }
                     font.bold: true
@@ -127,12 +153,22 @@ ColumnLayout {
                     horizontalAlignment: costCard.narrowCard ? Text.AlignLeft : Text.AlignRight
                     color: {
                         var cost = costCard.costViewMode === 0 ? costCard.totalCost
-                                 : costCard.costViewMode === 1 ? costCard.totalDailyCost
-                                 : costCard.totalMonthlyCost;
+                                 : costCard.costViewMode === 1 ? costCard.apiSpendToday
+                                 : costCard.costViewMode === 2 ? costCard.apiSpendThisMonth
+                                 : costCard.costViewMode === 3 ? costCard.subscriptionFees
+                                 : costCard.estimatedBurn;
                         if (cost > 50) return Kirigami.Theme.negativeTextColor;
                         if (cost > 20) return Kirigami.Theme.neutralTextColor;
                         return Kirigami.Theme.textColor;
                     }
+                }
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: i18n("API spend, fixed subscription fees, and estimated burn are labeled separately. Monthly exposure: $%1", costCard.totalMonthlyExposure.toFixed(2))
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    opacity: 0.68
+                    wrapMode: Text.WordWrap
                 }
             }
 
@@ -146,9 +182,17 @@ ColumnLayout {
                     Layout.fillWidth: true
                     readonly property double providerCost: {
                         if (!modelData.backend) return 0;
+                        var source = modelData.backend.costSource || "unknown";
+                        if (costCard.costViewMode === 3) return 0;
+                        if (costCard.costViewMode === 4) {
+                            if (source === "estimated_from_usage" || modelData.backend.isEstimatedCost)
+                                return modelData.backend.estimatedMonthlyCost || modelData.backend.monthlyCost || modelData.backend.cost || 0;
+                            return 0;
+                        }
+                        if (source !== "billing_api" && source !== "actual_api") return 0;
                         if (costCard.costViewMode === 1) return modelData.backend.dailyCost ?? 0;
                         if (costCard.costViewMode === 2) return modelData.backend.monthlyCost ?? 0;
-                        return modelData.backend.cost ?? 0;
+                        return modelData.backend.monthlyCost || modelData.backend.cost || 0;
                     }
                     visible: modelData.enabled && modelData.backend && modelData.backend.connected && providerCost > 0
                     spacing: Kirigami.Units.smallSpacing
@@ -177,14 +221,15 @@ ColumnLayout {
                         if (!modelData.monitor || !modelData.monitor.hasSubscriptionCost) return 0;
                         return modelData.monitor.subscriptionCost ?? 0;
                     }
-                    visible: costCard.costViewMode === 0 && modelData.enabled && toolCost > 0
+                    visible: (costCard.costViewMode === 0 || costCard.costViewMode === 3)
+                             && modelData.enabled && toolCost > 0
                     spacing: Kirigami.Units.smallSpacing
 
                     Rectangle { width: 8; height: 8; radius: 4; color: modelData.monitor?.toolColor ?? Kirigami.Theme.highlightColor }
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
                         elide: Text.ElideRight
-                        text: i18n("%1 (subscription)", modelData.name)
+                        text: i18n("%1 (subscription fee)", modelData.name)
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.8
                     }

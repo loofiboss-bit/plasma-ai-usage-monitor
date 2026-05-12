@@ -17,6 +17,17 @@ bool SecretsManager::isWalletOpen() const
     return m_walletOpen;
 }
 
+void SecretsManager::retryOpenWallet()
+{
+    delete m_wallet;
+    m_wallet = nullptr;
+    if (m_walletOpen) {
+        m_walletOpen = false;
+        Q_EMIT walletOpenChanged();
+    }
+    openWallet();
+}
+
 void SecretsManager::openWallet()
 {
     // Open KWallet asynchronously

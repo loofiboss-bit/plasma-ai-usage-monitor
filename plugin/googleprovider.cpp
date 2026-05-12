@@ -117,6 +117,9 @@ void GoogleProvider::onCountTokensReply(QNetworkReply *reply)
     applyKnownLimits();
 
     setConnected(true);
+    setUsageSource(QStringLiteral("connectivity_probe"));
+    setCostSource(QStringLiteral("connectivity_probe"));
+    setDataQuality(QStringLiteral("rate_limit_only"));
     setLoading(false);
     updateLastRefreshed();
     Q_EMIT dataUpdated();

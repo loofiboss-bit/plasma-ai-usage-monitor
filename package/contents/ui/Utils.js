@@ -35,9 +35,11 @@ function formatRelativeTime(dateTime) {
  * @param {object} theme - Kirigami.Theme reference
  * @returns {color} The appropriate status color
  */
-function usageColor(percent, theme) {
-    if (percent >= 95) return theme.negativeTextColor;
-    if (percent >= 80) return theme.neutralTextColor;
+function usageColor(percent, theme, warningThreshold, criticalThreshold) {
+    var warning = warningThreshold || 80;
+    var critical = criticalThreshold || 95;
+    if (percent >= critical) return theme.negativeTextColor;
+    if (percent >= warning) return theme.neutralTextColor;
     if (percent >= 50) return theme.neutralTextColor;
     return theme.positiveTextColor;
 }
@@ -64,10 +66,11 @@ function rateLimitColor(remaining, total, theme) {
  * @param {object} theme - Kirigami.Theme reference
  * @returns {color} The appropriate status color
  */
-function budgetColor(spent, budget, theme) {
+function budgetColor(spent, budget, theme, warningThreshold) {
     if (budget <= 0) return theme.disabledTextColor;
     var ratio = spent / budget;
+    var warning = (warningThreshold || 80) / 100.0;
     if (ratio < 0.5) return theme.positiveTextColor;
-    if (ratio < 0.8) return theme.neutralTextColor;
+    if (ratio < warning) return theme.neutralTextColor;
     return theme.negativeTextColor;
 }

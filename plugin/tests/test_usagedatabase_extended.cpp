@@ -8,10 +8,39 @@
 #include <QSqlQuery>
 #include <QStandardPaths>
 #include <QUuid>
+#include <QDir>
+#include <QFileInfo>
 
 #include "usagedatabase.h"
 
 namespace {
+QString databasePath()
+{
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+        + QStringLiteral("/plasma-ai-usage-monitor/usage_history.db");
+}
+
+QStringList snapshotColumns()
+{
+    const QString connName = QStringLiteral("ext_schema_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    QStringList columns;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connName);
+        db.setDatabaseName(databasePath());
+        if (db.open()) {
+            QSqlQuery query(db);
+            if (query.exec(QStringLiteral("PRAGMA table_info(usage_snapshots)"))) {
+                while (query.next()) {
+                    columns.append(query.value(1).toString());
+                }
+            }
+            db.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(connName);
+    return columns;
+}
+
 /**
  * Directly update a snapshot timestamp for test purposes.
  */
@@ -21,9 +50,7 @@ bool setSnapshotTimestamp(const QString &provider, double cost, const QString &t
     bool ok = false;
     {
         QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connName);
-        db.setDatabaseName(
-            QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
-            + QStringLiteral("/plasma-ai-usage-monitor/usage_history.db"));
+        db.setDatabaseName(databasePath());
         if (db.open()) {
             QSqlQuery query(db);
             query.prepare(QStringLiteral(
@@ -50,6 +77,8 @@ private Q_SLOTS:
     void testGetToolNames();
     void testExportCsv();
     void testExportJson();
+    void testSourceMetadataSchemaMigration();
+    void testSourceMetadataPersistenceAndExports();
     void testGetSummary();
     void testGetDailyCosts();
     void testPruneOldData();
@@ -169,6 +198,106 @@ void UsageDatabaseExtendedTest::testExportJson()
     QVERIFY(first.contains(QStringLiteral("timestamp")));
     QVERIFY(first.contains(QStringLiteral("cost")));
     QVERIFY(qAbs(first.value(QStringLiteral("cost")).toDouble() - 3.0) < 0.01);
+}
+
+void UsageDatabaseExtendedTest::testSourceMetadataSchemaMigration()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    const QString dbPath = databasePath();
+    QVERIFY(QDir().mkpath(QFileInfo(dbPath).absolutePath()));
+
+    const QString connName = QStringLiteral("old_schema_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase oldDb = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connName);
+        oldDb.setDatabaseName(dbPath);
+        QVERIFY(oldDb.open());
+        QSqlQuery query(oldDb);
+        QVERIFY(query.exec(QStringLiteral(
+            "CREATE TABLE usage_snapshots ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "timestamp DATETIME DEFAULT (datetime('now')),"
+            "provider TEXT NOT NULL,"
+            "input_tokens INTEGER DEFAULT 0,"
+            "output_tokens INTEGER DEFAULT 0,"
+            "request_count INTEGER DEFAULT 0,"
+            "cost REAL DEFAULT 0.0,"
+            "daily_cost REAL DEFAULT 0.0,"
+            "monthly_cost REAL DEFAULT 0.0,"
+            "rl_requests INTEGER DEFAULT 0,"
+            "rl_requests_remaining INTEGER DEFAULT 0,"
+            "rl_tokens INTEGER DEFAULT 0,"
+            "rl_tokens_remaining INTEGER DEFAULT 0"
+            ")"
+        )));
+        oldDb.close();
+    }
+    QSqlDatabase::removeDatabase(connName);
+
+    UsageDatabase db;
+    db.init();
+
+    const QStringList columns = snapshotColumns();
+    QVERIFY(columns.contains(QStringLiteral("cost_source")));
+    QVERIFY(columns.contains(QStringLiteral("usage_source")));
+    QVERIFY(columns.contains(QStringLiteral("currency")));
+    QVERIFY(columns.contains(QStringLiteral("data_quality")));
+}
+
+void UsageDatabaseExtendedTest::testSourceMetadataPersistenceAndExports()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+
+    db.recordSnapshot(QStringLiteral("OpenAI"),
+                      200,
+                      100,
+                      20,
+                      3.0,
+                      3.0,
+                      30.0,
+                      100,
+                      80,
+                      1000,
+                      800,
+                      QStringLiteral("gpt-5.4"),
+                      false,
+                      QStringLiteral("billing_api"),
+                      QStringLiteral("actual_api"),
+                      QStringLiteral("eur"),
+                      QStringLiteral("actual_billing"));
+
+    const QDateTime from = QDateTime::currentDateTimeUtc().addSecs(-3600);
+    const QDateTime to = QDateTime::currentDateTimeUtc().addSecs(3600);
+
+    QVariantList snapshots = db.getSnapshots(QStringLiteral("OpenAI"), from, to);
+    QCOMPARE(snapshots.size(), 1);
+    QVariantMap first = snapshots.first().toMap();
+    QCOMPARE(first.value(QStringLiteral("costSource")).toString(), QStringLiteral("billing_api"));
+    QCOMPARE(first.value(QStringLiteral("usageSource")).toString(), QStringLiteral("actual_api"));
+    QCOMPARE(first.value(QStringLiteral("currency")).toString(), QStringLiteral("EUR"));
+    QCOMPARE(first.value(QStringLiteral("dataQuality")).toString(), QStringLiteral("actual_billing"));
+
+    const QString csv = db.exportCsv(QStringLiteral("OpenAI"), from, to);
+    QVERIFY(csv.contains(QStringLiteral("cost_source,usage_source,currency,data_quality")));
+    QVERIFY(csv.contains(QStringLiteral("billing_api,actual_api,EUR,actual_billing")));
+
+    const QString jsonStr = db.exportJson(QStringLiteral("OpenAI"), from, to);
+    QJsonDocument doc = QJsonDocument::fromJson(jsonStr.toUtf8());
+    QVERIFY(doc.isObject());
+    QJsonArray arr = doc.object().value(QStringLiteral("snapshots")).toArray();
+    QCOMPARE(arr.size(), 1);
+    QJsonObject row = arr.first().toObject();
+    QCOMPARE(row.value(QStringLiteral("costSource")).toString(), QStringLiteral("billing_api"));
+    QCOMPARE(row.value(QStringLiteral("usageSource")).toString(), QStringLiteral("actual_api"));
+    QCOMPARE(row.value(QStringLiteral("currency")).toString(), QStringLiteral("EUR"));
+    QCOMPARE(row.value(QStringLiteral("dataQuality")).toString(), QStringLiteral("actual_billing"));
 }
 
 void UsageDatabaseExtendedTest::testGetSummary()

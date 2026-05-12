@@ -174,22 +174,48 @@ PlasmaExtras.Representation {
                         opacity: 0.7
                     }
 
+                    PlasmaExtras.Heading {
+                        level: 5
+                        text: fullRoot.onboardingStepTitle()
+                        Layout.fillWidth: true
+                        elide: Text.ElideRight
+                    }
+
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
                         wrapMode: Text.WordWrap
                         maximumLineCount: fullRoot.compactOnboarding ? 4 : 6
                         elide: Text.ElideRight
-                        text: {
-                            if (fullRoot.onboardingStep === 0) {
-                                return i18n("Choose at least one provider in Configure > Providers. OpenAI, Anthropic, Google, and OpenAI-compatible providers are supported.");
+                        text: fullRoot.onboardingStepCopy()
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+                        visible: !fullRoot.compactOnboarding
+
+                        Repeater {
+                            model: fullRoot.onboardingOptions()
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Kirigami.Units.smallSpacing
+
+                                Kirigami.Icon {
+                                    source: "dialog-ok"
+                                    Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                                    Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                                    color: Kirigami.Theme.positiveTextColor
+                                }
+
+                                PlasmaComponents.Label {
+                                    Layout.fillWidth: true
+                                    text: modelData
+                                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                    wrapMode: Text.WordWrap
+                                    opacity: 0.78
+                                }
                             }
-                            if (fullRoot.onboardingStep === 1) {
-                                return i18n("Add your API key for that provider. Keys are stored in KWallet and are never saved in plain text config files.");
-                            }
-                            if (fullRoot.onboardingStep === 2) {
-                                return i18n("Optional: configure subscription tools in Configure > Subscriptions, then review Diagnostics for catalog trust, browser sync readiness, and local tool status.");
-                            }
-                            return i18n("Apply a preset from Configure > General or return to this widget and use Refresh All. Once one provider or local tool is enabled, the dashboard appears automatically.");
                         }
                     }
 
@@ -414,7 +440,7 @@ PlasmaExtras.Representation {
                                 ColumnLayout {
                                     spacing: 0
                                     PlasmaComponents.Label {
-                                        text: i18n("Total Cost")
+                                        text: i18n("API Spend")
                                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                                         opacity: 0.7
                                     }
@@ -695,6 +721,7 @@ PlasmaExtras.Representation {
                                 providerIcon: modelData.iconSource || modelData.backend?.iconName || "globe"
                                 providerColor: modelData.color
                                 backend: modelData.backend ?? null
+                                scheduler: root.refreshScheduler
                                 showCost: true
                                 showUsage: true
                                 collapsed: fullRoot.shouldCollapseProviderCard(modelData)
@@ -948,6 +975,34 @@ PlasmaExtras.Representation {
                             showChartContent: fullRoot.detailHistoryReady
                             showEmptyState: false
                             chartData: fullRoot.detailSnapshots
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Layout.leftMargin: Kirigami.Units.smallSpacing
+                            Layout.rightMargin: Kirigami.Units.smallSpacing
+                            visible: fullRoot.detailHistoryReady
+                            spacing: Kirigami.Units.smallSpacing
+
+                            PlasmaComponents.Label {
+                                text: i18n("Latest source:")
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                opacity: 0.7
+                            }
+
+                            SourceBadge {
+                                text: fullRoot.sourceBadgeLabel(fullRoot.latestDetailSnapshot().costSource)
+                            }
+
+                            SourceBadge {
+                                text: fullRoot.sourceBadgeLabel(fullRoot.latestDetailSnapshot().usageSource)
+                            }
+
+                            SourceBadge {
+                                text: fullRoot.qualityBadgeLabel(fullRoot.latestDetailSnapshot().dataQuality)
+                            }
+
+                            Item { Layout.fillWidth: true }
                         }
 
                         TrendSummary {
@@ -1229,15 +1284,72 @@ PlasmaExtras.Representation {
     }
 
     function onboardingActionText() {
-        if (fullRoot.onboardingStep === 2) return i18n("Open Subscriptions & Diagnostics");
-        if (fullRoot.onboardingStep === 3) return i18n("Open Presets");
-        return i18n("Open Provider Settings");
+        if (fullRoot.onboardingStep === 0) return i18n("Choose Goal");
+        if (fullRoot.onboardingStep === 1) return i18n("Choose Data Level");
+        if (fullRoot.onboardingStep === 2) return i18n("Open Presets");
+        return i18n("Review Connections");
     }
 
     function onboardingActionIcon() {
-        if (fullRoot.onboardingStep === 2) return "tools-report-bug";
-        if (fullRoot.onboardingStep === 3) return "document-import";
-        return "configure";
+        if (fullRoot.onboardingStep === 0) return "flag";
+        if (fullRoot.onboardingStep === 1) return "view-statistics";
+        if (fullRoot.onboardingStep === 2) return "document-import";
+        return "tools-report-bug";
+    }
+
+    function onboardingStepTitle() {
+        if (fullRoot.onboardingStep === 0) return i18n("Monitoring Goal");
+        if (fullRoot.onboardingStep === 1) return i18n("Data Level");
+        if (fullRoot.onboardingStep === 2) return i18n("Quick Preset");
+        return i18n("Connection & Data Quality");
+    }
+
+    function onboardingStepCopy() {
+        if (fullRoot.onboardingStep === 0) {
+            return i18n("Start from the outcome you care about, then enable only the providers or local tools needed for that view.");
+        }
+        if (fullRoot.onboardingStep === 1) {
+            return i18n("Pick how exact the data should be. v10 labels actual billing, actual usage, estimates, self-tracked data, Browser Sync, and probe-only checks separately.");
+        }
+        if (fullRoot.onboardingStep === 2) {
+            return i18n("Use a preset to seed provider, budget, subscription, export, and operator settings without hiding advanced controls.");
+        }
+        return i18n("After keys or local tools are enabled, refresh once and review source badges, wallet state, model defaults, catalog review state, and browser-sync readiness.");
+    }
+
+    function onboardingOptions() {
+        if (fullRoot.onboardingStep === 0) {
+            return [
+                i18n("API spend and budgets"),
+                i18n("AI coding subscriptions"),
+                i18n("Local-only dashboard"),
+                i18n("Advanced/operator mode")
+            ];
+        }
+        if (fullRoot.onboardingStep === 1) {
+            return [
+                i18n("Actual billing or usage where APIs expose it"),
+                i18n("Estimated usage where providers lack billing APIs"),
+                i18n("Self-tracked local tool activity"),
+                i18n("Browser Sync Labs when explicitly enabled")
+            ];
+        }
+        if (fullRoot.onboardingStep === 2) {
+            return [
+                i18n("Solo Developer"),
+                i18n("Budget Watch"),
+                i18n("Multi-Provider"),
+                i18n("Local AI/tools"),
+                i18n("Operator/Prometheus")
+            ];
+        }
+        return [
+            i18n("Key stored"),
+            i18n("Connection OK"),
+            i18n("Usage API available"),
+            i18n("Billing API available"),
+            i18n("Source badges reviewed")
+        ];
     }
 
     function providerRateLimitPercent(backend) {
@@ -1278,8 +1390,9 @@ PlasmaExtras.Representation {
         if (!(monitor.installed ?? false)) return i18n("Tool not detected on this system");
         if (monitor.limitReached ?? false) return i18n("Primary limit reached");
         if (monitor.secondaryLimitReached ?? false) return i18n("Secondary limit reached");
-        if ((monitor.percentUsed ?? 0) >= 80) return i18n("Primary usage at %1%", Math.round(monitor.percentUsed));
-        if ((monitor.secondaryPercentUsed ?? 0) >= 80) return i18n("Secondary usage at %1%", Math.round(monitor.secondaryPercentUsed));
+        var warningThreshold = plasmoid.configuration.warningThreshold || 80;
+        if ((monitor.percentUsed ?? 0) >= warningThreshold) return i18n("Primary usage at %1%", Math.round(monitor.percentUsed));
+        if ((monitor.secondaryPercentUsed ?? 0) >= warningThreshold) return i18n("Secondary usage at %1%", Math.round(monitor.secondaryPercentUsed));
         var syncStatus = monitor.syncStatus ?? "";
         if (syncStatus !== ""
             && syncStatus !== "idle"
@@ -1325,7 +1438,10 @@ PlasmaExtras.Representation {
     function hasCostData() {
         var providers = root.allProviders ?? [];
         for (var i = 0; i < providers.length; i++) {
-            if (providers[i].enabled && providers[i].backend && providers[i].backend.cost > 0)
+            if (providers[i].enabled && providers[i].backend
+                && ((providers[i].backend.cost || 0) > 0
+                    || (providers[i].backend.dailyCost || 0) > 0
+                    || (providers[i].backend.monthlyCost || 0) > 0))
                 return true;
         }
         var tools = root.allSubscriptionTools ?? [];
@@ -1598,6 +1714,33 @@ PlasmaExtras.Representation {
         if (value >= 1000000) return (value / 1000000).toFixed(1) + "M";
         if (value >= 1000) return (value / 1000).toFixed(1) + "K";
         return Math.round(value).toString();
+    }
+
+    function latestDetailSnapshot() {
+        var rows = fullRoot.detailSnapshots || [];
+        if (rows.length === 0) return ({});
+        return rows[rows.length - 1] || {};
+    }
+
+    function sourceBadgeLabel(source) {
+        if (source === "billing_api") return i18n("Actual billing");
+        if (source === "actual_api") return i18n("Actual usage");
+        if (source === "estimated_from_usage") return i18n("Estimated");
+        if (source === "connectivity_probe") return i18n("Probe only");
+        if (source === "self_tracked") return i18n("Self-tracked");
+        if (source === "browser_sync") return i18n("Browser sync");
+        return i18n("Unknown");
+    }
+
+    function qualityBadgeLabel(quality) {
+        if (quality === "actual_billing") return i18n("Actual billing");
+        if (quality === "actual_usage") return i18n("Actual usage");
+        if (quality === "estimated") return i18n("Estimated");
+        if (quality === "probe_only") return i18n("Probe only");
+        if (quality === "rate_limit_only") return i18n("Probe only");
+        if (quality === "manual_review") return i18n("Review needed");
+        if (quality === "source_conflict") return i18n("Source conflict");
+        return i18n("Unknown");
     }
 
     function canExportCurrentView() {

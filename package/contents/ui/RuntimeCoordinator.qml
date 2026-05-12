@@ -22,20 +22,9 @@ Item {
     required property var windsurfMonitor
     required property var jetbrainsAiMonitor
 
-    function loadApiKeys() {
-        var providers = registry.allProviders || [];
-        for (var i = 0; i < providers.length; i++) {
-            var provider = providers[i];
-            if (provider.enabled && provider.requiresApiKey !== false) {
-                var keySlot = provider.configKey;
-                if (provider.configKey === "bedrock") {
-                    keySlot = "bedrock_access_key_id";
-                }
-                var key = secrets.getKey(keySlot);
-                if (key) {
-                    provider.backend.setApiKey(key);
-                }
-            }
+    function loadIntegrationSecrets() {
+        if (copilotMonitor) {
+            copilotMonitor.githubToken = secrets.getKey("copilot_github");
         }
 
         if (registry.bedrockBackend) {
@@ -45,6 +34,22 @@ Item {
 
         webhookNotifier.slackWebhookUrl = secrets.getKey("slack_webhook_url");
         webhookNotifier.discordWebhookUrl = secrets.getKey("discord_webhook_url");
+    }
+
+    function loadApiKeys() {
+        var providers = registry.allProviders || [];
+        for (var i = 0; i < providers.length; i++) {
+            var provider = providers[i];
+            if (provider.enabled && provider.requiresApiKey !== false) {
+                var keySlot = provider.secretKey || provider.configKey;
+                var key = secrets.getKey(keySlot);
+                if (key) {
+                    provider.backend.setApiKey(key);
+                }
+            }
+        }
+
+        loadIntegrationSecrets();
 
         scheduler.refreshAll();
         syncMetricsPayload();
@@ -73,7 +78,11 @@ Item {
             backend.rateLimitTokens,
             backend.rateLimitTokensRemaining,
             activeModel,
-            backend.isEstimatedCost
+            backend.isEstimatedCost,
+            backend.costSource || "unknown",
+            backend.usageSource || "unknown",
+            backend.currency || "USD",
+            backend.dataQuality || "unknown"
         );
         syncMetricsPayload();
     }
@@ -100,6 +109,11 @@ Item {
         }
 
         var lines = [];
+        var apiSpend = 0;
+        var apiSpendToday = 0;
+        var apiSpendMonth = 0;
+        var estimatedBurn = 0;
+        var subscriptionFees = 0;
         var providers = registry.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
@@ -108,18 +122,33 @@ Item {
             }
             var providerKey = provider.configKey;
             var backend = provider.backend;
+            var costSource = labelValue(backend.costSource || "unknown");
+            var usageSource = labelValue(backend.usageSource || "unknown");
+            var currency = labelValue(backend.currency || "USD");
+            var dataQuality = labelValue(backend.dataQuality || "unknown");
             lines.push("ai_usage_provider_connected{provider=\"" + providerKey + "\"} " + (backend.connected ? "1" : "0"));
-            lines.push("ai_usage_provider_cost{provider=\"" + providerKey + "\"} " + (backend.cost || 0));
-            lines.push("ai_usage_provider_daily_cost{provider=\"" + providerKey + "\"} " + (backend.dailyCost || 0));
-            lines.push("ai_usage_provider_monthly_cost{provider=\"" + providerKey + "\"} " + (backend.monthlyCost || 0));
+            lines.push("ai_usage_provider_source_info{provider=\"" + providerKey + "\",cost_source=\"" + costSource + "\",usage_source=\"" + usageSource + "\",currency=\"" + currency + "\",data_quality=\"" + dataQuality + "\"} 1");
+            lines.push("ai_usage_provider_cost{provider=\"" + providerKey + "\",cost_source=\"" + costSource + "\",currency=\"" + currency + "\"} " + (backend.cost || 0));
+            lines.push("ai_usage_provider_daily_cost{provider=\"" + providerKey + "\",cost_source=\"" + costSource + "\",currency=\"" + currency + "\"} " + (backend.dailyCost || 0));
+            lines.push("ai_usage_provider_monthly_cost{provider=\"" + providerKey + "\",cost_source=\"" + costSource + "\",currency=\"" + currency + "\"} " + (backend.monthlyCost || 0));
             lines.push("ai_usage_provider_input_tokens{provider=\"" + providerKey + "\"} " + (backend.inputTokens || 0));
             lines.push("ai_usage_provider_output_tokens{provider=\"" + providerKey + "\"} " + (backend.outputTokens || 0));
             lines.push("ai_usage_provider_requests{provider=\"" + providerKey + "\"} " + (backend.requestCount || 0));
+            lines.push("ai_usage_provider_probe_input_tokens{provider=\"" + providerKey + "\"} " + (backend.probeInputTokens || 0));
+            lines.push("ai_usage_provider_probe_output_tokens{provider=\"" + providerKey + "\"} " + (backend.probeOutputTokens || 0));
+            lines.push("ai_usage_provider_probe_requests{provider=\"" + providerKey + "\"} " + (backend.probeRequestCount || 0));
             lines.push("ai_usage_provider_rate_limit_requests{provider=\"" + providerKey + "\"} " + (backend.rateLimitRequests || 0));
             lines.push("ai_usage_provider_rate_limit_requests_remaining{provider=\"" + providerKey + "\"} " + (backend.rateLimitRequestsRemaining || 0));
             lines.push("ai_usage_provider_rate_limit_tokens{provider=\"" + providerKey + "\"} " + (backend.rateLimitTokens || 0));
             lines.push("ai_usage_provider_rate_limit_tokens_remaining{provider=\"" + providerKey + "\"} " + (backend.rateLimitTokensRemaining || 0));
             lines.push("ai_usage_provider_last_refresh_seconds{provider=\"" + providerKey + "\"} " + (backend.lastRefreshed ? Date.parse(backend.lastRefreshed) / 1000 : 0));
+            if (backend.costSource === "billing_api" || backend.costSource === "actual_api") {
+                apiSpend += backend.cost || 0;
+                apiSpendToday += backend.dailyCost || 0;
+                apiSpendMonth += backend.monthlyCost || 0;
+            } else if (backend.costSource === "estimated_from_usage" || backend.isEstimatedCost) {
+                estimatedBurn += backend.estimatedMonthlyCost || backend.monthlyCost || backend.cost || 0;
+            }
         }
 
         var tools = registry.allSubscriptionTools || [];
@@ -134,9 +163,46 @@ Item {
             lines.push("ai_usage_tool_usage_limit{tool=\"" + toolKey + "\"} " + (tool.monitor.usageLimit || 0));
             lines.push("ai_usage_tool_percent_used{tool=\"" + toolKey + "\"} " + (tool.monitor.percentUsed || 0));
             lines.push("ai_usage_tool_last_activity_seconds{tool=\"" + toolKey + "\"} " + (tool.monitor.lastActivity ? Date.parse(tool.monitor.lastActivity) / 1000 : 0));
+            lines.push("ai_usage_tool_subscription_fee{tool=\"" + toolKey + "\",cost_source=\"self_tracked\",currency=\"USD\"} " + (tool.monitor.hasSubscriptionCost ? (tool.monitor.subscriptionCost || 0) : 0));
+            if (tool.monitor.hasSubscriptionCost) {
+                subscriptionFees += tool.monitor.subscriptionCost || 0;
+            }
         }
 
+        lines.push("ai_usage_api_spend{period=\"current\",currency=\"USD\"} " + apiSpend);
+        lines.push("ai_usage_api_spend{period=\"today\",currency=\"USD\"} " + apiSpendToday);
+        lines.push("ai_usage_api_spend{period=\"month\",currency=\"USD\"} " + apiSpendMonth);
+        lines.push("ai_usage_subscription_fees{period=\"month\",currency=\"USD\",cost_source=\"self_tracked\"} " + subscriptionFees);
+        lines.push("ai_usage_estimated_burn{period=\"month\",currency=\"USD\",cost_source=\"estimated_from_usage\"} " + estimatedBurn);
+        lines.push("ai_usage_total_monthly_exposure{currency=\"USD\"} " + (apiSpendMonth + subscriptionFees + estimatedBurn));
+
         metricsServer.payload = lines.join("\n") + "\n";
+    }
+
+    function labelValue(value) {
+        return (value || "").toString().replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+    }
+
+    function providerRateLimitPercent(backend) {
+        if (!backend) {
+            return 0;
+        }
+        var requestPercent = 0;
+        var tokenPercent = 0;
+        if ((backend.rateLimitRequests || 0) > 0) {
+            requestPercent = 100 - ((backend.rateLimitRequestsRemaining || 0) * 100 / backend.rateLimitRequests);
+        }
+        if ((backend.rateLimitTokens || 0) > 0) {
+            tokenPercent = 100 - ((backend.rateLimitTokensRemaining || 0) * 100 / backend.rateLimitTokens);
+        }
+        return Math.max(requestPercent, tokenPercent);
+    }
+
+    function evaluateProviderQuota(displayName, backend) {
+        var usedPercent = providerRateLimitPercent(backend);
+        if (usedPercent >= (configuration.warningThreshold || 80)) {
+            notificationController.handleQuotaWarning(displayName, Math.round(usedPercent));
+        }
     }
 
     function connectProviderSignals() {
@@ -145,7 +211,6 @@ Item {
             var provider = providers[i];
             var backend = provider.backend;
 
-            backend.quotaWarning.connect(notificationController.handleQuotaWarning);
             backend.budgetWarning.connect(notificationController.handleBudgetWarning);
             backend.budgetExceeded.connect(notificationController.handleBudgetExceeded);
             backend.providerDisconnected.connect(notificationController.handleProviderDisconnected);
@@ -179,6 +244,7 @@ Item {
     function makeSnapshotHandler(dbName, backend) {
         return function() {
             recordProviderSnapshot(dbName, backend);
+            evaluateProviderQuota(dbName, backend);
         };
     }
 
@@ -206,6 +272,17 @@ Item {
         function onWalletOpenChanged() {
             if (runtime.secrets.walletOpen) {
                 runtime.loadApiKeys();
+                runtime.loadIntegrationSecrets();
+            }
+        }
+
+        function onKeyStored(provider) {
+            if (provider === "copilot_github"
+                    || provider === "bedrock_secret_access_key"
+                    || provider === "bedrock_session_token"
+                    || provider === "slack_webhook_url"
+                    || provider === "discord_webhook_url") {
+                runtime.loadIntegrationSecrets();
             }
         }
     }
@@ -242,7 +319,15 @@ Item {
 
         function onCopilotEnabledChanged() {
             if (runtime.copilotMonitor.enabled) {
+                runtime.loadIntegrationSecrets();
                 runtime.copilotMonitor.checkToolInstalled();
+            }
+        }
+
+        function onCopilotOrgNameChanged() {
+            runtime.loadIntegrationSecrets();
+            if (runtime.copilotMonitor.enabled) {
+                runtime.copilotMonitor.fetchOrgMetrics();
             }
         }
 
@@ -290,5 +375,13 @@ Item {
         interval: 5000
         repeat: false
         onTriggered: runtime.scheduler.performBrowserSync()
+    }
+
+    Timer {
+        id: integrationSecretReloadTimer
+        interval: 5000
+        running: runtime.secrets && runtime.secrets.walletOpen
+        repeat: true
+        onTriggered: runtime.loadIntegrationSecrets()
     }
 }

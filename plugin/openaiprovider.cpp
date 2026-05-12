@@ -6,6 +6,36 @@
 #include <QTimeZone>
 #include <QDebug>
 
+namespace {
+QJsonArray bucketResults(const QJsonObject &bucket)
+{
+    QJsonArray results = bucket.value(QStringLiteral("results")).toArray();
+    if (results.isEmpty()) {
+        results = bucket.value(QStringLiteral("result")).toArray();
+    }
+    return results;
+}
+
+double parseOpenAiCostAmountUsd(const QJsonObject &row)
+{
+    const QJsonValue amountValue = row.value(QStringLiteral("amount"));
+
+    if (amountValue.isObject()) {
+        const QJsonObject amount = amountValue.toObject();
+        const QString currency = amount.value(QStringLiteral("currency")).toString().toLower();
+
+        if (!currency.isEmpty() && currency != QLatin1String("usd")) {
+            qWarning() << "OpenAI cost currency is not USD:" << currency;
+        }
+
+        return amount.value(QStringLiteral("value")).toDouble(0.0);
+    }
+
+    // Legacy/mock fallback only. Old fixtures represented cents as a number.
+    return amountValue.toDouble(0.0) / 100.0;
+}
+} // namespace
+
 OpenAIProvider::OpenAIProvider(QObject *parent)
     : ProviderBackend(parent)
 {
@@ -160,7 +190,7 @@ void OpenAIProvider::onUsageReply(QNetworkReply *reply)
     int totalRequests = 0;
 
     for (const QJsonValue &bucket : buckets) {
-        QJsonArray results = bucket.toObject().value(QStringLiteral("result")).toArray();
+        QJsonArray results = bucketResults(bucket.toObject());
         for (const QJsonValue &result : results) {
             QJsonObject r = result.toObject();
             totalInput += r.value(QStringLiteral("input_tokens")).toInteger(0);
@@ -169,9 +199,9 @@ void OpenAIProvider::onUsageReply(QNetworkReply *reply)
         }
     }
 
-    setInputTokens(totalInput);
-    setOutputTokens(totalOutput);
-    setRequestCount(totalRequests);
+    setActualUsage(totalInput, totalOutput, totalRequests);
+    setUsageSource(QStringLiteral("actual_api"));
+    setDataQuality(QStringLiteral("actual_usage"));
     setConnected(true);
 
     checkAllDone();
@@ -212,17 +242,18 @@ void OpenAIProvider::onCostsReply(QNetworkReply *reply)
 
     double totalCost = 0.0;
     for (const QJsonValue &bucket : buckets) {
-        QJsonArray results = bucket.toObject().value(QStringLiteral("result")).toArray();
+        QJsonArray results = bucketResults(bucket.toObject());
         for (const QJsonValue &result : results) {
             QJsonObject r = result.toObject();
-            // Cost is in cents, convert to dollars
-            totalCost += r.value(QStringLiteral("amount")).toDouble(0.0);
+            totalCost += parseOpenAiCostAmountUsd(r);
         }
     }
 
-    double costDollars = totalCost / 100.0; // API returns cents
-    setCost(costDollars);
-    setDailyCost(costDollars); // 24h window = daily cost
+    setCost(totalCost);
+    setCostSource(QStringLiteral("billing_api"));
+    setCurrency(QStringLiteral("USD"));
+    setDataQuality(QStringLiteral("actual_billing"));
+    setDailyCost(totalCost); // 24h window = daily cost
     checkAllDone();
 }
 
@@ -293,15 +324,17 @@ void OpenAIProvider::onMonthlyCostsReply(QNetworkReply *reply)
 
     double totalCost = 0.0;
     for (const QJsonValue &bucket : buckets) {
-        QJsonArray results = bucket.toObject().value(QStringLiteral("result")).toArray();
+        QJsonArray results = bucketResults(bucket.toObject());
         for (const QJsonValue &result : results) {
             QJsonObject r = result.toObject();
-            totalCost += r.value(QStringLiteral("amount")).toDouble(0.0);
+            totalCost += parseOpenAiCostAmountUsd(r);
         }
     }
 
-    double costDollars = totalCost / 100.0; // API returns cents
-    setMonthlyCost(costDollars);
+    setMonthlyCost(totalCost);
+    setCostSource(QStringLiteral("billing_api"));
+    setCurrency(QStringLiteral("USD"));
+    setDataQuality(QStringLiteral("actual_billing"));
     checkAllDone();
 }
 
@@ -312,12 +345,5 @@ void OpenAIProvider::checkAllDone()
         updateLastRefreshed();
         Q_EMIT dataUpdated();
 
-        // Check for quota warnings
-        if (rateLimitRequests() > 0) {
-            int usedPercent = 100 - (rateLimitRequestsRemaining() * 100 / rateLimitRequests());
-            if (usedPercent >= 80) {
-                Q_EMIT quotaWarning(name(), usedPercent);
-            }
-        }
     }
 }

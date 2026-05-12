@@ -222,6 +222,28 @@ bool SubscriptionToolBackend::isLimitReached() const
     return m_usageLimit > 0 && m_usageCount >= m_usageLimit;
 }
 
+int SubscriptionToolBackend::warningThreshold() const { return m_warningThreshold; }
+void SubscriptionToolBackend::setWarningThreshold(int threshold)
+{
+    const int normalized = qBound(1, threshold, 100);
+    if (m_warningThreshold != normalized) {
+        m_warningThreshold = normalized;
+        Q_EMIT warningThresholdChanged();
+        checkLimitWarnings();
+    }
+}
+
+int SubscriptionToolBackend::criticalThreshold() const { return m_criticalThreshold; }
+void SubscriptionToolBackend::setCriticalThreshold(int threshold)
+{
+    const int normalized = qBound(1, threshold, 100);
+    if (m_criticalThreshold != normalized) {
+        m_criticalThreshold = normalized;
+        Q_EMIT warningThresholdChanged();
+        checkLimitWarnings();
+    }
+}
+
 // --- Secondary Window ---
 
 int SubscriptionToolBackend::secondaryUsageCount() const { return m_secondaryUsageCount; }
@@ -416,7 +438,7 @@ void SubscriptionToolBackend::checkLimitWarnings()
 
     if (m_usageCount >= m_usageLimit) {
         Q_EMIT usageLimitReached(toolName());
-    } else if (pct >= 80.0) {
+    } else if (pct >= m_warningThreshold) {
         Q_EMIT limitWarning(toolName(), static_cast<int>(pct));
     }
 

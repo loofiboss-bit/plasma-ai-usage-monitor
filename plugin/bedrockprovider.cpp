@@ -173,7 +173,10 @@ void BedrockProvider::refresh()
             }
         }
 
-        setRequestCount(requestCount() + 1);
+        setProbeUsage(probeInputTokens(), probeOutputTokens(), probeRequestCount() + 1);
+        setUsageSource(QStringLiteral("connectivity_probe"));
+        setCostSource(QStringLiteral("connectivity_probe"));
+        setDataQuality(QStringLiteral("rate_limit_only"));
         setConnected(true);
         setLoading(false);
         updateLastRefreshed();

@@ -1,7 +1,7 @@
 # Roadmap — Plasma AI Usage Monitor
 
-> **Current version:** v9.0.0 (Confidence)
-> **Last updated:** 2026-05-08
+> **Current version:** v10.0.0 (Accuracy)
+> **Last updated:** 2026-05-12
 > **Direction:** Keep the widget desktop-native, local-first, and honest about data quality. Prefer setup clarity, diagnostics, export, notifications, and loopback integrations over backend/server expansion.
 
 ## Product Direction
@@ -20,12 +20,26 @@ The project stays focused on:
 
 | Version | Codename | Theme | Status |
 | ------- | -------- | ----- | ------ |
-| v9.0.0 | **Confidence** | Setup, diagnostics, catalog trust, and release hardening | Current |
+| v10.0.0 | **Accuracy** | Cost correctness, probe honesty, source-aware history, and onboarding | Current |
+| v9.0.0 | **Confidence** | Setup, diagnostics, catalog trust, and release hardening | Released |
 | v8.0.0 | **Source Of Truth** | Local catalogs for pricing, plans, and quota windows | Released |
 | v7.0.0 | **Beacon** | Fedora KDE 44 reliability, trust, and UX | Released |
 | v6.0.1 | **Ground Truth** | Stabilization, trust, and metadata | Released |
 | v6.0.0 | **Nexus (Light)** | UI redesign and local integrations | Released |
 | v5.3.0 | **Vanguard** | Distribution and local tools | Released |
+
+## v10.0.0 — "Accuracy"
+
+**Goal:** make user-visible usage and cost numbers honest about source and confidence before adding provider breadth.
+
+| Feature | Description | Technical Risk |
+| ------- | ----------- | -------------- |
+| **OpenAI billing correctness** | Parse Costs API object amounts with currency warnings and legacy mock fallback only. | Low |
+| **Probe isolation** | Keep health-check tokens and requests separate from displayed usage, spend, history spend, Prometheus spend, and budgets. | Medium |
+| **Source-aware history** | Persist cost source, usage source, currency, and data quality through SQLite, exports, metrics, and Analyst summaries. | Medium |
+| **Catalog/default gate** | Validate KConfig model defaults against Provider Catalog v3 during local, release, and CTest gates. | Low |
+| **Goal-driven onboarding** | First-run flow starts with monitoring goal, data level, quick preset, and data-quality review. | Medium |
+| **Trust Center actions** | Diagnostics includes wallet, catalog review, Browser Sync, insecure URL, install-shadowing, and copyable support-report actions. | Low |
 
 ## v9.0.0 — "Confidence"
 

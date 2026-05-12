@@ -125,15 +125,10 @@ void AnthropicProvider::onCountTokensReply(QNetworkReply *reply)
     }
 
     setConnected(true);
+    setUsageSource(QStringLiteral("connectivity_probe"));
+    setCostSource(QStringLiteral("connectivity_probe"));
+    setDataQuality(QStringLiteral("rate_limit_only"));
     setLoading(false);
     updateLastRefreshed();
     Q_EMIT dataUpdated();
-
-    // Quota warning check
-    if (reqLimit > 0) {
-        int usedPercent = 100 - (reqRemaining * 100 / reqLimit);
-        if (usedPercent >= 80) {
-            Q_EMIT quotaWarning(name(), usedPercent);
-        }
-    }
 }

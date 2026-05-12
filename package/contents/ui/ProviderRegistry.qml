@@ -30,149 +30,57 @@ QtObject {
 
     property ProviderCatalog providerCatalog: ProviderCatalog {}
     readonly property bool demoMode: AppInfo.demoMode
+    readonly property var backendByConfigKey: ({
+        openai: openaiBackend,
+        anthropic: anthropicBackend,
+        google: googleBackend,
+        mistral: mistralBackend,
+        deepseek: deepseekBackend,
+        groq: groqBackend,
+        xai: xaiBackend,
+        ollama: ollamaBackend,
+        openrouter: openrouterBackend,
+        together: togetherBackend,
+        cohere: cohereBackend,
+        googleveo: googleveoBackend,
+        azure: azureBackend,
+        bedrock: bedrockBackend
+    })
 
     function backendForConfigKey(configKey) {
-        switch (configKey) {
-        case "openai":
-            return openaiBackend;
-        case "anthropic":
-            return anthropicBackend;
-        case "google":
-            return googleBackend;
-        case "mistral":
-            return mistralBackend;
-        case "deepseek":
-            return deepseekBackend;
-        case "groq":
-            return groqBackend;
-        case "xai":
-            return xaiBackend;
-        case "ollama":
-            return ollamaBackend;
-        case "openrouter":
-            return openrouterBackend;
-        case "together":
-            return togetherBackend;
-        case "cohere":
-            return cohereBackend;
-        case "googleveo":
-            return googleveoBackend;
-        case "azure":
-            return azureBackend;
-        case "bedrock":
-            return bedrockBackend;
-        default:
-            return null;
-        }
+        return backendByConfigKey[configKey] || null;
     }
 
-    function providerEnabled(configKey) {
+    function providerEnabled(descriptor) {
+        var configKey = descriptor.configKey;
         if (demoMode) {
             return ["openai", "google", "mistral", "deepseek", "groq", "openrouter"].indexOf(configKey) >= 0;
         }
-
-        switch (configKey) {
-        case "openai":
-            return configuration.openaiEnabled;
-        case "anthropic":
-            return configuration.anthropicEnabled;
-        case "google":
-            return configuration.googleEnabled;
-        case "mistral":
-            return configuration.mistralEnabled;
-        case "deepseek":
-            return configuration.deepseekEnabled;
-        case "groq":
-            return configuration.groqEnabled;
-        case "xai":
-            return configuration.xaiEnabled;
-        case "ollama":
-            return configuration.ollamaEnabled;
-        case "openrouter":
-            return configuration.openrouterEnabled;
-        case "together":
-            return configuration.togetherEnabled;
-        case "cohere":
-            return configuration.cohereEnabled;
-        case "googleveo":
-            return configuration.googleveoEnabled;
-        case "azure":
-            return configuration.azureEnabled;
-        case "bedrock":
-            return configuration.bedrockEnabled;
-        default:
-            return false;
-        }
+        return !!configuration[providerEnabledKey(descriptor)];
     }
 
-    function providerRefreshInterval(configKey) {
-        switch (configKey) {
-        case "openai":
-            return configuration.openaiRefreshInterval;
-        case "anthropic":
-            return configuration.anthropicRefreshInterval;
-        case "google":
-            return configuration.googleRefreshInterval;
-        case "mistral":
-            return configuration.mistralRefreshInterval;
-        case "deepseek":
-            return configuration.deepseekRefreshInterval;
-        case "groq":
-            return configuration.groqRefreshInterval;
-        case "xai":
-            return configuration.xaiRefreshInterval;
-        case "ollama":
-            return configuration.ollamaRefreshInterval;
-        case "openrouter":
-            return configuration.openrouterRefreshInterval;
-        case "together":
-            return configuration.togetherRefreshInterval;
-        case "cohere":
-            return configuration.cohereRefreshInterval;
-        case "googleveo":
-            return configuration.googleveoRefreshInterval;
-        case "azure":
-            return configuration.azureRefreshInterval;
-        case "bedrock":
-            return configuration.bedrockRefreshInterval;
-        default:
-            return 0;
-        }
+    function providerEnabledKey(descriptor) {
+        return descriptor.enabledConfigKey || descriptor.configKey + "Enabled";
     }
 
-    function providerNotificationsEnabled(configKey) {
-        switch (configKey) {
-        case "openai":
-            return configuration.openaiNotificationsEnabled;
-        case "anthropic":
-            return configuration.anthropicNotificationsEnabled;
-        case "google":
-            return configuration.googleNotificationsEnabled;
-        case "mistral":
-            return configuration.mistralNotificationsEnabled;
-        case "deepseek":
-            return configuration.deepseekNotificationsEnabled;
-        case "groq":
-            return configuration.groqNotificationsEnabled;
-        case "xai":
-            return configuration.xaiNotificationsEnabled;
-        case "ollama":
-            return configuration.ollamaNotificationsEnabled;
-        case "openrouter":
-            return configuration.openrouterNotificationsEnabled;
-        case "together":
-            return configuration.togetherNotificationsEnabled;
-        case "cohere":
-            return configuration.cohereNotificationsEnabled;
-        case "googleveo":
-            return configuration.googleveoNotificationsEnabled;
-        case "azure":
-            return configuration.azureNotificationsEnabled;
-        case "bedrock":
-            return configuration.bedrockNotificationsEnabled;
-        default:
-            return false;
-        }
+    function providerModelKey(descriptor) {
+        return descriptor.modelConfigKey || descriptor.configKey + "Model";
+    }
+
+    function providerBaseUrlKey(descriptor) {
+        return descriptor.customBaseUrlConfigKey || descriptor.configKey + "CustomBaseUrl";
+    }
+
+    function providerSecretKey(descriptor) {
+        return descriptor.secretKey || (descriptor.configKey === "bedrock" ? "bedrock_access_key_id" : descriptor.configKey);
+    }
+
+    function providerRefreshInterval(descriptor) {
+        return configuration[descriptor.refreshConfigKey] || 0;
+    }
+
+    function providerNotificationsEnabled(descriptor) {
+        return !!configuration[descriptor.notificationsConfigKey];
     }
 
     readonly property var allProviders: {
@@ -186,12 +94,21 @@ QtObject {
                 dbName: descriptor.dbName,
                 configKey: descriptor.configKey,
                 backend: backendForConfigKey(descriptor.configKey),
-                enabled: providerEnabled(descriptor.configKey),
+                enabledKey: providerEnabledKey(descriptor),
+                modelKey: providerModelKey(descriptor),
+                customBaseUrlKey: providerBaseUrlKey(descriptor),
+                refreshKey: descriptor.refreshConfigKey,
+                notificationsKey: descriptor.notificationsConfigKey,
+                dailyBudgetKey: descriptor.dailyBudgetConfigKey,
+                monthlyBudgetKey: descriptor.monthlyBudgetConfigKey,
+                secretKey: providerSecretKey(descriptor),
+                catalogKey: descriptor.catalogKey || descriptor.configKey,
+                enabled: providerEnabled(descriptor),
                 color: descriptor.color,
                 iconSource: Qt.resolvedUrl("../icons/providers/" + descriptor.configKey + ".svg"),
                 requiresApiKey: descriptor.requiresApiKey,
-                refreshInterval: providerRefreshInterval(descriptor.configKey),
-                notificationsEnabled: providerNotificationsEnabled(descriptor.configKey)
+                refreshInterval: providerRefreshInterval(descriptor),
+                notificationsEnabled: providerNotificationsEnabled(descriptor)
             });
         }
         return providers;
@@ -266,14 +183,10 @@ QtObject {
         var total = 0;
         for (var i = 0; i < allProviders.length; i++) {
             if (allProviders[i].enabled && allProviders[i].backend && allProviders[i].backend.connected) {
-                total += allProviders[i].backend.cost;
-            }
-        }
-        for (var j = 0; j < allSubscriptionTools.length; j++) {
-            if (allSubscriptionTools[j].enabled
-                    && allSubscriptionTools[j].monitor
-                    && allSubscriptionTools[j].monitor.hasSubscriptionCost) {
-                total += allSubscriptionTools[j].monitor.subscriptionCost;
+                var source = allProviders[i].backend.costSource || "unknown";
+                if (source === "billing_api" || source === "actual_api") {
+                    total += allProviders[i].backend.cost;
+                }
             }
         }
         return total;

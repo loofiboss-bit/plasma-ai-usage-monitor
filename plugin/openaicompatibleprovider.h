@@ -12,8 +12,8 @@
  * Handles the common pattern of:
  * - POST /chat/completions with max_tokens=1 to read rate limit headers
  * - Parsing x-ratelimit-* response headers
- * - Parsing usage object from response body (tokens)
- * - Session-level token tracking (accumulated within one app session)
+ * - Parsing usage object from response body as widget probe traffic
+ * - Probe-level token tracking kept separate from user usage and spend
  *
  * Subclasses must provide: name(), iconName(), defaultModel(), baseUrl()
  * Subclasses can override refresh() to add extra API calls (e.g., balance endpoint)
@@ -59,10 +59,10 @@ private:
     int m_pendingRequests = 0;
     QByteArray m_lastRequestBody; // stored for retry support
 
-    // Session-level token tracking (accumulated across refreshes within one session)
-    qint64 m_sessionInputTokens = 0;
-    qint64 m_sessionOutputTokens = 0;
-    int m_sessionRequestCount = 0;
+    // Widget-generated connectivity probes, kept separate from user usage.
+    qint64 m_sessionProbeInputTokens = 0;
+    qint64 m_sessionProbeOutputTokens = 0;
+    int m_sessionProbeRequestCount = 0;
 };
 
 #endif // OPENAICOMPATIBLEPROVIDER_H

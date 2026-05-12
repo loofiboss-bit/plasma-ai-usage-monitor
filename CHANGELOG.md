@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.0.0] — 2026-05-12
+
+### Added
+- Add source-aware provider state for actual usage, probe usage, cost source, usage source, currency, and data quality.
+- Add source-aware SQLite snapshot columns, CSV/JSON export fields, Prometheus source labels, and Analyst summary confidence flags.
+- Add `scripts/check_config_defaults_exist_in_catalog.py` to block provider default-model drift in `just check`, `just release-check`, and CTest.
+- Add OpenAI Costs API object-amount, legacy numeric fallback, empty result, malformed JSON, retry-after, non-USD warning, and probe-isolation regression tests.
+
+### Changed
+- Parse OpenAI Costs API `amount.value` directly and warn on non-USD currencies; only legacy numeric mock data uses cents-to-dollars conversion.
+- Treat OpenAI-compatible and Azure chat-completion health checks as connectivity probes, not user usage or spend.
+- Rework first-run onboarding around monitoring goals, data level, quick presets, and source/data-quality review.
+- Expand Diagnostics with wallet, Copilot token, catalog review, Browser Sync readiness, insecure URL, install-shadowing, and support-report actions.
+- Separate dashboard, compact, Prometheus, and card labels for API spend, subscription fees, estimated burn, and monthly exposure.
+- Make Copilot/Bedrock/webhook secret loading react to wallet state and delayed key availability, and make subscription plan changes apply without a Plasma reload.
+- Refresh Provider Catalog v3 and Subscription Catalog v1 release metadata to 2026-05-12 while keeping remaining manual-review entries visible.
+
+### Fixed
+- Fix fresh-install defaults for OpenAI, Azure OpenAI, and AWS Bedrock so they resolve to shipped catalog model IDs.
+- Remove hardcoded provider/tool alert threshold decisions from refresh and card logic so configured warning, critical, and budget thresholds drive UI and notifications.
+
+### Known Metadata Uncertainty
+- Provider manual-review entries remain for Anthropic, Google, Mistral, DeepSeek, Groq, xAI, Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo, and AWS Bedrock.
+- Subscription manual-review/source-conflict entries remain visible for Windsurf and subscription catalog conflict tracking.
+
 ## [9.0.0] — 2026-05-08
 
 ### Added
@@ -632,7 +657,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v9.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v10.0.0...HEAD
+[10.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v9.0.0...v10.0.0
 [9.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.3...v9.0.0
 [8.0.3]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.2...v8.0.3
 [8.0.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.1...v8.0.2

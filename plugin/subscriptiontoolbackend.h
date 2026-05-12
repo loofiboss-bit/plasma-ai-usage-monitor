@@ -46,6 +46,8 @@ class SubscriptionToolBackend : public QObject
     Q_PROPERTY(double percentUsed READ percentUsed NOTIFY usageUpdated)
     Q_PROPERTY(bool limitReached READ isLimitReached NOTIFY usageUpdated)
     Q_PROPERTY(QString periodLabel READ periodLabel CONSTANT)
+    Q_PROPERTY(int warningThreshold READ warningThreshold WRITE setWarningThreshold NOTIFY warningThresholdChanged)
+    Q_PROPERTY(int criticalThreshold READ criticalThreshold WRITE setCriticalThreshold NOTIFY warningThresholdChanged)
 
     // Secondary usage window (e.g., weekly limit alongside 5-hour session)
     Q_PROPERTY(int secondaryUsageCount READ secondaryUsageCount NOTIFY usageUpdated)
@@ -130,6 +132,10 @@ public:
     double percentUsed() const;
     bool isLimitReached() const;
     virtual QString periodLabel() const = 0;
+    int warningThreshold() const;
+    void setWarningThreshold(int threshold);
+    int criticalThreshold() const;
+    void setCriticalThreshold(int threshold);
 
     // Secondary window
     int secondaryUsageCount() const;
@@ -214,6 +220,7 @@ Q_SIGNALS:
     void syncCompleted(bool success, const QString &message);
     void syncDiagnostic(const QString &toolName, const QString &code, const QString &message);
     void quotaWindowsChanged();
+    void warningThresholdChanged();
     void limitWarning(const QString &tool, int percentUsed);
     void usageLimitReached(const QString &tool);
     void activityDetected(const QString &tool);
@@ -265,6 +272,8 @@ private:
 
     int m_usageCount = 0;
     int m_usageLimit = 0;
+    int m_warningThreshold = 80;
+    int m_criticalThreshold = 95;
     int m_secondaryUsageCount = 0;
     int m_secondaryUsageLimit = 0;
 

@@ -1,8 +1,8 @@
 {
   "schemaVersion": 3,
-  "catalogVersion": "2026.05.08",
-  "release": "9.0.0",
-  "lastReviewed": "2026-05-08",
+  "catalogVersion": "2026.05.12",
+  "release": "10.0.0",
+  "lastReviewed": "2026-05-12",
   "runtimeScraping": false,
   "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries with manual-review flags now include user-visible reasons in Diagnostics.",
   "providers": [
@@ -563,6 +563,8 @@
             "unit": "unknown",
             "precision": "unknown"
           },
+          "allowUnknownDefault": true,
+          "unknownDefaultReason": "Ollama Cloud is a connectivity provider in v10; the default model is allowed because no stable public unit pricing is available and the UI labels it as probe-only or unknown pricing.",
           "sourceRefs": [
             {
               "label": "Ollama Cloud",

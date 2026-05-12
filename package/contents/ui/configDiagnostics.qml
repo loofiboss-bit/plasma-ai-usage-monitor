@@ -12,6 +12,7 @@ KCM.SimpleKCM {
     SecretsManager { id: secrets }
     BrowserCookieExtractor { id: syncDetector }
     ProviderCatalog { id: providerCatalog }
+    ClipboardHelper { id: clipboard }
 
     // Helpers to detect CLI tools
     ClaudeCodeMonitor { id: claudeDetector; Component.onCompleted: checkToolInstalled() }
@@ -133,6 +134,23 @@ KCM.SimpleKCM {
             Layout.fillWidth: true
         }
 
+        RowLayout {
+            Kirigami.FormData.label: i18n("Catalog Actions:")
+            spacing: Kirigami.Units.smallSpacing
+
+            QQC2.Button {
+                text: i18n("Open review checklist")
+                icon.name: "text-markdown"
+                onClicked: Qt.openUrlExternally(Qt.resolvedUrl("../../../docs/release/v" + AppInfo.version + "-checklist.md"))
+            }
+
+            QQC2.Button {
+                text: i18n("Review provider catalog")
+                icon.name: "document-open"
+                onClicked: Qt.openUrlExternally(Qt.resolvedUrl("../catalog/providers-v3.json"))
+            }
+        }
+
         QQC2.Label {
             Kirigami.FormData.label: i18n("Provider Health:")
             text: i18n("%1 providers enabled", enabledProviderCount())
@@ -155,8 +173,36 @@ KCM.SimpleKCM {
             }
 
             QQC2.Label {
+                Layout.fillWidth: true
                 text: secrets.walletOpen ? i18n("Wallet is open and accessible") : i18n("Wallet is closed or inaccessible. API keys cannot be saved or loaded.")
                 color: secrets.walletOpen ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
+                wrapMode: Text.WordWrap
+            }
+
+            QQC2.Button {
+                text: secrets.walletOpen ? i18n("Reload") : i18n("Open Wallet")
+                icon.name: "wallet-open"
+                onClicked: secrets.retryOpenWallet()
+            }
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Copilot Token:")
+            spacing: Kirigami.Units.smallSpacing
+
+            Kirigami.Icon {
+                source: secrets.walletOpen && secrets.hasKey("copilot_github") ? "dialog-ok" : "dialog-warning"
+                Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                color: secrets.walletOpen && secrets.hasKey("copilot_github") ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
+            }
+
+            QQC2.Label {
+                Layout.fillWidth: true
+                text: secrets.walletOpen && secrets.hasKey("copilot_github")
+                    ? i18n("GitHub token is available for organization metrics")
+                    : i18n("No GitHub token loaded for Copilot organization metrics")
+                wrapMode: Text.WordWrap
             }
         }
 
@@ -177,8 +223,16 @@ KCM.SimpleKCM {
             }
 
             QQC2.Label {
+                Layout.fillWidth: true
                 text: syncDetector.hasCurrentBrowserProfile ? i18n("Found browser profiles for sync") : i18n("No supported browser profile found")
                 color: syncDetector.hasCurrentBrowserProfile ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
+                wrapMode: Text.WordWrap
+            }
+
+            QQC2.Button {
+                text: i18n("Choose profile")
+                icon.name: "folder-open"
+                onClicked: plasmoid.internalAction("configure").trigger()
             }
         }
 
@@ -215,6 +269,33 @@ KCM.SimpleKCM {
                 Layout.fillWidth: true
                 text: syncDetector.hasSafeStorageAccess ? i18n("Ready for selected browser") : i18n("Safe storage is locked or unavailable; use local estimation.")
                 wrapMode: Text.WordWrap
+            }
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Custom URLs:")
+            spacing: Kirigami.Units.smallSpacing
+
+            Kirigami.Icon {
+                source: insecureCustomUrlCount() === 0 ? "dialog-ok" : "dialog-warning"
+                Layout.preferredWidth: Kirigami.Units.iconSizes.small
+                Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                color: insecureCustomUrlCount() === 0 ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
+            }
+
+            QQC2.Label {
+                Layout.fillWidth: true
+                text: insecureCustomUrlCount() === 0
+                    ? i18n("No insecure remote custom API URLs configured")
+                    : i18n("%1 insecure remote custom API URLs need review", insecureCustomUrlCount())
+                wrapMode: Text.WordWrap
+            }
+
+            QQC2.Button {
+                text: i18n("Review URLs")
+                icon.name: "configure"
+                enabled: insecureCustomUrlCount() > 0
+                onClicked: plasmoid.internalAction("configure").trigger()
             }
         }
 
@@ -311,6 +392,12 @@ KCM.SimpleKCM {
                     Qt.openUrlExternally("konsole --hold -e sh -c 'cd " + AppInfo.pluginPath + "/../scripts && ./show_installed_versions.sh'");
                 }
             }
+
+            QQC2.Button {
+                text: i18n("Copy support report")
+                icon.name: "edit-copy"
+                onClicked: clipboard.setText(buildSupportReport())
+            }
         }
     }
 
@@ -370,5 +457,57 @@ KCM.SimpleKCM {
             }
         }
         return count;
+    }
+
+    function insecureCustomUrlCount() {
+        var keys = [
+            "openaiCustomBaseUrl", "anthropicCustomBaseUrl", "googleCustomBaseUrl",
+            "mistralCustomBaseUrl", "deepseekCustomBaseUrl", "groqCustomBaseUrl",
+            "xaiCustomBaseUrl", "ollamaCustomBaseUrl", "openrouterCustomBaseUrl",
+            "togetherCustomBaseUrl", "cohereCustomBaseUrl", "googleveoCustomBaseUrl",
+            "azureCustomBaseUrl", "bedrockCustomBaseUrl"
+        ];
+        var count = 0;
+        for (var i = 0; i < keys.length; i++) {
+            var url = (plasmoid.configuration[keys[i]] || "").toString().trim();
+            if (url.indexOf("http://") === 0
+                && url.indexOf("http://localhost") !== 0
+                && url.indexOf("http://127.0.0.1") !== 0
+                && url.indexOf("http://[::1]") !== 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    function buildSupportReport() {
+        var readiness = syncDetector.readinessReport("");
+        var lines = [];
+        lines.push("Plasma AI Usage Monitor Support Report");
+        lines.push("Version: " + AppInfo.version);
+        lines.push("Plugin path: " + AppInfo.pluginPath);
+        lines.push("Enabled providers: " + enabledProviderCount());
+        lines.push("Wallet open: " + (secrets.walletOpen ? "yes" : "no"));
+        lines.push("Copilot token loaded: " + (secrets.walletOpen && secrets.hasKey("copilot_github") ? "yes" : "no"));
+        lines.push("Provider catalog: " + ProviderPricingCatalog.catalogVersion
+                   + " reviewed " + ProviderPricingCatalog.lastReviewed
+                   + " review_items=" + ProviderPricingCatalog.manualReviewCount
+                   + " conflicts=" + ProviderPricingCatalog.sourceConflictCount);
+        lines.push("Subscription catalog: " + SubscriptionPlanCatalog.catalogVersion
+                   + " reviewed " + SubscriptionPlanCatalog.lastReviewed
+                   + " review_items=" + SubscriptionPlanCatalog.manualReviewCount
+                   + " conflicts=" + SubscriptionPlanCatalog.sourceConflictCount);
+        lines.push("Browser sync enabled: " + (plasmoid.configuration.browserSyncEnabled ? "yes" : "no"));
+        lines.push("Browser profile found: " + (syncDetector.hasCurrentBrowserProfile ? "yes" : "no"));
+        lines.push("Cookie DB readable: " + (readiness.cookieDatabaseReadable ? "yes" : "no"));
+        lines.push("Safe storage access: " + (syncDetector.hasSafeStorageAccess ? "yes" : "no"));
+        lines.push("Insecure custom URLs: " + insecureCustomUrlCount());
+        lines.push("Local tools: Claude=" + (claudeDetector.installed ? "yes" : "no")
+                   + " Codex=" + (codexDetector.installed ? "yes" : "no")
+                   + " Copilot=" + (copilotDetector.installed ? "yes" : "no"));
+        lines.push("Alerts: warning=" + plasmoid.configuration.warningThreshold
+                   + "% critical=" + plasmoid.configuration.criticalThreshold
+                   + "% budget=" + plasmoid.configuration.budgetWarningPercent + "%");
+        return lines.join("\n");
     }
 }

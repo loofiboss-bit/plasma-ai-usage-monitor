@@ -182,8 +182,12 @@ void UsageDatabaseAnalystTest::testAnalystOverview()
                           80,
                           1000,
                           700,
-                          QStringLiteral("gpt-5.4-pro"),
-                          false);
+                          QStringLiteral("gpt-5.4"),
+                          false,
+                          QStringLiteral("billing_api"),
+                          QStringLiteral("actual_api"),
+                          QStringLiteral("USD"),
+                          QStringLiteral("actual_billing"));
         QVERIFY(updateSnapshotData(QStringLiteral("OpenAI"),
                                    openAiDaily,
                                    100 + dayOffset,
@@ -203,13 +207,40 @@ void UsageDatabaseAnalystTest::testAnalystOverview()
                           500,
                           420,
                           QStringLiteral("claude-3-5-sonnet"),
-                          true);
+                          true,
+                          QStringLiteral("estimated_from_usage"),
+                          QStringLiteral("actual_api"),
+                          QStringLiteral("USD"),
+                          QStringLiteral("estimated"));
         QVERIFY(updateSnapshotData(QStringLiteral("Anthropic"),
                                    0.6,
                                    70 + dayOffset,
                                    90 + dayOffset,
                                    now.addDays(-dayOffset).toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))));
     }
+
+    db.recordSnapshot(QStringLiteral("ProbeOnly"),
+                      0,
+                      0,
+                      0,
+                      99.0,
+                      99.0,
+                      99.0,
+                      0,
+                      0,
+                      0,
+                      0,
+                      QStringLiteral("probe-model"),
+                      false,
+                      QStringLiteral("connectivity_probe"),
+                      QStringLiteral("connectivity_probe"),
+                      QStringLiteral("USD"),
+                      QStringLiteral("probe_only"));
+    QVERIFY(updateSnapshotData(QStringLiteral("ProbeOnly"),
+                               99.0,
+                               0,
+                               0,
+                               now.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))));
 
     const QVariantMap overview = db.getAnalystOverview(30);
     QVERIFY(overview.contains(QStringLiteral("averageDailyCost")));
@@ -218,16 +249,26 @@ void UsageDatabaseAnalystTest::testAnalystOverview()
     QVERIFY(overview.contains(QStringLiteral("topModels")));
 
     QVERIFY(overview.value(QStringLiteral("averageDailyCost")).toDouble() > 0.0);
+    QVERIFY(overview.value(QStringLiteral("averageDailyCost")).toDouble() < 20.0);
     QVERIFY(overview.value(QStringLiteral("weekOverWeekPercent")).toDouble() > 0.0);
     QVERIFY(overview.value(QStringLiteral("anomalyCount")).toInt() >= 1);
+    QVERIFY(overview.value(QStringLiteral("hasEstimatedData")).toBool());
+    QVERIFY(overview.value(QStringLiteral("hasProbeOnlyData")).toBool());
 
     const QVariantList drivers = overview.value(QStringLiteral("topDrivers")).toList();
     QVERIFY(!drivers.isEmpty());
     QCOMPARE(drivers.first().toMap().value(QStringLiteral("provider")).toString(), QStringLiteral("OpenAI"));
+    for (const QVariant &driverValue : drivers) {
+        const QVariantMap driver = driverValue.toMap();
+        QVERIFY(driver.value(QStringLiteral("provider")).toString() != QStringLiteral("ProbeOnly"));
+        QVERIFY(driver.contains(QStringLiteral("costSource")));
+        QVERIFY(driver.contains(QStringLiteral("usageSource")));
+        QVERIFY(driver.contains(QStringLiteral("dataQuality")));
+    }
 
     const QVariantList models = overview.value(QStringLiteral("topModels")).toList();
     QVERIFY(!models.isEmpty());
-    QCOMPARE(models.first().toMap().value(QStringLiteral("model")).toString(), QStringLiteral("gpt-5.4-pro"));
+    QCOMPARE(models.first().toMap().value(QStringLiteral("model")).toString(), QStringLiteral("gpt-5.4"));
 }
 
 QTEST_MAIN(UsageDatabaseAnalystTest)

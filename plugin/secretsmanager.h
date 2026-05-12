@@ -25,6 +25,7 @@ public:
     Q_INVOKABLE QString getKey(const QString &provider);
     Q_INVOKABLE void removeKey(const QString &provider);
     Q_INVOKABLE bool hasKey(const QString &provider);
+    Q_INVOKABLE void retryOpenWallet();
 
 Q_SIGNALS:
     void walletOpenChanged();

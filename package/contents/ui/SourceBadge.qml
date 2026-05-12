@@ -27,10 +27,10 @@ Rectangle {
     }
 
     function badgeColor() {
-        if (text === "Synced" || text === "Official") return Kirigami.Theme.positiveTextColor;
-        if (text === "Needs review") return Kirigami.Theme.neutralTextColor;
-        if (text === "Custom" || text === "Self-tracked") return Kirigami.Theme.linkColor;
-        if (text === "Estimated" || text === "Unknown") return Kirigami.Theme.disabledTextColor;
+        if (text === "Actual billing" || text === "Actual usage" || text === "Synced" || text === "Official") return Kirigami.Theme.positiveTextColor;
+        if (text === "Needs review" || text === "Source conflict" || text === "Unknown pricing") return Kirigami.Theme.neutralTextColor;
+        if (text === "Custom" || text === "Self-tracked" || text === "Browser sync") return Kirigami.Theme.linkColor;
+        if (text === "Estimated" || text === "Probe only" || text === "Unknown") return Kirigami.Theme.disabledTextColor;
         return Kirigami.Theme.textColor;
     }
 }

@@ -13,7 +13,7 @@
         "Id": "com.github.loofi.aiusagemonitor",
         "License": "GPL-3.0-or-later",
         "Name": "AI Usage Monitor",
-        "Version": "9.0.0",
+        "Version": "10.0.0",
         "Website": "https://github.com/loofiboss-bit/plasma-ai-usage-monitor",
         "BugReportUrl": "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues"
     },

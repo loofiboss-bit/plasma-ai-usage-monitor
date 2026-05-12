@@ -14,6 +14,7 @@ ColumnLayout {
     required property string providerIcon
     required property string providerColor
     required property var backend
+    property var scheduler: null
     property bool showCost: false
     property bool showUsage: false
     property bool collapsed: false
@@ -97,6 +98,35 @@ ColumnLayout {
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         color: card.backend?.error ? Kirigami.Theme.negativeTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.7)
                         elide: Text.ElideRight
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+                        visible: card.backend
+
+                        SourceBadge {
+                            text: sourceLabel(card.backend?.costSource ?? "unknown")
+                        }
+
+                        SourceBadge {
+                            text: usageLabel(card.backend?.usageSource ?? "unknown")
+                        }
+
+                        SourceBadge {
+                            visible: modelNeedsReview()
+                            text: i18n("Review needed")
+                        }
+
+                        SourceBadge {
+                            visible: modelSourceConflict()
+                            text: i18n("Source conflict")
+                        }
+
+                        SourceBadge {
+                            visible: modelUnknownPricing()
+                            text: i18n("Unknown pricing")
+                        }
                     }
                 }
 
@@ -224,7 +254,7 @@ ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
                     PlasmaComponents.Label {
-                        text: (card.backend?.isEstimatedCost ?? false) ? i18n("Estimated Cost") : i18n("Cost")
+                        text: costHeading()
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.7
                     }
@@ -240,6 +270,15 @@ ColumnLayout {
                             return Kirigami.Theme.textColor;
                         }
                     }
+                }
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: (card.backend?.costSource ?? "") === "connectivity_probe"
+                    text: i18n("Connection check only — this provider does not expose account usage. Cost is not billing spend.")
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
                 }
 
                 // DeepSeek Balance
@@ -390,8 +429,83 @@ ColumnLayout {
                             : Kirigami.Theme.disabledTextColor
                     }
                 }
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: (card.backend?.probeRequestCount ?? 0) > 0
+                    text: i18n("Connection checks: %1, probe tokens: %2",
+                               card.backend?.probeRequestCount ?? 0,
+                               formatNumber((card.backend?.probeInputTokens ?? 0) + (card.backend?.probeOutputTokens ?? 0)))
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: card.scheduler !== null && card.backend
+                    text: i18n("Next refresh: %1%2",
+                               nextRefreshText(),
+                               refreshModeSuffix())
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    color: (card.backend?.consecutiveErrors ?? 0) > 0
+                        ? Kirigami.Theme.neutralTextColor
+                        : Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
             }
         }
+    }
+
+    function sourceLabel(source) {
+        if (source === "billing_api") return i18n("Actual billing");
+        if (source === "actual_api") return i18n("Actual usage");
+        if (source === "estimated_from_usage") return i18n("Estimated");
+        if (source === "connectivity_probe") return i18n("Probe only");
+        if (source === "self_tracked") return i18n("Self-tracked");
+        if (source === "browser_sync") return i18n("Browser sync");
+        return i18n("Unknown");
+    }
+
+    function usageLabel(source) {
+        if (source === "actual_api") return i18n("Actual usage");
+        if (source === "connectivity_probe") return i18n("Probe only");
+        if (source === "self_tracked") return i18n("Self-tracked");
+        if (source === "browser_sync") return i18n("Browser sync");
+        if (source === "estimated_from_usage") return i18n("Estimated");
+        return i18n("Unknown");
+    }
+
+    function costHeading() {
+        var source = card.backend?.costSource ?? "unknown";
+        if (source === "billing_api") return i18n("API Spend");
+        if (source === "estimated_from_usage") return i18n("Estimated Burn");
+        if (source === "connectivity_probe") return i18n("Probe Cost");
+        return (card.backend?.isEstimatedCost ?? false) ? i18n("Estimated Cost") : i18n("Cost");
+    }
+
+    function currentCatalogModel() {
+        if (!card.backend || !card.modelData) return ({});
+        var providerKey = card.modelData.catalogKey || card.modelData.configKey || "";
+        var modelId = card.backend.model || card.modelData.model || "";
+        if (providerKey === "" || modelId === "") return ({});
+        return ProviderPricingCatalog.model(providerKey, modelId) || ({});
+    }
+
+    function modelNeedsReview() {
+        var row = currentCatalogModel();
+        return row.needsManualReview === true;
+    }
+
+    function modelSourceConflict() {
+        var row = currentCatalogModel();
+        return row.sourceConflict === true;
+    }
+
+    function modelUnknownPricing() {
+        var row = currentCatalogModel();
+        var pricing = row.pricing || {};
+        return pricing.precision === "unknown" || row.dataQuality === "unknown_pricing";
     }
 
     function humanizeError(raw) {
@@ -414,4 +528,27 @@ ColumnLayout {
     function budgetColor(spent, budget) { return Utils.budgetColor(spent, budget, Kirigami.Theme); }
     function formatNumber(n) { return Utils.formatNumber(n); }
     function formatRelativeTime(dateTime) { return Utils.formatRelativeTime(dateTime, Qt, i18n); }
+
+    function nextRefreshText() {
+        if (!card.scheduler || !card.modelData || !card.backend) return i18n("unknown");
+        var last = card.backend.lastRefreshed;
+        if (!last) return i18n("on next timer");
+        var lastDate = new Date(last);
+        var interval = card.scheduler.scheduledInterval(card.modelData) || 0;
+        var ms = lastDate.getTime() + interval - Date.now();
+        if (ms <= 0) return i18n("due now");
+        var seconds = Math.ceil(ms / 1000);
+        if (seconds < 60) return i18n("in %1 sec", seconds);
+        var minutes = Math.ceil(seconds / 60);
+        if (minutes < 60) return i18n("in %1 min", minutes);
+        return i18n("in %1 h", Math.ceil(minutes / 60));
+    }
+
+    function refreshModeSuffix() {
+        if (!card.scheduler || !card.modelData) return "";
+        var parts = [];
+        if (card.scheduler.popupOpen) parts.push(i18n("popup fast-refresh"));
+        if (card.scheduler.backoffMultiplier(card.modelData) > 1) parts.push(i18n("backoff active"));
+        return parts.length > 0 ? " (" + parts.join(", ") + ")" : "";
+    }
 }

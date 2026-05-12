@@ -22,7 +22,7 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current release:** `v9.0.0 Confidence` focuses on first-run activation, actionable Diagnostics, catalog review transparency, safe config portability v2, and stricter release validation.
+> **Current release:** `v10.0.0 Accuracy` focuses on correct OpenAI billing parsing, probe-only honesty, source-aware history, safer defaults, and actionable onboarding/diagnostics.
 
 ## Quick Links
 
@@ -43,7 +43,7 @@ A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, an
 - **Real-time monitoring** — Periodic background polling with configurable per-provider refresh intervals (default 5 min) and manual refresh
 - **14 AI providers** — OpenAI, Azure OpenAI, AWS Bedrock, Anthropic, Google Gemini, Mistral AI, DeepSeek, Groq, xAI/Grok, Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo
 - **Token usage tracking** — Input/output tokens used, requests made, quota/tier limits
-- **Cost tracking** — Dollar spending with daily and monthly cost breakdowns; catalog-backed token and non-token cost estimation for providers without billing APIs
+- **Cost tracking** — API spend, subscription fees, estimated burn, and monthly exposure are labeled separately; OpenAI billing data uses the Costs API shape with source badges
 - **Budget management** — Per-provider daily/monthly budgets with configurable warning thresholds and notifications when budgets are exceeded
 - **Usage history** — SQLite-backed persistence with configurable retention (7-365 days, default 90)
 - **Interactive charts** — Canvas-based line/area charts showing cost, tokens, requests, and rate limit trends over 24h/7d/30d
@@ -58,7 +58,7 @@ A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, an
 - **Webhook alerts** — Optional Slack and Discord incoming webhooks driven by the same local alert pipeline
 - **Notification controls** — Per-provider toggles, cooldown period, Do Not Disturb schedule
 - **Secure key storage** — API keys stored in KWallet, never written to config files on disk
-- **Panel display modes** — Compact icon shows green/yellow/red status badge, or current cost, or active provider count
+- **Panel display modes** — Compact icon shows green/yellow/red status badge, API spend, active provider count, daily spend, remaining requests, or most critical provider
 - **Proxy support** — Custom base URLs per provider for API proxies/gateways, with inline HTTPS security warnings
 - **Data export** — Clipboard export, scheduled JSON/CSV history export, and safe schema-v2 configuration export/import that excludes secrets
 - **Prometheus endpoint** — Optional loopback-only `/metrics` export for Grafana/Prometheus pipelines
@@ -429,7 +429,7 @@ Right-click the widget and select **Configure** to access six settings tabs:
 ### General
 
 - **Refresh interval** — How often to poll APIs (30s to 30min, default 5min)
-- **Compact display mode** — What to show in the panel: icon only, current cost, or active provider count
+- **Compact display mode** — What to show in the panel: icon only, API spend, active provider count, daily API spend, remaining requests, or most critical provider
 - **Per-provider refresh intervals** — Override the global interval for specific providers
 
 ### Providers
@@ -438,7 +438,7 @@ Each provider has:
 
 - **Enable/disable** toggle
 - **API key** field — Keys are stored in KWallet. Use the eye icon to show/hide, and the clear button to remove a key.
-- **Model selector** — Choose which model to query (e.g., `gpt-5.4-pro`, `claude-opus-4.7`, `gemini-3.1-flash-live`, `mistral-large-latest`, `deepseek-chat-v3`, `gemma-4-31b-it`, `grok-3`)
+- **Model selector** — Choose which model to query (e.g., `gpt-5.4`, `claude-opus-4.7`, `gemini-3.1-flash-live`, `mistral-large-latest`, `deepseek-chat-v3`, `gemma-4-31b-it`, `grok-3`)
 - **Custom base URL** — Optional proxy/gateway URL override. Shows a security warning if you enter an `http://` (non-HTTPS) URL.
 - **Project ID** (OpenAI only) — Optional, to filter usage to a specific project
 
@@ -686,12 +686,20 @@ Check that the History tab is enabled in configuration. Data is stored in `~/.lo
 | [SECURITY.md](SECURITY.md)                                               | Security policy, vulnerability reporting, and design decisions |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                                       | Development setup, coding standards, and contribution workflow |
 | [docs/demo/fedora-kde-vm.md](docs/demo/fedora-kde-vm.md)                 | Fedora KDE VM workflow for live testing and screenshot capture |
-| [docs/release/v9.0.0-checklist.md](docs/release/v9.0.0-checklist.md)     | Confidence release validation checklist                        |
+| [docs/release/v10.0.0-checklist.md](docs/release/v10.0.0-checklist.md)   | Accuracy release validation checklist                          |
 | [docs/store/submission-checklist.md](docs/store/submission-checklist.md) | Manual GitHub + KDE Store update checklist                     |
 | [assets/screenshots/README.md](assets/screenshots/README.md)             | Canonical shot list and screenshot quality guide               |
 | [docs/walkthrough.md](docs/walkthrough.md)                               | Current documentation map and historical walkthrough note      |
 
 ## Changelog
+
+### v10.0.0 — Accuracy: Correctness, Source Honesty, and Onboarding
+
+- Parse OpenAI Costs API object amounts correctly and keep legacy numeric fixtures as mock-only fallback
+- Keep provider connectivity probes out of displayed usage, real spend, history spend, Prometheus spend, and budget warnings
+- Add source metadata to provider state, history, CSV/JSON exports, Prometheus metrics, and Analyst summaries
+- Add model-default catalog validation and source badges for actual billing, estimates, probe-only checks, self-tracked usage, Browser Sync, review-needed, and source-conflict data
+- Rework onboarding and Diagnostics around monitoring goals, data levels, fix actions, support-report copy, and separate API/subscription cost labels
 
 ### v9.0.0 — Confidence: Setup, Trust, and Validation
 

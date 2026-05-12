@@ -155,30 +155,37 @@ void GoogleVeoProvider::onModelInfoReply(QNetworkReply *reply)
         ProviderBackend::normalizeUsageCost(ProviderBackend::ProviderId::GoogleVeo, doc.object());
 
     if (normalized.parsed) {
-        setInputTokens(normalized.inputTokens);
-        setOutputTokens(normalized.outputTokens);
-        setRequestCount(qMax(1, normalized.requestCount));
+        setActualUsage(normalized.inputTokens,
+                       normalized.outputTokens,
+                       qMax(1, normalized.requestCount));
+        setUsageSource(QStringLiteral("actual_api"));
 
         if (normalized.cost > 0.0) {
             setCost(normalized.cost);
+            setCostSource(QStringLiteral("actual_api"));
             setDailyCost(normalized.dailyCost > 0.0 ? normalized.dailyCost : normalized.cost);
             setMonthlyCost(normalized.monthlyCost > 0.0 ? normalized.monthlyCost : normalized.cost);
+            setDataQuality(QStringLiteral("actual_usage"));
         } else {
             const double durationSeconds = extractDurationSeconds(doc.object());
             if (durationSeconds > 0.0) {
                 setEstimatedCost(durationSeconds * modelCostPerSecond(m_model));
+                setDataQuality(QStringLiteral("estimated"));
             } else {
                 setCost(0.0);
+                setCostSource(QStringLiteral("unknown"));
                 setDailyCost(cost());
                 setMonthlyCost(cost());
+                setDataQuality(QStringLiteral("actual_usage"));
             }
         }
     } else {
         // Connectivity-only path for model-info endpoint.
-        setInputTokens(0);
-        setOutputTokens(0);
-        setRequestCount(1);
+        setProbeUsage(probeInputTokens(), probeOutputTokens(), probeRequestCount() + 1);
+        setUsageSource(QStringLiteral("connectivity_probe"));
         setCost(0.0);
+        setCostSource(QStringLiteral("connectivity_probe"));
+        setDataQuality(QStringLiteral("probe_only"));
         setDailyCost(0.0);
         setMonthlyCost(0.0);
     }

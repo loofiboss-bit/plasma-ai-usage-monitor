@@ -214,41 +214,16 @@ void AzureOpenAIProvider::onCompletionReply(QNetworkReply *reply)
         m_sessionRequestCount += 1;
     }
 
-    setInputTokens(m_sessionInputTokens);
-    setOutputTokens(m_sessionOutputTokens);
-    setRequestCount(m_sessionRequestCount);
-
-    if (normalized.parsed && normalized.cost > 0.0) {
-        m_sessionTotalCost += normalized.cost;
-        setCost(m_sessionTotalCost);
-
-        if (normalized.dailyCost > 0.0) {
-            m_sessionDailyCost += normalized.dailyCost;
-        } else {
-            m_sessionDailyCost += normalized.cost;
-        }
-
-        if (normalized.monthlyCost > 0.0) {
-            m_sessionMonthlyCost += normalized.monthlyCost;
-        } else {
-            m_sessionMonthlyCost += normalized.cost;
-        }
-
-        setDailyCost(m_sessionDailyCost);
-        setMonthlyCost(m_sessionMonthlyCost);
-    } else {
-        updateEstimatedCost(m_model);
-    }
+    setProbeUsage(m_sessionInputTokens, m_sessionOutputTokens, m_sessionRequestCount);
+    setUsageSource(QStringLiteral("connectivity_probe"));
+    setCost(0.0);
+    setCostSource(QStringLiteral("connectivity_probe"));
+    setDataQuality(QStringLiteral("probe_only"));
+    setDailyCost(0.0);
+    setMonthlyCost(0.0);
 
     setConnected(true);
     setLoading(false);
     updateLastRefreshed();
     Q_EMIT dataUpdated();
-
-    if (rateLimitRequests() > 0) {
-        const int usedPercent = 100 - (rateLimitRequestsRemaining() * 100 / rateLimitRequests());
-        if (usedPercent >= 80) {
-            Q_EMIT quotaWarning(name(), usedPercent);
-        }
-    }
 }

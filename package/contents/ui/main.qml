@@ -68,6 +68,7 @@ PlasmoidItem {
     property alias azure: azureBackend
     property alias bedrock: bedrockBackend
     property alias usageDb: usageDatabase
+    property alias refreshScheduler: refreshScheduler
 
     property alias claudeCode: claudeCodeMonitor
     property alias codexCli: codexCliMonitor
@@ -96,6 +97,24 @@ PlasmoidItem {
             return monitor.planIdForLabel(plans[legacyIndex]);
         }
         return plans.length > 0 ? monitor.planIdForLabel(plans[0]) : "";
+    }
+
+    function applySubscriptionPlan(monitor, planId, legacyIndex, customLimit) {
+        if (!monitor) {
+            return;
+        }
+        var resolvedPlan = root.selectedPlanTier(monitor, planId, legacyIndex);
+        monitor.planTier = resolvedPlan;
+
+        if (customLimit > 0) {
+            monitor.usageLimit = customLimit;
+        } else {
+            monitor.usageLimit = monitor.defaultLimitForPlan(resolvedPlan);
+        }
+
+        if (monitor.hasSecondaryLimit) {
+            monitor.secondaryUsageLimit = monitor.defaultSecondaryLimitForPlan(resolvedPlan);
+        }
     }
 
     function refreshAll() {
@@ -268,56 +287,41 @@ PlasmoidItem {
     ClaudeCodeMonitor {
         id: claudeCodeMonitor
         enabled: plasmoid.configuration.claudeCodeEnabled
-        usageLimit: plasmoid.configuration.claudeCodeCustomLimit
+        warningThreshold: plasmoid.configuration.warningThreshold
+        criticalThreshold: plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
             syncEnabled = Qt.binding(function() { return plasmoid.configuration.browserSyncEnabled; });
-            planTier = root.selectedPlanTier(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan);
-            if (usageLimit === 0) {
-                usageLimit = defaultLimitForPlan(planTier);
-            }
-            if (hasSecondaryLimit) {
-                secondaryUsageLimit = defaultSecondaryLimitForPlan(planTier);
-            }
+            root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit);
         }
     }
 
     CodexCliMonitor {
         id: codexCliMonitor
         enabled: plasmoid.configuration.codexEnabled
-        usageLimit: plasmoid.configuration.codexCustomLimit
+        warningThreshold: plasmoid.configuration.warningThreshold
+        criticalThreshold: plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
             syncEnabled = Qt.binding(function() { return plasmoid.configuration.browserSyncEnabled; });
-            planTier = root.selectedPlanTier(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan);
-            if (usageLimit === 0) {
-                usageLimit = defaultLimitForPlan(planTier);
-            }
-            if (hasSecondaryLimit) {
-                secondaryUsageLimit = defaultSecondaryLimitForPlan(planTier);
-            }
+            root.applySubscriptionPlan(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan, plasmoid.configuration.codexCustomLimit);
         }
     }
 
     CopilotMonitor {
         id: copilotMonitor
         enabled: plasmoid.configuration.copilotEnabled
-        usageLimit: plasmoid.configuration.copilotCustomLimit
+        warningThreshold: plasmoid.configuration.warningThreshold
+        criticalThreshold: plasmoid.configuration.criticalThreshold
         orgName: plasmoid.configuration.copilotOrgName
         billingMode: plasmoid.configuration.copilotBillingMode || "auto"
         monthlyResetDay: plasmoid.configuration.copilotResetDay || 1
 
         Component.onCompleted: {
             checkToolInstalled();
-            planTier = root.selectedPlanTier(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan);
-            if (usageLimit === 0) {
-                usageLimit = defaultLimitForPlan(planTier);
-            }
-            if (secrets.walletOpen && secrets.hasKey("copilot_github")) {
-                githubToken = secrets.getKey("copilot_github");
-            }
+            root.applySubscriptionPlan(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan, plasmoid.configuration.copilotCustomLimit);
             fetchOrgMetrics();
         }
     }
@@ -325,43 +329,65 @@ PlasmoidItem {
     CursorMonitor {
         id: cursorMonitor
         enabled: plasmoid.configuration.cursorEnabled
-        usageLimit: plasmoid.configuration.cursorCustomLimit
+        warningThreshold: plasmoid.configuration.warningThreshold
+        criticalThreshold: plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
-            planTier = root.selectedPlanTier(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan);
-            if (usageLimit === 0) {
-                usageLimit = defaultLimitForPlan(planTier);
-            }
+            root.applySubscriptionPlan(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan, plasmoid.configuration.cursorCustomLimit);
         }
     }
 
     WindsurfMonitor {
         id: windsurfMonitor
         enabled: plasmoid.configuration.windsurfEnabled
-        usageLimit: plasmoid.configuration.windsurfCustomLimit
+        warningThreshold: plasmoid.configuration.warningThreshold
+        criticalThreshold: plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
-            planTier = root.selectedPlanTier(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan);
-            if (usageLimit === 0) {
-                usageLimit = defaultLimitForPlan(planTier);
-            }
+            root.applySubscriptionPlan(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan, plasmoid.configuration.windsurfCustomLimit);
         }
     }
 
     JetBrainsAiMonitor {
         id: jetbrainsAiMonitor
         enabled: plasmoid.configuration.jetbrainsAiEnabled
-        usageLimit: plasmoid.configuration.jetbrainsAiCustomLimit
+        warningThreshold: plasmoid.configuration.warningThreshold
+        criticalThreshold: plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
-            planTier = root.selectedPlanTier(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan);
-            if (usageLimit === 0) {
-                usageLimit = defaultLimitForPlan(planTier);
-            }
+            root.applySubscriptionPlan(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan, plasmoid.configuration.jetbrainsAiCustomLimit);
         }
+    }
+
+    Connections {
+        target: plasmoid.configuration
+
+        function onClaudeCodePlanIdChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
+        function onClaudeCodePlanChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
+        function onClaudeCodeCustomLimitChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
+
+        function onCodexPlanIdChanged() { root.applySubscriptionPlan(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan, plasmoid.configuration.codexCustomLimit); }
+        function onCodexPlanChanged() { root.applySubscriptionPlan(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan, plasmoid.configuration.codexCustomLimit); }
+        function onCodexCustomLimitChanged() { root.applySubscriptionPlan(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan, plasmoid.configuration.codexCustomLimit); }
+
+        function onCopilotPlanIdChanged() { root.applySubscriptionPlan(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan, plasmoid.configuration.copilotCustomLimit); }
+        function onCopilotPlanChanged() { root.applySubscriptionPlan(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan, plasmoid.configuration.copilotCustomLimit); }
+        function onCopilotCustomLimitChanged() { root.applySubscriptionPlan(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan, plasmoid.configuration.copilotCustomLimit); }
+
+        function onCursorPlanIdChanged() { root.applySubscriptionPlan(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan, plasmoid.configuration.cursorCustomLimit); }
+        function onCursorPlanChanged() { root.applySubscriptionPlan(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan, plasmoid.configuration.cursorCustomLimit); }
+        function onCursorCustomLimitChanged() { root.applySubscriptionPlan(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan, plasmoid.configuration.cursorCustomLimit); }
+
+        function onWindsurfPlanIdChanged() { root.applySubscriptionPlan(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan, plasmoid.configuration.windsurfCustomLimit); }
+        function onWindsurfPlanChanged() { root.applySubscriptionPlan(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan, plasmoid.configuration.windsurfCustomLimit); }
+        function onWindsurfCustomLimitChanged() { root.applySubscriptionPlan(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan, plasmoid.configuration.windsurfCustomLimit); }
+
+        function onJetbrainsAiPlanIdChanged() { root.applySubscriptionPlan(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan, plasmoid.configuration.jetbrainsAiCustomLimit); }
+        function onJetbrainsAiPlanChanged() { root.applySubscriptionPlan(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan, plasmoid.configuration.jetbrainsAiCustomLimit); }
+        function onJetbrainsAiCustomLimitChanged() { root.applySubscriptionPlan(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan, plasmoid.configuration.jetbrainsAiCustomLimit); }
     }
 
     LocalMetricsServer {

@@ -92,6 +92,20 @@ ColumnLayout {
                         color: (toolCard.monitor?.limitReached ?? false) ? Kirigami.Theme.negativeTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.7)
                         elide: Text.ElideRight
                     }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Kirigami.Units.smallSpacing
+
+                        SourceBadge {
+                            text: (toolCard.monitor?.syncEnabled ?? false) ? i18n("Browser sync") : i18n("Self-tracked")
+                        }
+
+                        SourceBadge {
+                            visible: toolCard.monitor?.hasSubscriptionCost ?? false
+                            text: i18n("Subscription fee")
+                        }
+                    }
                 }
 
                 RowLayout {

@@ -50,7 +50,7 @@ void CatalogsTest::providerCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 3);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.08"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.12"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(!catalog.reviewItems().isEmpty());
@@ -71,7 +71,7 @@ void CatalogsTest::subscriptionCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 1);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.08"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.12"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(catalog.sourceConflictCount() > 0);

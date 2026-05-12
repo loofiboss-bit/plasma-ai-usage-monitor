@@ -228,14 +228,14 @@ Item {
 
         subscriptionNotification.text = i18n("%1: %2% of usage limit reached",
                                              toolName, Math.round(percentUsed));
-        subscriptionNotification.urgency = percentUsed >= 95
+        subscriptionNotification.urgency = percentUsed >= configuration.criticalThreshold
             ? Notification.CriticalUrgency
             : Notification.NormalUrgency;
         subscriptionNotification.sendEvent();
         webhookNotifier.sendAlert("tool_warning_" + toolName,
                                   i18n("%1 usage warning", toolName),
                                   subscriptionNotification.text,
-                                  percentUsed >= 95);
+                                  percentUsed >= configuration.criticalThreshold);
     }
 
     function handleToolLimitReached(toolName) {

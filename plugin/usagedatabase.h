@@ -48,7 +48,11 @@ public:
                                      int rateLimitTokens,
                                      int rateLimitTokensRemaining,
                                      const QString &model = QString(),
-                                     bool isEstimatedCost = false);
+                                     bool isEstimatedCost = false,
+                                     const QString &costSource = QStringLiteral("unknown"),
+                                     const QString &usageSource = QStringLiteral("unknown"),
+                                     const QString &currency = QStringLiteral("USD"),
+                                     const QString &dataQuality = QStringLiteral("unknown"));
 
     /**
      * Record a usage snapshot for a subscription tool.
@@ -96,7 +100,7 @@ public:
      * Query usage snapshots for a provider within a time range.
      * Returns a list of QVariantMap with keys: timestamp, inputTokens, outputTokens,
      * requestCount, cost, dailyCost, monthlyCost, rlRequests, rlRequestsRemaining,
-     * rlTokens, rlTokensRemaining.
+     * rlTokens, rlTokensRemaining, costSource, usageSource, currency, dataQuality.
      */
     Q_INVOKABLE QVariantList getSnapshots(const QString &provider,
                                            const QDateTime &from,

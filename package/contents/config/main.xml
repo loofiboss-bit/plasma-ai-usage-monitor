@@ -86,7 +86,7 @@
             <default>false</default>
         </entry>
         <entry name="openaiModel" type="String">
-            <default>gpt-5.4-pro</default>
+            <default>gpt-5.4</default>
         </entry>
         <entry name="openaiProjectId" type="String">
             <default></default>
@@ -100,7 +100,7 @@
             <default>false</default>
         </entry>
         <entry name="azureModel" type="String">
-            <default>gpt-5.4-pro</default>
+            <default>gpt-5.4</default>
         </entry>
         <entry name="azureDeploymentId" type="String">
             <default></default>
@@ -117,7 +117,7 @@
             <default>us-east-1</default>
         </entry>
         <entry name="bedrockModel" type="String">
-            <default>anthropic.claude-3-5-sonnet-20240620-v1:0</default>
+            <default>anthropic.claude-3-5-sonnet-20241022-v2:0</default>
         </entry>
         <entry name="bedrockCustomBaseUrl" type="String">
             <default></default>
