@@ -1,6 +1,6 @@
 # Roadmap — Plasma AI Usage Monitor
 
-> **Current version:** v10.0.0 (Accuracy)
+> **Current version:** v10.0.1 (Accuracy)
 > **Last updated:** 2026-05-12
 > **Direction:** Keep the widget desktop-native, local-first, and honest about data quality. Prefer setup clarity, diagnostics, export, notifications, and loopback integrations over backend/server expansion.
 
@@ -20,7 +20,8 @@ The project stays focused on:
 
 | Version | Codename | Theme | Status |
 | ------- | -------- | ----- | ------ |
-| v10.0.0 | **Accuracy** | Cost correctness, probe honesty, source-aware history, and onboarding | Current |
+| v10.0.1 | **Accuracy Patch** | Provider card catalog singleton import fix for installed v10 packages | Current |
+| v10.0.0 | **Accuracy** | Cost correctness, probe honesty, source-aware history, and onboarding | Released |
 | v9.0.0 | **Confidence** | Setup, diagnostics, catalog trust, and release hardening | Released |
 | v8.0.0 | **Source Of Truth** | Local catalogs for pricing, plans, and quota windows | Released |
 | v7.0.0 | **Beacon** | Fedora KDE 44 reliability, trust, and UX | Released |

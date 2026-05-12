@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        10.0.0
+Version:        10.0.1
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
 License:        GPL-3.0-or-later
@@ -72,6 +72,9 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Tue May 12 2026 Loofi <loofi@github.com> - 10.0.1-1
+- Fix provider card catalog singleton import so the installed plasmoid loads v10 source badges without runtime ReferenceError noise
+
 * Tue May 12 2026 Loofi <loofi@github.com> - 10.0.0-1
 - Ship Accuracy with OpenAI Costs API object amount parsing and source-aware usage metadata
 - Keep connectivity probes out of displayed usage, spend, history spend, and budget warning state

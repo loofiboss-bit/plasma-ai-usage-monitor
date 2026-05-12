@@ -6,7 +6,7 @@ import argparse
 def main():
     parser = argparse.ArgumentParser(description="Smoke test QML import.")
     parser.add_argument("--strict", action="store_true", help="Fail hard if PyQt6 is missing or module cannot be imported.")
-    parser.add_argument("--expected-version", default="10.0.0", help="Expected version string (default: 10.0.0).")
+    parser.add_argument("--expected-version", default="10.0.1", help="Expected version string (default: 10.0.1).")
     args = parser.parse_args()
 
     try:

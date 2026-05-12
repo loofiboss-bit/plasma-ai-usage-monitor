@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.0.1] — 2026-05-12
+
+### Fixed
+- Import the AI Usage Monitor plugin module in `ProviderCard.qml` so the installed v10 provider cards can resolve `ProviderPricingCatalog` when rendering catalog review, source-conflict, and unknown-pricing badges.
+
 ## [10.0.0] — 2026-05-12
 
 ### Added
@@ -657,7 +662,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v10.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v10.0.1...HEAD
+[10.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v10.0.0...v10.0.1
 [10.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v9.0.0...v10.0.0
 [9.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.3...v9.0.0
 [8.0.3]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.2...v8.0.3

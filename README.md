@@ -22,7 +22,7 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current release:** `v10.0.0 Accuracy` focuses on correct OpenAI billing parsing, probe-only honesty, source-aware history, safer defaults, and actionable onboarding/diagnostics.
+> **Current release:** `v10.0.1 Accuracy` keeps the v10 correctness work and fixes the installed provider-card catalog import used by source badges.
 
 ## Quick Links
 
@@ -686,12 +686,18 @@ Check that the History tab is enabled in configuration. Data is stored in `~/.lo
 | [SECURITY.md](SECURITY.md)                                               | Security policy, vulnerability reporting, and design decisions |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                                       | Development setup, coding standards, and contribution workflow |
 | [docs/demo/fedora-kde-vm.md](docs/demo/fedora-kde-vm.md)                 | Fedora KDE VM workflow for live testing and screenshot capture |
+| [docs/release/v10.0.1-checklist.md](docs/release/v10.0.1-checklist.md)   | Accuracy patch release validation checklist                    |
 | [docs/release/v10.0.0-checklist.md](docs/release/v10.0.0-checklist.md)   | Accuracy release validation checklist                          |
 | [docs/store/submission-checklist.md](docs/store/submission-checklist.md) | Manual GitHub + KDE Store update checklist                     |
 | [assets/screenshots/README.md](assets/screenshots/README.md)             | Canonical shot list and screenshot quality guide               |
 | [docs/walkthrough.md](docs/walkthrough.md)                               | Current documentation map and historical walkthrough note      |
 
 ## Changelog
+
+### v10.0.1 — Accuracy Patch
+
+- Fix the installed provider-card catalog singleton import used by review, source-conflict, and unknown-pricing badges
+- Rebuild and republish v10 packages so local RPM installs no longer emit `ProviderPricingCatalog is not defined`
 
 ### v10.0.0 — Accuracy: Correctness, Source Honesty, and Onboarding
 

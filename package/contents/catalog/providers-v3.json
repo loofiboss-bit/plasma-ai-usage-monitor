@@ -1,7 +1,7 @@
 {
   "schemaVersion": 3,
   "catalogVersion": "2026.05.12",
-  "release": "10.0.0",
+  "release": "10.0.1",
   "lastReviewed": "2026-05-12",
   "runtimeScraping": false,
   "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries with manual-review flags now include user-visible reasons in Diagnostics.",

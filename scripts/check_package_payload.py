@@ -13,7 +13,7 @@ def expected_version_from_cmake():
                 return match.group(1)
     except OSError:
         pass
-    return "10.0.0"
+    return "10.0.1"
 
 def main():
     expected_version = expected_version_from_cmake()

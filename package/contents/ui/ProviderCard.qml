@@ -4,6 +4,7 @@ import QtQuick.Controls as QQC2
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
+import com.github.loofi.aiusagemonitor 1.0
 import "Utils.js" as Utils
 
 ColumnLayout {
