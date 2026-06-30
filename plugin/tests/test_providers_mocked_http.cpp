@@ -425,9 +425,9 @@ void ProvidersMockedHttpTest::openAiRetryAfterThenSuccess()
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 5000);
 
-    QCOMPARE(provider.inputTokens(), 12);
-    QCOMPARE(provider.outputTokens(), 3);
-    QCOMPARE(provider.requestCount(), 1);
+    QTRY_COMPARE_WITH_TIMEOUT(provider.inputTokens(), 12, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(provider.outputTokens(), 3, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(provider.requestCount(), 1, 5000);
     QVERIFY(server.hitCount(QStringLiteral("/v1/organization/usage/completions")) >= 2);
 }
 
