@@ -164,7 +164,7 @@
             <default>false</default>
         </entry>
         <entry name="deepseekModel" type="String">
-            <default>deepseek-chat</default>
+            <default>deepseek-v4-flash</default>
         </entry>
         <entry name="deepseekCustomBaseUrl" type="String">
             <default></default>

@@ -6,7 +6,7 @@
 DeepSeekProvider::DeepSeekProvider(QObject *parent)
     : OpenAICompatibleProvider(parent)
 {
-    setModel(QStringLiteral("deepseek-chat"));
+    setModel(QStringLiteral("deepseek-v4-flash"));
     registerCatalogPricing(QStringLiteral("deepseek"));
 }
 

@@ -1,7 +1,7 @@
 # Roadmap — Plasma AI Usage Monitor
 
-> **Current version:** v10.0.1 (Accuracy)
-> **Last updated:** 2026-05-12
+> **Current version:** v11.0.0 (Distribution & Catalog Truth)
+> **Last updated:** 2026-06-30
 > **Direction:** Keep the widget desktop-native, local-first, and honest about data quality. Prefer setup clarity, diagnostics, export, notifications, and loopback integrations over backend/server expansion.
 
 ## Product Direction
@@ -20,7 +20,8 @@ The project stays focused on:
 
 | Version | Codename | Theme | Status |
 | ------- | -------- | ----- | ------ |
-| v10.0.1 | **Accuracy Patch** | Provider card catalog singleton import fix for installed v10 packages | Current |
+| v11.0.0 | **Distribution & Catalog Truth** | RPM/COPR visibility, fresh catalogs, and release gates | Current |
+| v10.0.1 | **Accuracy Patch** | Provider card catalog singleton import fix for installed v10 packages | Released |
 | v10.0.0 | **Accuracy** | Cost correctness, probe honesty, source-aware history, and onboarding | Released |
 | v9.0.0 | **Confidence** | Setup, diagnostics, catalog trust, and release hardening | Released |
 | v8.0.0 | **Source Of Truth** | Local catalogs for pricing, plans, and quota windows | Released |
@@ -28,6 +29,18 @@ The project stays focused on:
 | v6.0.1 | **Ground Truth** | Stabilization, trust, and metadata | Released |
 | v6.0.0 | **Nexus (Light)** | UI redesign and local integrations | Released |
 | v5.3.0 | **Vanguard** | Distribution and local tools | Released |
+
+## v11.0.0 — "Distribution & Catalog Truth"
+
+**Goal:** make Fedora RPM delivery and shipped pricing/plan catalogs trustworthy before expanding the product surface.
+
+| Feature | Description | Technical Risk |
+| ------- | ----------- | -------------- |
+| **COPR-first RPM path** | Document COPR as the supported Fedora install path and verify Fedora 43/44 builds before release. | Low |
+| **Provider catalog refresh** | Refresh Provider Catalog v3 to 2026-06-30 with official source refs, DeepSeek v4 models, and visible manual-review reasons. | Medium |
+| **Subscription catalog refresh** | Refresh Subscription Catalog v1 to 2026-06-30, including Copilot AI credits and Windsurf/Devin/Cognition source-conflict notes. | Medium |
+| **Copilot billing label fix** | Keep Auto mode visible after the 2026-06-01 AI credits transition so tests and UI stay aligned. | Low |
+| **Release checklist hardening** | Add v11 checklist items for COPR install/update/remove, artifacts, and issue #12 closure. | Low |
 
 ## v10.0.0 — "Accuracy"
 

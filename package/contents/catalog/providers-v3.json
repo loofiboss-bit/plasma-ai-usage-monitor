@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
-  "catalogVersion": "2026.05.12",
-  "release": "10.0.1",
-  "lastReviewed": "2026-05-12",
+  "catalogVersion": "2026.06.30",
+  "release": "11.0.0",
+  "lastReviewed": "2026-06-30",
   "runtimeScraping": false,
-  "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries with manual-review flags now include user-visible reasons in Diagnostics.",
+  "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries were re-reviewed on 2026-06-30; manual-review flags remain visible when exact pricing or lifecycle state cannot be represented safely.",
   "providers": [
     {
       "key": "openai",
@@ -37,8 +37,8 @@
           "sourceRefs": [
             {
               "label": "OpenAI API pricing",
-              "url": "https://openai.com/api/pricing/",
-              "reviewedAt": "2026-05-08"
+              "url": "https://platform.openai.com/docs/pricing",
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -65,8 +65,8 @@
           "sourceRefs": [
             {
               "label": "OpenAI API pricing",
-              "url": "https://openai.com/api/pricing/",
-              "reviewedAt": "2026-05-08"
+              "url": "https://platform.openai.com/docs/pricing",
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -93,8 +93,36 @@
           "sourceRefs": [
             {
               "label": "OpenAI API pricing",
-              "url": "https://openai.com/api/pricing/",
-              "reviewedAt": "2026-05-08"
+              "url": "https://platform.openai.com/docs/pricing",
+              "reviewedAt": "2026-06-30"
+            }
+          ]
+        },
+        {
+          "id": "gpt-5.4-nano",
+          "displayName": "GPT-5.4 nano",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "output": 1.25,
+            "batchDiscountPercent": 50,
+            "precision": "official_exact"
+          },
+          "context": {
+            "pricingContextLimitTokens": 270000,
+            "maxContextTokens": null,
+            "sourceQuality": "official"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenAI API pricing",
+              "url": "https://platform.openai.com/docs/pricing",
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
@@ -117,15 +145,16 @@
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 15.0,
-            "output": 75.0,
-            "precision": "provider_catalog"
+            "input": 5.0,
+            "output": 25.0,
+            "precision": "provider_catalog",
+            "cachedInput": 0.5
           },
           "sourceRefs": [
             {
-              "label": "Anthropic API pricing",
-              "url": "https://www.anthropic.com/pricing",
-              "reviewedAt": "2026-05-08"
+              "label": "Anthropic Claude pricing",
+              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -144,9 +173,9 @@
           },
           "sourceRefs": [
             {
-              "label": "Anthropic API pricing",
-              "url": "https://www.anthropic.com/pricing",
-              "reviewedAt": "2026-05-08"
+              "label": "Anthropic Claude pricing",
+              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -165,9 +194,9 @@
           },
           "sourceRefs": [
             {
-              "label": "Anthropic API pricing",
-              "url": "https://www.anthropic.com/pricing",
-              "reviewedAt": "2026-05-08"
+              "label": "Anthropic Claude pricing",
+              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -186,14 +215,102 @@
           },
           "sourceRefs": [
             {
-              "label": "Anthropic API pricing",
-              "url": "https://www.anthropic.com/pricing",
-              "reviewedAt": "2026-05-08"
+              "label": "Anthropic Claude pricing",
+              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+              "reviewedAt": "2026-06-30"
+            }
+          ]
+        },
+        {
+          "id": "claude-opus-4.8",
+          "displayName": "Claude Opus 4.8",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 5.0,
+            "output": 25.0,
+            "precision": "provider_catalog",
+            "cachedInput": 0.5
+          },
+          "sourceRefs": [
+            {
+              "label": "Anthropic Claude pricing",
+              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+              "reviewedAt": "2026-06-30"
+            }
+          ]
+        },
+        {
+          "id": "claude-sonnet-4.6",
+          "displayName": "Claude Sonnet 4.6",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog",
+            "cachedInput": 0.3
+          },
+          "sourceRefs": [
+            {
+              "label": "Anthropic Claude pricing",
+              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+              "reviewedAt": "2026-06-30"
+            }
+          ]
+        },
+        {
+          "id": "claude-sonnet-4.5",
+          "displayName": "Claude Sonnet 4.5",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog",
+            "cachedInput": 0.3
+          },
+          "sourceRefs": [
+            {
+              "label": "Anthropic Claude pricing",
+              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+              "reviewedAt": "2026-06-30"
+            }
+          ]
+        },
+        {
+          "id": "claude-haiku-4.5",
+          "displayName": "Claude Haiku 4.5",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 1.0,
+            "output": 5.0,
+            "precision": "provider_catalog",
+            "cachedInput": 0.1
+          },
+          "sourceRefs": [
+            {
+              "label": "Anthropic Claude pricing",
+              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed official Anthropic pricing on 2026-05-08; kept manual review because the shipped model IDs include aliases/newer naming that need a deliberate model-list refresh before exact pricing labels."
+      "reviewReason": "Reviewed official Anthropic pricing on 2026-06-30; kept manual review because current and legacy Claude model IDs coexist and data-residency/fast-mode modifiers are not represented in the local flat token table."
     },
     {
       "key": "google",
@@ -220,7 +337,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -241,7 +358,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -262,7 +379,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -283,12 +400,12 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed Google AI pricing on 2026-05-08; kept manual review because Gemini and Veo pricing varies by model, tier, and media unit and the catalog needs a model-by-model refresh."
+      "reviewReason": "Reviewed Google AI pricing on 2026-06-30; kept manual review because Gemini and Veo pricing varies by model, tier, media unit, and API surface."
     },
     {
       "key": "mistral",
@@ -315,7 +432,7 @@
             {
               "label": "Mistral pricing",
               "url": "https://mistral.ai/products/la-plateforme#pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -336,7 +453,7 @@
             {
               "label": "Mistral pricing",
               "url": "https://mistral.ai/products/la-plateforme#pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -357,7 +474,7 @@
             {
               "label": "Mistral pricing",
               "url": "https://mistral.ai/products/la-plateforme#pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -378,12 +495,12 @@
             {
               "label": "Mistral pricing",
               "url": "https://mistral.ai/products/la-plateforme#pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed Mistral pricing on 2026-05-08; kept manual review because carried-forward provider_catalog values need model-by-model reconciliation against the current pricing page."
+      "reviewReason": "Reviewed Mistral pricing on 2026-06-30; kept manual review because model aliases and current La Plateforme pricing need provider-by-provider reconciliation before exact labels are safe."
     },
     {
       "key": "deepseek",
@@ -393,6 +510,68 @@
       "needsManualReview": true,
       "sourceConflict": false,
       "models": [
+        {
+          "id": "deepseek-v4-flash",
+          "displayName": "DeepSeek V4 Flash",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.14,
+            "output": 0.28,
+            "precision": "provider_catalog",
+            "cachedInput": 0.0028
+          },
+          "sourceRefs": [
+            {
+              "label": "DeepSeek API models and pricing",
+              "url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "reviewedAt": "2026-06-30"
+            }
+          ],
+          "context": {
+            "pricingContextLimitTokens": 1000000,
+            "maxContextTokens": 1000000,
+            "sourceQuality": "official"
+          },
+          "lifecycle": {
+            "status": "current",
+            "concurrencyLimit": 2500
+          }
+        },
+        {
+          "id": "deepseek-v4-pro",
+          "displayName": "DeepSeek V4 Pro",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.435,
+            "output": 0.87,
+            "precision": "provider_catalog",
+            "cachedInput": 0.003625
+          },
+          "sourceRefs": [
+            {
+              "label": "DeepSeek API models and pricing",
+              "url": "https://api-docs.deepseek.com/quick_start/pricing",
+              "reviewedAt": "2026-06-30"
+            }
+          ],
+          "context": {
+            "pricingContextLimitTokens": 1000000,
+            "maxContextTokens": 1000000,
+            "sourceQuality": "official"
+          },
+          "lifecycle": {
+            "status": "current",
+            "concurrencyLimit": 500
+          }
+        },
         {
           "id": "deepseek-chat",
           "displayName": "DeepSeek Chat",
@@ -404,15 +583,21 @@
             "unit": "1M_tokens",
             "input": 0.14,
             "output": 0.28,
-            "precision": "provider_catalog"
+            "precision": "provider_catalog",
+            "cachedInput": 0.0028
           },
           "sourceRefs": [
             {
-              "label": "DeepSeek API docs",
+              "label": "DeepSeek API models and pricing",
               "url": "https://api-docs.deepseek.com/quick_start/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "deprecated_on_2026-07-24",
+            "replacement": "deepseek-v4-flash non-thinking mode",
+            "notes": "DeepSeek says this compatibility alias will be deprecated on 2026-07-24 15:59 UTC."
+          }
         },
         {
           "id": "deepseek-reasoner",
@@ -425,18 +610,24 @@
             "unit": "1M_tokens",
             "input": 0.55,
             "output": 2.19,
-            "precision": "provider_catalog"
+            "precision": "provider_catalog",
+            "cachedInput": 0.0028
           },
           "sourceRefs": [
             {
-              "label": "DeepSeek API docs",
+              "label": "DeepSeek API models and pricing",
               "url": "https://api-docs.deepseek.com/quick_start/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "deprecated_on_2026-07-24",
+            "replacement": "deepseek-v4-flash thinking mode",
+            "notes": "DeepSeek says this compatibility alias will be deprecated on 2026-07-24 15:59 UTC."
+          }
         }
       ],
-      "reviewReason": "Reviewed DeepSeek pricing on 2026-05-08; kept manual review because official input pricing distinguishes cache-hit and cache-miss rates while the current catalog stores one input value."
+      "reviewReason": "Reviewed DeepSeek pricing on 2026-06-30; kept manual review because official input pricing distinguishes cache-hit and cache-miss rates while the local pricing table stores one cachedInput and one input value."
     },
     {
       "key": "groq",
@@ -461,9 +652,9 @@
           },
           "sourceRefs": [
             {
-              "label": "Groq pricing",
-              "url": "https://groq.com/pricing/",
-              "reviewedAt": "2026-05-08"
+              "label": "Groq models and pricing",
+              "url": "https://console.groq.com/docs/models",
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -482,14 +673,14 @@
           },
           "sourceRefs": [
             {
-              "label": "Groq pricing",
-              "url": "https://groq.com/pricing/",
-              "reviewedAt": "2026-05-08"
+              "label": "Groq models and pricing",
+              "url": "https://console.groq.com/docs/models",
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed Groq pricing on 2026-05-08; kept manual review until the current model lineup and carried-forward provider_catalog values are reconciled."
+      "reviewReason": "Reviewed Groq model/pricing docs on 2026-06-30; kept manual review because Groq model availability and pricing are model-specific and can change independently of the widget release."
     },
     {
       "key": "xai",
@@ -514,9 +705,9 @@
           },
           "sourceRefs": [
             {
-              "label": "xAI API docs",
+              "label": "xAI models and pricing",
               "url": "https://docs.x.ai/docs/models",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -535,14 +726,56 @@
           },
           "sourceRefs": [
             {
-              "label": "xAI API docs",
+              "label": "xAI models and pricing",
               "url": "https://docs.x.ai/docs/models",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
+            }
+          ]
+        },
+        {
+          "id": "grok-4",
+          "displayName": "Grok 4",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "xAI models and pricing",
+              "url": "https://docs.x.ai/docs/models",
+              "reviewedAt": "2026-06-30"
+            }
+          ]
+        },
+        {
+          "id": "grok-4-fast",
+          "displayName": "Grok 4 Fast",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 3.0,
+            "output": 15.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "xAI models and pricing",
+              "url": "https://docs.x.ai/docs/models",
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed xAI model docs on 2026-05-08; kept manual review until Grok model pricing and model-retirement state are reconciled with the shipped defaults."
+      "reviewReason": "Reviewed xAI model docs on 2026-06-30; kept manual review until Grok pricing and model-retirement state are reconciled against shipped defaults."
     },
     {
       "key": "ollama",
@@ -567,14 +800,14 @@
           "unknownDefaultReason": "Ollama Cloud is a connectivity provider in v10; the default model is allowed because no stable public unit pricing is available and the UI labels it as probe-only or unknown pricing.",
           "sourceRefs": [
             {
-              "label": "Ollama Cloud",
+              "label": "Ollama Cloud pricing",
               "url": "https://ollama.com/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed Ollama Cloud docs on 2026-05-08; no stable public unit pricing was confirmed for the shipped cloud model, so pricing remains unknown."
+      "reviewReason": "Reviewed Ollama Cloud pricing on 2026-06-30; no stable public unit pricing was confirmed for the shipped cloud model, so pricing remains unknown."
     },
     {
       "key": "openrouter",
@@ -602,7 +835,7 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -623,7 +856,7 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -644,7 +877,7 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -665,12 +898,56 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
+            }
+          ]
+        },
+        {
+          "id": "deepseek/deepseek-v4-flash",
+          "displayName": "DeepSeek V4 Flash",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.14,
+            "cachedInput": 0.0028,
+            "output": 0.28,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenRouter model catalog",
+              "url": "https://openrouter.ai/models",
+              "reviewedAt": "2026-06-30"
+            }
+          ]
+        },
+        {
+          "id": "deepseek/deepseek-v4-pro",
+          "displayName": "DeepSeek V4 Pro",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.435,
+            "cachedInput": 0.003625,
+            "output": 0.87,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenRouter model catalog",
+              "url": "https://openrouter.ai/models",
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed OpenRouter pricing on 2026-05-08; kept manual review because prices are provider-routed and can vary by selected route/model provider."
+      "reviewReason": "Reviewed OpenRouter model catalog on 2026-06-30; kept manual review because prices are provider-routed and can vary by selected route/model provider."
     },
     {
       "key": "together",
@@ -697,7 +974,7 @@
             {
               "label": "Together AI pricing",
               "url": "https://www.together.ai/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -718,12 +995,12 @@
             {
               "label": "Together AI pricing",
               "url": "https://www.together.ai/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed Together AI pricing on 2026-05-08; kept manual review because official pricing is model/category-specific and the shipped values need reconciliation."
+      "reviewReason": "Reviewed Together AI pricing on 2026-06-30; kept manual review because official pricing is model/category-specific and shipped aliases need reconciliation."
     },
     {
       "key": "cohere",
@@ -750,7 +1027,7 @@
             {
               "label": "Cohere pricing",
               "url": "https://cohere.com/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -771,12 +1048,12 @@
             {
               "label": "Cohere pricing",
               "url": "https://cohere.com/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed Cohere docs on 2026-05-08; kept manual review because current Command model pricing needs reconciliation with the shipped model aliases."
+      "reviewReason": "Reviewed Cohere pricing on 2026-06-30; kept manual review because current Command model aliases and pricing tiers need reconciliation with shipped defaults."
     },
     {
       "key": "googleveo",
@@ -802,7 +1079,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -822,19 +1099,19 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed Google AI pricing on 2026-05-08; kept manual review because video-generation pricing depends on API/product surface and unit semantics."
+      "reviewReason": "Reviewed Google AI pricing on 2026-06-30; kept manual review because video-generation pricing depends on model, API/product surface, and unit semantics."
     },
     {
       "key": "azure",
       "label": "Azure OpenAI",
       "dataQuality": "actual-api-usage",
       "pricingFreshness": "inherits-openai",
-      "needsManualReview": false,
+      "needsManualReview": true,
       "sourceConflict": false,
       "models": [
         {
@@ -849,13 +1126,13 @@
             "input": 2.5,
             "cachedInput": 0.25,
             "output": 15.0,
-            "precision": "official_exact"
+            "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
-              "label": "OpenAI API pricing",
-              "url": "https://openai.com/api/pricing/",
-              "reviewedAt": "2026-05-08"
+              "label": "Azure OpenAI Service pricing",
+              "url": "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -868,16 +1145,16 @@
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 2.5,
+            "input": 30.0,
             "cachedInput": 0.25,
-            "output": 15.0,
+            "output": 180.0,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
-              "label": "OpenAI API pricing",
-              "url": "https://openai.com/api/pricing/",
-              "reviewedAt": "2026-05-08"
+              "label": "Azure OpenAI Service pricing",
+              "url": "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
+              "reviewedAt": "2026-06-30"
             }
           ]
         },
@@ -893,17 +1170,18 @@
             "input": 0.75,
             "cachedInput": 0.075,
             "output": 4.5,
-            "precision": "official_exact"
+            "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
-              "label": "OpenAI API pricing",
-              "url": "https://openai.com/api/pricing/",
-              "reviewedAt": "2026-05-08"
+              "label": "Azure OpenAI Service pricing",
+              "url": "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
-      ]
+      ],
+      "reviewReason": "Reviewed Azure OpenAI pricing on 2026-06-30; kept manual review because Azure pricing varies by region, deployment type, and Azure model availability even when model names mirror OpenAI."
     },
     {
       "key": "bedrock",
@@ -928,14 +1206,14 @@
           },
           "sourceRefs": [
             {
-              "label": "AWS Bedrock pricing",
+              "label": "Amazon Bedrock pricing",
               "url": "https://aws.amazon.com/bedrock/pricing/",
-              "reviewedAt": "2026-05-08"
+              "reviewedAt": "2026-06-30"
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed Amazon Bedrock pricing on 2026-05-08; kept manual review because Bedrock pricing is region, provider, and model specific."
+      "reviewReason": "Reviewed Amazon Bedrock pricing on 2026-06-30; kept manual review because Bedrock pricing is region, provider, and model specific."
     }
   ]
 }

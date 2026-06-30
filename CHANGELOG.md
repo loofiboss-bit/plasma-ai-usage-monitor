@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [11.0.0] — 2026-06-30
+
+### Added
+- Add DeepSeek v4 Flash and v4 Pro catalog entries and mark the legacy `deepseek-chat` and `deepseek-reasoner` compatibility aliases with the official 2026-07-24 deprecation note.
+- Add v11 release checklist coverage for COPR Fedora 43/44 build verification, RPM install/update/remove smoke checks, and issue #12 follow-through.
+
+### Changed
+- Refresh Provider Catalog v3 and Subscription Catalog v1 to `catalogVersion: 2026.06.30`, `release: 11.0.0`, and `lastReviewed: 2026-06-30`.
+- Refresh provider and subscription source references against official pricing/model/plan pages, keeping manual-review flags visible where exact pricing, route, region, unit, or rebrand semantics remain ambiguous.
+- Make Fedora COPR/RPM installation the primary documented Fedora path.
+- Switch the default DeepSeek model to `deepseek-v4-flash` while preserving compatibility aliases for existing configurations.
+
+### Fixed
+- Keep GitHub Copilot Auto billing mode visible after the 2026-06-01 AI credits transition so the UI and `subscription_tools` regression test agree.
+
+### Known Metadata Uncertainty
+- Provider manual-review entries remain for Anthropic, Google, Mistral, DeepSeek, Groq, xAI, Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo, Azure OpenAI, and AWS Bedrock.
+- Windsurf remains a visible subscription source-conflict while public Windsurf, Devin, and Cognition-branded pages describe overlapping plan and quota semantics.
+
 ## [10.0.1] — 2026-05-12
 
 ### Fixed
@@ -662,7 +681,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v10.0.1...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v11.0.0...HEAD
+[11.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v10.0.1...v11.0.0
 [10.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v10.0.0...v10.0.1
 [10.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v9.0.0...v10.0.0
 [9.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v8.0.3...v9.0.0

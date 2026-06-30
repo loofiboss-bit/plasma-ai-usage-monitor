@@ -154,11 +154,14 @@ QString CopilotMonitor::billingModeForDate(const QString &isoDate) const
 QString CopilotMonitor::usageSourceLabel() const
 {
     const QString effective = effectiveBillingMode();
+    if (m_billingMode == QStringLiteral("auto")) {
+        if (effective == QStringLiteral("ai_credits_usage_based")) {
+            return QStringLiteral("Auto mode: AI credits are active after the 2026-06-01 transition; local activity is self-tracked unless GitHub org metrics are configured.");
+        }
+        return QStringLiteral("Auto mode: premium request tracking is used before the 2026-06-01 AI credits transition.");
+    }
     if (effective == QStringLiteral("ai_credits_usage_based")) {
         return QStringLiteral("AI credits mode: local activity is self-tracked unless GitHub org metrics are configured.");
-    }
-    if (m_billingMode == QStringLiteral("auto")) {
-        return QStringLiteral("Auto mode: premium request tracking is used before the 2026-06-01 AI credits transition.");
     }
     return QStringLiteral("Premium request mode: local activity is self-tracked unless GitHub org metrics are configured.");
 }

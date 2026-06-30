@@ -786,8 +786,9 @@ KCM.SimpleKCM {
             description: i18n("Tracks rate limits, token usage, and account balance")
             keyPlaceholder: i18n("Enter DeepSeek API key...")
             modelOptions: [
+                "deepseek-v4-flash",
+                "deepseek-v4-pro",
                 "deepseek-chat",
-                "deepseek-coder",
                 "deepseek-reasoner"
             ]
         }

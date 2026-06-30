@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "catalogVersion": "2026.05.12",
-  "release": "10.0.1",
-  "lastReviewed": "2026-05-12",
+  "catalogVersion": "2026.06.30",
+  "release": "11.0.0",
+  "lastReviewed": "2026-06-30",
   "runtimeScraping": false,
-  "notes": "Static local metadata for shipped subscription defaults. Browser sync may override with actual account data. Do not scrape vendor pages at runtime. Review/conflict flags include user-visible reasons in Diagnostics.",
+  "notes": "Static local metadata for shipped subscription defaults. Browser sync may override with actual account data. Do not scrape vendor pages at runtime. Entries were re-reviewed on 2026-06-30; review/conflict flags include user-visible reasons in Diagnostics.",
   "tools": [
     {
       "key": "claude-code",
@@ -18,22 +18,22 @@
         {
           "label": "Claude pricing",
           "url": "https://claude.com/pricing",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         },
         {
           "label": "Use Claude Code with Pro or Max",
           "url": "https://support.claude.com/en/articles/11145838-use-claude-code-with-your-pro-or-max-plan",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         },
         {
           "label": "Claude Pro usage limits",
           "url": "https://support.claude.com/en/articles/8325606-what-is-the-pro-plan",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         },
         {
           "label": "Claude Max usage limits",
           "url": "https://support.claude.com/en/articles/11049741-what-is-the-max-plan",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         }
       ],
       "plans": [
@@ -212,17 +212,17 @@
         {
           "label": "Using Codex with your ChatGPT plan",
           "url": "https://help.openai.com/en/articles/11369540-using-codex-with-your-chatgpt-plan",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         },
         {
           "label": "About ChatGPT Pro tiers",
           "url": "https://help.openai.com/en/articles/9793128-about-chatgpt-pro-tiers",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         },
         {
           "label": "Using Credits for Flexible Usage in ChatGPT",
           "url": "https://help.openai.com/en/articles/12642688-using-credits-for-flexible-usage-in-chatgpt-freegopluspro",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         }
       ],
       "plans": [
@@ -497,17 +497,17 @@
         {
           "label": "Plans for GitHub Copilot",
           "url": "https://docs.github.com/en/copilot/get-started/plans",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         },
         {
           "label": "Requests in GitHub Copilot",
           "url": "https://docs.github.com/en/copilot/concepts/billing/copilot-requests",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         },
         {
           "label": "About billing for individual GitHub Copilot plans",
           "url": "https://docs.github.com/en/copilot/concepts/billing/billing-for-individuals",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         }
       ],
       "plans": [
@@ -719,7 +719,7 @@
         {
           "label": "Cursor pricing",
           "url": "https://cursor.com/pricing",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         }
       ],
       "plans": [
@@ -860,17 +860,22 @@
         {
           "label": "Windsurf pricing",
           "url": "https://windsurf.com/pricing",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         },
         {
           "label": "Windsurf usage docs",
           "url": "https://docs.windsurf.com/windsurf/accounts/usage",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         },
         {
           "label": "Windsurf quota docs",
           "url": "https://docs.windsurf.com/windsurf/accounts/quota",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
+        },
+        {
+          "label": "Devin plans after Windsurf acquisition",
+          "url": "https://devin.ai/pricing",
+          "reviewedAt": "2026-06-30"
         }
       ],
       "plans": [
@@ -892,7 +897,8 @@
               "source": "official_preset",
               "visibleByDefault": true,
               "notes": [
-                "Pricing page says usage allowance refreshes daily and weekly; docs also describe quota-based usage."
+                "Pricing page says usage allowance refreshes daily and weekly; docs also describe quota-based usage.",
+                "Re-reviewed on 2026-06-30 after Windsurf/Devin/Cognition branding changes; keep exact limits manual until vendor docs converge."
               ]
             }
           ]
@@ -915,7 +921,8 @@
               "source": "official_preset",
               "visibleByDefault": true,
               "notes": [
-                "Source conflict: pricing page and quota docs require a manual review before exact limits are shown."
+                "Source conflict: pricing page and quota docs require a manual review before exact limits are shown.",
+                "Re-reviewed on 2026-06-30 after Windsurf/Devin/Cognition branding changes; keep exact limits manual until vendor docs converge."
               ]
             },
             {
@@ -924,7 +931,10 @@
               "unit": "usd",
               "precision": "official_qualitative",
               "source": "official_preset",
-              "visibleByDefault": true
+              "visibleByDefault": true,
+              "notes": [
+                "Re-reviewed on 2026-06-30 after Windsurf/Devin/Cognition branding changes; keep exact limits manual until vendor docs converge."
+              ]
             }
           ]
         },
@@ -944,7 +954,10 @@
               "unit": "usage",
               "precision": "needs_manual_review",
               "source": "official_preset",
-              "visibleByDefault": true
+              "visibleByDefault": true,
+              "notes": [
+                "Re-reviewed on 2026-06-30 after Windsurf/Devin/Cognition branding changes; keep exact limits manual until vendor docs converge."
+              ]
             },
             {
               "kind": "extra_spend",
@@ -952,7 +965,10 @@
               "unit": "usd",
               "precision": "official_qualitative",
               "source": "official_preset",
-              "visibleByDefault": true
+              "visibleByDefault": true,
+              "notes": [
+                "Re-reviewed on 2026-06-30 after Windsurf/Devin/Cognition branding changes; keep exact limits manual until vendor docs converge."
+              ]
             }
           ]
         },
@@ -972,7 +988,10 @@
               "unit": "usage",
               "precision": "needs_manual_review",
               "source": "official_preset",
-              "visibleByDefault": true
+              "visibleByDefault": true,
+              "notes": [
+                "Re-reviewed on 2026-06-30 after Windsurf/Devin/Cognition branding changes; keep exact limits manual until vendor docs converge."
+              ]
             },
             {
               "kind": "extra_spend",
@@ -980,7 +999,10 @@
               "unit": "usd",
               "precision": "official_qualitative",
               "source": "official_preset",
-              "visibleByDefault": true
+              "visibleByDefault": true,
+              "notes": [
+                "Re-reviewed on 2026-06-30 after Windsurf/Devin/Cognition branding changes; keep exact limits manual until vendor docs converge."
+              ]
             }
           ]
         },
@@ -998,13 +1020,16 @@
               "unit": "usage",
               "precision": "needs_manual_review",
               "source": "official_preset",
-              "visibleByDefault": true
+              "visibleByDefault": true,
+              "notes": [
+                "Re-reviewed on 2026-06-30 after Windsurf/Devin/Cognition branding changes; keep exact limits manual until vendor docs converge."
+              ]
             }
           ]
         }
       ],
-      "reviewReason": "Reviewed Windsurf pricing and quota docs on 2026-05-08; exact limits remain manual-review because public sources describe both prompt-credit plans and quota-based budgets.",
-      "sourceConflictReason": "Windsurf pricing still advertises monthly prompt credits, while Windsurf quota docs say self-serve plans moved to daily and weekly quota budgets in March 2026."
+      "reviewReason": "Reviewed Windsurf/Cognition/Devin pricing and quota docs on 2026-06-30; exact local limits remain manual-review because public pages preserve Windsurf pricing while routing some plan/account surfaces through Devin/Cognition branding.",
+      "sourceConflictReason": "Windsurf pricing still advertises usage allowances, while Windsurf quota docs and Devin/Cognition-branded account pages describe daily/weekly or plan-specific budgets after the acquisition/rebrand."
     },
     {
       "key": "jetbrains-ai",
@@ -1018,7 +1043,7 @@
         {
           "label": "JetBrains AI plans and usage",
           "url": "https://www.jetbrains.com/help/ai-assistant/licensing-and-subscriptions.html",
-          "reviewedAt": "2026-05-08"
+          "reviewedAt": "2026-06-30"
         }
       ],
       "plans": [
@@ -1126,7 +1151,7 @@
           ]
         }
       ],
-      "reviewReason": "Reviewed JetBrains AI plans and usage docs on 2026-05-08; personal and commercial tables are represented as official ranges instead of a source conflict."
+      "reviewReason": "Reviewed JetBrains AI plans and usage docs on 2026-06-30; personal and commercial tables are represented as official ranges instead of a source conflict."
     }
   ]
 }

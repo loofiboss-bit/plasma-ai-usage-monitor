@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        10.0.1
+Version:        11.0.0
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
 License:        GPL-3.0-or-later
@@ -72,6 +72,12 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Tue Jun 30 2026 Loofi <loofi@github.com> - 11.0.0-1
+- Ship Distribution & Catalog Truth with provider/subscription catalogs reviewed on 2026-06-30
+- Make the COPR RPM path the primary Fedora install route and document install/update/remove validation
+- Add DeepSeek v4 catalog entries and preserve legacy aliases with visible deprecation metadata
+- Keep Copilot Auto billing labels accurate after the 2026-06-01 AI credits transition
+
 * Tue May 12 2026 Loofi <loofi@github.com> - 10.0.1-1
 - Fix provider card catalog singleton import so the installed plasmoid loads v10 source badges without runtime ReferenceError noise
 

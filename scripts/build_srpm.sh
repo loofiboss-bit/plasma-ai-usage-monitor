@@ -58,11 +58,18 @@ SOURCE_TARBALL="$TOPDIR/SOURCES/plasma-ai-usage-monitor-${VERSION}.tar.gz"
 PREFIX_DIR="plasma-ai-usage-monitor-${VERSION}/"
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git archive \
-    --format=tar.gz \
-    --prefix="$PREFIX_DIR" \
-    -o "$SOURCE_TARBALL" \
-    HEAD
+  git -c core.quotepath=off ls-files -z | tar \
+    --null \
+    --no-recursion \
+    --sort=name \
+    --mtime="@${SOURCE_DATE_EPOCH:-0}" \
+    --owner=0 \
+    --group=0 \
+    --numeric-owner \
+    --transform="s,^,${PREFIX_DIR}," \
+    --pax-option=delete=atime,delete=ctime \
+    -czf "$SOURCE_TARBALL" \
+    --files-from=-
 else
   # COPR make_srpm builds run from an unpacked source tree without git metadata.
   find . \

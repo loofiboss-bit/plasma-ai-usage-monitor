@@ -60,7 +60,7 @@ release-check:
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
     python3 scripts/check_qml_registered_types.py
-    PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --expected-version 10.0.1
+    PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --expected-version 11.0.0
     @if command -v appstreamcli >/dev/null 2>&1; then appstreamcli validate com.github.loofi.aiusagemonitor.metainfo.xml; else echo "Warning: appstreamcli not found, skipping validation. Run 'sudo dnf install appstream' on Fedora."; exit 1; fi
     @if command -v rpmlint >/dev/null 2>&1; then rpmlint plasma-ai-usage-monitor.spec; else echo "Warning: rpmlint not found, skipping validation. Run 'sudo dnf install rpmlint' on Fedora."; exit 1; fi
     bash scripts/package_source_tarball.sh --check

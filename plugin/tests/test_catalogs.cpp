@@ -50,7 +50,7 @@ void CatalogsTest::providerCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 3);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.12"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.06.30"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(!catalog.reviewItems().isEmpty());
@@ -61,6 +61,7 @@ void CatalogsTest::providerCatalogLoads()
     const QVariantMap gpt54Pricing = catalog.pricing(QStringLiteral("openai"), QStringLiteral("gpt-5.4"));
     QCOMPARE(gpt54Pricing.value(QStringLiteral("unit")).toString(), QStringLiteral("1M_tokens"));
     QCOMPARE(gpt54Pricing.value(QStringLiteral("precision")).toString(), QStringLiteral("official_exact"));
+    QVERIFY(!catalog.pricing(QStringLiteral("deepseek"), QStringLiteral("deepseek-v4-flash")).isEmpty());
 
     QVERIFY(qAbs(catalog.amountForModelUnit(QStringLiteral("googleveo"), QStringLiteral("veo-2"), QStringLiteral("video_second")) - 0.35) < 0.000001);
 }
@@ -71,7 +72,7 @@ void CatalogsTest::subscriptionCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 1);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.05.12"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.06.30"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(catalog.sourceConflictCount() > 0);

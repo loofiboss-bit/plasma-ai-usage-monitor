@@ -22,7 +22,7 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current release:** `v10.0.1 Accuracy` keeps the v10 correctness work and fixes the installed provider-card catalog import used by source badges.
+> **Current release:** `v11.0.0 Distribution & Catalog Truth` refreshes the shipped pricing/plan catalogs to 2026-06-30, fixes Copilot auto billing labels after the AI credits transition, and makes the COPR RPM path the primary Fedora install route.
 
 ## Quick Links
 
@@ -339,7 +339,7 @@ sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor
 sudo dnf install plasma-ai-usage-monitor
 ```
 
-This installs both the QML plasmoid package and the C++ plugin. After installation, log out and back in (or run `plasmashell --replace &`), then add the widget from "Add Widgets...".
+This is the supported Fedora RPM path and answers requests for an installable package instead of a local source build. The COPR package installs both the QML plasmoid package and the C++ plugin. After installation, log out and back in (or run `plasmashell --replace &`), then add the widget from "Add Widgets...".
 
 To uninstall:
 
@@ -686,6 +686,7 @@ Check that the History tab is enabled in configuration. Data is stored in `~/.lo
 | [SECURITY.md](SECURITY.md)                                               | Security policy, vulnerability reporting, and design decisions |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                                       | Development setup, coding standards, and contribution workflow |
 | [docs/demo/fedora-kde-vm.md](docs/demo/fedora-kde-vm.md)                 | Fedora KDE VM workflow for live testing and screenshot capture |
+| [docs/release/v11.0.0-checklist.md](docs/release/v11.0.0-checklist.md)   | Distribution and catalog release validation checklist          |
 | [docs/release/v10.0.1-checklist.md](docs/release/v10.0.1-checklist.md)   | Accuracy patch release validation checklist                    |
 | [docs/release/v10.0.0-checklist.md](docs/release/v10.0.0-checklist.md)   | Accuracy release validation checklist                          |
 | [docs/store/submission-checklist.md](docs/store/submission-checklist.md) | Manual GitHub + KDE Store update checklist                     |
@@ -693,6 +694,13 @@ Check that the History tab is enabled in configuration. Data is stored in `~/.lo
 | [docs/walkthrough.md](docs/walkthrough.md)                               | Current documentation map and historical walkthrough note      |
 
 ## Changelog
+
+### v11.0.0 — Distribution & Catalog Truth
+
+- Refresh provider and subscription catalogs to 2026-06-30 with official source refs and visible review/conflict reasons
+- Add DeepSeek v4 Flash / v4 Pro catalog entries and mark legacy DeepSeek aliases with their official deprecation note
+- Keep Copilot Auto billing mode visible after the 2026-06-01 AI credits transition
+- Make COPR/RPM installation the primary Fedora package path for users who do not want to build locally
 
 ### v10.0.1 — Accuracy Patch
 

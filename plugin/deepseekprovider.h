@@ -11,7 +11,7 @@
  * - Usage data from chat completion response body
  * - Balance from GET /user/balance endpoint
  *
- * Models: deepseek-chat, deepseek-reasoner
+ * Models: deepseek-v4-flash, deepseek-v4-pro, and compatibility aliases.
  */
 class DeepSeekProvider : public OpenAICompatibleProvider
 {
