@@ -1,7 +1,7 @@
 name: Sanitizers
 on:
   pull_request:
-    paths: ['plugin/**', 'CMakeLists.txt', 'CMakePresets.json']
+    paths: ['plugin/**', 'CMakeLists.txt', 'CMakePresets.json', '.github/workflows/release.yml', '.github/workflows/sanitizers.yml']
   schedule:
     - cron: '17 3 * * 2'
 permissions:
