@@ -1,0 +1,22 @@
+# Default ownership
+* @loofiboss-bit
+
+# Release and automation
+/.github/workflows/ @loofiboss-bit
+/scripts/ @loofiboss-bit
+/VERSION @loofiboss-bit
+/com.github.loofi.aiusagemonitor.metainfo.xml @loofiboss-bit
+
+# Catalog contracts
+/package/contents/catalog/ @loofiboss-bit
+
+# Native plugin and tests
+/plugin/ @loofiboss-bit
+
+# Plasma/QML frontend
+/package/contents/ui/ @loofiboss-bit
+/package/contents/config/ @loofiboss-bit
+
+# Packaging
+/plasma-ai-usage-monitor.spec @loofiboss-bit
+/packaging/ @loofiboss-bit

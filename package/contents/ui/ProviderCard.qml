@@ -137,7 +137,7 @@ ColumnLayout {
                     spacing: Kirigami.Units.smallSpacing
 
                     PlasmaComponents.Label {
-                        text: "$" + (card.backend?.cost ?? 0).toFixed(2)
+                        text: Utils.formatMoney(card.backend?.cost ?? 0, card.backend?.currency || "USD")
                         font.bold: true
                         color: Kirigami.Theme.textColor
                     }
@@ -187,7 +187,7 @@ ColumnLayout {
                             icon.name: "view-refresh"
                             display: PlasmaComponents.AbstractButton.IconOnly
                             PlasmaComponents.ToolTip { text: i18n("Retry") }
-                            onClicked: if (card.backend) card.backend.refresh()
+                            onClicked: if (card.backend) card.backend.requestRefresh(3)
                         }
                     }
                 }
@@ -252,6 +252,15 @@ ColumnLayout {
                 visible: !card.collapsed && card.showCost && (card.backend?.connected ?? false)
                 spacing: Kirigami.Units.smallSpacing
 
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: card.backend?.budgetCurrencyMismatch ?? false
+                    text: i18n("Budget disabled: configured currency %1 does not match observed %2.",
+                               card.backend?.budgetCurrency || "USD", card.backend?.currency || "")
+                    color: Kirigami.Theme.neutralTextColor
+                    wrapMode: Text.WordWrap
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     PlasmaComponents.Label {
@@ -261,7 +270,7 @@ ColumnLayout {
                     }
                     Item { Layout.fillWidth: true }
                     PlasmaComponents.Label {
-                        text: "$" + (card.backend?.cost ?? 0).toFixed(4)
+                        text: Utils.formatMoney(card.backend?.cost ?? 0, card.backend?.currency || "USD")
                         font.bold: true
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.2
                         color: {
@@ -293,7 +302,7 @@ ColumnLayout {
                     }
                     Item { Layout.fillWidth: true }
                     PlasmaComponents.Label {
-                        text: "$" + (card.backend?.balance ?? 0).toFixed(2)
+                        text: Utils.formatMoney(card.backend?.balance ?? 0, card.backend?.currency || "USD")
                         font.bold: true
                         color: (card.backend?.balance ?? 0) < 5 ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.positiveTextColor
                     }
@@ -307,7 +316,7 @@ ColumnLayout {
                     ]
                     ColumnLayout {
                         Layout.fillWidth: true
-                        visible: modelData.budget > 0
+                        visible: modelData.budget > 0 && !(card.backend?.budgetCurrencyMismatch ?? false)
                         spacing: 2
                         RowLayout {
                             Layout.fillWidth: true
@@ -318,7 +327,8 @@ ColumnLayout {
                             }
                             Item { Layout.fillWidth: true }
                             PlasmaComponents.Label {
-                                text: "$" + modelData.cost.toFixed(2) + " / $" + modelData.budget.toFixed(2)
+                                text: Utils.formatMoney(modelData.cost, card.backend?.currency || "USD")
+                                      + " / " + Utils.formatMoney(modelData.budget, card.backend?.currency || "USD")
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                             }
                         }

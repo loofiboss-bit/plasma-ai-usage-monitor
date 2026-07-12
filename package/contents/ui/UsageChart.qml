@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
+import "Utils.js" as Utils
 
 /**
  * Canvas-based line/area chart for visualizing usage history data.
@@ -397,7 +398,7 @@ Item {
     function formatValue(val) {
         switch (chartRoot.metric) {
             case "cost":
-                return "$" + val.toFixed(2);
+                return Utils.formatMoney(val, chartData.length > 0 ? chartData[0].currency || "USD" : "USD");
             case "tokens":
                 if (val >= 1000000) return (val / 1000000).toFixed(1) + "M";
                 if (val >= 1000) return (val / 1000).toFixed(1) + "K";

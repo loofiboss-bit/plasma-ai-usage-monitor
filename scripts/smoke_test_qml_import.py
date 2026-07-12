@@ -2,11 +2,19 @@
 import sys
 import os
 import argparse
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
 
 def main():
     parser = argparse.ArgumentParser(description="Smoke test QML import.")
     parser.add_argument("--strict", action="store_true", help="Fail hard if PyQt6 is missing or module cannot be imported.")
-    parser.add_argument("--expected-version", default="10.0.1", help="Expected version string (default: 10.0.1).")
+    parser.add_argument(
+        "--expected-version",
+        default=(ROOT / "VERSION").read_text(encoding="utf-8").strip(),
+        help="Expected version string (defaults to VERSION).",
+    )
+    parser.add_argument("--build-dir", default="build", help="Configured CMake build directory.")
     args = parser.parse_args()
 
     try:
@@ -26,7 +34,7 @@ def main():
     # Create a temporary QML module directory structure so QQmlEngine can find it
     import shutil
     
-    temp_qml_dir = os.path.abspath(os.path.join("build", "qml-smoke"))
+    temp_qml_dir = os.path.abspath(os.path.join(args.build_dir, "qml-smoke"))
     if os.path.exists(temp_qml_dir):
         shutil.rmtree(temp_qml_dir)
     try:
@@ -34,10 +42,14 @@ def main():
         os.makedirs(module_path, exist_ok=True)
         
         # We need qmldir and the compiled .so
-        qmldir_src = os.path.abspath("plugin/qmldir")
-        so_src = os.path.abspath("build/plugin/libaiusagemonitorplugin.so")
+        plugin_root = Path(args.build_dir).resolve() / "plugin"
+        qmldir_candidates = list(plugin_root.rglob("qmldir"))
+        qmldir_src = str(qmldir_candidates[0]) if qmldir_candidates else ""
+        candidates = list(plugin_root.rglob("aiusagemonitorplugin.so"))
+        candidates += list(plugin_root.rglob("libaiusagemonitorplugin.so"))
+        so_src = str(candidates[0]) if candidates else str(plugin_root / "aiusagemonitorplugin.so")
         
-        if os.path.exists(qmldir_src):
+        if qmldir_src and os.path.exists(qmldir_src):
             shutil.copy(qmldir_src, os.path.join(module_path, "qmldir"))
         if os.path.exists(so_src):
             shutil.copy(so_src, os.path.join(module_path, "libaiusagemonitorplugin.so"))

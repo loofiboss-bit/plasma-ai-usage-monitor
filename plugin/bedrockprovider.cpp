@@ -79,16 +79,16 @@ void BedrockProvider::setSessionToken(const QString &token)
     }
 }
 
-void BedrockProvider::refresh()
+void BedrockProvider::refreshImpl()
 {
     if (m_region.isEmpty()) {
-        setError(i18n("AWS region missing (e.g., us-east-1)"));
+        setErrorDetails(i18n("AWS region missing (e.g., us-east-1)"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
 
     if (!hasApiKey() || m_secretAccessKey.isEmpty()) {
-        setError(i18n("AWS access key ID or secret access key missing"));
+        setErrorDetails(i18n("AWS access key ID or secret access key missing"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
@@ -141,11 +141,13 @@ void BedrockProvider::refresh()
         const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (reply->error() != QNetworkReply::NoError) {
             if (httpStatus == 401 || httpStatus == 403) {
-                setError(i18n("AWS credentials rejected or missing IAM permissions for Bedrock foundation-models:List. Check region %1.", m_region));
+                setErrorDetails(i18n("AWS credentials rejected or missing IAM permissions for Bedrock foundation-models:List. Check region %1.", m_region),
+                                httpStatus == 401 ? ProviderErrorKind::Authentication : ProviderErrorKind::Permission,
+                                httpStatus);
             } else {
-                setError(i18n("Bedrock API error: %1 (HTTP %2)",
-                              reply->errorString(),
-                              QString::number(httpStatus)));
+                setNetworkError(reply, i18n("Bedrock API error: %1 (HTTP %2)",
+                                            reply->errorString(),
+                                            QString::number(httpStatus)));
             }
             setConnected(false);
             setLoading(false);
@@ -157,7 +159,7 @@ void BedrockProvider::refresh()
         reply->deleteLater();
 
         if (doc.isNull() || !doc.isObject()) {
-            setError(i18n("Invalid Bedrock API response"));
+            setErrorDetails(i18n("Invalid Bedrock API response"), ProviderErrorKind::Schema);
             setConnected(false);
             setLoading(false);
             return;
@@ -183,7 +185,8 @@ void BedrockProvider::refresh()
         Q_EMIT dataUpdated();
 
         if (!matchedConfiguredModel) {
-            setError(i18n("Configured model not returned by Bedrock in region %1", m_region));
+            setErrorDetails(i18n("Configured model not returned by Bedrock in region %1", m_region),
+                            ProviderErrorKind::Unsupported);
         } else {
             clearError();
         }

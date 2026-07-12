@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
+import "Utils.js" as Utils
 
 KCM.SimpleKCM {
     id: budgetPage
@@ -44,11 +45,12 @@ KCM.SimpleKCM {
 
     // Shared formatting functions
     function centsToText(value) {
-        return "$" + (value / 100).toFixed(2);
+        return Utils.formatMoney(value / 100, "USD");
     }
 
     function textToCents(text) {
-        var val = parseFloat(text.replace("$", ""));
+        var numeric = text.replace(/[^0-9,.-]/g, "");
+        var val = Number.fromLocaleString(Qt.locale(), numeric);
         return isNaN(val) ? 0 : Math.round(val * 100);
     }
 
@@ -56,7 +58,7 @@ KCM.SimpleKCM {
         anchors.fill: parent
 
         QQC2.Label {
-            text: i18n("Set daily and monthly budget limits per provider. Set to $0.00 to disable budget tracking for that provider.")
+            text: i18n("Budgets are stored in USD. Set a value to zero to disable it. A budget is automatically disabled when observed data uses another currency.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -106,7 +108,7 @@ KCM.SimpleKCM {
 
                 QQC2.SpinBox {
                     id: dailyField
-                    Kirigami.FormData.label: i18n("Daily budget ($):")
+                    Kirigami.FormData.label: i18n("Daily budget (USD):")
                     from: 0; to: 100000; stepSize: 100
                     value: budgetPage["cfg_" + modelData.dailyBudgetConfigKey]
 
@@ -128,7 +130,7 @@ KCM.SimpleKCM {
 
                 QQC2.SpinBox {
                     id: monthlyField
-                    Kirigami.FormData.label: i18n("Monthly budget ($):")
+                    Kirigami.FormData.label: i18n("Monthly budget (USD):")
                     from: 0; to: 1000000; stepSize: 500
                     value: budgetPage["cfg_" + modelData.monthlyBudgetConfigKey]
 

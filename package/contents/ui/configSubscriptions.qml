@@ -1078,8 +1078,8 @@ KCM.SimpleKCM {
         }
     }
 
-    // ── BrowserCookieExtractor for config page ──
-    BrowserCookieExtractor {
+    // Browser Sync exposes readiness only; cookie values remain in C++.
+    BrowserSyncService {
         id: syncDetector
         browserType: subscriptionsPage.cfg_browserSyncBrowser
         selectedFirefoxProfile: subscriptionsPage.cfg_browserSyncProfile

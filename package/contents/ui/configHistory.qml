@@ -231,7 +231,7 @@ KCM.SimpleKCM {
                 } else if (historyPage.cfg_autoExportFormat === "csv") {
                     formats = ["csv"];
                 }
-                historyDb.exportAllToDirectory(autoExportDirectoryField.text, formats);
+                historyDb.requestExportAll("manual-" + Date.now(), autoExportDirectoryField.text, formats);
             }
         }
     }

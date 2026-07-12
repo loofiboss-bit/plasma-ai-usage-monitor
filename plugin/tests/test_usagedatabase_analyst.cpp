@@ -36,6 +36,14 @@ bool updateSnapshotData(const QString &provider, double dailyCost, qint64 input,
             query.addBindValue(input);
             query.addBindValue(output);
             ok = query.exec() && query.numRowsAffected() > 0;
+            QSqlQuery observation(db);
+            observation.prepare(QStringLiteral(
+                "UPDATE observations SET observed_at_utc=?, value=?, semantic='interval_total' "
+                "WHERE id=(SELECT MAX(id) FROM observations WHERE provider=? AND metric_kind='cost')"));
+            observation.addBindValue(timestamp);
+            observation.addBindValue(dailyCost);
+            observation.addBindValue(provider);
+            ok = ok && observation.exec() && observation.numRowsAffected() > 0;
             db.close();
         }
     }

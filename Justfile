@@ -10,19 +10,23 @@ default:
 
 # Configure and build (Release mode)
 build:
-    cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Release
-    cmake --build build --parallel $(nproc)
+    cmake --preset release -DCMAKE_INSTALL_PREFIX=/usr
+    cmake --build --preset release --parallel $(nproc)
 
 # Configure and build (Debug mode, enables unit tests)
 build-debug:
-    cmake -S . -B build -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON
-    cmake --build build --parallel $(nproc)
+    cmake --preset debug -DCMAKE_INSTALL_PREFIX=/usr
+    cmake --build --preset debug --parallel $(nproc)
 
 # Run unit tests
 test: build-debug
-    ctest --test-dir build --output-on-failure
+    ctest --preset debug
 
-# Check version consistency across all 4 version files
+# Lint all shipped QML with the built module import path
+qml-lint:
+    python3 scripts/qml_lint.py --build-dir build/debug
+
+# Check release metadata against the canonical VERSION file
 check:
     bash scripts/check_version_consistency.sh
     bash scripts/check_no_hardcoded_versions.sh
@@ -50,7 +54,7 @@ smoke:
     bash scripts/dev_smoke_check.sh
 
 # Strict release validation gate
-release-check:
+release-check: build-debug
     @echo "=== Running strict release checks ==="
     bash scripts/check_version_consistency.sh
     bash scripts/check_no_hardcoded_versions.sh
@@ -60,7 +64,7 @@ release-check:
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
     python3 scripts/check_qml_registered_types.py
-    PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --expected-version 11.0.0
+    PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --strict --build-dir build/debug --expected-version "$(< VERSION)"
     @if command -v appstreamcli >/dev/null 2>&1; then appstreamcli validate com.github.loofi.aiusagemonitor.metainfo.xml; else echo "Warning: appstreamcli not found, skipping validation. Run 'sudo dnf install appstream' on Fedora."; exit 1; fi
     @if command -v rpmlint >/dev/null 2>&1; then rpmlint plasma-ai-usage-monitor.spec; else echo "Warning: rpmlint not found, skipping validation. Run 'sudo dnf install rpmlint' on Fedora."; exit 1; fi
     bash scripts/package_source_tarball.sh --check
@@ -91,7 +95,7 @@ clean-local-dry-run:
 
 # Build then install to /usr (requires sudo)
 install: build
-    sudo cmake --install build
+    sudo cmake --install build/release
 
 # Reinstall: uninstall then install
 reinstall: uninstall install
@@ -100,12 +104,12 @@ reinstall: uninstall install
 uninstall:
     #!/usr/bin/env bash
     set -euo pipefail
-    if [ -f build/install_manifest.txt ]; then
-        sudo xargs rm -f < build/install_manifest.txt
+    if [ -f build/release/install_manifest.txt ]; then
+        sudo xargs rm -f < build/release/install_manifest.txt
         sudo ldconfig
         echo "Uninstalled. Removed files listed in build/install_manifest.txt"
     else
-        echo "No build/install_manifest.txt found."
+        echo "No build/release/install_manifest.txt found."
         echo "Run 'just install' first, or use 'just copr-remove' for COPR installs."
         exit 1
     fi
@@ -151,6 +155,10 @@ demo-bootstrap-install:
 demo-server:
     .venv/bin/python scripts/demo/mock_ai_usage_server.py
 
+# Generate deterministic v12 state and 1k/10k/100k observation fixtures
+reliability-fixtures:
+    python3 scripts/demo/generate_reliability_fixtures.py
+
 # Guided COPR installation on Fedora
 bootstrap-copr:
     bash scripts/install_bootstrap.sh --method copr
@@ -167,9 +175,9 @@ copr-srpm:
     bash scripts/build_srpm.sh --output-dir dist
 
 # Build and submit an SRPM to an existing COPR project
-copr-submit PROJECT="loofitheboss/plasma-ai-usage-monitor":
+copr-submit TAG PROJECT="loofitheboss/plasma-ai-usage-monitor":
     mkdir -p dist
-    bash scripts/copr_submit_build.sh --project "{{PROJECT}}" --output-dir dist
+    bash scripts/copr_submit_build.sh --project "{{PROJECT}}" --tag "{{TAG}}" --output-dir dist
 
 # Enable the COPR repository
 copr-enable:
@@ -190,6 +198,6 @@ copr-remove:
 
 # ── Version Management ────────────────────────────────────────────────────────
 
-# Bump version across all 4 files: just bump VERSION=3.3.0
+# Update all release surfaces from the canonical VERSION source
 bump VERSION:
     bash scripts/bump_version.sh {{VERSION}}

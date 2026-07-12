@@ -88,22 +88,22 @@ QUrl AzureOpenAIProvider::completionUrl() const
     return url;
 }
 
-void AzureOpenAIProvider::refresh()
+void AzureOpenAIProvider::refreshImpl()
 {
     if (!hasApiKey()) {
-        setError(i18n("No API key configured"));
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
 
     if (endpointBaseUrl().isEmpty()) {
-        setError(i18n("No Azure endpoint configured"));
+        setErrorDetails(i18n("No Azure endpoint configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
 
     if (m_deploymentId.isEmpty()) {
-        setError(i18n("No Azure deployment ID configured"));
+        setErrorDetails(i18n("No Azure deployment ID configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
@@ -160,13 +160,16 @@ void AzureOpenAIProvider::onCompletionReply(QNetworkReply *reply)
         }
 
         if (httpStatus == 401 || httpStatus == 403) {
-            setError(i18n("Authentication failed. Check Azure API key and endpoint."));
+            setErrorDetails(i18n("Authentication failed. Check Azure API key and endpoint."),
+                            httpStatus == 401 ? ProviderErrorKind::Authentication : ProviderErrorKind::Permission,
+                            httpStatus);
         } else if (httpStatus == 404) {
-            setError(i18n("Azure deployment not found. Check deployment ID and endpoint."));
+            setErrorDetails(i18n("Azure deployment not found. Check deployment ID and endpoint."),
+                            ProviderErrorKind::Configuration, httpStatus);
         } else {
-            setError(i18n("Azure OpenAI API error: %1 (HTTP %2)",
-                          reply->errorString(),
-                          QString::number(httpStatus)));
+            setNetworkError(reply, i18n("Azure OpenAI API error: %1 (HTTP %2)",
+                                        reply->errorString(),
+                                        QString::number(httpStatus)));
         }
 
         reply->deleteLater();
@@ -183,7 +186,7 @@ void AzureOpenAIProvider::onCompletionReply(QNetworkReply *reply)
 
     const QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull()) {
-        setError(i18n("Failed to parse Azure OpenAI response"));
+        setErrorDetails(i18n("Failed to parse Azure OpenAI response"), ProviderErrorKind::Schema);
         setConnected(false);
         setLoading(false);
         updateLastRefreshed();

@@ -6,6 +6,7 @@ set(aiusagemonitor_SRCS
     subscriptionplancatalog.cpp
     secretsmanager.cpp
     providerbackend.cpp
+    refreshschedulermodel.cpp
     openaicompatibleprovider.cpp
     openaiprovider.cpp
     azureopenaiprovider.cpp
@@ -31,6 +32,7 @@ set(aiusagemonitor_SRCS
     windsurfmonitor.cpp
     jetbrainsaimonitor.cpp
     browsercookieextractor.cpp
+    browsersyncservice.cpp
     awssigv4signer.cpp
     bedrockprovider.cpp
     localmetricsserver.cpp
@@ -45,6 +47,7 @@ set(aiusagemonitor_HDRS
     subscriptionplancatalog.h
     secretsmanager.h
     providerbackend.h
+    refreshschedulermodel.h
     openaicompatibleprovider.h
     openaiprovider.h
     azureopenaiprovider.h
@@ -71,24 +74,35 @@ set(aiusagemonitor_HDRS
     windsurfmonitor.h
     jetbrainsaimonitor.h
     browsercookieextractor.h
+    browsersyncservice.h
     awssigv4signer.h
     bedrockprovider.h
     localmetricsserver.h
     webhooknotifier.h
 )
 
-add_library(aiusagemonitorplugin SHARED ${aiusagemonitor_SRCS} ${aiusagemonitor_HDRS})
+qt_add_qml_module(aiusagemonitorplugin
+    URI com.github.loofi.aiusagemonitor
+    VERSION 1.0
+    CLASS_NAME AiUsagePlugin
+    PLUGIN_TARGET aiusagemonitorplugin
+    NO_GENERATE_PLUGIN_SOURCE
+    OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/com/github/loofi/aiusagemonitor
+    SOURCES ${aiusagemonitor_SRCS} ${aiusagemonitor_HDRS}
+)
 
 target_compile_definitions(aiusagemonitorplugin
     PRIVATE AIUSAGE_MONITOR_VERSION="${PROJECT_VERSION}"
 )
 
 target_link_libraries(aiusagemonitorplugin
+    PRIVATE
     Qt6::Core
     Qt6::Qml
     Qt6::Quick
     Qt6::Network
     Qt6::Sql
+    Qt6::Concurrent
     OpenSSL::Crypto
     KF6::Wallet
     KF6::Notifications
@@ -96,7 +110,9 @@ target_link_libraries(aiusagemonitorplugin
 )
 
 install(TARGETS aiusagemonitorplugin DESTINATION ${KDE_INSTALL_QMLDIR}/com/github/loofi/aiusagemonitor)
-install(FILES qmldir DESTINATION ${KDE_INSTALL_QMLDIR}/com/github/loofi/aiusagemonitor)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/com/github/loofi/aiusagemonitor/qmldir
+              ${CMAKE_CURRENT_BINARY_DIR}/com/github/loofi/aiusagemonitor/aiusagemonitorplugin.qmltypes
+        DESTINATION ${KDE_INSTALL_QMLDIR}/com/github/loofi/aiusagemonitor)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)

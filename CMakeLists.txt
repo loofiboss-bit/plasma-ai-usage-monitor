@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
-project(plasma-ai-usage-monitor VERSION 11.0.0)
+
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" PROJECT_VERSION_VALUE
+     LIMIT_COUNT 1 REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+if(NOT PROJECT_VERSION_VALUE)
+    message(FATAL_ERROR "VERSION must contain one MAJOR.MINOR.PATCH value")
+endif()
+project(plasma-ai-usage-monitor VERSION "${PROJECT_VERSION_VALUE}")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,7 +20,8 @@ include(KDEInstallDirs)
 include(KDECMakeSettings)
 include(KDECompilerSettings NO_POLICY_SCOPE)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Network Sql)
+find_package(Qt6 REQUIRED COMPONENTS Core Qml Quick Network Sql Concurrent)
+qt_policy(SET QTP0001 NEW)
 find_package(OpenSSL REQUIRED)
 find_package(Plasma REQUIRED)
 find_package(KF6Wallet REQUIRED)

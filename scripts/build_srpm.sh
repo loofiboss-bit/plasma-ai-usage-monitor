@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 OUTPUT_DIR="."
 SPEC_PATH="plasma-ai-usage-monitor.spec"
 VERSION=""
+TAG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -20,6 +21,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --version)
       VERSION="${2:-}"
+      shift 2
+      ;;
+    --tag)
+      TAG="${2:-}"
       shift 2
       ;;
     *)
@@ -36,6 +41,10 @@ fi
 
 if [[ -z "$VERSION" ]]; then
   VERSION="$(sed -n 's/^Version:[[:space:]]*\([0-9.]*\).*/\1/p' "$SPEC_PATH" | head -1)"
+fi
+
+if [[ -n "$TAG" ]]; then
+  bash "$ROOT_DIR/scripts/verify_exact_tag.sh" "$TAG"
 fi
 
 if [[ -z "$VERSION" ]]; then
@@ -57,7 +66,10 @@ cp "$SPEC_PATH" "$TOPDIR/SPECS/"
 SOURCE_TARBALL="$TOPDIR/SOURCES/plasma-ai-usage-monitor-${VERSION}.tar.gz"
 PREFIX_DIR="plasma-ai-usage-monitor-${VERSION}/"
 
-if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+if [[ -n "$TAG" ]]; then
+  git archive --format=tar --prefix="${PREFIX_DIR}" "$TAG" \
+    | gzip -n > "$SOURCE_TARBALL"
+elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git -c core.quotepath=off ls-files -z | tar \
     --null \
     --no-recursion \

@@ -33,7 +33,7 @@ public:
     QString sessionToken() const;
     void setSessionToken(const QString &token);
 
-    Q_INVOKABLE void refresh() override;
+    void refreshImpl() override;
 
 Q_SIGNALS:
     void regionChanged();

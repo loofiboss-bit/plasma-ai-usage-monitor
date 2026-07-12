@@ -35,6 +35,19 @@ class ProviderBackend : public QObject
     Q_PROPERTY(QString error READ errorString NOTIFY errorChanged)
     Q_PROPERTY(int errorCount READ errorCount NOTIFY errorChanged)
     Q_PROPERTY(int consecutiveErrors READ consecutiveErrors NOTIFY errorChanged)
+    Q_PROPERTY(ProviderState providerState READ providerState NOTIFY stateChanged)
+    Q_PROPERTY(ProviderErrorKind errorKind READ errorKind NOTIFY errorChanged)
+    Q_PROPERTY(int httpStatus READ httpStatus NOTIFY errorChanged)
+    Q_PROPERTY(bool retryable READ isRetryable NOTIFY errorChanged)
+    Q_PROPERTY(QDateTime retryAfter READ retryAfter NOTIFY errorChanged)
+    Q_PROPERTY(QDateTime nextRetry READ retryAfter NOTIFY errorChanged)
+    Q_PROPERTY(RefreshReason lastRefreshReason READ lastRefreshReason NOTIFY stateChanged)
+    Q_PROPERTY(QDateTime lastAttempt READ lastAttempt NOTIFY stateChanged)
+    Q_PROPERTY(QDateTime lastSuccess READ lastSuccess NOTIFY stateChanged)
+    Q_PROPERTY(Freshness freshness READ freshness NOTIFY stateChanged)
+    Q_PROPERTY(QDateTime nextScheduledRefresh READ nextScheduledRefresh NOTIFY diagnosticsChanged)
+    Q_PROPERTY(int coalescedRefreshCount READ coalescedRefreshCount NOTIFY diagnosticsChanged)
+    Q_PROPERTY(int cancellationCount READ cancellationCount NOTIFY diagnosticsChanged)
 
     // Usage data
     Q_PROPERTY(qint64 inputTokens READ inputTokens NOTIFY dataUpdated)
@@ -70,6 +83,8 @@ class ProviderBackend : public QObject
     Q_PROPERTY(double monthlyCost READ monthlyCost NOTIFY dataUpdated)
     Q_PROPERTY(double estimatedMonthlyCost READ estimatedMonthlyCost NOTIFY dataUpdated)
     Q_PROPERTY(int budgetWarningPercent READ budgetWarningPercent WRITE setBudgetWarningPercent NOTIFY budgetChanged)
+    Q_PROPERTY(QString budgetCurrency READ budgetCurrency WRITE setBudgetCurrency NOTIFY budgetChanged)
+    Q_PROPERTY(bool budgetCurrencyMismatch READ budgetCurrencyMismatch NOTIFY budgetChanged)
 
     // Custom base URL (proxy support)
     Q_PROPERTY(QString customBaseUrl READ customBaseUrl WRITE setCustomBaseUrl NOTIFY customBaseUrlChanged)
@@ -79,6 +94,59 @@ class ProviderBackend : public QObject
     Q_PROPERTY(int refreshCount READ refreshCount NOTIFY dataUpdated)
 
 public:
+    enum class ProviderState {
+        Disabled,
+        Unconfigured,
+        Idle,
+        Refreshing,
+        Healthy,
+        Stale,
+        Degraded,
+        Failed
+    };
+    Q_ENUM(ProviderState)
+
+    enum class ProviderErrorKind {
+        None,
+        Configuration,
+        Authentication,
+        Permission,
+        RateLimit,
+        Timeout,
+        Network,
+        Server,
+        Schema,
+        Unsupported,
+        Cancelled
+    };
+    Q_ENUM(ProviderErrorKind)
+
+    enum class RefreshReason {
+        Startup,
+        Scheduled,
+        PopupOpened,
+        Manual,
+        ConfigurationChanged,
+        CredentialChanged,
+        Retry
+    };
+    Q_ENUM(RefreshReason)
+
+    enum class MetricSource {
+        BillingApi,
+        UsageApi,
+        ResponseHeaders,
+        ConnectivityProbe,
+        Estimate,
+        StaticDocumentation,
+        SelfTracked,
+        BrowserSync
+    };
+    Q_ENUM(MetricSource)
+
+    enum class Freshness { Fresh, Aging, Stale, Never };
+    Q_ENUM(Freshness)
+
     enum class ProviderId {
         Unknown = 0,
         OpenAI,
@@ -142,6 +210,18 @@ public:
     QString errorString() const;
     int errorCount() const;
     int consecutiveErrors() const;
+    ProviderState providerState() const;
+    ProviderErrorKind errorKind() const;
+    int httpStatus() const;
+    bool isRetryable() const;
+    QDateTime retryAfter() const;
+    RefreshReason lastRefreshReason() const;
+    QDateTime lastAttempt() const;
+    QDateTime lastSuccess() const;
+    Freshness freshness() const;
+    QDateTime nextScheduledRefresh() const;
+    int coalescedRefreshCount() const;
+    int cancellationCount() const;
 
     // Usage data
     qint64 inputTokens() const;
@@ -180,6 +260,9 @@ public:
     double dailyCost() const;
     double monthlyCost() const;
     double estimatedMonthlyCost() const;
+    QString budgetCurrency() const;
+    void setBudgetCurrency(const QString &currency);
+    bool budgetCurrencyMismatch() const;
 
     // Custom URL
     QString customBaseUrl() const;
@@ -194,7 +277,10 @@ public:
     Q_INVOKABLE bool hasApiKey() const;
 
     // Data fetching
-    Q_INVOKABLE virtual void refresh() = 0;
+    Q_INVOKABLE void refresh();
+    Q_INVOKABLE bool requestRefresh(RefreshReason reason = RefreshReason::Manual);
+    Q_INVOKABLE void cancelRefresh();
+    Q_INVOKABLE void setNextScheduledRefresh(const QDateTime &when);
 
     /// Current request generation. Incremented on each refresh().
     /// Reply handlers should discard results if the generation has advanced.
@@ -207,16 +293,25 @@ Q_SIGNALS:
     void dataUpdated();
     void quotaWarning(const QString &provider, int percentUsed);
     void budgetChanged();
-    void budgetWarning(const QString &provider, const QString &period, double spent, double budget);
-    void budgetExceeded(const QString &provider, const QString &period, double spent, double budget);
+    void budgetWarning(const QString &provider, const QString &period, double spent, double budget, const QString &currency);
+    void budgetExceeded(const QString &provider, const QString &period, double spent, double budget, const QString &currency);
     void customBaseUrlChanged();
+    void stateChanged();
+    void diagnosticsChanged();
     void providerDisconnected(const QString &provider);
     void providerReconnected(const QString &provider);
 
 protected:
+    virtual void refreshImpl() = 0;
+
     void setConnected(bool connected);
     void setLoading(bool loading);
     void setError(const QString &error);
+    void setErrorDetails(const QString &error,
+                         ProviderErrorKind kind,
+                         int httpStatus = 0,
+                         const QDateTime &retryAfter = QDateTime());
+    void setNetworkError(QNetworkReply *reply, const QString &fallbackMessage = QString());
     void clearError();
 
     QNetworkAccessManager *networkManager() const;
@@ -241,6 +336,8 @@ protected:
 
     /// Check if an HTTP status code is retryable (429, 500, 502, 503).
     static bool isRetryableStatus(int httpStatus);
+    static ProviderErrorKind errorKindForNetworkReply(QNetworkReply *reply);
+    static QDateTime retryAfterForReply(QNetworkReply *reply, const QDateTime &now = QDateTime::currentDateTimeUtc());
 
     /// Register a QNetworkReply for tracking. Tracked replies are aborted
     /// by beginRefresh() when a new refresh cycle starts.
@@ -310,6 +407,17 @@ private:
     QString m_error;
     int m_errorCount = 0;
     int m_consecutiveErrors = 0;
+    ProviderState m_providerState = ProviderState::Unconfigured;
+    ProviderErrorKind m_errorKind = ProviderErrorKind::None;
+    int m_httpStatus = 0;
+    QDateTime m_retryAfter;
+    RefreshReason m_lastRefreshReason = RefreshReason::Startup;
+    RefreshReason m_pendingRefreshReason = RefreshReason::Startup;
+    QDateTime m_lastAttempt;
+    QDateTime m_lastSuccess;
+    QDateTime m_nextScheduledRefresh;
+    int m_coalescedRefreshCount = 0;
+    int m_cancellationCount = 0;
 
     qint64 m_inputTokens = 0;
     qint64 m_outputTokens = 0;
@@ -331,6 +439,7 @@ private:
     double m_dailyBudget = 0.0;
     double m_monthlyBudget = 0.0;
     int m_budgetWarningPercent = 80;
+    QString m_budgetCurrency = QStringLiteral("USD");
 
     int m_rateLimitRequests = 0;
     int m_rateLimitTokens = 0;

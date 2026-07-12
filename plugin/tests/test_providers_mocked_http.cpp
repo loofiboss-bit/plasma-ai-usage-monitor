@@ -380,6 +380,7 @@ void ProvidersMockedHttpTest::openAiMalformedUsageAndNonUsdCostWarning()
     QCOMPARE(provider.monthlyCost(), 1.25);
     QCOMPARE(provider.costSource(), QStringLiteral("billing_api"));
     QVERIFY(!provider.errorString().isEmpty());
+    QCOMPARE(provider.errorKind(), ProviderBackend::ProviderErrorKind::Schema);
 }
 
 void ProvidersMockedHttpTest::openAiRetryAfterThenSuccess()
@@ -453,6 +454,9 @@ void ProvidersMockedHttpTest::openAiAuthError()
     QVERIFY(provider.errorCount() >= 1);
     QVERIFY(!provider.errorString().isEmpty());
     QVERIFY(!provider.isConnected());
+    QCOMPARE(provider.errorKind(), ProviderBackend::ProviderErrorKind::Authentication);
+    QCOMPARE(provider.httpStatus(), 401);
+    QVERIFY(!provider.isRetryable());
 }
 
 void ProvidersMockedHttpTest::anthropicRateLimitHeaders()
@@ -867,6 +871,8 @@ void ProvidersMockedHttpTest::googleVeoAuthError()
     QVERIFY(provider.errorCount() >= 1);
     QVERIFY(!provider.errorString().isEmpty());
     QVERIFY(!provider.isConnected());
+    QCOMPARE(provider.errorKind(), ProviderBackend::ProviderErrorKind::Configuration);
+    QCOMPARE(provider.httpStatus(), 404);
 }
 
 void ProvidersMockedHttpTest::ollamaStaleGenerationDiscarded()
@@ -1320,6 +1326,8 @@ void ProvidersMockedHttpTest::azureProviderAuthError()
     QVERIFY(provider.errorCount() >= 1);
     QVERIFY(!provider.errorString().isEmpty());
     QVERIFY(!provider.isConnected());
+    QCOMPARE(provider.errorKind(), ProviderBackend::ProviderErrorKind::Authentication);
+    QCOMPARE(provider.httpStatus(), 401);
 }
 
 void ProvidersMockedHttpTest::azureNormalizeHappyPath()

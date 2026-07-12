@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
 import os
-import re
 import sys
 import json
 import tarfile
 
-def expected_version_from_cmake():
+def read_expected_version():
     try:
-        with open("CMakeLists.txt", "r", encoding="utf-8") as f:
-            match = re.search(r"project\(plasma-ai-usage-monitor VERSION ([0-9]+\.[0-9]+\.[0-9]+)\)", f.read())
-            if match:
-                return match.group(1)
+        with open("VERSION", "r", encoding="utf-8") as f:
+            version = f.read().strip()
+            if version:
+                return version
     except OSError:
         pass
-    return "10.0.1"
+    raise RuntimeError("Unable to read canonical VERSION")
 
 def main():
-    expected_version = expected_version_from_cmake()
+    expected_version = read_expected_version()
     
     expected_files_in_source = [
         "package/metadata.json",
         "package/contents/ui/main.qml",
-        "package/contents/catalog/providers-v3.json",
+        "package/contents/catalog/providers-v4.json",
         "package/contents/catalog/subscriptions-v1.json",
         "package/contents/icons/providers/openai.svg",
         "package/contents/icons/tools/copilot.svg",
         "assets/logo.svg",
-        "plugin/qmldir",
+        "plugin/CMakeLists.txt",
         "com.github.loofi.aiusagemonitor.metainfo.xml"
     ]
 
@@ -56,6 +55,10 @@ def main():
             if version != expected_version:
                 print(f"Error: package/metadata.json version is {version}, expected {expected_version}")
                 missing = True
+            required_plugin = metadata.get("X-AIUsageMonitor-RequiredPluginVersion")
+            if required_plugin != expected_version:
+                print(f"Error: frontend requires plugin {required_plugin}, expected {expected_version}")
+                missing = True
     except Exception as e:
         print(f"Error reading package/metadata.json: {e}")
         missing = True
@@ -75,12 +78,12 @@ def main():
                 # Check for key files in the tarball
                 tar_expected = [
                     f"plasma-ai-usage-monitor-{expected_version}/package/metadata.json",
-                    f"plasma-ai-usage-monitor-{expected_version}/package/contents/catalog/providers-v3.json",
+                    f"plasma-ai-usage-monitor-{expected_version}/package/contents/catalog/providers-v4.json",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/catalog/subscriptions-v1.json",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/icons/providers/openai.svg",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/icons/tools/copilot.svg",
                     f"plasma-ai-usage-monitor-{expected_version}/assets/logo.svg",
-                    f"plasma-ai-usage-monitor-{expected_version}/plugin/qmldir",
+                    f"plasma-ai-usage-monitor-{expected_version}/plugin/CMakeLists.txt",
                     f"plasma-ai-usage-monitor-{expected_version}/CMakeLists.txt"
                 ]
                 

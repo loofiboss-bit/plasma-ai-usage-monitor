@@ -44,11 +44,13 @@ public:
 Q_SIGNALS:
     void configChanged();
     void deliveryFailed(const QString &channel, const QString &message);
+    void delivered(const QString &channel, int httpStatus);
 
 private:
     bool shouldSend(const QString &eventKey);
     void postSlack(const QString &title, const QString &message, bool critical);
     void postDiscord(const QString &title, const QString &message, bool critical);
+    bool validateWebhookUrl(const QString &channel, const QString &url);
 
     QNetworkAccessManager *m_networkManager = nullptr;
     bool m_slackEnabled = false;

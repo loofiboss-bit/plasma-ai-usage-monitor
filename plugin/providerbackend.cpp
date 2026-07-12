@@ -4,6 +4,8 @@
 #include <QUrl>
 #include <QRandomGenerator>
 #include <QSet>
+#include <QLocale>
+#include <QTimeZone>
 
 namespace {
 ProviderBackend::NormalizedUsageCost normalizeOpenAiLikeUsage(const QJsonObject &payload)
@@ -166,6 +168,33 @@ bool ProviderBackend::isLoading() const { return m_loading; }
 QString ProviderBackend::errorString() const { return m_error; }
 int ProviderBackend::errorCount() const { return m_errorCount; }
 int ProviderBackend::consecutiveErrors() const { return m_consecutiveErrors; }
+ProviderBackend::ProviderState ProviderBackend::providerState() const { return m_providerState; }
+ProviderBackend::ProviderErrorKind ProviderBackend::errorKind() const { return m_errorKind; }
+int ProviderBackend::httpStatus() const { return m_httpStatus; }
+QDateTime ProviderBackend::retryAfter() const { return m_retryAfter; }
+ProviderBackend::RefreshReason ProviderBackend::lastRefreshReason() const { return m_lastRefreshReason; }
+QDateTime ProviderBackend::lastAttempt() const { return m_lastAttempt; }
+QDateTime ProviderBackend::lastSuccess() const { return m_lastSuccess; }
+ProviderBackend::Freshness ProviderBackend::freshness() const
+{
+    if (!m_lastSuccess.isValid()) return Freshness::Never;
+    const qint64 age = m_lastSuccess.secsTo(QDateTime::currentDateTimeUtc());
+    if (age < 5 * 60) return Freshness::Fresh;
+    if (age < 15 * 60) return Freshness::Aging;
+    return Freshness::Stale;
+}
+QDateTime ProviderBackend::nextScheduledRefresh() const { return m_nextScheduledRefresh; }
+int ProviderBackend::coalescedRefreshCount() const { return m_coalescedRefreshCount; }
+int ProviderBackend::cancellationCount() const { return m_cancellationCount; }
+
+bool ProviderBackend::isRetryable() const
+{
+    return m_errorKind == ProviderErrorKind::RateLimit
+        || m_errorKind == ProviderErrorKind::Timeout
+        || m_errorKind == ProviderErrorKind::Network
+        || m_errorKind == ProviderErrorKind::Server
+        || isRetryableStatus(m_httpStatus);
+}
 
 void ProviderBackend::setConnected(bool connected)
 {
@@ -188,23 +217,72 @@ void ProviderBackend::setLoading(bool loading)
 {
     if (m_loading != loading) {
         m_loading = loading;
+        const ProviderState nextState = loading
+            ? ProviderState::Refreshing
+            : (m_connected ? (m_error.isEmpty() ? ProviderState::Healthy : ProviderState::Degraded)
+                           : (m_error.isEmpty() ? ProviderState::Idle : ProviderState::Failed));
+        if (m_providerState != nextState) {
+            m_providerState = nextState;
+            Q_EMIT stateChanged();
+        }
         Q_EMIT loadingChanged();
     }
 }
 
 void ProviderBackend::setError(const QString &error)
 {
+    setErrorDetails(error, ProviderErrorKind::Server);
+}
+
+void ProviderBackend::setErrorDetails(const QString &error,
+                                      ProviderErrorKind kind,
+                                      int httpStatus,
+                                      const QDateTime &retryAfter)
+{
     m_error = error;
+    m_errorKind = kind;
+    m_httpStatus = httpStatus;
+    m_retryAfter = retryAfter;
     m_errorCount++;
     m_consecutiveErrors++;
+    const ProviderState nextState = m_connected ? ProviderState::Degraded : ProviderState::Failed;
+    if (m_providerState != nextState) {
+        m_providerState = nextState;
+        Q_EMIT stateChanged();
+    }
     Q_EMIT errorChanged();
+}
+
+void ProviderBackend::setNetworkError(QNetworkReply *reply, const QString &fallbackMessage)
+{
+    const int status = reply
+        ? reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() : 0;
+    QString message = fallbackMessage;
+    if (message.isEmpty() && reply) {
+        message = reply->errorString();
+    }
+    if (message.isEmpty()) {
+        message = QStringLiteral("Provider request failed");
+    }
+    setErrorDetails(message, errorKindForNetworkReply(reply), status,
+                    retryAfterForReply(reply));
 }
 
 void ProviderBackend::clearError()
 {
     if (!m_error.isEmpty()) {
         m_error.clear();
+        m_errorKind = ProviderErrorKind::None;
+        m_httpStatus = 0;
+        m_retryAfter = QDateTime();
         m_consecutiveErrors = 0;
+        if (m_connected) {
+            m_lastSuccess = QDateTime::currentDateTimeUtc();
+            if (m_providerState != ProviderState::Healthy) {
+                m_providerState = ProviderState::Healthy;
+                Q_EMIT stateChanged();
+            }
+        }
         Q_EMIT errorChanged();
     }
 }
@@ -298,7 +376,12 @@ void ProviderBackend::setUsageSource(const QString &source)
 void ProviderBackend::setCurrency(const QString &currency)
 {
     const QString normalized = currency.trimmed().toUpper();
-    m_currency = normalized.isEmpty() ? QStringLiteral("USD") : normalized;
+    const QString next = normalized.isEmpty() ? QStringLiteral("USD") : normalized;
+    const bool mismatchBefore = budgetCurrencyMismatch();
+    m_currency = next;
+    if (mismatchBefore != budgetCurrencyMismatch()) {
+        Q_EMIT budgetChanged();
+    }
 }
 
 void ProviderBackend::setDataQuality(const QString &quality)
@@ -334,6 +417,22 @@ double ProviderBackend::estimatedMonthlyCost() const
     }
     // Fallback for estimated-cost providers: project daily cost to full month
     return m_dailyCost * daysInMonth;
+}
+
+QString ProviderBackend::budgetCurrency() const { return m_budgetCurrency; }
+bool ProviderBackend::budgetCurrencyMismatch() const
+{
+    return !m_currency.isEmpty() && !m_budgetCurrency.isEmpty()
+        && m_currency.compare(m_budgetCurrency, Qt::CaseInsensitive) != 0;
+}
+
+void ProviderBackend::setBudgetCurrency(const QString &currency)
+{
+    const QString normalized = currency.trimmed().toUpper();
+    if (!normalized.isEmpty() && m_budgetCurrency != normalized) {
+        m_budgetCurrency = normalized;
+        Q_EMIT budgetChanged();
+    }
 }
 
 void ProviderBackend::setDailyBudget(double budget)
@@ -372,16 +471,19 @@ void ProviderBackend::setMonthlyCost(double cost) {
 
 void ProviderBackend::checkBudgetLimits()
 {
+    if (budgetCurrencyMismatch()) {
+        return;
+    }
     double warningFraction = m_budgetWarningPercent / 100.0;
 
     // Daily budget checks
     if (m_dailyBudget > 0) {
         if (m_dailyCost >= m_dailyBudget && !m_dailyExceededEmitted) {
             m_dailyExceededEmitted = true;
-            Q_EMIT budgetExceeded(name(), QStringLiteral("daily"), m_dailyCost, m_dailyBudget);
+            Q_EMIT budgetExceeded(name(), QStringLiteral("daily"), m_dailyCost, m_dailyBudget, m_currency);
         } else if (m_dailyCost >= m_dailyBudget * warningFraction && !m_dailyWarningEmitted) {
             m_dailyWarningEmitted = true;
-            Q_EMIT budgetWarning(name(), QStringLiteral("daily"), m_dailyCost, m_dailyBudget);
+            Q_EMIT budgetWarning(name(), QStringLiteral("daily"), m_dailyCost, m_dailyBudget, m_currency);
         }
         // Reset flags when cost drops (new billing period)
         if (m_dailyCost < m_dailyBudget * warningFraction) {
@@ -394,10 +496,10 @@ void ProviderBackend::checkBudgetLimits()
     if (m_monthlyBudget > 0) {
         if (m_monthlyCost >= m_monthlyBudget && !m_monthlyExceededEmitted) {
             m_monthlyExceededEmitted = true;
-            Q_EMIT budgetExceeded(name(), QStringLiteral("monthly"), m_monthlyCost, m_monthlyBudget);
+            Q_EMIT budgetExceeded(name(), QStringLiteral("monthly"), m_monthlyCost, m_monthlyBudget, m_currency);
         } else if (m_monthlyCost >= m_monthlyBudget * warningFraction && !m_monthlyWarningEmitted) {
             m_monthlyWarningEmitted = true;
-            Q_EMIT budgetWarning(name(), QStringLiteral("monthly"), m_monthlyCost, m_monthlyBudget);
+            Q_EMIT budgetWarning(name(), QStringLiteral("monthly"), m_monthlyCost, m_monthlyBudget, m_currency);
         }
         // Reset flags when cost drops (new billing period)
         if (m_monthlyCost < m_monthlyBudget * warningFraction) {
@@ -474,16 +576,27 @@ int ProviderBackend::refreshCount() const { return m_refreshCount; }
 void ProviderBackend::updateLastRefreshed()
 {
     m_lastRefreshed = QDateTime::currentDateTime();
+    m_lastSuccess = m_lastRefreshed.toUTC();
     m_refreshCount++;
+    Q_EMIT stateChanged();
 }
 
 // --- API Key ---
 
 void ProviderBackend::setApiKey(const QString &key)
 {
+    if (m_apiKey == key) {
+        return;
+    }
+    cancelRefresh();
     m_apiKey = key;
     if (key.isEmpty()) {
         setConnected(false);
+        m_providerState = ProviderState::Unconfigured;
+        Q_EMIT stateChanged();
+    } else if (m_providerState == ProviderState::Unconfigured) {
+        m_providerState = ProviderState::Idle;
+        Q_EMIT stateChanged();
     }
 }
 
@@ -557,6 +670,56 @@ int ProviderBackend::currentGeneration() const
     return m_generation;
 }
 
+bool ProviderBackend::requestRefresh(RefreshReason reason)
+{
+    if (m_loading) {
+        if (reason != RefreshReason::Manual) {
+            ++m_coalescedRefreshCount;
+            Q_EMIT diagnosticsChanged();
+            return false;
+        }
+        cancelRefresh();
+    }
+
+    m_pendingRefreshReason = reason;
+    refreshImpl();
+    return true;
+}
+
+void ProviderBackend::refresh()
+{
+    requestRefresh(RefreshReason::Manual);
+}
+
+void ProviderBackend::cancelRefresh()
+{
+    const bool hadActiveWork = m_loading || !m_activeReplies.isEmpty();
+    ++m_generation;
+    for (QNetworkReply *reply : std::as_const(m_activeReplies)) {
+        if (reply != nullptr && reply->isRunning()) {
+            reply->abort();
+        }
+        if (reply != nullptr) {
+            reply->deleteLater();
+        }
+    }
+    m_activeReplies.clear();
+    if (hadActiveWork) {
+        ++m_cancellationCount;
+        Q_EMIT diagnosticsChanged();
+    }
+    setLoading(false);
+}
+
+void ProviderBackend::setNextScheduledRefresh(const QDateTime &when)
+{
+    const QDateTime normalized = when.isValid() ? when.toUTC() : QDateTime();
+    if (m_nextScheduledRefresh != normalized) {
+        m_nextScheduledRefresh = normalized;
+        Q_EMIT diagnosticsChanged();
+    }
+}
+
 void ProviderBackend::trackReply(QNetworkReply *reply)
 {
     m_activeReplies.append(reply);
@@ -569,6 +732,9 @@ void ProviderBackend::trackReply(QNetworkReply *reply)
 void ProviderBackend::beginRefresh()
 {
     m_generation++;
+    m_lastRefreshReason = m_pendingRefreshReason;
+    m_lastAttempt = QDateTime::currentDateTimeUtc();
+    Q_EMIT stateChanged();
 
     // Abort and clean up any in-flight replies from previous refresh
     for (QNetworkReply *reply : std::as_const(m_activeReplies)) {
@@ -589,7 +755,49 @@ bool ProviderBackend::isCurrentGeneration(int generation) const
 
 bool ProviderBackend::isRetryableStatus(int httpStatus)
 {
-    return httpStatus == 429 || httpStatus == 500 || httpStatus == 502 || httpStatus == 503;
+    return httpStatus == 408 || httpStatus == 425 || httpStatus == 429
+        || httpStatus == 500 || httpStatus == 502 || httpStatus == 503 || httpStatus == 504;
+}
+
+ProviderBackend::ProviderErrorKind ProviderBackend::errorKindForNetworkReply(QNetworkReply *reply)
+{
+    if (!reply) {
+        return ProviderErrorKind::Network;
+    }
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (status == 401) return ProviderErrorKind::Authentication;
+    if (status == 403) return ProviderErrorKind::Permission;
+    if (status == 429) return ProviderErrorKind::RateLimit;
+    if (status >= 500) return ProviderErrorKind::Server;
+    if (reply->error() == QNetworkReply::OperationCanceledError) return ProviderErrorKind::Cancelled;
+    if (reply->error() == QNetworkReply::TimeoutError) return ProviderErrorKind::Timeout;
+    if (reply->error() != QNetworkReply::NoError) return ProviderErrorKind::Network;
+    return ProviderErrorKind::None;
+}
+
+QDateTime ProviderBackend::retryAfterForReply(QNetworkReply *reply, const QDateTime &now)
+{
+    if (!reply) {
+        return {};
+    }
+    const QByteArray value = reply->rawHeader("Retry-After").trimmed();
+    if (value.isEmpty()) {
+        return {};
+    }
+    bool secondsOk = false;
+    const qint64 seconds = value.toLongLong(&secondsOk);
+    if (secondsOk && seconds >= 0) {
+        return now.toUTC().addSecs(qMin<qint64>(seconds, 3600));
+    }
+    QDateTime parsed = QDateTime::fromString(QString::fromLatin1(value), Qt::RFC2822Date);
+    if (!parsed.isValid()) {
+        parsed = QLocale::c().toDateTime(QString::fromLatin1(value),
+                                         QStringLiteral("ddd, dd MMM yyyy HH:mm:ss 'GMT'"));
+        if (parsed.isValid()) {
+            parsed.setTimeZone(QTimeZone::UTC);
+        }
+    }
+    return parsed.isValid() ? parsed.toUTC() : QDateTime();
 }
 
 void ProviderBackend::retryRequest(QNetworkReply *reply,
@@ -612,13 +820,9 @@ void ProviderBackend::retryRequest(QNetworkReply *reply,
 
     // Check for Retry-After header (seconds or HTTP date)
     int delaySecs = (1 << attempt); // 2, 4, 8...
-    QByteArray retryAfter = reply->rawHeader("Retry-After");
-    if (!retryAfter.isEmpty()) {
-        bool ok;
-        int retryVal = retryAfter.toInt(&ok);
-        if (ok && retryVal > 0 && retryVal < 120) {
-            delaySecs = retryVal;
-        }
+    const QDateTime retryAt = retryAfterForReply(reply);
+    if (retryAt.isValid()) {
+        delaySecs = qBound(0, static_cast<int>(QDateTime::currentDateTimeUtc().secsTo(retryAt)), 3600);
     }
 
     int delayMs = delaySecs * 1000 + (QRandomGenerator::global()->bounded(500)); // jitter

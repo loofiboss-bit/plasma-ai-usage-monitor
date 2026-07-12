@@ -22,7 +22,7 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current release:** `v11.0.0 Distribution & Catalog Truth` refreshes the shipped pricing/plan catalogs to 2026-06-30, fixes Copilot auto billing labels after the AI credits transition, and makes the COPR RPM path the primary Fedora install route.
+> **Current development release:** `v12.0.0 Reliability Core` makes refresh deterministic, provider state typed, history semantics explicit, and mixed-currency totals honest. The supported Fedora route remains the COPR package.
 
 ## Quick Links
 
@@ -518,7 +518,7 @@ plasma-ai-usage-monitor/
 │           └── configHistory.qml
 └── plugin/                         # C++ QML plugin
     ├── CMakeLists.txt
-    ├── qmldir                      # QML module registration
+    ├── CMakeLists.txt              # Generates QML module metadata with qt_add_qml_module
     ├── aiusageplugin.{h,cpp}       # QQmlExtensionPlugin provider, catalog, tool, and integration types
     ├── appinfo.{h,cpp}             # App version singleton for QML (build-version source of truth)
     ├── secretsmanager.{h,cpp}      # KWallet wrapper
@@ -638,22 +638,22 @@ An RPM spec file is included for Fedora/RHEL packaging:
 rpmbuild -ba plasma-ai-usage-monitor.spec
 ```
 
-## Packaging Kickoff (Flatpak + Deterministic Local Artifacts)
+## Distribution capabilities and deterministic artifacts
 
-- Canonical Flatpak manifest at `packaging/flatpak/com.github.loofi.aiusagemonitor.yaml`
-- Deterministic local packaging scripts:
+- **Fedora COPR (supported, primary):** installs the QML package and matching compiled plugin.
+- **Source build (supported):** builds and installs both required parts.
+- **GitHub source tarball (supported artifact):** reproducible source from the exact tag.
+- **KDE Store / `.plasmoid` (frontend-only):** contains QML, catalogs, icons, and metadata; it does not contain the architecture-specific compiled plugin. Install the matching COPR/source plugin first.
+- **Flatpak (not supported in v12):** the previous QML-only scaffold was removed because it could not produce a functioning full package. See `packaging/flatpak/README.md`.
+- Deterministic packaging scripts:
   - `scripts/package_source_tarball.sh`
   - `scripts/package_plasmoid.sh`
-  - `scripts/check_flatpak_scaffold.sh`
-- Packaging validation checks manifest identity/runtime fields and version consistency with project metadata through the local release scripts and checks above.
 - The `.plasmoid` archive is built from the **contents of `package/`**, so `metadata.json` and `contents/` sit at the archive root as required by Plasma/KDE Store package installs.
-- **Important:** the KDE Store / `.plasmoid` artifact contains only the plasmoid package payload. This project still needs the compiled QML plugin from the distro package or a source install to work fully.
 
 Quick checks:
 
 ```bash
 bash scripts/check_version_consistency.sh
-bash scripts/check_flatpak_scaffold.sh
 bash scripts/package_source_tarball.sh --check
 bash scripts/package_plasmoid.sh --check
 ```

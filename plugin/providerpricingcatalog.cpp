@@ -1,9 +1,10 @@
 #include "providerpricingcatalog.h"
 
 #include <QJsonArray>
+#include <QDate>
 
 ProviderPricingCatalog::ProviderPricingCatalog(QObject *parent)
-    : CatalogLoader(QStringLiteral("providers-v3.json"), 3, parent)
+    : CatalogLoader(QStringLiteral("providers-v4.json"), 4, parent)
 {
     load();
 }
@@ -72,6 +73,49 @@ double ProviderPricingCatalog::amountForModelUnit(const QString &providerKey, co
         return 0.0;
     }
     return pricing.value(QStringLiteral("amount")).toDouble(0.0);
+}
+
+QVariantList ProviderPricingCatalog::selectableModelsForProvider(const QString &providerKey) const
+{
+    QVariantList result;
+    const QDate today = QDate::currentDate();
+    const QJsonArray models = providerObject(providerKey).value(QStringLiteral("models")).toArray();
+    for (const QJsonValue &entry : models) {
+        const QJsonObject model = entry.toObject();
+        const QJsonObject lifecycle = model.value(QStringLiteral("lifecycle")).toObject();
+        const QString status = lifecycle.value(QStringLiteral("status")).toString();
+        const QDate deprecationDate = QDate::fromString(
+            lifecycle.value(QStringLiteral("deprecationDate")).toString(), Qt::ISODate);
+        if (status == QLatin1String("retired")
+            || (status == QLatin1String("deprecated") && deprecationDate.isValid() && today >= deprecationDate)) {
+            continue;
+        }
+        result.append(model.toVariantMap());
+    }
+    return result;
+}
+
+QString ProviderPricingCatalog::effectiveModelId(const QString &providerKey, const QString &modelId) const
+{
+    return effectiveModelIdAt(providerKey, modelId, QDate::currentDate());
+}
+
+QString ProviderPricingCatalog::effectiveModelIdAt(const QString &providerKey,
+                                                    const QString &modelId,
+                                                    const QDate &today) const
+{
+    const QJsonObject model = modelObject(providerKey, modelId);
+    const QJsonObject lifecycle = model.value(QStringLiteral("lifecycle")).toObject();
+    const QString status = lifecycle.value(QStringLiteral("status")).toString();
+    const QDate deprecationDate = QDate::fromString(
+        lifecycle.value(QStringLiteral("deprecationDate")).toString(), Qt::ISODate);
+    const QString replacement = lifecycle.value(QStringLiteral("replacementId")).toString();
+    if ((status == QLatin1String("retired")
+         || (status == QLatin1String("deprecated") && deprecationDate.isValid() && today >= deprecationDate))
+        && !replacement.isEmpty()) {
+        return replacement;
+    }
+    return modelId;
 }
 
 QJsonObject ProviderPricingCatalog::providerObject(const QString &providerKey) const

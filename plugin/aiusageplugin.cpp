@@ -4,6 +4,7 @@
 #include "subscriptionplancatalog.h"
 #include "secretsmanager.h"
 #include "providerbackend.h"
+#include "refreshschedulermodel.h"
 #include "openaiprovider.h"
 #include "azureopenaiprovider.h"
 #include "anthropicprovider.h"
@@ -27,7 +28,7 @@
 #include "cursormonitor.h"
 #include "windsurfmonitor.h"
 #include "jetbrainsaimonitor.h"
-#include "browsercookieextractor.h"
+#include "browsersyncservice.h"
 #include "bedrockprovider.h"
 #include "localmetricsserver.h"
 #include "webhooknotifier.h"
@@ -54,6 +55,7 @@ void AiUsagePlugin::registerTypes(const char *uri)
 
     // Register C++ types for use in QML
     qmlRegisterType<SecretsManager>(uri, 1, 0, "SecretsManager");
+    qmlRegisterType<RefreshSchedulerModel>(uri, 1, 0, "RefreshSchedulerModel");
     qmlRegisterType<OpenAIProvider>(uri, 1, 0, "OpenAIProvider");
     qmlRegisterType<AzureOpenAIProvider>(uri, 1, 0, "AzureOpenAIProvider");
     qmlRegisterType<AnthropicProvider>(uri, 1, 0, "AnthropicProvider");
@@ -79,8 +81,8 @@ void AiUsagePlugin::registerTypes(const char *uri)
     qmlRegisterType<WindsurfMonitor>(uri, 1, 0, "WindsurfMonitor");
     qmlRegisterType<JetBrainsAiMonitor>(uri, 1, 0, "JetBrainsAiMonitor");
 
-    // Browser cookie extraction for sync
-    qmlRegisterType<BrowserCookieExtractor>(uri, 1, 0, "BrowserCookieExtractor");
+    // Browser Sync keeps cookie values behind the C++ boundary.
+    qmlRegisterType<BrowserSyncService>(uri, 1, 0, "BrowserSyncService");
 
     qmlRegisterType<BedrockProvider>(uri, 1, 0, "BedrockProvider");
     qmlRegisterType<LocalMetricsServer>(uri, 1, 0, "LocalMetricsServer");

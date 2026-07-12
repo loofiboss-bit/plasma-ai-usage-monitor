@@ -2,6 +2,11 @@ build/
 build-*/
 build_*/
 dist/
+*.tar.gz
+*.src.rpm
+*.rpm
+SHA256SUMS*
+*.sha256
 *.o
 *.so
 *.qmlc

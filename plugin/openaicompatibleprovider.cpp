@@ -17,10 +17,10 @@ void OpenAICompatibleProvider::setModel(const QString &model)
     }
 }
 
-void OpenAICompatibleProvider::refresh()
+void OpenAICompatibleProvider::refreshImpl()
 {
     if (!hasApiKey()) {
-        setError(i18n("No API key configured"));
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
@@ -110,15 +110,16 @@ void OpenAICompatibleProvider::onCompletionFinished(QNetworkReply *reply)
         }
 
         if (httpStatus == 401) {
-            setError(i18n("Invalid API key"));
+            setErrorDetails(i18n("Invalid API key"), ProviderErrorKind::Authentication, httpStatus);
         } else if (httpStatus == 429) {
-            setError(i18n("Rate limited"));
+            setErrorDetails(i18n("Rate limited"), ProviderErrorKind::RateLimit, httpStatus,
+                            retryAfterForReply(reply));
             // Still parse headers on 429
             parseRateLimitHeaders(reply);
         } else {
-            setError(i18n("API error: %1 (HTTP %2)",
-                         reply->errorString(),
-                         QString::number(httpStatus)));
+            setNetworkError(reply, i18n("API error: %1 (HTTP %2)",
+                                        reply->errorString(),
+                                        QString::number(httpStatus)));
         }
 
         reply->deleteLater();

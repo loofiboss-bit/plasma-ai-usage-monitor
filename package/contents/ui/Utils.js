@@ -13,6 +13,27 @@ function formatNumber(n) {
     return Math.round(n).toString();
 }
 
+function formatMoney(value, currency) {
+    var code = (currency || "USD").toUpperCase();
+    return Number(value || 0).toLocaleCurrencyString(Qt.locale(), code);
+}
+
+function addCurrencyTotal(totals, currency, value) {
+    var code = (currency || "USD").toUpperCase();
+    totals[code] = (totals[code] || 0) + Number(value || 0);
+}
+
+function formatCurrencyTotals(totals) {
+    var currencies = Object.keys(totals || {}).sort();
+    if (currencies.length === 0) return formatMoney(0, "USD");
+    var parts = [];
+    for (var i = 0; i < currencies.length; i++) {
+        var currency = currencies[i];
+        parts.push(formatMoney(totals[currency], currency));
+    }
+    return parts.join(" + ");
+}
+
 /**
  * Format a date/time as a human-readable relative time string.
  * @param {Date} dateTime - The date to format

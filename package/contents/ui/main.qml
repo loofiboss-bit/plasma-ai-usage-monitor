@@ -5,9 +5,15 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import com.github.loofi.aiusagemonitor 1.0
+import "Utils.js" as Utils
 
 PlasmoidItem {
     id: root
+    property string modelMigrationNotice: ""
+    readonly property bool pluginVersionMismatch: {
+        var required = plasmoid.metaData?.version || "";
+        return required !== "" && required !== AppInfo.version;
+    }
 
     switchWidth: Kirigami.Units.gridUnit * 12
     switchHeight: Kirigami.Units.gridUnit * 12
@@ -21,7 +27,7 @@ PlasmoidItem {
             if (provider.enabled && provider.backend && provider.backend.connected) {
                 var info = provider.name + ": ";
                 if (provider.backend.cost > 0) {
-                    info += "$" + provider.backend.cost.toFixed(2) + " | ";
+                    info += Utils.formatMoney(provider.backend.cost, provider.backend.currency || "USD") + " | ";
                 }
                 if ((provider.backend.rateLimitRequestsRemaining || 0) > 0) {
                     info += provider.backend.rateLimitRequestsRemaining + " req left";
@@ -83,6 +89,8 @@ PlasmoidItem {
     readonly property int enabledToolCount: providerRegistry.enabledToolCount
     readonly property int connectedCount: providerRegistry.connectedCount
     readonly property double totalCost: providerRegistry.totalCost
+    readonly property string totalCostLabel: providerRegistry.totalCostLabel
+    readonly property bool hasMixedCurrencies: providerRegistry.hasMixedCurrencies
 
     function formatCompactMetric(value) {
         return providerRegistry.formatCompactMetric(value);
@@ -278,8 +286,8 @@ PlasmoidItem {
         budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
     }
 
-    BrowserCookieExtractor {
-        id: browserCookies
+    BrowserSyncService {
+        id: browserSyncService
         browserType: plasmoid.configuration.browserSyncBrowser
         selectedFirefoxProfile: plasmoid.configuration.browserSyncProfile
     }
@@ -442,7 +450,7 @@ PlasmoidItem {
         id: refreshScheduler
         configuration: plasmoid.configuration
         registry: providerRegistry
-        browserCookies: browserCookies
+        browserSyncService: browserSyncService
         claudeCodeMonitor: claudeCodeMonitor
         codexCliMonitor: codexCliMonitor
         copilotMonitor: copilotMonitor
@@ -486,6 +494,15 @@ PlasmoidItem {
 
     compactRepresentation: CompactRepresentation {}
     fullRepresentation: FullRepresentation {}
+
+    Component.onCompleted: {
+        var saved = plasmoid.configuration.deepseekModel || "";
+        var effective = ProviderPricingCatalog.effectiveModelId("deepseek", saved);
+        if (saved && effective !== saved) {
+            plasmoid.configuration.deepseekModel = effective;
+            root.modelMigrationNotice = i18n("DeepSeek model %1 was retired and migrated to %2.", saved, effective);
+        }
+    }
 
     Plasmoid.contextualActions: [
         PlasmaCore.Action {

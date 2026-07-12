@@ -3,6 +3,7 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QHostAddress>
+#include <QTimer>
 
 LocalMetricsServer::LocalMetricsServer(QObject *parent)
     : QObject(parent)
@@ -12,16 +13,52 @@ LocalMetricsServer::LocalMetricsServer(QObject *parent)
         while (m_server->hasPendingConnections()) {
             QTcpSocket *socket = m_server->nextPendingConnection();
             connect(socket, &QTcpSocket::readyRead, this, [this, socket]() {
-                socket->readAll();
+                QByteArray request = socket->property("requestBuffer").toByteArray();
+                request += socket->readAll();
+                if (request.size() > 8192) {
+                    socket->write("HTTP/1.1 431 Request Header Fields Too Large\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+                    socket->disconnectFromHost();
+                    return;
+                }
+                if (!request.contains("\r\n\r\n")) {
+                    socket->setProperty("requestBuffer", request);
+                    return;
+                }
+                const QList<QByteArray> requestLine = request.left(request.indexOf("\r\n")).split(' ');
+                if (requestLine.size() != 3) {
+                    socket->write("HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+                    socket->disconnectFromHost();
+                    return;
+                }
+                const QByteArray method = requestLine.at(0);
+                const QByteArray path = requestLine.at(1);
+                if (path != "/metrics") {
+                    socket->write("HTTP/1.1 404 Not Found\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+                    socket->disconnectFromHost();
+                    return;
+                }
+                if (method != "GET" && method != "HEAD") {
+                    socket->write("HTTP/1.1 405 Method Not Allowed\r\nAllow: GET, HEAD\r\nConnection: close\r\nContent-Length: 0\r\n\r\n");
+                    socket->disconnectFromHost();
+                    return;
+                }
                 const QByteArray body = m_payload.toUtf8();
-                const QByteArray response =
+                QByteArray response =
                     "HTTP/1.1 200 OK\r\n"
                     "Content-Type: text/plain; version=0.0.4; charset=utf-8\r\n"
                     "Cache-Control: no-store\r\n"
                     "Content-Length: " + QByteArray::number(body.size()) + "\r\n"
-                    "Connection: close\r\n\r\n" + body;
+                    "Connection: close\r\n\r\n";
+                if (method == "GET") {
+                    response += body;
+                }
                 socket->write(response);
                 socket->disconnectFromHost();
+            });
+            QTimer::singleShot(5000, socket, [socket]() {
+                if (socket->state() != QAbstractSocket::UnconnectedState) {
+                    socket->disconnectFromHost();
+                }
             });
             connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
         }

@@ -1,0 +1,17 @@
+name: Sanitizers
+on:
+  pull_request:
+    paths: ['plugin/**', 'CMakeLists.txt', 'CMakePresets.json']
+  schedule:
+    - cron: '17 3 * * 2'
+permissions:
+  contents: read
+jobs:
+  asan-ubsan:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - run: dnf install -y git cmake ninja-build gcc-c++ extra-cmake-modules qt6-qtbase-devel qt6-qtdeclarative-devel libplasma-devel kf6-kwallet-devel kf6-ki18n-devel kf6-knotifications-devel openssl-devel
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: cmake --preset sanitizers && cmake --build --preset sanitizers
+      - run: ctest --preset sanitizers

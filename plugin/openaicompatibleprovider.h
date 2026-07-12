@@ -16,7 +16,7 @@
  * - Probe-level token tracking kept separate from user usage and spend
  *
  * Subclasses must provide: name(), iconName(), defaultModel(), baseUrl()
- * Subclasses can override refresh() to add extra API calls (e.g., balance endpoint)
+ * Subclasses can override refreshImpl() to add extra API calls (e.g., balance endpoint)
  */
 class OpenAICompatibleProvider : public ProviderBackend
 {
@@ -30,7 +30,7 @@ public:
     QString model() const;
     void setModel(const QString &model);
 
-    Q_INVOKABLE void refresh() override;
+    void refreshImpl() override;
 
 Q_SIGNALS:
     void modelChanged();

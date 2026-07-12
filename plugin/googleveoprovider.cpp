@@ -66,10 +66,10 @@ void GoogleVeoProvider::setTier(const QString &tier)
     }
 }
 
-void GoogleVeoProvider::refresh()
+void GoogleVeoProvider::refreshImpl()
 {
     if (!hasApiKey()) {
-        setError(i18n("No API key configured"));
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
@@ -110,13 +110,14 @@ void GoogleVeoProvider::onModelInfoReply(QNetworkReply *reply)
     if (reply->error() != QNetworkReply::NoError) {
         int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (httpStatus == 400 || httpStatus == 404) {
-            setError(i18n("Invalid API key or model name"));
+            setErrorDetails(i18n("Invalid API key or model name"), ProviderErrorKind::Configuration, httpStatus);
         } else if (httpStatus == 429) {
-            setError(i18n("Rate limited"));
+            setErrorDetails(i18n("Rate limited"), ProviderErrorKind::RateLimit, httpStatus,
+                            retryAfterForReply(reply));
         } else {
-            setError(i18n("API error: %1 (HTTP %2)",
-                         reply->errorString(),
-                         QString::number(httpStatus)));
+            setNetworkError(reply, i18n("API error: %1 (HTTP %2)",
+                                        reply->errorString(),
+                                        QString::number(httpStatus)));
         }
         setLoading(false);
         setConnected(false);
@@ -128,7 +129,7 @@ void GoogleVeoProvider::onModelInfoReply(QNetworkReply *reply)
     const QByteArray data = reply->readAll();
     const QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull() || !doc.isObject()) {
-        setError(i18n("Unexpected API response format"));
+        setErrorDetails(i18n("Unexpected API response format"), ProviderErrorKind::Schema);
         setLoading(false);
         setConnected(false);
         updateLastRefreshed();

@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
+import "Utils.js" as Utils
 
 ColumnLayout {
     id: costCard
@@ -21,52 +22,63 @@ ColumnLayout {
         return total;
     }
 
-    readonly property double apiSpend: {
-        var total = 0;
+    function providerTotals(field, estimated) {
+        var totals = {};
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
-            if (provider.enabled && provider.backend && provider.backend.connected
-                && (provider.backend.costSource === "billing_api" || provider.backend.costSource === "actual_api"))
-                total += provider.backend.cost;
+            if (!provider.enabled || !provider.backend || !provider.backend.connected) continue;
+            var source = provider.backend.costSource || "unknown";
+            var isEstimate = source === "estimated_from_usage" || provider.backend.isEstimatedCost;
+            if (estimated !== isEstimate) continue;
+            if (!estimated && source !== "billing_api" && source !== "actual_api") continue;
+            Utils.addCurrencyTotal(totals, provider.backend.currency, provider.backend[field] || 0);
         }
-        return total;
+        return totals;
     }
 
-    readonly property double apiSpendToday: {
-        var total = 0;
+    function mergedTotals() {
+        var totals = {};
+        var actual = apiSpendThisMonth;
+        var estimates = estimatedBurn;
+        var currencies = Object.keys(actual);
+        for (var i = 0; i < currencies.length; i++) Utils.addCurrencyTotal(totals, currencies[i], actual[currencies[i]]);
+        currencies = Object.keys(estimates);
+        for (var j = 0; j < currencies.length; j++) Utils.addCurrencyTotal(totals, currencies[j], estimates[currencies[j]]);
+        Utils.addCurrencyTotal(totals, "USD", subscriptionFees);
+        return totals;
+    }
+
+    function selectedTotals() {
+        if (costViewMode === 0) return totalMonthlyExposure;
+        if (costViewMode === 1) return apiSpendToday;
+        if (costViewMode === 2) return apiSpendThisMonth;
+        if (costViewMode === 3) return ({ USD: subscriptionFees });
+        return estimatedBurn;
+    }
+
+    function onlyValue(totals) {
+        var keys = Object.keys(totals || {});
+        return keys.length === 1 ? totals[keys[0]] : 0;
+    }
+
+    readonly property var apiSpend: providerTotals("cost", false)
+    readonly property var apiSpendToday: providerTotals("dailyCost", false)
+    readonly property var apiSpendThisMonth: providerTotals("monthlyCost", false)
+    readonly property var estimatedBurn: {
+        var totals = {};
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
-            if (provider.enabled && provider.backend && provider.backend.connected
-                && (provider.backend.costSource === "billing_api" || provider.backend.costSource === "actual_api"))
-                total += provider.backend.dailyCost;
+            if (!provider.enabled || !provider.backend || !provider.backend.connected) continue;
+            var source = provider.backend.costSource || "unknown";
+            if (source === "estimated_from_usage" || provider.backend.isEstimatedCost) {
+                Utils.addCurrencyTotal(totals, provider.backend.currency,
+                    provider.backend.estimatedMonthlyCost || provider.backend.monthlyCost || provider.backend.cost || 0);
+            }
         }
-        return total;
+        return totals;
     }
-
-    readonly property double apiSpendThisMonth: {
-        var total = 0;
-        for (var i = 0; i < providers.length; i++) {
-            var provider = providers[i];
-            if (provider.enabled && provider.backend && provider.backend.connected
-                && (provider.backend.costSource === "billing_api" || provider.backend.costSource === "actual_api"))
-                total += provider.backend.monthlyCost;
-        }
-        return total;
-    }
-
-    readonly property double estimatedBurn: {
-        var total = 0;
-        for (var i = 0; i < providers.length; i++) {
-            var provider = providers[i];
-            if (provider.enabled && provider.backend && provider.backend.connected
-                && (provider.backend.costSource === "estimated_from_usage" || provider.backend.isEstimatedCost))
-                total += provider.backend.estimatedMonthlyCost || provider.backend.monthlyCost || provider.backend.cost || 0;
-        }
-        return total;
-    }
-
-    readonly property double totalMonthlyExposure: apiSpendThisMonth + subscriptionFees + estimatedBurn
-    readonly property double totalCost: totalMonthlyExposure
+    readonly property var totalMonthlyExposure: mergedTotals()
+    readonly property var totalCost: totalMonthlyExposure
 
     spacing: 0
     property int costViewMode: 0
@@ -141,22 +153,13 @@ ColumnLayout {
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     text: {
-                        var val = costCard.costViewMode === 0 ? costCard.totalCost
-                                : costCard.costViewMode === 1 ? costCard.apiSpendToday
-                                : costCard.costViewMode === 2 ? costCard.apiSpendThisMonth
-                                : costCard.costViewMode === 3 ? costCard.subscriptionFees
-                                : costCard.estimatedBurn;
-                        return "$" + val.toFixed(val < 1 ? 4 : 2);
+                        return Utils.formatCurrencyTotals(costCard.selectedTotals());
                     }
                     font.bold: true
                     font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.5
                     horizontalAlignment: costCard.narrowCard ? Text.AlignLeft : Text.AlignRight
                     color: {
-                        var cost = costCard.costViewMode === 0 ? costCard.totalCost
-                                 : costCard.costViewMode === 1 ? costCard.apiSpendToday
-                                 : costCard.costViewMode === 2 ? costCard.apiSpendThisMonth
-                                 : costCard.costViewMode === 3 ? costCard.subscriptionFees
-                                 : costCard.estimatedBurn;
+                        var cost = costCard.onlyValue(costCard.selectedTotals());
                         if (cost > 50) return Kirigami.Theme.negativeTextColor;
                         if (cost > 20) return Kirigami.Theme.neutralTextColor;
                         return Kirigami.Theme.textColor;
@@ -165,7 +168,9 @@ ColumnLayout {
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    text: i18n("API spend, fixed subscription fees, and estimated burn are labeled separately. Monthly exposure: $%1", costCard.totalMonthlyExposure.toFixed(2))
+                    text: Object.keys(costCard.totalMonthlyExposure).length > 1
+                        ? i18n("Mixed currencies are grouped and are never converted or silently summed: %1", Utils.formatCurrencyTotals(costCard.totalMonthlyExposure))
+                        : i18n("API spend, fixed subscription fees, and estimated burn are labeled separately.")
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     opacity: 0.68
                     wrapMode: Text.WordWrap
@@ -206,7 +211,7 @@ ColumnLayout {
                         opacity: 0.8
                     }
                     PlasmaComponents.Label {
-                        text: "$" + parent.providerCost.toFixed(parent.providerCost < 1 ? 4 : 2)
+                        text: Utils.formatMoney(parent.providerCost, modelData.backend?.currency || "USD")
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         font.bold: true
                     }
@@ -234,7 +239,7 @@ ColumnLayout {
                         opacity: 0.8
                     }
                     PlasmaComponents.Label {
-                        text: "$" + parent.toolCost.toFixed(parent.toolCost < 1 ? 4 : 2)
+                        text: Utils.formatMoney(parent.toolCost, "USD")
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         font.bold: true
                     }
