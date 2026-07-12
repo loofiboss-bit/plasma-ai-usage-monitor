@@ -86,6 +86,7 @@ else
     --group=0 \
     --numeric-owner \
     --pax-option=delete=atime,delete=ctime \
+    --transform="s,^\./,plasma-ai-usage-monitor-${VERSION}/," \
     --warning=no-file-changed \
     -czf "$TMP_ARCHIVE_PATH" \
     --exclude=.git \
