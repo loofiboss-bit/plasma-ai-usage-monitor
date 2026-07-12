@@ -27,6 +27,8 @@ for entry in \
   [[ "$value" == "$version" ]] || { echo "Version mismatch: ${label}=${value}, VERSION=${version}" >&2; exit 1; }
 done
 
+# The literal CMake expression is intentional; the shell must not expand it.
+# shellcheck disable=SC2016
 grep -Fq 'file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION"' CMakeLists.txt || {
   echo "CMake does not derive its version from VERSION" >&2
   exit 1
