@@ -1,0 +1,23 @@
+name: Package
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  artifacts:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - run: dnf install -y git python3 tar gzip
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: mkdir -p dist && SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_source_tarball.sh --output-dir dist
+      - run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_plasmoid.sh --output-dir dist
+      - run: python3 scripts/check_package_payload.py
+      - run: cd dist && sha256sum * > SHA256SUMS.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: source-and-frontend-packages
+          path: dist/
+          if-no-files-found: error

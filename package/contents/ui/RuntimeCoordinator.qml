@@ -36,22 +36,35 @@ Item {
         webhookNotifier.discordWebhookUrl = secrets.getKey("discord_webhook_url");
     }
 
-    function loadApiKeys() {
+    function loadProviderApiKey(configKey, reason, shouldRefresh) {
+        var provider = registry.providerByConfigKey(configKey);
+        if (!provider || !provider.backend) {
+            return;
+        }
+        if (!provider.enabled) {
+            provider.backend.cancelRefresh();
+            provider.backend.setApiKey("");
+            return;
+        }
+        if (provider.requiresApiKey !== false) {
+            var keySlot = provider.secretKey || provider.configKey;
+            provider.backend.setApiKey(secrets.getKey(keySlot));
+        }
+        if (shouldRefresh) {
+            scheduler.refreshProvider(provider, reason, true);
+        }
+    }
+
+    function loadApiKeys(reason, shouldRefresh) {
         var providers = registry.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
-            if (provider.enabled && provider.requiresApiKey !== false) {
-                var keySlot = provider.secretKey || provider.configKey;
-                var key = secrets.getKey(keySlot);
-                if (key) {
-                    provider.backend.setApiKey(key);
-                }
-            }
+            loadProviderApiKey(provider.configKey,
+                               reason === undefined ? scheduler.refreshStartup : reason,
+                               shouldRefresh === true);
         }
 
         loadIntegrationSecrets();
-
-        scheduler.refreshAll();
         syncMetricsPayload();
     }
 
@@ -109,10 +122,10 @@ Item {
         }
 
         var lines = [];
-        var apiSpend = 0;
-        var apiSpendToday = 0;
-        var apiSpendMonth = 0;
-        var estimatedBurn = 0;
+        var apiSpend = {};
+        var apiSpendToday = {};
+        var apiSpendMonth = {};
+        var estimatedBurn = {};
         var subscriptionFees = 0;
         var providers = registry.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
@@ -143,11 +156,12 @@ Item {
             lines.push("ai_usage_provider_rate_limit_tokens_remaining{provider=\"" + providerKey + "\"} " + (backend.rateLimitTokensRemaining || 0));
             lines.push("ai_usage_provider_last_refresh_seconds{provider=\"" + providerKey + "\"} " + (backend.lastRefreshed ? Date.parse(backend.lastRefreshed) / 1000 : 0));
             if (backend.costSource === "billing_api" || backend.costSource === "actual_api") {
-                apiSpend += backend.cost || 0;
-                apiSpendToday += backend.dailyCost || 0;
-                apiSpendMonth += backend.monthlyCost || 0;
+                addCurrencyValue(apiSpend, currency, backend.cost || 0);
+                addCurrencyValue(apiSpendToday, currency, backend.dailyCost || 0);
+                addCurrencyValue(apiSpendMonth, currency, backend.monthlyCost || 0);
             } else if (backend.costSource === "estimated_from_usage" || backend.isEstimatedCost) {
-                estimatedBurn += backend.estimatedMonthlyCost || backend.monthlyCost || backend.cost || 0;
+                addCurrencyValue(estimatedBurn, currency,
+                                 backend.estimatedMonthlyCost || backend.monthlyCost || backend.cost || 0);
             }
         }
 
@@ -169,18 +183,45 @@ Item {
             }
         }
 
-        lines.push("ai_usage_api_spend{period=\"current\",currency=\"USD\"} " + apiSpend);
-        lines.push("ai_usage_api_spend{period=\"today\",currency=\"USD\"} " + apiSpendToday);
-        lines.push("ai_usage_api_spend{period=\"month\",currency=\"USD\"} " + apiSpendMonth);
+        appendCurrencyMetrics(lines, "ai_usage_api_spend", "period=\"current\"", apiSpend);
+        appendCurrencyMetrics(lines, "ai_usage_api_spend", "period=\"today\"", apiSpendToday);
+        appendCurrencyMetrics(lines, "ai_usage_api_spend", "period=\"month\"", apiSpendMonth);
         lines.push("ai_usage_subscription_fees{period=\"month\",currency=\"USD\",cost_source=\"self_tracked\"} " + subscriptionFees);
-        lines.push("ai_usage_estimated_burn{period=\"month\",currency=\"USD\",cost_source=\"estimated_from_usage\"} " + estimatedBurn);
-        lines.push("ai_usage_total_monthly_exposure{currency=\"USD\"} " + (apiSpendMonth + subscriptionFees + estimatedBurn));
+        appendCurrencyMetrics(lines, "ai_usage_estimated_burn",
+                              "period=\"month\",cost_source=\"estimated_from_usage\"", estimatedBurn);
+
+        var exposure = {};
+        mergeCurrencyValues(exposure, apiSpendMonth);
+        mergeCurrencyValues(exposure, estimatedBurn);
+        addCurrencyValue(exposure, "USD", subscriptionFees);
+        appendCurrencyMetrics(lines, "ai_usage_total_monthly_exposure", "", exposure);
 
         metricsServer.payload = lines.join("\n") + "\n";
     }
 
     function labelValue(value) {
         return (value || "").toString().replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+    }
+
+    function addCurrencyValue(totals, currency, value) {
+        var code = labelValue(currency || "USD").toUpperCase();
+        totals[code] = (totals[code] || 0) + Number(value || 0);
+    }
+
+    function mergeCurrencyValues(target, source) {
+        var currencies = Object.keys(source || {});
+        for (var i = 0; i < currencies.length; i++) {
+            addCurrencyValue(target, currencies[i], source[currencies[i]]);
+        }
+    }
+
+    function appendCurrencyMetrics(lines, metric, extraLabels, totals) {
+        var currencies = Object.keys(totals || {}).sort();
+        for (var i = 0; i < currencies.length; i++) {
+            var prefix = extraLabels ? extraLabels + "," : "";
+            lines.push(metric + "{" + prefix + "currency=\"" + currencies[i] + "\"} "
+                       + totals[currencies[i]]);
+        }
     }
 
     function providerRateLimitPercent(backend) {
@@ -271,8 +312,7 @@ Item {
 
         function onWalletOpenChanged() {
             if (runtime.secrets.walletOpen) {
-                runtime.loadApiKeys();
-                runtime.loadIntegrationSecrets();
+                runtime.loadApiKeys(runtime.scheduler.refreshCredentialChanged, true);
             }
         }
 
@@ -283,6 +323,29 @@ Item {
                     || provider === "slack_webhook_url"
                     || provider === "discord_webhook_url") {
                 runtime.loadIntegrationSecrets();
+                return;
+            }
+            var providers = runtime.registry.allProviders || [];
+            for (var i = 0; i < providers.length; i++) {
+                var descriptor = providers[i];
+                if ((descriptor.secretKey || descriptor.configKey) === provider) {
+                    runtime.loadProviderApiKey(descriptor.configKey,
+                                               runtime.scheduler.refreshCredentialChanged,
+                                               true);
+                    return;
+                }
+            }
+        }
+
+        function onKeyRemoved(provider) {
+            var providers = runtime.registry.allProviders || [];
+            for (var i = 0; i < providers.length; i++) {
+                var descriptor = providers[i];
+                if ((descriptor.secretKey || descriptor.configKey) === provider) {
+                    descriptor.backend.cancelRefresh();
+                    descriptor.backend.setApiKey("");
+                    return;
+                }
             }
         }
     }
@@ -290,20 +353,24 @@ Item {
     Connections {
         target: runtime.configuration
 
-        function onOpenaiEnabledChanged() { runtime.loadApiKeys(); }
-        function onAnthropicEnabledChanged() { runtime.loadApiKeys(); }
-        function onGoogleEnabledChanged() { runtime.loadApiKeys(); }
-        function onMistralEnabledChanged() { runtime.loadApiKeys(); }
-        function onDeepseekEnabledChanged() { runtime.loadApiKeys(); }
-        function onGroqEnabledChanged() { runtime.loadApiKeys(); }
-        function onXaiEnabledChanged() { runtime.loadApiKeys(); }
-        function onOllamaEnabledChanged() { runtime.loadApiKeys(); }
-        function onOpenrouterEnabledChanged() { runtime.loadApiKeys(); }
-        function onTogetherEnabledChanged() { runtime.loadApiKeys(); }
-        function onCohereEnabledChanged() { runtime.loadApiKeys(); }
-        function onGoogleveoEnabledChanged() { runtime.loadApiKeys(); }
-        function onAzureEnabledChanged() { runtime.loadApiKeys(); }
-        function onBedrockEnabledChanged() { runtime.loadApiKeys(); }
+        function providerEnabledChanged(configKey) {
+            runtime.loadProviderApiKey(configKey, runtime.scheduler.refreshConfigurationChanged, true);
+        }
+
+        function onOpenaiEnabledChanged() { providerEnabledChanged("openai"); }
+        function onAnthropicEnabledChanged() { providerEnabledChanged("anthropic"); }
+        function onGoogleEnabledChanged() { providerEnabledChanged("google"); }
+        function onMistralEnabledChanged() { providerEnabledChanged("mistral"); }
+        function onDeepseekEnabledChanged() { providerEnabledChanged("deepseek"); }
+        function onGroqEnabledChanged() { providerEnabledChanged("groq"); }
+        function onXaiEnabledChanged() { providerEnabledChanged("xai"); }
+        function onOllamaEnabledChanged() { providerEnabledChanged("ollama"); }
+        function onOpenrouterEnabledChanged() { providerEnabledChanged("openrouter"); }
+        function onTogetherEnabledChanged() { providerEnabledChanged("together"); }
+        function onCohereEnabledChanged() { providerEnabledChanged("cohere"); }
+        function onGoogleveoEnabledChanged() { providerEnabledChanged("googleveo"); }
+        function onAzureEnabledChanged() { providerEnabledChanged("azure"); }
+        function onBedrockEnabledChanged() { providerEnabledChanged("bedrock"); }
 
         function onClaudeCodeEnabledChanged() {
             if (runtime.claudeCodeMonitor.enabled) {
@@ -356,9 +423,10 @@ Item {
         repeat: false
         onTriggered: {
             if (runtime.secrets.walletOpen) {
-                runtime.loadApiKeys();
+                runtime.loadApiKeys(runtime.scheduler.refreshStartup, false);
+                runtime.scheduler.refreshAll(runtime.scheduler.refreshStartup);
             } else {
-                runtime.scheduler.refreshAll();
+                runtime.scheduler.refreshAll(runtime.scheduler.refreshStartup);
             }
         }
     }
@@ -377,11 +445,4 @@ Item {
         onTriggered: runtime.scheduler.performBrowserSync()
     }
 
-    Timer {
-        id: integrationSecretReloadTimer
-        interval: 5000
-        running: runtime.secrets && runtime.secrets.walletOpen
-        repeat: true
-        onTriggered: runtime.loadIntegrationSecrets()
-    }
 }

@@ -37,7 +37,7 @@ public:
     QString tier() const;
     void setTier(const QString &tier);
 
-    Q_INVOKABLE void refresh() override;
+    void refreshImpl() override;
 
 Q_SIGNALS:
     void modelChanged();

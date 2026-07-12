@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        11.0.0
+Version:        12.0.0
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
 License:        GPL-3.0-or-later
@@ -72,6 +72,9 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Mon Jul 13 2026 Loofi <loofi@github.com> - 12.0.0-1
+- Begin Reliability Core: deterministic refresh, typed provider state, and currency-aware history
+
 * Tue Jun 30 2026 Loofi <loofi@github.com> - 11.0.0-1
 - Ship Distribution & Catalog Truth with provider/subscription catalogs reviewed on 2026-06-30
 - Make the COPR RPM path the primary Fedora install route and document install/update/remove validation

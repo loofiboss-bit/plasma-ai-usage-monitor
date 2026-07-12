@@ -35,7 +35,7 @@ public:
     QString model() const;
     void setModel(const QString &model);
 
-    Q_INVOKABLE void refresh() override;
+    void refreshImpl() override;
 
 Q_SIGNALS:
     void projectIdChanged();

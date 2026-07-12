@@ -17,12 +17,18 @@ bool SecretsManager::isWalletOpen() const
     return m_walletOpen;
 }
 
+int SecretsManager::secretReadCount() const
+{
+    return m_secretReadCount;
+}
+
 void SecretsManager::retryOpenWallet()
 {
     delete m_wallet;
     m_wallet = nullptr;
     if (m_walletOpen) {
         m_walletOpen = false;
+        m_secretCache.clear();
         Q_EMIT walletOpenChanged();
     }
     openWallet();
@@ -58,6 +64,7 @@ void SecretsManager::onWalletOpened(bool success)
     }
 
     ensureFolder();
+    warmCache();
 
     // Process any pending operations
     for (const auto &op : std::as_const(m_pendingOps)) {
@@ -71,6 +78,23 @@ void SecretsManager::onWalletOpened(bool success)
         }
     }
     m_pendingOps.clear();
+}
+
+void SecretsManager::warmCache()
+{
+    if (!ensureFolder()) {
+        return;
+    }
+    const QStringList entries = m_wallet->entryList();
+    for (const QString &entry : entries) {
+        QString value;
+        if (m_wallet->readPassword(entry, value) == 0) {
+            m_secretCache.insert(entry, value);
+            ++m_secretReadCount;
+            Q_EMIT secretAvailabilityChanged(entry, !value.isEmpty());
+        }
+    }
+    Q_EMIT diagnosticsChanged();
 }
 
 bool SecretsManager::ensureFolder()
@@ -99,7 +123,9 @@ void SecretsManager::storeKey(const QString &provider, const QString &key)
 
     int result = m_wallet->writePassword(provider, key);
     if (result == 0) {
+        m_secretCache.insert(provider, key);
         Q_EMIT keyStored(provider);
+        Q_EMIT secretAvailabilityChanged(provider, !key.isEmpty());
     } else {
         qWarning() << "AI Usage Monitor: Failed to store key for" << provider;
         Q_EMIT error(QStringLiteral("Failed to store key for %1").arg(provider));
@@ -112,12 +138,21 @@ QString SecretsManager::getKey(const QString &provider)
         return QString();
     }
 
+    const auto cached = m_secretCache.constFind(provider);
+    if (cached != m_secretCache.cend()) {
+        return cached.value();
+    }
+
     QString password;
     int result = m_wallet->readPassword(provider, password);
     if (result != 0) {
         qWarning() << "AI Usage Monitor: Failed to read key for" << provider;
         return QString();
     }
+    m_secretCache.insert(provider, password);
+    ++m_secretReadCount;
+    Q_EMIT diagnosticsChanged();
+    Q_EMIT secretAvailabilityChanged(provider, !password.isEmpty());
     return password;
 }
 
@@ -132,7 +167,9 @@ void SecretsManager::removeKey(const QString &provider)
 
     int result = m_wallet->removeEntry(provider);
     if (result == 0) {
+        m_secretCache.remove(provider);
         Q_EMIT keyRemoved(provider);
+        Q_EMIT secretAvailabilityChanged(provider, false);
     } else {
         qWarning() << "AI Usage Monitor: Failed to remove key for" << provider;
         Q_EMIT error(QStringLiteral("Failed to remove key for %1").arg(provider));
@@ -143,6 +180,9 @@ bool SecretsManager::hasKey(const QString &provider)
 {
     if (!m_walletOpen || !ensureFolder()) {
         return false;
+    }
+    if (m_secretCache.contains(provider)) {
+        return !m_secretCache.value(provider).isEmpty();
     }
     return m_wallet->hasEntry(provider);
 }

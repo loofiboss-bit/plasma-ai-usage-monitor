@@ -123,6 +123,18 @@ public:
                                        const QDateTime &from,
                                        const QDateTime &to) const;
 
+    Q_INVOKABLE void requestHistory(const QString &requestId,
+                                    const QString &provider,
+                                    const QDateTime &from,
+                                    const QDateTime &to);
+    Q_INVOKABLE void requestComparison(const QString &requestId,
+                                       const QStringList &names,
+                                       const QDateTime &from,
+                                       const QDateTime &to,
+                                       const QString &source,
+                                       const QString &metric,
+                                       int bucketMinutes = 60);
+
     /**
      * Get all providers that have recorded data.
      */
@@ -189,6 +201,9 @@ public:
      */
     Q_INVOKABLE QStringList exportAllToDirectory(const QString &dirPath,
                                                  const QStringList &formats) const;
+    Q_INVOKABLE void requestExportAll(const QString &requestId,
+                                      const QString &dirPath,
+                                      const QStringList &formats);
 
     /**
      * Remove data older than retentionDays.
@@ -209,10 +224,24 @@ public:
 Q_SIGNALS:
     void enabledChanged();
     void retentionDaysChanged();
+    void historyReady(const QString &requestId, const QVariantMap &payload);
+    void comparisonReady(const QString &requestId, const QVariantList &series);
+    void exportFinished(const QString &requestId, const QStringList &paths);
 
 private:
     void initDatabase();
     void createTables();
+    bool migrateToObservationSchemaV3();
+    bool recordObservations(const QString &provider,
+                            const QString &model,
+                            qint64 inputTokens,
+                            qint64 outputTokens,
+                            int requestCount,
+                            double cost,
+                            const QString &currency,
+                            const QString &costSource,
+                            const QString &usageSource,
+                            const QString &dataQuality);
     void ensureColumnExists(const QString &table,
                             const QString &column,
                             const QString &definition);
@@ -228,7 +257,7 @@ private:
     // Write throttling: minimum 60 seconds between writes per provider
     static constexpr int WRITE_THROTTLE_SECS = 60;
     QHash<QString, qint64> m_lastWriteTime; // provider -> epoch seconds
-    QHash<QString, double> m_lastWrittenCost; // provider -> last cost to detect changes
+    QHash<QString, QByteArray> m_lastWrittenState; // complete normalized provider state
 };
 
 #endif // USAGEDATABASE_H

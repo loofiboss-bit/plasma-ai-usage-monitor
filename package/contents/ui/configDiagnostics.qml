@@ -10,7 +10,7 @@ KCM.SimpleKCM {
     id: diagnosticsPage
 
     SecretsManager { id: secrets }
-    BrowserCookieExtractor { id: syncDetector }
+    BrowserSyncService { id: syncDetector }
     ProviderCatalog { id: providerCatalog }
     ClipboardHelper { id: clipboard }
 
@@ -147,7 +147,7 @@ KCM.SimpleKCM {
             QQC2.Button {
                 text: i18n("Review provider catalog")
                 icon.name: "document-open"
-                onClicked: Qt.openUrlExternally(Qt.resolvedUrl("../catalog/providers-v3.json"))
+                onClicked: Qt.openUrlExternally(Qt.resolvedUrl("../catalog/providers-v4.json"))
             }
         }
 

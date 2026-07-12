@@ -19,7 +19,7 @@ class LocalIntegrationsTest : public QObject
 private Q_SLOTS:
     void metricsServerResponds();
     void usageDatabaseExportsFiles();
-    void webhookNotifierPostsToLocalEndpoints();
+    void webhookNotifierRejectsInsecureEndpoints();
     void awsSigV4SignerShapesHeaders();
 };
 
@@ -42,6 +42,23 @@ void LocalIntegrationsTest::metricsServerResponds()
     QVERIFY(response.contains("HTTP/1.1 200 OK"));
     QVERIFY(response.contains("Content-Type: text/plain; version=0.0.4"));
     QVERIFY(response.contains("test_metric 1"));
+
+    auto request = [](const QByteArray &payload) {
+        QTcpSocket client;
+        client.connectToHost(QHostAddress::LocalHost, 19464);
+        if (!client.waitForConnected()) return QByteArray();
+        client.write(payload);
+        client.waitForBytesWritten();
+        for (int i = 0; i < 30 && client.bytesAvailable() == 0; ++i) {
+            QTest::qWait(10);
+        }
+        return client.readAll();
+    };
+    const QByteArray head = request("HEAD /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n");
+    QVERIFY(head.contains("HTTP/1.1 200 OK"));
+    QVERIFY(!head.contains("test_metric 1"));
+    QVERIFY(request("GET /missing HTTP/1.1\r\nHost: localhost\r\n\r\n").contains("404 Not Found"));
+    QVERIFY(request("POST /metrics HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n").contains("405 Method Not Allowed"));
 }
 
 void LocalIntegrationsTest::usageDatabaseExportsFiles()
@@ -62,7 +79,7 @@ void LocalIntegrationsTest::usageDatabaseExportsFiles()
     }
 }
 
-void LocalIntegrationsTest::webhookNotifierPostsToLocalEndpoints()
+void LocalIntegrationsTest::webhookNotifierRejectsInsecureEndpoints()
 {
     QTcpServer server;
     QVERIFY(server.listen(QHostAddress::LocalHost, 0));
@@ -74,22 +91,11 @@ void LocalIntegrationsTest::webhookNotifierPostsToLocalEndpoints()
     notifier.setSlackWebhookUrl(QStringLiteral("http://127.0.0.1:%1/slack").arg(port));
     notifier.setDiscordWebhookUrl(QStringLiteral("http://127.0.0.1:%1/discord").arg(port));
     notifier.setCooldownMinutes(1);
+    QSignalSpy failureSpy(&notifier, &WebhookNotifier::deliveryFailed);
     notifier.sendAlert(QStringLiteral("budget"), QStringLiteral("Budget warning"), QStringLiteral("Threshold reached"), true);
-
-    QByteArray receivedBodies;
-    for (int i = 0; i < 2; ++i) {
-        QTRY_VERIFY_WITH_TIMEOUT(server.hasPendingConnections(), 3000);
-        QTcpSocket *socket = server.nextPendingConnection();
-        QVERIFY(socket != nullptr);
-        QTRY_VERIFY_WITH_TIMEOUT(socket->bytesAvailable() > 0, 3000);
-        receivedBodies += socket->readAll();
-        socket->write("HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n");
-        socket->disconnectFromHost();
-        socket->deleteLater();
-    }
-
-    QVERIFY(receivedBodies.contains("Budget warning"));
-    QVERIFY(receivedBodies.contains("Threshold reached"));
+    QCOMPARE(failureSpy.count(), 2);
+    QVERIFY(!server.hasPendingConnections());
+    QVERIFY(failureSpy.first().at(1).toString().contains(QStringLiteral("HTTPS")));
 }
 
 void LocalIntegrationsTest::awsSigV4SignerShapesHeaders()

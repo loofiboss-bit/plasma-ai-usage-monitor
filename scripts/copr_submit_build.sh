@@ -6,6 +6,7 @@ cd "$ROOT_DIR"
 
 PROJECT=""
 OUTPUT_DIR="${ROOT_DIR}/dist"
+TAG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -17,6 +18,10 @@ while [[ $# -gt 0 ]]; do
       OUTPUT_DIR="${2:-}"
       shift 2
       ;;
+    --tag)
+      TAG="${2:-}"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1" >&2
       exit 1
@@ -25,9 +30,15 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$PROJECT" ]]; then
-  echo "Usage: $0 --project <owner/project> [--output-dir <dir>]" >&2
+  echo "Usage: $0 --project <owner/project> --tag vX.Y.Z [--output-dir <dir>]" >&2
   exit 1
 fi
+
+if [[ -z "$TAG" ]]; then
+  echo "COPR release builds require --tag vX.Y.Z" >&2
+  exit 1
+fi
+bash "$ROOT_DIR/scripts/verify_exact_tag.sh" "$TAG"
 
 if ! command -v copr-cli >/dev/null 2>&1; then
   echo "copr-cli is not installed. Install it first, then rerun this command." >&2
@@ -41,7 +52,7 @@ if [[ ! -f "${HOME}/.config/copr" ]]; then
 fi
 
 mkdir -p "$OUTPUT_DIR"
-bash "${ROOT_DIR}/scripts/build_srpm.sh" --output-dir "$OUTPUT_DIR"
+bash "${ROOT_DIR}/scripts/build_srpm.sh" --output-dir "$OUTPUT_DIR" --tag "$TAG"
 
 SRPM_PATH="$(find "$OUTPUT_DIR" -maxdepth 1 -name '*.src.rpm' | sort | tail -n 1)"
 

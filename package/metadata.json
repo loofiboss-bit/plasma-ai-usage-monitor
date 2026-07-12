@@ -1,22 +1,23 @@
 {
-    "KPlugin": {
-        "Authors": [
-            {
-                "Email": "loofi@github.com",
-                "Name": "Loofi"
-            }
-        ],
-        "Category": "System Information",
-        "Copyright": "© 2025-2026 Loofi",
-        "Description": "Monitor AI API token usage, rate limits, costs, and budgets across multiple providers",
-        "Icon": "com.github.loofi.aiusagemonitor",
-        "Id": "com.github.loofi.aiusagemonitor",
-        "License": "GPL-3.0-or-later",
-        "Name": "AI Usage Monitor",
-        "Version": "11.0.0",
-        "Website": "https://github.com/loofiboss-bit/plasma-ai-usage-monitor",
-        "BugReportUrl": "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues"
-    },
-    "X-Plasma-API-Minimum-Version": "6.0",
-    "KPackageStructure": "Plasma/Applet"
+  "KPlugin": {
+    "Authors": [
+      {
+        "Email": "loofi@github.com",
+        "Name": "Loofi"
+      }
+    ],
+    "Category": "System Information",
+    "Copyright": "© 2025-2026 Loofi",
+    "Description": "Monitor AI API token usage, rate limits, costs, and budgets across multiple providers",
+    "Icon": "com.github.loofi.aiusagemonitor",
+    "Id": "com.github.loofi.aiusagemonitor",
+    "License": "GPL-3.0-or-later",
+    "Name": "AI Usage Monitor",
+    "Version": "12.0.0",
+    "Website": "https://github.com/loofiboss-bit/plasma-ai-usage-monitor",
+    "BugReportUrl": "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues"
+  },
+  "X-Plasma-API-Minimum-Version": "6.0",
+  "KPackageStructure": "Plasma/Applet",
+  "X-AIUsageMonitor-RequiredPluginVersion": "12.0.0"
 }

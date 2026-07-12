@@ -6,7 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / "package/contents/config/main.xml"
-CATALOG = ROOT / "package/contents/catalog/providers-v3.json"
+CATALOG = ROOT / "package/contents/catalog/providers-v4.json"
 NS = {"k": "http://www.kde.org/standards/kcfg/1.0"}
 
 MODEL_KEYS = {
@@ -85,7 +85,7 @@ def main() -> None:
 
         if model_id not in provider_models:
             fail(
-                f"{config_key} default '{model_id}' is not in providers-v3.json "
+                f"{config_key} default '{model_id}' is not in providers-v4.json "
                 f"provider '{provider_key}'"
             )
 

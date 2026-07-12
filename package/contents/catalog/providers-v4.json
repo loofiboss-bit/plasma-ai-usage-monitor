@@ -1,8 +1,8 @@
 {
-  "schemaVersion": 3,
-  "catalogVersion": "2026.06.30",
-  "release": "11.0.0",
-  "lastReviewed": "2026-06-30",
+  "schemaVersion": 4,
+  "catalogVersion": "2026.07.13",
+  "release": "12.0.0",
+  "lastReviewed": "2026-07-13",
   "runtimeScraping": false,
   "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries were re-reviewed on 2026-06-30; manual-review flags remain visible when exact pricing or lifecycle state cannot be represented safely.",
   "providers": [
@@ -40,7 +40,10 @@
               "url": "https://platform.openai.com/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "gpt-5.4",
@@ -68,7 +71,10 @@
               "url": "https://platform.openai.com/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "gpt-5.4-mini",
@@ -96,7 +102,10 @@
               "url": "https://platform.openai.com/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "gpt-5.4-nano",
@@ -124,9 +133,50 @@
               "url": "https://platform.openai.com/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
-      ]
+      ],
+      "stableId": "openai",
+      "displayName": "OpenAI",
+      "dbName": "OpenAI",
+      "icon": "openai",
+      "colorToken": "#10A37F",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "openai"
+        ]
+      },
+      "endpoint": {
+        "default": "https://api.openai.com/v1",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "openai",
+        "enabled": "openaiEnabled",
+        "model": "openaiModel",
+        "refreshInterval": "openaiRefreshInterval",
+        "notifications": "openaiNotificationsEnabled",
+        "dailyBudget": "openaiDailyBudget",
+        "monthlyBudget": "openaiMonthlyBudget"
+      }
     },
     {
       "key": "anthropic",
@@ -156,7 +206,10 @@
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "claude-sonnet-4.8",
@@ -177,7 +230,10 @@
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "claude-sonnet-4-20250514",
@@ -198,7 +254,10 @@
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "claude-haiku-4-20250514",
@@ -219,7 +278,10 @@
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "claude-opus-4.8",
@@ -241,7 +303,10 @@
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "claude-sonnet-4.6",
@@ -263,7 +328,10 @@
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "claude-sonnet-4.5",
@@ -285,7 +353,10 @@
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "claude-haiku-4.5",
@@ -307,10 +378,51 @@
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed official Anthropic pricing on 2026-06-30; kept manual review because current and legacy Claude model IDs coexist and data-residency/fast-mode modifiers are not represented in the local flat token table."
+      "reviewReason": "Reviewed official Anthropic pricing on 2026-06-30; kept manual review because current and legacy Claude model IDs coexist and data-residency/fast-mode modifiers are not represented in the local flat token table.",
+      "stableId": "anthropic",
+      "displayName": "Anthropic",
+      "dbName": "Anthropic",
+      "icon": "anthropic",
+      "colorToken": "#D4A574",
+      "auth": {
+        "scheme": "x-api-key",
+        "credentialSlots": [
+          "anthropic"
+        ]
+      },
+      "endpoint": {
+        "default": "https://api.anthropic.com/v1",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "anthropic",
+        "enabled": "anthropicEnabled",
+        "model": "anthropicModel",
+        "refreshInterval": "anthropicRefreshInterval",
+        "notifications": "anthropicNotificationsEnabled",
+        "dailyBudget": "anthropicDailyBudget",
+        "monthlyBudget": "anthropicMonthlyBudget"
+      }
     },
     {
       "key": "google",
@@ -339,7 +451,10 @@
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "gemini-2.5-pro",
@@ -360,7 +475,10 @@
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "gemini-2.5-flash",
@@ -381,7 +499,10 @@
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "gemini-2.0-flash",
@@ -402,10 +523,51 @@
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed Google AI pricing on 2026-06-30; kept manual review because Gemini and Veo pricing varies by model, tier, media unit, and API surface."
+      "reviewReason": "Reviewed Google AI pricing on 2026-06-30; kept manual review because Gemini and Veo pricing varies by model, tier, media unit, and API surface.",
+      "stableId": "google",
+      "displayName": "Google Gemini",
+      "dbName": "Google",
+      "icon": "google",
+      "colorToken": "#4285F4",
+      "auth": {
+        "scheme": "query-key",
+        "credentialSlots": [
+          "google"
+        ]
+      },
+      "endpoint": {
+        "default": "https://generativelanguage.googleapis.com/v1beta",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "google",
+        "enabled": "googleEnabled",
+        "model": "googleModel",
+        "refreshInterval": "googleRefreshInterval",
+        "notifications": "googleNotificationsEnabled",
+        "dailyBudget": "googleDailyBudget",
+        "monthlyBudget": "googleMonthlyBudget"
+      }
     },
     {
       "key": "mistral",
@@ -434,7 +596,10 @@
               "url": "https://mistral.ai/products/la-plateforme#pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "mistral-large-latest",
@@ -455,7 +620,10 @@
               "url": "https://mistral.ai/products/la-plateforme#pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "mistral-medium",
@@ -476,7 +644,10 @@
               "url": "https://mistral.ai/products/la-plateforme#pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "mistral-small",
@@ -497,10 +668,51 @@
               "url": "https://mistral.ai/products/la-plateforme#pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed Mistral pricing on 2026-06-30; kept manual review because model aliases and current La Plateforme pricing need provider-by-provider reconciliation before exact labels are safe."
+      "reviewReason": "Reviewed Mistral pricing on 2026-06-30; kept manual review because model aliases and current La Plateforme pricing need provider-by-provider reconciliation before exact labels are safe.",
+      "stableId": "mistral",
+      "displayName": "Mistral AI",
+      "dbName": "Mistral",
+      "icon": "mistral",
+      "colorToken": "#FF7000",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "mistral"
+        ]
+      },
+      "endpoint": {
+        "default": "https://api.mistral.ai/v1",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "mistral",
+        "enabled": "mistralEnabled",
+        "model": "mistralModel",
+        "refreshInterval": "mistralRefreshInterval",
+        "notifications": "mistralNotificationsEnabled",
+        "dailyBudget": "mistralDailyBudget",
+        "monthlyBudget": "mistralMonthlyBudget"
+      }
     },
     {
       "key": "deepseek",
@@ -537,7 +749,7 @@
             "sourceQuality": "official"
           },
           "lifecycle": {
-            "status": "current",
+            "status": "active",
             "concurrencyLimit": 2500
           }
         },
@@ -568,7 +780,7 @@
             "sourceQuality": "official"
           },
           "lifecycle": {
-            "status": "current",
+            "status": "active",
             "concurrencyLimit": 500
           }
         },
@@ -594,9 +806,11 @@
             }
           ],
           "lifecycle": {
-            "status": "deprecated_on_2026-07-24",
+            "status": "deprecated",
             "replacement": "deepseek-v4-flash non-thinking mode",
-            "notes": "DeepSeek says this compatibility alias will be deprecated on 2026-07-24 15:59 UTC."
+            "notes": "DeepSeek says this compatibility alias will be deprecated on 2026-07-24 15:59 UTC.",
+            "deprecationDate": "2026-07-24",
+            "replacementId": "deepseek-v4-flash"
           }
         },
         {
@@ -621,13 +835,53 @@
             }
           ],
           "lifecycle": {
-            "status": "deprecated_on_2026-07-24",
+            "status": "deprecated",
             "replacement": "deepseek-v4-flash thinking mode",
-            "notes": "DeepSeek says this compatibility alias will be deprecated on 2026-07-24 15:59 UTC."
+            "notes": "DeepSeek says this compatibility alias will be deprecated on 2026-07-24 15:59 UTC.",
+            "deprecationDate": "2026-07-24",
+            "replacementId": "deepseek-v4-flash"
           }
         }
       ],
-      "reviewReason": "Reviewed DeepSeek pricing on 2026-06-30; kept manual review because official input pricing distinguishes cache-hit and cache-miss rates while the local pricing table stores one cachedInput and one input value."
+      "reviewReason": "Reviewed DeepSeek pricing on 2026-06-30; kept manual review because official input pricing distinguishes cache-hit and cache-miss rates while the local pricing table stores one cachedInput and one input value.",
+      "stableId": "deepseek",
+      "displayName": "DeepSeek",
+      "dbName": "DeepSeek",
+      "icon": "deepseek",
+      "colorToken": "#5B6EE1",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "deepseek"
+        ]
+      },
+      "endpoint": {
+        "default": "https://api.deepseek.com/v1",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "deepseek",
+        "enabled": "deepseekEnabled",
+        "model": "deepseekModel",
+        "refreshInterval": "deepseekRefreshInterval",
+        "notifications": "deepseekNotificationsEnabled",
+        "dailyBudget": "deepseekDailyBudget",
+        "monthlyBudget": "deepseekMonthlyBudget"
+      }
     },
     {
       "key": "groq",
@@ -656,7 +910,10 @@
               "url": "https://console.groq.com/docs/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "gemma-4-31b-it",
@@ -677,10 +934,51 @@
               "url": "https://console.groq.com/docs/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed Groq model/pricing docs on 2026-06-30; kept manual review because Groq model availability and pricing are model-specific and can change independently of the widget release."
+      "reviewReason": "Reviewed Groq model/pricing docs on 2026-06-30; kept manual review because Groq model availability and pricing are model-specific and can change independently of the widget release.",
+      "stableId": "groq",
+      "displayName": "Groq",
+      "dbName": "Groq",
+      "icon": "groq",
+      "colorToken": "#F55036",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "groq"
+        ]
+      },
+      "endpoint": {
+        "default": "https://api.groq.com/openai/v1",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "groq",
+        "enabled": "groqEnabled",
+        "model": "groqModel",
+        "refreshInterval": "groqRefreshInterval",
+        "notifications": "groqNotificationsEnabled",
+        "dailyBudget": "groqDailyBudget",
+        "monthlyBudget": "groqMonthlyBudget"
+      }
     },
     {
       "key": "xai",
@@ -709,7 +1007,10 @@
               "url": "https://docs.x.ai/docs/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "grok-3-mini",
@@ -730,7 +1031,10 @@
               "url": "https://docs.x.ai/docs/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "grok-4",
@@ -751,7 +1055,10 @@
               "url": "https://docs.x.ai/docs/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "grok-4-fast",
@@ -772,10 +1079,51 @@
               "url": "https://docs.x.ai/docs/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed xAI model docs on 2026-06-30; kept manual review until Grok pricing and model-retirement state are reconciled against shipped defaults."
+      "reviewReason": "Reviewed xAI model docs on 2026-06-30; kept manual review until Grok pricing and model-retirement state are reconciled against shipped defaults.",
+      "stableId": "xai",
+      "displayName": "xAI / Grok",
+      "dbName": "xAI",
+      "icon": "xai",
+      "colorToken": "#1DA1F2",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "xai"
+        ]
+      },
+      "endpoint": {
+        "default": "https://api.x.ai/v1",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "xai",
+        "enabled": "xaiEnabled",
+        "model": "xaiModel",
+        "refreshInterval": "xaiRefreshInterval",
+        "notifications": "xaiNotificationsEnabled",
+        "dailyBudget": "xaiDailyBudget",
+        "monthlyBudget": "xaiMonthlyBudget"
+      }
     },
     {
       "key": "ollama",
@@ -804,10 +1152,51 @@
               "url": "https://ollama.com/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed Ollama Cloud pricing on 2026-06-30; no stable public unit pricing was confirmed for the shipped cloud model, so pricing remains unknown."
+      "reviewReason": "Reviewed Ollama Cloud pricing on 2026-06-30; no stable public unit pricing was confirmed for the shipped cloud model, so pricing remains unknown.",
+      "stableId": "ollama",
+      "displayName": "Ollama Cloud",
+      "dbName": "OllamaCloud",
+      "icon": "ollama",
+      "colorToken": "#111827",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "ollama"
+        ]
+      },
+      "endpoint": {
+        "default": "https://ollama.com/v1",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "ollama",
+        "enabled": "ollamaEnabled",
+        "model": "ollamaModel",
+        "refreshInterval": "ollamaRefreshInterval",
+        "notifications": "ollamaNotificationsEnabled",
+        "dailyBudget": "ollamaDailyBudget",
+        "monthlyBudget": "ollamaMonthlyBudget"
+      }
     },
     {
       "key": "openrouter",
@@ -837,7 +1226,10 @@
               "url": "https://openrouter.ai/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "openai/gpt-5.4-pro",
@@ -858,7 +1250,10 @@
               "url": "https://openrouter.ai/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "anthropic/claude-sonnet-4.8",
@@ -879,7 +1274,10 @@
               "url": "https://openrouter.ai/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "google/gemini-2.5-pro",
@@ -900,7 +1298,10 @@
               "url": "https://openrouter.ai/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "deepseek/deepseek-v4-flash",
@@ -922,7 +1323,10 @@
               "url": "https://openrouter.ai/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "deepseek/deepseek-v4-pro",
@@ -944,10 +1348,51 @@
               "url": "https://openrouter.ai/models",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed OpenRouter model catalog on 2026-06-30; kept manual review because prices are provider-routed and can vary by selected route/model provider."
+      "reviewReason": "Reviewed OpenRouter model catalog on 2026-06-30; kept manual review because prices are provider-routed and can vary by selected route/model provider.",
+      "stableId": "openrouter",
+      "displayName": "OpenRouter",
+      "dbName": "OpenRouter",
+      "icon": "openrouter",
+      "colorToken": "#6366F1",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "openrouter"
+        ]
+      },
+      "endpoint": {
+        "default": "https://openrouter.ai/api/v1",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "openrouter",
+        "enabled": "openrouterEnabled",
+        "model": "openrouterModel",
+        "refreshInterval": "openrouterRefreshInterval",
+        "notifications": "openrouterNotificationsEnabled",
+        "dailyBudget": "openrouterDailyBudget",
+        "monthlyBudget": "openrouterMonthlyBudget"
+      }
     },
     {
       "key": "together",
@@ -976,7 +1421,10 @@
               "url": "https://www.together.ai/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
@@ -997,10 +1445,51 @@
               "url": "https://www.together.ai/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed Together AI pricing on 2026-06-30; kept manual review because official pricing is model/category-specific and shipped aliases need reconciliation."
+      "reviewReason": "Reviewed Together AI pricing on 2026-06-30; kept manual review because official pricing is model/category-specific and shipped aliases need reconciliation.",
+      "stableId": "together",
+      "displayName": "Together AI",
+      "dbName": "Together",
+      "icon": "together",
+      "colorToken": "#0EA5E9",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "together"
+        ]
+      },
+      "endpoint": {
+        "default": "https://api.together.xyz/v1",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "together",
+        "enabled": "togetherEnabled",
+        "model": "togetherModel",
+        "refreshInterval": "togetherRefreshInterval",
+        "notifications": "togetherNotificationsEnabled",
+        "dailyBudget": "togetherDailyBudget",
+        "monthlyBudget": "togetherMonthlyBudget"
+      }
     },
     {
       "key": "cohere",
@@ -1029,7 +1518,10 @@
               "url": "https://cohere.com/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "command-r-plus",
@@ -1050,10 +1542,51 @@
               "url": "https://cohere.com/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed Cohere pricing on 2026-06-30; kept manual review because current Command model aliases and pricing tiers need reconciliation with shipped defaults."
+      "reviewReason": "Reviewed Cohere pricing on 2026-06-30; kept manual review because current Command model aliases and pricing tiers need reconciliation with shipped defaults.",
+      "stableId": "cohere",
+      "displayName": "Cohere",
+      "dbName": "Cohere",
+      "icon": "cohere",
+      "colorToken": "#39D353",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "cohere"
+        ]
+      },
+      "endpoint": {
+        "default": "https://api.cohere.com/v2",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "cohere",
+        "enabled": "cohereEnabled",
+        "model": "cohereModel",
+        "refreshInterval": "cohereRefreshInterval",
+        "notifications": "cohereNotificationsEnabled",
+        "dailyBudget": "cohereDailyBudget",
+        "monthlyBudget": "cohereMonthlyBudget"
+      }
     },
     {
       "key": "googleveo",
@@ -1081,7 +1614,10 @@
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "veo-2",
@@ -1101,10 +1637,51 @@
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed Google AI pricing on 2026-06-30; kept manual review because video-generation pricing depends on model, API/product surface, and unit semantics."
+      "reviewReason": "Reviewed Google AI pricing on 2026-06-30; kept manual review because video-generation pricing depends on model, API/product surface, and unit semantics.",
+      "stableId": "googleveo",
+      "displayName": "Google Veo",
+      "dbName": "GoogleVeo",
+      "icon": "googleveo",
+      "colorToken": "#EA4335",
+      "auth": {
+        "scheme": "query-key",
+        "credentialSlots": [
+          "googleveo"
+        ]
+      },
+      "endpoint": {
+        "default": "https://generativelanguage.googleapis.com/v1beta",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "googleveo",
+        "enabled": "googleveoEnabled",
+        "model": "googleveoModel",
+        "refreshInterval": "googleveoRefreshInterval",
+        "notifications": "googleveoNotificationsEnabled",
+        "dailyBudget": "googleveoDailyBudget",
+        "monthlyBudget": "googleveoMonthlyBudget"
+      }
     },
     {
       "key": "azure",
@@ -1134,7 +1711,10 @@
               "url": "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "gpt-5.4-pro",
@@ -1156,7 +1736,10 @@
               "url": "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         },
         {
           "id": "gpt-5.4-mini",
@@ -1178,10 +1761,51 @@
               "url": "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed Azure OpenAI pricing on 2026-06-30; kept manual review because Azure pricing varies by region, deployment type, and Azure model availability even when model names mirror OpenAI."
+      "reviewReason": "Reviewed Azure OpenAI pricing on 2026-06-30; kept manual review because Azure pricing varies by region, deployment type, and Azure model availability even when model names mirror OpenAI.",
+      "stableId": "azure",
+      "displayName": "Azure OpenAI",
+      "dbName": "AzureOpenAI",
+      "icon": "azure",
+      "colorToken": "#0078D4",
+      "auth": {
+        "scheme": "api-key",
+        "credentialSlots": [
+          "azure_openai_api_key"
+        ]
+      },
+      "endpoint": {
+        "default": "",
+        "customPolicy": "required"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "azure",
+        "enabled": "azureEnabled",
+        "model": "azureModel",
+        "refreshInterval": "azureRefreshInterval",
+        "notifications": "azureNotificationsEnabled",
+        "dailyBudget": "azureDailyBudget",
+        "monthlyBudget": "azureMonthlyBudget"
+      }
     },
     {
       "key": "bedrock",
@@ -1210,10 +1834,53 @@
               "url": "https://aws.amazon.com/bedrock/pricing/",
               "reviewedAt": "2026-06-30"
             }
-          ]
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
         }
       ],
-      "reviewReason": "Reviewed Amazon Bedrock pricing on 2026-06-30; kept manual review because Bedrock pricing is region, provider, and model specific."
+      "reviewReason": "Reviewed Amazon Bedrock pricing on 2026-06-30; kept manual review because Bedrock pricing is region, provider, and model specific.",
+      "stableId": "bedrock",
+      "displayName": "AWS Bedrock",
+      "dbName": "AWS Bedrock",
+      "icon": "bedrock",
+      "colorToken": "#FF9900",
+      "auth": {
+        "scheme": "aws-sigv4",
+        "credentialSlots": [
+          "bedrock_access_key_id",
+          "bedrock_secret_access_key",
+          "bedrock_session_token"
+        ]
+      },
+      "endpoint": {
+        "default": "https://bedrock-runtime.{region}.amazonaws.com",
+        "customPolicy": "allowed"
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "billing_api",
+        "usage_api",
+        "response_headers",
+        "estimate"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "config": {
+        "key": "bedrock",
+        "enabled": "bedrockEnabled",
+        "model": "bedrockModel",
+        "refreshInterval": "bedrockRefreshInterval",
+        "notifications": "bedrockNotificationsEnabled",
+        "dailyBudget": "bedrockDailyBudget",
+        "monthlyBudget": "bedrockMonthlyBudget"
+      }
     }
   ]
 }

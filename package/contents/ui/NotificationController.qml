@@ -1,5 +1,6 @@
 import QtQuick
 import org.kde.notification
+import "Utils.js" as Utils
 
 Item {
     id: notifications
@@ -143,7 +144,7 @@ Item {
         }
     }
 
-    function handleBudgetWarning(provider, period, spent, budget) {
+    function handleBudgetWarning(provider, period, spent, budget, currency) {
         if (!configuration.alertsEnabled
                 || !configuration.notifyOnBudgetWarning
                 || !registry.isProviderNotificationEnabled(provider)
@@ -151,12 +152,12 @@ Item {
             return;
         }
 
-        budgetNotification.text = i18n("%1: %2 budget at %3% — $%4 / $%5",
+        budgetNotification.text = i18n("%1: %2 budget at %3% — %4 / %5",
                                        provider,
                                        period,
                                        Math.round(spent / budget * 100),
-                                       spent.toFixed(2),
-                                       budget.toFixed(2));
+                                       Utils.formatMoney(spent, currency || "USD"),
+                                       Utils.formatMoney(budget, currency || "USD"));
         budgetNotification.urgency = Notification.NormalUrgency;
         budgetNotification.sendEvent();
         webhookNotifier.sendAlert("budgetwarn_" + provider + "_" + period,
@@ -165,7 +166,7 @@ Item {
                                   false);
     }
 
-    function handleBudgetExceeded(provider, period, spent, budget) {
+    function handleBudgetExceeded(provider, period, spent, budget, currency) {
         if (!configuration.alertsEnabled
                 || !configuration.notifyOnBudgetWarning
                 || !registry.isProviderNotificationEnabled(provider)
@@ -173,8 +174,10 @@ Item {
             return;
         }
 
-        budgetNotification.text = i18n("%1: %2 budget exceeded! $%3 / $%4",
-                                       provider, period, spent.toFixed(2), budget.toFixed(2));
+        budgetNotification.text = i18n("%1: %2 budget exceeded! %3 / %4",
+                                       provider, period,
+                                       Utils.formatMoney(spent, currency || "USD"),
+                                       Utils.formatMoney(budget, currency || "USD"));
         budgetNotification.urgency = Notification.CriticalUrgency;
         budgetNotification.sendEvent();
         webhookNotifier.sendAlert("budget_" + provider + "_" + period,

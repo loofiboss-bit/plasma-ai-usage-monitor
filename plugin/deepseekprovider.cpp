@@ -12,17 +12,17 @@ DeepSeekProvider::DeepSeekProvider(QObject *parent)
 
 double DeepSeekProvider::balance() const { return m_balance; }
 
-void DeepSeekProvider::refresh()
+void DeepSeekProvider::refreshImpl()
 {
     if (!hasApiKey()) {
-        setError(i18n("No API key configured"));
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
 
     // Call parent's refresh which sets loading, clears error,
     // resets pending count, and kicks off chat completion request
-    OpenAICompatibleProvider::refresh();
+    OpenAICompatibleProvider::refreshImpl();
 
     // Additionally fetch the balance (adds to pending count)
     fetchBalance();
@@ -52,7 +52,7 @@ void DeepSeekProvider::onBalanceReply(QNetworkReply *reply)
 
     if (reply->error() != QNetworkReply::NoError) {
         // Non-fatal: rate limit data may still be available
-        qWarning() << "AI Usage Monitor: DeepSeek balance API error:" << reply->errorString();
+        setNetworkError(reply, i18n("Balance API unavailable: %1", reply->errorString()));
         onAllRequestsDone();
         return;
     }

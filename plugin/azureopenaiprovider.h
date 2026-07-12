@@ -38,7 +38,7 @@ public:
     QString apiVersion() const;
     void setApiVersion(const QString &apiVersion);
 
-    Q_INVOKABLE void refresh() override;
+    void refreshImpl() override;
 
 Q_SIGNALS:
     void modelChanged();

@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import com.github.loofi.aiusagemonitor 1.0
 
 Item {
     id: scheduler
@@ -11,34 +12,32 @@ Item {
 
     required property var configuration
     required property var registry
-    required property var browserCookies
+    required property var browserSyncService
     required property var claudeCodeMonitor
     required property var codexCliMonitor
     required property var copilotMonitor
     required property var usageDatabase
     required property bool popupOpen
 
+    readonly property int refreshStartup: 0
+    readonly property int refreshScheduled: 1
+    readonly property int refreshPopupOpened: 2
+    readonly property int refreshManual: 3
+    readonly property int refreshConfigurationChanged: 4
+    readonly property int refreshCredentialChanged: 5
+
+    RefreshSchedulerModel { id: refreshPolicy }
+
     onPopupOpenChanged: {
         if (popupOpen) {
-            refreshAll();
+            refreshStaleProviders(refreshPopupOpened);
         }
     }
 
     function effectiveInterval(providerInterval) {
-        var seconds = providerInterval > 0 ? providerInterval : configuration.refreshInterval;
-        if (!popupOpen) {
-            seconds = Math.max(seconds * 4, 900);
-        }
-        return seconds * 1000;
-    }
-
-    function providerJitter(configKey) {
-        var text = configKey || "";
-        var hash = 0;
-        for (var i = 0; i < text.length; i++) {
-            hash = (hash + text.charCodeAt(i) * (i + 1)) % 997;
-        }
-        return hash * 37;
+        return refreshPolicy.effectiveIntervalMs(providerInterval || 0,
+                                                 configuration.refreshInterval || 60,
+                                                 popupOpen);
     }
 
     function backoffMultiplier(provider) {
@@ -49,35 +48,63 @@ Item {
         if (errors <= 0) {
             return 1;
         }
-        var errorText = (provider.backend.error || "").toString();
-        var terminalBackoff = errorText.indexOf("403") >= 0
-            || errorText.indexOf("429") >= 0
-            || errorText.toLowerCase().indexOf("network") >= 0;
-        return terminalBackoff ? Math.min(8, Math.pow(2, Math.min(errors, 3))) : Math.min(4, errors + 1);
+        return refreshPolicy.backoffMultiplier(errors, provider.backend.retryable);
     }
 
     function scheduledInterval(provider) {
-        return effectiveInterval(provider.refreshInterval || 0) * backoffMultiplier(provider)
-            + providerJitter(provider.configKey);
+        return refreshPolicy.scheduledIntervalMs(provider.configKey || "",
+                                                  provider.refreshInterval || 0,
+                                                  configuration.refreshInterval || 60,
+                                                  popupOpen,
+                                                  provider.backend?.consecutiveErrors || 0,
+                                                  provider.backend?.retryable || false);
+    }
+
+    function nextSchedule(provider, base) {
+        return refreshPolicy.nextScheduledRefresh(
+            base, provider.configKey || "", provider.refreshInterval || 0,
+            configuration.refreshInterval || 60, popupOpen,
+            provider.backend?.consecutiveErrors || 0,
+            provider.backend?.retryable || false);
     }
 
     function canRefreshBackend(backend, requiresApiKey) {
         return backend && (!requiresApiKey || backend.hasApiKey());
     }
 
-    function refreshProvider(provider) {
+    function isFresh(provider) {
+        if (!provider || !provider.backend || !provider.backend.lastSuccess) {
+            return false;
+        }
+        return refreshPolicy.isFresh(provider.backend.lastSuccess,
+                                     provider.refreshInterval || 0,
+                                     configuration.refreshInterval || 60,
+                                     popupOpen);
+    }
+
+    function refreshProvider(provider, reason, force) {
         if (!provider || !provider.enabled || !provider.backend) {
             return;
         }
+        if (!force && isFresh(provider)) {
+            return;
+        }
         if (canRefreshBackend(provider.backend, provider.requiresApiKey !== false)) {
-            provider.backend.refresh();
+            provider.backend.requestRefresh(reason === undefined ? refreshManual : reason);
         }
     }
 
-    function refreshAll() {
+    function refreshAll(reason) {
         var providers = registry.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
-            refreshProvider(providers[i]);
+            refreshProvider(providers[i], reason === undefined ? refreshManual : reason, true);
+        }
+    }
+
+    function refreshStaleProviders(reason) {
+        var providers = registry.allProviders || [];
+        for (var i = 0; i < providers.length; i++) {
+            refreshProvider(providers[i], reason, false);
         }
     }
 
@@ -87,13 +114,11 @@ Item {
         }
 
         if (configuration.claudeCodeEnabled && claudeCodeMonitor.installed) {
-            var claudeHeader = browserCookies.getCookieHeader("claude.ai");
-            claudeCodeMonitor.syncFromBrowser(claudeHeader, configuration.browserSyncBrowser);
+            browserSyncService.sync("claude", claudeCodeMonitor);
         }
 
         if (configuration.codexEnabled && codexCliMonitor.installed) {
-            var codexHeader = browserCookies.getCookieHeader("chatgpt.com");
-            codexCliMonitor.syncFromBrowser(codexHeader, configuration.browserSyncBrowser);
+            browserSyncService.sync("codex", codexCliMonitor);
         }
     }
 
@@ -106,7 +131,16 @@ Item {
             interval: scheduler.scheduledInterval(modelData)
             running: modelData.enabled
             repeat: true
-            onTriggered: scheduler.refreshProvider(modelData)
+            onTriggered: scheduler.refreshProvider(modelData, scheduler.refreshScheduled, true)
+            onIntervalChanged: updateNextSchedule()
+
+            function updateNextSchedule() {
+                if (!modelData.backend) return;
+                var base = modelData.backend.lastSuccess || new Date();
+                modelData.backend.setNextScheduledRefresh(scheduler.nextSchedule(modelData, base));
+            }
+
+            Component.onCompleted: updateNextSchedule()
         }
     }
 
@@ -138,7 +172,9 @@ Item {
             } else {
                 formats = ["json", "csv"];
             }
-            scheduler.usageDatabase.exportAllToDirectory(scheduler.configuration.autoExportDirectory, formats);
+            scheduler.usageDatabase.requestExportAll("scheduled-" + Date.now(),
+                                                     scheduler.configuration.autoExportDirectory,
+                                                     formats);
         }
     }
 

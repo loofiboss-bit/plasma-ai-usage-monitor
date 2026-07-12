@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 import json
 import sys
+import xml.etree.ElementTree as ET
 from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-CATALOG = ROOT / "package/contents/catalog/providers-v3.json"
+CATALOG = ROOT / "package/contents/catalog/providers-v4.json"
 EXPECTED_KEYS = {
     "openai", "anthropic", "google", "mistral", "deepseek", "groq", "xai",
     "ollama", "openrouter", "together", "cohere", "googleveo", "azure",
@@ -47,8 +48,8 @@ def main() -> None:
     except json.JSONDecodeError as exc:
         fail(f"invalid JSON: {exc}")
 
-    if catalog.get("schemaVersion") != 3:
-        fail("schemaVersion must be 3")
+    if catalog.get("schemaVersion") != 4:
+        fail("schemaVersion must be 4")
     if catalog.get("runtimeScraping") is not False:
         fail("runtimeScraping must be false")
 
@@ -61,6 +62,11 @@ def main() -> None:
         fail("providers must be a list")
 
     seen = set()
+    config_keys = {
+        entry.attrib.get("name")
+        for entry in ET.parse(ROOT / "package/contents/config/main.xml").iter()
+        if entry.tag.endswith("entry")
+    }
     manual_review = 0
     source_conflict = 0
 
@@ -77,6 +83,28 @@ def main() -> None:
         for field in ("label", "dataQuality", "pricingFreshness"):
             if not provider.get(field):
                 fail(f"{key} missing {field}")
+        for field in ("stableId", "displayName", "dbName", "icon", "colorToken",
+                      "auth", "endpoint", "capabilities", "expectedSources",
+                      "probePolicy", "reviewExpiresAt", "config"):
+            if not provider.get(field):
+                fail(f"{key} missing v4 field {field}")
+        if provider["stableId"] != key:
+            fail(f"{key} stableId must match key")
+        auth = provider["auth"]
+        if not isinstance(auth, dict) or not auth.get("scheme") or not auth.get("credentialSlots"):
+            fail(f"{key} auth must declare scheme and credentialSlots")
+        endpoint = provider["endpoint"]
+        if not isinstance(endpoint, dict) or endpoint.get("customPolicy") not in {"allowed", "forbidden", "required"}:
+            fail(f"{key} endpoint customPolicy is invalid")
+        default_endpoint = endpoint.get("default", "")
+        if default_endpoint and not default_endpoint.startswith("https://"):
+            fail(f"{key} default endpoint must use HTTPS")
+        expiry = require_iso_date(str(provider["reviewExpiresAt"]), f"{key} reviewExpiresAt")
+        if expiry < date.today():
+            fail(f"{key} review metadata expired on {expiry}")
+        for config_field, config_key in provider["config"].items():
+            if config_field != "key" and config_key not in config_keys:
+                fail(f"{key} config.{config_field} references missing KConfig key {config_key}")
         if provider.get("needsManualReview") is True:
             manual_review += 1
             if not provider.get("reviewReason"):
@@ -101,6 +129,14 @@ def main() -> None:
                 fail(f"{key} duplicate model id: {model_id}")
             model_ids.add(model_id)
             require_source_refs(model.get("sourceRefs"), f"{key}/{model_id}")
+            for source_ref in model["sourceRefs"]:
+                if not source_ref["url"].startswith("https://"):
+                    fail(f"{key}/{model_id} official source URL must use HTTPS")
+            lifecycle = model.get("lifecycle")
+            if not isinstance(lifecycle, dict) or lifecycle.get("status") not in {"active", "deprecated", "retired"}:
+                fail(f"{key}/{model_id} lifecycle status is invalid")
+            if lifecycle.get("status") in {"deprecated", "retired"} and not lifecycle.get("replacementId"):
+                fail(f"{key}/{model_id} lifecycle replacementId missing")
 
             pricing = model.get("pricing")
             if not isinstance(pricing, dict):

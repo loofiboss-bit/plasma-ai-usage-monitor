@@ -1,0 +1,19 @@
+name: QML
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  lint-and-smoke:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - run: dnf install -y git cmake ninja-build gcc-c++ dbus-daemon extra-cmake-modules qt6-qtbase-devel qt6-qtdeclarative-devel libplasma-devel plasma-workspace kf6-kcoreaddons-devel kf6-kpackage-devel kf6-kwallet-devel kf6-ki18n-devel kf6-knotifications-devel openssl-devel python3-PyQt6 xorg-x11-server-Xvfb
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: cmake --preset ci && cmake --build --preset ci
+      - run: python3 scripts/qml_lint.py --build-dir build/ci
+      - run: PYTHONNOUSERSITE=1 xvfb-run -a python3 scripts/smoke_test_qml_import.py --strict --build-dir build/ci
+      - run: dbus-run-session -- xvfb-run -a bash scripts/smoke_test_plasmoid.sh build/ci

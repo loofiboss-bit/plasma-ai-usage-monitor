@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [12.0.0] — Unreleased
+
+### Added
+- Add typed provider lifecycle, error, refresh reason, metric source and freshness contracts with deterministic retry scheduling.
+- Add observation schema v3 with explicit period semantics, source, quality, model scope, correlation IDs and currency-aware queries.
+- Add Provider Catalog v4, a C++ Browser Sync boundary, async history/export workers, reliability fixtures and split CI gates.
+
+### Changed
+- Coalesce provider refreshes, target configuration changes, cache KWallet reads and refresh stale providers on popup open.
+- Group spend by ISO currency throughout the UI, notifications, Prometheus and Analyst views; mixed currencies are never silently summed.
+- Split the popup into lazy Overview, History and Analyst views and migrate the native plugin to `qt_add_qml_module()`.
+- Stream large JSON/CSV exports from forward-only SQL queries with atomic output files.
+- Define COPR/source builds as full supported distributions and label the KDE Store plasmoid as frontend-only.
+
+### Removed
+- Remove the non-functional Flatpak scaffold, tracked v7 release tarball, periodic secret polling and error-text control flow.
+
+### Release status
+- Release candidate publication, Fedora 44 install/upgrade/rollback/remove verification, real screenshots and the required seven-day soak remain release gates.
+
 ## [11.0.0] — 2026-06-30
 
 ### Added

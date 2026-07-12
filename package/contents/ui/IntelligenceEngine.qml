@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
+import "Utils.js" as Utils
 
 /**
  * Lightweight deterministic analyst insight generator.
@@ -46,22 +47,27 @@ Item {
             }
 
             var lines = [];
+            if (overview.mixedCurrencies) {
+                lines.push(i18n("Spend insights are paused because the selected history contains mixed currencies and no conversion source is configured."));
+                return lines;
+            }
+            var currency = overview.currency || "USD";
             if (drivers.length > 0) {
                 var lead = drivers[0];
-                lines.push(i18n("%1 is currently the top spend driver at about $%2 for the month.",
-                                lead.provider, Number(lead.value || 0).toFixed(2)));
+                lines.push(i18n("%1 is currently the top spend driver at about %2 for the month.",
+                                lead.provider, Utils.formatMoney(lead.value || 0, currency)));
             } else {
                 lines.push(i18n("Not enough cost history is available yet to identify a spend driver."));
             }
 
             if (anomalies.length > 0) {
                 var anomaly = anomalies[0];
-                lines.push(i18n("A spending spike was detected on %1 at $%2, around %3% above baseline.",
-                                anomaly.date, Number(anomaly.value || 0).toFixed(2),
+                lines.push(i18n("A spending spike was detected on %1 at %2, around %3% above baseline.",
+                                anomaly.date, Utils.formatMoney(anomaly.value || 0, currency),
                                 Math.round(anomaly.deltaPercent || 0)));
             } else if (averageCost > 0) {
-                lines.push(i18n("Daily spending is stable around $%1 with no major anomalies in the current window.",
-                                averageCost.toFixed(2)));
+                lines.push(i18n("Daily spending is stable around %1 with no major anomalies in the current window.",
+                                Utils.formatMoney(averageCost, currency)));
             }
 
             if (wow > 5) {

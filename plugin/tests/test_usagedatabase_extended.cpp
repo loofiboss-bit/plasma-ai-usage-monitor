@@ -59,6 +59,35 @@ bool setSnapshotTimestamp(const QString &provider, double cost, const QString &t
             query.addBindValue(provider);
             query.addBindValue(cost);
             ok = query.exec() && query.numRowsAffected() > 0;
+            QSqlQuery observationQuery(db);
+            observationQuery.prepare(QStringLiteral(
+                "UPDATE observations SET observed_at_utc = ? "
+                "WHERE provider = ? AND metric_kind = 'cost' AND ABS(value - ?) < 0.00001"));
+            observationQuery.addBindValue(timestamp);
+            observationQuery.addBindValue(provider);
+            observationQuery.addBindValue(cost);
+            ok = ok && observationQuery.exec() && observationQuery.numRowsAffected() > 0;
+            db.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(connName);
+    return ok;
+}
+
+bool setCostSemantic(const QString &provider, const QString &semantic)
+{
+    const QString connName = QStringLiteral("semantic_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    bool ok = false;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connName);
+        db.setDatabaseName(databasePath());
+        if (db.open()) {
+            QSqlQuery query(db);
+            query.prepare(QStringLiteral(
+                "UPDATE observations SET semantic = ? WHERE provider = ? AND metric_kind = 'cost'"));
+            query.addBindValue(semantic);
+            query.addBindValue(provider);
+            ok = query.exec() && query.numRowsAffected() > 0;
             db.close();
         }
     }
@@ -76,11 +105,14 @@ private Q_SLOTS:
     void testGetProviders();
     void testGetToolNames();
     void testExportCsv();
+    void testExportCsvRfc4180Quoting();
     void testExportJson();
     void testSourceMetadataSchemaMigration();
+    void testObservationSchemaV3AndCurrencyIsolation();
     void testSourceMetadataPersistenceAndExports();
     void testGetSummary();
     void testGetDailyCosts();
+    void testAsyncHistoryRequest();
     void testPruneOldData();
     void testDisabledRecording();
 };
@@ -118,6 +150,53 @@ void UsageDatabaseExtendedTest::testGetProviders()
     QStringList providers = db.getProviders();
     QVERIFY(providers.contains(QStringLiteral("OpenAI")));
     QVERIFY(providers.contains(QStringLiteral("Anthropic")));
+}
+
+void UsageDatabaseExtendedTest::testObservationSchemaV3AndCurrencyIsolation()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    db.recordSnapshot(QStringLiteral("OpenAI"), 100, 20, 2, 1.25, 1.25, 1.25,
+                      0, 0, 0, 0, QStringLiteral("gpt"), false,
+                      QStringLiteral("billing_api"), QStringLiteral("usage_api"),
+                      QStringLiteral("USD"), QStringLiteral("complete"));
+    db.recordSnapshot(QStringLiteral("European"), 50, 10, 1, 2.50, 2.50, 2.50,
+                      0, 0, 0, 0, QStringLiteral("eu-model"), false,
+                      QStringLiteral("billing_api"), QStringLiteral("usage_api"),
+                      QStringLiteral("EUR"), QStringLiteral("complete"));
+
+    const QString connectionName = QStringLiteral("observation_schema_%1")
+        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        check.setDatabaseName(databasePath());
+        QVERIFY(check.open());
+        QSqlQuery query(check);
+        QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toInt(), 3);
+
+        QVERIFY(query.exec(QStringLiteral(
+            "SELECT currency, value, semantic, source, data_quality, correlation_id "
+            "FROM observations WHERE metric_kind='cost' ORDER BY provider")));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toString(), QStringLiteral("EUR"));
+        QCOMPARE(query.value(1).toDouble(), 2.50);
+        QCOMPARE(query.value(2).toString(), QStringLiteral("gauge"));
+        QCOMPARE(query.value(3).toString(), QStringLiteral("billing_api"));
+        QCOMPARE(query.value(4).toString(), QStringLiteral("complete"));
+        QVERIFY(!query.value(5).toString().isEmpty());
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toString(), QStringLiteral("USD"));
+        QCOMPARE(query.value(1).toDouble(), 1.25);
+        QVERIFY(!query.next());
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
 }
 
 void UsageDatabaseExtendedTest::testGetToolNames()
@@ -198,6 +277,22 @@ void UsageDatabaseExtendedTest::testExportJson()
     QVERIFY(first.contains(QStringLiteral("timestamp")));
     QVERIFY(first.contains(QStringLiteral("cost")));
     QVERIFY(qAbs(first.value(QStringLiteral("cost")).toDouble() - 3.0) < 0.01);
+}
+
+void UsageDatabaseExtendedTest::testExportCsvRfc4180Quoting()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+    UsageDatabase db;
+    db.init();
+    const QString provider = QStringLiteral("Provider, \"quoted\"");
+    db.recordSnapshot(provider, 1, 2, 1, 0.1, 0.1, 0.1, 0, 0, 0, 0,
+                      QStringLiteral("model,\"line\"\nnext"));
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const QString csv = db.exportCsv(provider, now.addSecs(-60), now.addSecs(60));
+    QVERIFY(csv.contains(QStringLiteral("\"Provider, \"\"quoted\"\"\"")));
+    QVERIFY(csv.contains(QStringLiteral("\"model,\"\"line\"\"\nnext\"")));
 }
 
 void UsageDatabaseExtendedTest::testSourceMetadataSchemaMigration()
@@ -341,12 +436,14 @@ void UsageDatabaseExtendedTest::testGetDailyCosts()
 
     // Insert another for today (different cost to bypass throttle)
     db.recordSnapshot(QStringLiteral("DailyCostProv"), 200, 100, 20, 8.0, 8.0, 80.0, 0, 0, 0, 0);
+    QVERIFY(setCostSemantic(QStringLiteral("DailyCostProv"), QStringLiteral("interval_total")));
 
     const QDateTime from = QDateTime::currentDateTimeUtc().addDays(-2);
     const QDateTime to = QDateTime::currentDateTimeUtc().addSecs(3600);
 
     QVariantList dailyCosts = db.getDailyCosts(QStringLiteral("DailyCostProv"), from, to);
-    QVERIFY(dailyCosts.size() >= 1);
+    QCOMPARE(dailyCosts.size(), 2);
+    QCOMPARE(dailyCosts.first().toMap().value(QStringLiteral("currency")).toString(), QStringLiteral("USD"));
 }
 
 void UsageDatabaseExtendedTest::testPruneOldData()
@@ -377,6 +474,29 @@ void UsageDatabaseExtendedTest::testPruneOldData()
     // Old snapshot should be pruned, recent one kept
     QCOMPARE(snapshots.size(), 1);
     QVERIFY(qAbs(snapshots.first().toMap().value(QStringLiteral("cost")).toDouble() - 9.0) < 0.01);
+}
+
+void UsageDatabaseExtendedTest::testAsyncHistoryRequest()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    db.recordSnapshot(QStringLiteral("AsyncProvider"), 10, 5, 1, 0.5, 0.5, 0.5,
+                      0, 0, 0, 0, QStringLiteral("model"), false,
+                      QStringLiteral("billing_api"), QStringLiteral("usage_api"));
+    QSignalSpy spy(&db, &UsageDatabase::historyReady);
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    db.requestHistory(QStringLiteral("request-1"), QStringLiteral("AsyncProvider"),
+                      now.addSecs(-60), now.addSecs(60));
+    QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 3000);
+    QCOMPARE(spy.first().at(0).toString(), QStringLiteral("request-1"));
+    const QVariantMap payload = spy.first().at(1).toMap();
+    QCOMPARE(payload.value(QStringLiteral("snapshots")).toList().size(), 1);
+    QVERIFY(payload.contains(QStringLiteral("summary")));
+    QVERIFY(payload.contains(QStringLiteral("dailyCosts")));
 }
 
 void UsageDatabaseExtendedTest::testDisabledRecording()

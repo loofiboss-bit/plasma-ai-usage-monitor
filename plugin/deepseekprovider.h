@@ -27,7 +27,7 @@ public:
 
     double balance() const;
 
-    Q_INVOKABLE void refresh() override;
+    void refreshImpl() override;
 
 Q_SIGNALS:
     void balanceChanged();

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
+import "Utils.js" as Utils
 
 Item {
     id: chartRoot
@@ -451,7 +452,15 @@ Item {
 
     function formatMetricValue(value) {
         if (metric === "cost") {
-            return "$" + value.toFixed(value < 1 ? 4 : 2);
+            var currencies = {};
+            for (var i = 0; i < seriesData.length; i++) {
+                currencies[seriesData[i].currency || "USD"] = true;
+                if (seriesData[i].mixedCurrency) currencies.__mixed = true;
+            }
+            var keys = Object.keys(currencies).filter(function(key) { return key !== "__mixed"; });
+            return keys.length === 1 && !currencies.__mixed
+                ? Utils.formatMoney(value, keys[0])
+                : value.toFixed(value < 1 ? 4 : 2) + " " + i18n("mixed currencies");
         }
         if (metric === "tokens") {
             if (value >= 1000000) return (value / 1000000).toFixed(1) + "M";

@@ -12,16 +12,16 @@ OpenRouterProvider::OpenRouterProvider(QObject *parent)
 
 double OpenRouterProvider::credits() const { return m_credits; }
 
-void OpenRouterProvider::refresh()
+void OpenRouterProvider::refreshImpl()
 {
     if (!hasApiKey()) {
-        setError(i18n("No API key configured"));
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
 
     // Call parent's refresh (chat completion for rate limits + usage)
-    OpenAICompatibleProvider::refresh();
+    OpenAICompatibleProvider::refreshImpl();
 
     // Additionally fetch credits balance
     fetchCredits();
@@ -51,7 +51,7 @@ void OpenRouterProvider::onCreditsReply(QNetworkReply *reply)
 
     if (reply->error() != QNetworkReply::NoError) {
         // Non-fatal: rate limit data may still be available
-        qWarning() << "AI Usage Monitor: OpenRouter credits API error:" << reply->errorString();
+        setNetworkError(reply, i18n("Credits API unavailable: %1", reply->errorString()));
         onAllRequestsDone();
         return;
     }

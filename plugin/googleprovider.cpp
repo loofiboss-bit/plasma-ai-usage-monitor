@@ -28,10 +28,10 @@ void GoogleProvider::setTier(const QString &tier)
     }
 }
 
-void GoogleProvider::refresh()
+void GoogleProvider::refreshImpl()
 {
     if (!hasApiKey()) {
-        setError(i18n("No API key configured"));
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
@@ -86,13 +86,14 @@ void GoogleProvider::onCountTokensReply(QNetworkReply *reply)
     if (reply->error() != QNetworkReply::NoError) {
         int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (httpStatus == 400) {
-            setError(i18n("Invalid API key or model name"));
+            setErrorDetails(i18n("Invalid API key or model name"), ProviderErrorKind::Configuration, httpStatus);
         } else if (httpStatus == 429) {
-            setError(i18n("Rate limited"));
+            setErrorDetails(i18n("Rate limited"), ProviderErrorKind::RateLimit, httpStatus,
+                            retryAfterForReply(reply));
         } else {
-            setError(i18n("API error: %1 (HTTP %2)",
-                         reply->errorString(),
-                         QString::number(httpStatus)));
+            setNetworkError(reply, i18n("API error: %1 (HTTP %2)",
+                                        reply->errorString(),
+                                        QString::number(httpStatus)));
         }
         setLoading(false);
         setConnected(false);

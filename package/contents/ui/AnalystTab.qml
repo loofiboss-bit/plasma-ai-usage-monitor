@@ -90,7 +90,8 @@ Kirigami.ScrollablePage {
     }
 
     function formatCurrency(value) {
-        return "$" + Number(value || 0).toFixed(2);
+        if (overview.mixedCurrencies) return i18n("Mixed currencies");
+        return Utils.formatMoney(value || 0, overview.currency || "USD");
     }
 
     function formatPercent(value) {

@@ -29,6 +29,11 @@ bool AppInfo::demoMode() const
     return qEnvironmentVariableIsSet("PLASMA_AI_MONITOR_DEMO");
 }
 
+QString AppInfo::smokeView() const
+{
+    return qEnvironmentVariable("PLASMA_AI_MONITOR_SMOKE_VIEW").trimmed().toLower();
+}
+
 bool AppInfo::exportConfig(const QString &jsonConfig, const QString &filePath) const
 {
     QString localPath = filePath;

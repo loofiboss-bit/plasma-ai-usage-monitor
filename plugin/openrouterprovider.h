@@ -32,7 +32,7 @@ public:
 
     double credits() const;
 
-    Q_INVOKABLE void refresh() override;
+    void refreshImpl() override;
 
 Q_SIGNALS:
     void creditsChanged();

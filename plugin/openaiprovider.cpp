@@ -59,10 +59,10 @@ void OpenAIProvider::setModel(const QString &model)
     }
 }
 
-void OpenAIProvider::refresh()
+void OpenAIProvider::refreshImpl()
 {
     if (!hasApiKey()) {
-        setError(i18n("No API key configured"));
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
@@ -155,15 +155,16 @@ void OpenAIProvider::onUsageReply(QNetworkReply *reply)
             return;
         }
 
-        reply->deleteLater();
-
         if (httpStatus == 401 || httpStatus == 403) {
-            setError(i18n("Authentication failed. Ensure you're using an Admin API key."));
+            setErrorDetails(i18n("Authentication failed. Ensure you're using an Admin API key."),
+                            httpStatus == 401 ? ProviderErrorKind::Authentication : ProviderErrorKind::Permission,
+                            httpStatus);
         } else {
-            setError(i18n("Usage API error: %1 (HTTP %2)",
-                         reply->errorString(),
-                         QString::number(httpStatus)));
+            setNetworkError(reply, i18n("Usage API error: %1 (HTTP %2)",
+                                        reply->errorString(),
+                                        QString::number(httpStatus)));
         }
+        reply->deleteLater();
         checkAllDone();
         return;
     }
@@ -177,7 +178,7 @@ void OpenAIProvider::onUsageReply(QNetworkReply *reply)
     QByteArray data = reply->readAll();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull()) {
-        setError(i18n("Failed to parse usage response"));
+        setErrorDetails(i18n("Failed to parse usage response"), ProviderErrorKind::Schema);
         checkAllDone();
         return;
     }
@@ -223,7 +224,7 @@ void OpenAIProvider::onCostsReply(QNetworkReply *reply)
         }
 
         // Non-fatal: usage data may still be available
-        qWarning() << "AI Usage Monitor: OpenAI costs API error:" << reply->errorString();
+        setNetworkError(reply, i18n("Costs API unavailable: %1", reply->errorString()));
         reply->deleteLater();
         checkAllDone();
         return;
@@ -233,6 +234,7 @@ void OpenAIProvider::onCostsReply(QNetworkReply *reply)
     reply->deleteLater();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull()) {
+        setErrorDetails(i18n("Failed to parse costs response"), ProviderErrorKind::Schema);
         checkAllDone();
         return;
     }
@@ -305,7 +307,7 @@ void OpenAIProvider::onMonthlyCostsReply(QNetworkReply *reply)
         }
 
         // Non-fatal: daily cost data may still be available
-        qWarning() << "AI Usage Monitor: OpenAI monthly costs API error:" << reply->errorString();
+        setNetworkError(reply, i18n("Monthly costs API unavailable: %1", reply->errorString()));
         reply->deleteLater();
         checkAllDone();
         return;
@@ -315,6 +317,7 @@ void OpenAIProvider::onMonthlyCostsReply(QNetworkReply *reply)
     reply->deleteLater();
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull()) {
+        setErrorDetails(i18n("Failed to parse monthly costs response"), ProviderErrorKind::Schema);
         checkAllDone();
         return;
     }

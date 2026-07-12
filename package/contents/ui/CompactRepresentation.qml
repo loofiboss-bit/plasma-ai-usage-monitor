@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
+import "Utils.js" as Utils
 
 MouseArea {
     id: compactRoot
@@ -14,15 +15,15 @@ MouseArea {
     readonly property int warningThreshold: plasmoid.configuration.warningThreshold || 80
     readonly property int criticalThreshold: plasmoid.configuration.criticalThreshold || 95
 
-    readonly property double compactApiSpend: {
-        var total = 0;
+    readonly property var compactApiSpend: {
+        var totals = {};
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
             if (provider && provider.enabled && provider.backend && provider.backend.connected
                 && (provider.backend.costSource === "billing_api" || provider.backend.costSource === "actual_api"))
-                total += provider.backend.cost ?? 0;
+                Utils.addCurrencyTotal(totals, provider.backend.currency, provider.backend.cost ?? 0);
         }
-        return total;
+        return totals;
     }
 
     readonly property double compactSubscriptionFees: {
@@ -129,7 +130,7 @@ MouseArea {
         id: costLabel
         anchors.fill: parent
         visible: compactRoot.displayMode === "cost"
-        text: "$" + compactRoot.compactApiSpend.toFixed(2)
+        text: Utils.formatCurrencyTotals(compactRoot.compactApiSpend)
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         font.bold: true
@@ -137,7 +138,8 @@ MouseArea {
         minimumPointSize: Kirigami.Theme.smallFont.pointSize
         fontSizeMode: Text.Fit
         color: {
-            var cost = compactRoot.compactApiSpend;
+            var currencies = Object.keys(compactRoot.compactApiSpend);
+            var cost = currencies.length === 1 ? compactRoot.compactApiSpend[currencies[0]] : 0;
             if (cost > 10) return Kirigami.Theme.negativeTextColor;
             if (cost > 5) return Kirigami.Theme.neutralTextColor;
             return Kirigami.Theme.textColor;
@@ -163,14 +165,14 @@ MouseArea {
         }
     }
 
-    readonly property double compactDailyCost: {
-        var total = 0;
+    readonly property var compactDailyCost: {
+        var totals = {};
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
             if (provider && provider.enabled && provider.backend && provider.backend.connected)
-                total += provider.backend.dailyCost ?? 0;
+                Utils.addCurrencyTotal(totals, provider.backend.currency, provider.backend.dailyCost ?? 0);
         }
-        return total;
+        return totals;
     }
 
     readonly property int totalRequestsRemaining: {
@@ -203,7 +205,7 @@ MouseArea {
     PlasmaComponents.Label {
         anchors.fill: parent
         visible: compactRoot.displayMode === "dailycost"
-        text: "$" + compactRoot.compactDailyCost.toFixed(2)
+        text: Utils.formatCurrencyTotals(compactRoot.compactDailyCost)
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         font.bold: true

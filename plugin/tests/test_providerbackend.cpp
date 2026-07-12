@@ -1,5 +1,6 @@
 #include <QtTest>
 #include <QSignalSpy>
+#include <QTimeZone>
 
 #include "providerbackend.h"
 
@@ -17,17 +18,26 @@ public:
 
     QString name() const override { return QStringLiteral("TestProvider"); }
     QString iconName() const override { return QStringLiteral("test-icon"); }
-    void refresh() override { /* no-op */ }
+    void refreshImpl() override
+    {
+        ++refreshCalls;
+        beginRefresh();
+        setLoading(true);
+    }
+
+    int refreshCalls = 0;
 
     // Public wrappers for protected methods
     using ProviderBackend::setConnected;
     using ProviderBackend::setLoading;
     using ProviderBackend::setError;
+    using ProviderBackend::setErrorDetails;
     using ProviderBackend::clearError;
     using ProviderBackend::setInputTokens;
     using ProviderBackend::setOutputTokens;
     using ProviderBackend::setRequestCount;
     using ProviderBackend::setCost;
+    using ProviderBackend::setCurrency;
     using ProviderBackend::setDailyCost;
     using ProviderBackend::setMonthlyCost;
     using ProviderBackend::effectiveBaseUrl;
@@ -37,6 +47,7 @@ public:
     using ProviderBackend::updateEstimatedCost;
     using ProviderBackend::checkBudgetLimits;
     using ProviderBackend::isRetryableStatus;
+    using ProviderBackend::retryAfterForReply;
 };
 
 class ProviderBackendTest : public QObject
@@ -54,6 +65,7 @@ private Q_SLOTS:
     void testBudgetExceededSignal();
     void testBudgetDedupFlags();
     void testMonthlyBudgetSignals();
+    void testBudgetCurrencyMismatchDisablesAlerts();
     void testCostEstimation();
     void testCostEstimationPrefixMatch();
     void testGenerationCounter();
@@ -63,6 +75,9 @@ private Q_SLOTS:
     void testErrorCountAndConsecutiveErrors();
     void testClearError();
     void testIsRetryableStatus();
+    void testTypedErrorRetryability();
+    void testRefreshCoalescingAndManualSupersede();
+    void testRetryAfterNumericAndHttpDate();
     void testEffectiveBaseUrl();
     void testEffectiveBaseUrlTrailingSlash();
     void testTotalTokens();
@@ -253,6 +268,20 @@ void ProviderBackendTest::testMonthlyBudgetSignals()
     QCOMPARE(exceededSpy.first().at(1).toString(), QStringLiteral("monthly"));
 }
 
+void ProviderBackendTest::testBudgetCurrencyMismatchDisablesAlerts()
+{
+    TestProvider p;
+    p.setBudgetCurrency(QStringLiteral("USD"));
+    p.setCurrency(QStringLiteral("EUR"));
+    p.setDailyBudget(10.0);
+    QSignalSpy warningSpy(&p, &ProviderBackend::budgetWarning);
+    QSignalSpy exceededSpy(&p, &ProviderBackend::budgetExceeded);
+    p.setDailyCost(20.0);
+    QVERIFY(p.budgetCurrencyMismatch());
+    QCOMPARE(warningSpy.count(), 0);
+    QCOMPARE(exceededSpy.count(), 0);
+}
+
 void ProviderBackendTest::testCostEstimation()
 {
     TestProvider p;
@@ -299,6 +328,66 @@ void ProviderBackendTest::testGenerationCounter()
     p.beginRefresh();
     QCOMPARE(p.currentGeneration(), 2);
     QVERIFY(!p.isCurrentGeneration(1));
+}
+
+void ProviderBackendTest::testTypedErrorRetryability()
+{
+    TestProvider p;
+    p.setErrorDetails(QStringLiteral("Too many requests"),
+                      ProviderBackend::ProviderErrorKind::RateLimit,
+                      429,
+                      QDateTime::currentDateTimeUtc().addSecs(30));
+    QCOMPARE(p.errorKind(), ProviderBackend::ProviderErrorKind::RateLimit);
+    QCOMPARE(p.httpStatus(), 429);
+    QVERIFY(p.isRetryable());
+    QVERIFY(p.retryAfter().isValid());
+
+    p.setErrorDetails(QStringLiteral("Unauthorized"),
+                      ProviderBackend::ProviderErrorKind::Authentication,
+                      401);
+    QVERIFY(!p.isRetryable());
+}
+
+void ProviderBackendTest::testRefreshCoalescingAndManualSupersede()
+{
+    TestProvider p;
+    QVERIFY(p.requestRefresh(ProviderBackend::RefreshReason::Startup));
+    QCOMPARE(p.refreshCalls, 1);
+    QCOMPARE(p.lastRefreshReason(), ProviderBackend::RefreshReason::Startup);
+
+    QVERIFY(!p.requestRefresh(ProviderBackend::RefreshReason::Scheduled));
+    QCOMPARE(p.refreshCalls, 1);
+    QCOMPARE(p.coalescedRefreshCount(), 1);
+
+    QVERIFY(p.requestRefresh(ProviderBackend::RefreshReason::Manual));
+    QCOMPARE(p.refreshCalls, 2);
+    QCOMPARE(p.cancellationCount(), 1);
+    QCOMPARE(p.lastRefreshReason(), ProviderBackend::RefreshReason::Manual);
+}
+
+void ProviderBackendTest::testRetryAfterNumericAndHttpDate()
+{
+    class Reply final : public QNetworkReply {
+    public:
+        Reply()
+        {
+            setOpenMode(QIODevice::ReadOnly);
+            setFinished(true);
+        }
+        void abort() override {}
+        qint64 bytesAvailable() const override { return 0; }
+        void setRetryAfter(const QByteArray &value) { setRawHeader("Retry-After", value); }
+    protected:
+        qint64 readData(char *, qint64) override { return -1; }
+    } reply;
+
+    const QDateTime now(QDate(2026, 7, 13), QTime(12, 0), QTimeZone::UTC);
+    reply.setRetryAfter("42");
+    TestProvider provider;
+    QCOMPARE(provider.retryAfterForReply(&reply, now), now.addSecs(42));
+
+    reply.setRetryAfter("Mon, 13 Jul 2026 12:02:00 GMT");
+    QCOMPARE(provider.retryAfterForReply(&reply, now), now.addSecs(120));
 }
 
 void ProviderBackendTest::testDisconnectReconnectSignals()
@@ -386,6 +475,8 @@ void ProviderBackendTest::testClearError()
 void ProviderBackendTest::testIsRetryableStatus()
 {
     QVERIFY(TestProvider::isRetryableStatus(429));
+    QVERIFY(TestProvider::isRetryableStatus(408));
+    QVERIFY(TestProvider::isRetryableStatus(425));
     QVERIFY(TestProvider::isRetryableStatus(500));
     QVERIFY(TestProvider::isRetryableStatus(502));
     QVERIFY(TestProvider::isRetryableStatus(503));
@@ -395,7 +486,7 @@ void ProviderBackendTest::testIsRetryableStatus()
     QVERIFY(!TestProvider::isRetryableStatus(401));
     QVERIFY(!TestProvider::isRetryableStatus(403));
     QVERIFY(!TestProvider::isRetryableStatus(404));
-    QVERIFY(!TestProvider::isRetryableStatus(504));
+    QVERIFY(TestProvider::isRetryableStatus(504));
 }
 
 void ProviderBackendTest::testEffectiveBaseUrl()

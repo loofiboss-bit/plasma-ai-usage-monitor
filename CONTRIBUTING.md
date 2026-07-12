@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the AI Usage Monitor plasmoid. Th
 
 ### Prerequisites
 
-Fedora 43 KDE (or any distro with KDE Plasma 6):
+Fedora 44 KDE (or any distro with KDE Plasma 6):
 
 ```bash
 sudo dnf install cmake extra-cmake-modules gcc-c++ \
@@ -177,7 +177,7 @@ If the new provider uses an OpenAI-compatible chat completions API:
 1. Create `plugin/newprovider.h` and `plugin/newprovider.cpp` inheriting from `OpenAICompatibleProvider`
 2. Implement only `name()`, `iconName()`, and `defaultBaseUrl()` — typically ~15 lines per file
 3. In the constructor, set the default model and call `registerModelPricing()` for each supported model
-4. Register the type in `plugin/aiusageplugin.cpp` and add to `plugin/qmldir`
+4. Register the type in `plugin/aiusageplugin.cpp`; `qt_add_qml_module()` generates `qmldir` and type metadata.
 5. Add source files to `plugin/CMakeLists.txt`
 6. Add config entries in `package/contents/config/main.xml` (enable, model, customBaseUrl, budget, notifications, refresh interval)
 7. Add UI elements in `configProviders.qml`, `configBudget.qml`, `configAlerts.qml`, and `configGeneral.qml`

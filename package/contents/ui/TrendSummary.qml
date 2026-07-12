@@ -50,7 +50,9 @@ Item {
             Layout.alignment: Qt.AlignRight
         }
         PlasmaComponents.Label {
-            text: "$" + (summaryData.totalCost || 0).toFixed(4)
+            text: summaryData.mixedCurrencies
+                ? Utils.formatCurrencyTotals(summaryData.currencyTotals || {})
+                : Utils.formatCurrencyTotals(summaryData.currencyTotals || ({ USD: summaryData.totalCost || 0 }))
             font.bold: true
             elide: Text.ElideRight
             Layout.fillWidth: true
@@ -64,7 +66,9 @@ Item {
             Layout.alignment: Qt.AlignRight
         }
         PlasmaComponents.Label {
-            text: "$" + (summaryData.avgDailyCost || 0).toFixed(4)
+            text: dailyCosts.length > 0
+                ? Utils.formatMoney(summaryData.avgDailyCost || 0, dailyCosts[0].currency || "USD")
+                : i18n("Not derivable")
             elide: Text.ElideRight
             Layout.fillWidth: true
         }
@@ -77,7 +81,9 @@ Item {
             Layout.alignment: Qt.AlignRight
         }
         PlasmaComponents.Label {
-            text: "$" + (summaryData.maxDailyCost || 0).toFixed(4)
+            text: dailyCosts.length > 0
+                ? Utils.formatMoney(summaryData.maxDailyCost || 0, dailyCosts[0].currency || "USD")
+                : i18n("Not derivable")
             color: (summaryData.maxDailyCost || 0) > (summaryData.avgDailyCost || 0) * 2
                    ? Kirigami.Theme.negativeTextColor
                    : Kirigami.Theme.textColor

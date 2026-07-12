@@ -49,8 +49,8 @@ void CatalogsTest::providerCatalogLoads()
     ProviderPricingCatalog catalog;
 
     QVERIFY(catalog.isValid());
-    QCOMPARE(catalog.schemaVersion(), 3);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.06.30"));
+    QCOMPARE(catalog.schemaVersion(), 4);
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.07.13"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(!catalog.reviewItems().isEmpty());
@@ -62,6 +62,13 @@ void CatalogsTest::providerCatalogLoads()
     QCOMPARE(gpt54Pricing.value(QStringLiteral("unit")).toString(), QStringLiteral("1M_tokens"));
     QCOMPARE(gpt54Pricing.value(QStringLiteral("precision")).toString(), QStringLiteral("official_exact"));
     QVERIFY(!catalog.pricing(QStringLiteral("deepseek"), QStringLiteral("deepseek-v4-flash")).isEmpty());
+    QCOMPARE(catalog.effectiveModelIdAt(QStringLiteral("deepseek"), QStringLiteral("deepseek-chat"),
+                                        QDate(2026, 7, 23)), QStringLiteral("deepseek-chat"));
+    QCOMPARE(catalog.effectiveModelIdAt(QStringLiteral("deepseek"), QStringLiteral("deepseek-chat"),
+                                        QDate(2026, 7, 24)), QStringLiteral("deepseek-v4-flash"));
+    const QVariantMap openAi = catalog.provider(QStringLiteral("openai"));
+    QCOMPARE(openAi.value(QStringLiteral("stableId")).toString(), QStringLiteral("openai"));
+    QVERIFY(openAi.value(QStringLiteral("capabilities")).toList().contains(QStringLiteral("cost")));
 
     QVERIFY(qAbs(catalog.amountForModelUnit(QStringLiteral("googleveo"), QStringLiteral("veo-2"), QStringLiteral("video_second")) - 0.35) < 0.000001);
 }
@@ -102,10 +109,10 @@ void CatalogsTest::staleCatalogDetection()
     EnvVarGuard guard("AIUSAGE_MONITOR_CATALOG_DIR");
     qputenv("AIUSAGE_MONITOR_CATALOG_DIR", dir.path().toUtf8());
 
-    QFile file(dir.filePath(QStringLiteral("providers-v3.json")));
+    QFile file(dir.filePath(QStringLiteral("providers-v4.json")));
     QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
     file.write(R"JSON({
-        "schemaVersion": 3,
+        "schemaVersion": 4,
         "catalogVersion": "2026.01.01",
         "release": "8.0.0",
         "lastReviewed": "2026-01-01",

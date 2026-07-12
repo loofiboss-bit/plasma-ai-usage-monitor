@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$VERSION" ]]; then
-  VERSION="$(sed -n 's/^project(plasma-ai-usage-monitor VERSION \([0-9.]*\)).*/\1/p' CMakeLists.txt | head -1)"
+  VERSION="$(tr -d '[:space:]' < VERSION)"
 fi
 
 if [[ -z "$VERSION" ]]; then
@@ -59,8 +59,13 @@ cleanup() {
 trap cleanup EXIT
 
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  # Deterministic tarball from tracked files only.
-  git -c core.quotepath=off ls-files -z | tar \
+  # Package the current source tree, including new release files, while
+  # excluding ignored artifacts and paths deleted from the working tree.
+  git -c core.quotepath=off ls-files -z --cached --others --exclude-standard \
+    | while IFS= read -r -d '' path; do
+        [[ -e "$path" ]] && printf '%s\0' "$path"
+      done \
+    | tar \
     --null \
     --no-recursion \
     --sort=name \
@@ -81,6 +86,7 @@ else
     --group=0 \
     --numeric-owner \
     --pax-option=delete=atime,delete=ctime \
+    --transform="s,^\./,plasma-ai-usage-monitor-${VERSION}/," \
     --warning=no-file-changed \
     -czf "$TMP_ARCHIVE_PATH" \
     --exclude=.git \

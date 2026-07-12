@@ -72,7 +72,7 @@ target_include_directories(test_usagedatabase_series
 )
 
 target_link_libraries(test_usagedatabase_series
-    PRIVATE Qt6::Core Qt6::Test Qt6::Sql
+    PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent
 )
 
 add_test(NAME usagedatabase_series COMMAND test_usagedatabase_series)
@@ -88,7 +88,7 @@ target_include_directories(test_history_mapping_regression
 )
 
 target_link_libraries(test_history_mapping_regression
-    PRIVATE Qt6::Core Qt6::Test Qt6::Sql
+    PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent
 )
 
 add_test(NAME history_mapping_regression COMMAND test_history_mapping_regression)
@@ -141,6 +141,14 @@ target_link_libraries(test_providerbackend
 
 add_test(NAME providerbackend COMMAND test_providerbackend)
 
+add_executable(test_refreshscheduler
+    test_refreshscheduler.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp
+)
+target_include_directories(test_refreshscheduler PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_refreshscheduler PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME refreshscheduler COMMAND test_refreshscheduler)
+
 # --- SubscriptionToolBackend unit test ---
 add_executable(test_subscriptiontoolbackend
     test_subscriptiontoolbackend.cpp
@@ -184,7 +192,7 @@ target_include_directories(test_local_integrations
 )
 
 target_link_libraries(test_local_integrations
-    PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Sql
+    PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Sql Qt6::Concurrent
 )
 
 add_test(NAME local_integrations COMMAND test_local_integrations)
@@ -216,7 +224,7 @@ target_include_directories(test_usagedatabase_extended
 )
 
 target_link_libraries(test_usagedatabase_extended
-    PRIVATE Qt6::Core Qt6::Test Qt6::Sql
+    PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent
 )
 
 add_test(NAME usagedatabase_extended COMMAND test_usagedatabase_extended)
@@ -232,7 +240,7 @@ target_include_directories(test_usagedatabase_analyst
 )
 
 target_link_libraries(test_usagedatabase_analyst
-    PRIVATE Qt6::Core Qt6::Test Qt6::Sql
+    PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent
 )
 
 add_test(NAME usagedatabase_analyst COMMAND test_usagedatabase_analyst)

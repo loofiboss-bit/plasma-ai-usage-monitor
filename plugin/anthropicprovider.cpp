@@ -18,10 +18,10 @@ void AnthropicProvider::setModel(const QString &model)
     }
 }
 
-void AnthropicProvider::refresh()
+void AnthropicProvider::refreshImpl()
 {
     if (!hasApiKey()) {
-        setError(i18n("No API key configured"));
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
         setConnected(false);
         return;
     }
@@ -73,14 +73,15 @@ void AnthropicProvider::onCountTokensReply(QNetworkReply *reply)
     if (reply->error() != QNetworkReply::NoError) {
         int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         if (httpStatus == 401) {
-            setError(i18n("Invalid API key"));
+            setErrorDetails(i18n("Invalid API key"), ProviderErrorKind::Authentication, httpStatus);
         } else if (httpStatus == 429) {
-            setError(i18n("Rate limited"));
+            setErrorDetails(i18n("Rate limited"), ProviderErrorKind::RateLimit, httpStatus,
+                            retryAfterForReply(reply));
             // Still parse headers -- they're returned on 429 too
         } else {
-            setError(i18n("API error: %1 (HTTP %2)",
-                         reply->errorString(),
-                         QString::number(httpStatus)));
+            setNetworkError(reply, i18n("API error: %1 (HTTP %2)",
+                                        reply->errorString(),
+                                        QString::number(httpStatus)));
             setLoading(false);
             return;
         }

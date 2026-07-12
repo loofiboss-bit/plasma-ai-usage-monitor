@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QMap>
+#include <QHash>
 #include <KWallet>
 
 /**
@@ -14,12 +15,14 @@ class SecretsManager : public QObject
 {
     Q_OBJECT
     Q_PROPERTY(bool walletOpen READ isWalletOpen NOTIFY walletOpenChanged)
+    Q_PROPERTY(int secretReadCount READ secretReadCount NOTIFY diagnosticsChanged)
 
 public:
     explicit SecretsManager(QObject *parent = nullptr);
     ~SecretsManager() override;
 
     bool isWalletOpen() const;
+    int secretReadCount() const;
 
     Q_INVOKABLE void storeKey(const QString &provider, const QString &key);
     Q_INVOKABLE QString getKey(const QString &provider);
@@ -32,6 +35,8 @@ Q_SIGNALS:
     void keyStored(const QString &provider);
     void keyRemoved(const QString &provider);
     void error(const QString &message);
+    void secretAvailabilityChanged(const QString &provider, bool available);
+    void diagnosticsChanged();
 
 private Q_SLOTS:
     void onWalletOpened(bool success);
@@ -39,10 +44,13 @@ private Q_SLOTS:
 private:
     void openWallet();
     bool ensureFolder();
+    void warmCache();
 
     KWallet::Wallet *m_wallet = nullptr;
     bool m_walletOpen = false;
     QString m_folderName = QStringLiteral("ai-usage-monitor");
+    QHash<QString, QString> m_secretCache;
+    int m_secretReadCount = 0;
 
     // Pending operations queue
     struct PendingOp {

@@ -1,5 +1,6 @@
 import QtQuick
 import com.github.loofi.aiusagemonitor 1.0
+import "Utils.js" as Utils
 
 QtObject {
     id: registry
@@ -179,17 +180,27 @@ QtObject {
         return count;
     }
 
-    readonly property double totalCost: {
-        var total = 0;
+    readonly property var actualSpendByCurrency: {
+        var totals = {};
         for (var i = 0; i < allProviders.length; i++) {
             if (allProviders[i].enabled && allProviders[i].backend && allProviders[i].backend.connected) {
                 var source = allProviders[i].backend.costSource || "unknown";
                 if (source === "billing_api" || source === "actual_api") {
-                    total += allProviders[i].backend.cost;
+                    Utils.addCurrencyTotal(totals,
+                                           allProviders[i].backend.currency,
+                                           allProviders[i].backend.cost);
                 }
             }
         }
-        return total;
+        return totals;
+    }
+
+    readonly property var actualSpendCurrencies: Object.keys(actualSpendByCurrency).sort()
+    readonly property bool hasMixedCurrencies: actualSpendCurrencies.length > 1
+    readonly property string totalCostLabel: Utils.formatCurrencyTotals(actualSpendByCurrency)
+    readonly property double totalCost: {
+        if (actualSpendCurrencies.length !== 1) return 0;
+        return actualSpendByCurrency[actualSpendCurrencies[0]] || 0;
     }
 
     function formatCompactMetric(value) {

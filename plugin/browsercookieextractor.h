@@ -46,6 +46,7 @@ public:
     int browserType() const;
     void setBrowserType(int type);
     bool hasFirefoxProfile() const;
+    bool hasCurrentBrowserProfile() const;
     QString selectedFirefoxProfile() const;
     void setSelectedFirefoxProfile(const QString &profile);
 
@@ -122,7 +123,6 @@ private:
     QString chromiumSafeStoragePassword() const;
     QString chromiumSafeStoragePasswordFromKWallet() const;
     QString decryptChromiumCookieValue(const QByteArray &encryptedValue) const;
-    bool hasCurrentBrowserProfile() const;
 
     int m_browserType = Firefox;
 
