@@ -16,7 +16,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--build-dir", default="build")
     args = parser.parse_args()
-    qmllint = shutil.which("qmllint")
+    qmllint = shutil.which("qmllint") or shutil.which("qmllint-qt6")
     if not qmllint:
         print("qmllint is required", file=sys.stderr)
         return 2
