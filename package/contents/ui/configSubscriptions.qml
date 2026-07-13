@@ -841,9 +841,8 @@ KCM.SimpleKCM {
         QQC2.Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: i18n("Sync real-time usage data by reading session cookies from your browser. "
-                     + "This reads cookies from your browser's cookie database (read-only) to "
-                     + "fetch usage data from Claude.ai and ChatGPT.")
+            text: i18n("Sync real-time usage data from Claude browser cookies and the existing local Codex login. "
+                     + "Browser cookie databases are read-only; credentials are never stored by the widget.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
         }
@@ -864,8 +863,8 @@ KCM.SimpleKCM {
                 }
                 wrapMode: Text.WordWrap
                 text: i18n("⚠ This feature uses internal, undocumented APIs. It may stop working "
-                         + "if services change their API. Your cookie data never leaves your "
-                         + "machine — all requests go directly to the official services.")
+                         + "if services change their API. Credentials are sent only to the "
+                         + "corresponding official service.")
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 color: Kirigami.Theme.neutralTextColor
             }

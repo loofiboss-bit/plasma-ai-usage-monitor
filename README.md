@@ -22,7 +22,7 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current development release:** `v12.0.1 Reliability Core` makes refresh deterministic, provider state typed, history semantics explicit, and mixed-currency totals honest. The supported Fedora route remains the COPR package.
+> **Current development release:** `v12.0.2 Reliability Core` makes refresh deterministic, provider state typed, history semantics explicit, and mixed-currency totals honest. The supported Fedora route remains the COPR package.
 
 ## Quick Links
 
@@ -79,7 +79,7 @@ In addition to API providers, the widget tracks usage limits for subscription-ba
 
 - Monitors `~/.codex/` directory for activity via filesystem watcher
 - Plans: **Plus** (45/5h), **Pro** (300/5h), **Business** (45/5h)
-- Single 5-hour rolling window
+- Shows the live 5-hour and weekly remaining quota when the local Codex login is available
 
 ### GitHub Copilot
 
@@ -101,9 +101,9 @@ In addition to API providers, the widget tracks usage limits for subscription-ba
 Optionally sync real-time usage data by reading session cookies from your browser:
 
 - **Claude Code** — Syncs session usage %, weekly limits, and extra usage spending from claude.ai internal API
-- **Codex CLI** — Syncs 5-hour usage, weekly limits, code review quotas, and remaining credits from chatgpt.com internal API
+- **Codex CLI** — Syncs 5-hour and weekly limits from the local `~/.codex/auth.json` login; browser account cookies remain a compatibility fallback
 
-**How it works:** The widget reads cookies from the selected browser profile's cookie database (read-only) and makes authenticated requests to the same internal APIs that the web dashboards use. Your cookie data never leaves your machine — all requests go directly to the official services.
+**How it works:** The widget reads the selected browser profile's cookie database (read-only) for Claude and fallback account checks. For Codex it prefers the existing local Codex login. Credentials are never exported or stored by the widget; authenticated requests go directly to the official services.
 
 **Supported Browsers:**
 - **Firefox** (System, Flatpak, Snap)

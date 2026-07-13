@@ -248,6 +248,7 @@ protected:
     void setTertiaryResetDate(const QDateTime &date);
     void setRemainingCredits(int credits);
     void setSubscriptionCostValue(double cost);
+    void setSyncedQuotaWindows(const QVariantList &windows);
 
     // Period management
     virtual UsagePeriod primaryPeriodType() const = 0;
@@ -298,6 +299,7 @@ private:
 
     // Credits
     int m_remainingCredits = 0;
+    QVariantList m_syncedQuotaWindows;
 
     // Sync state
     bool m_syncEnabled = false;

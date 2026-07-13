@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [12.0.2] — 2026-07-13
+
+### Added
+- Add GPT-5.6 Sol, Terra, and Luna to the OpenAI catalog and move the OpenAI/OpenRouter defaults to GPT-5.6 Terra.
+- Parse Codex's live 5-hour and weekly quota windows, including remaining percentages and reset timestamps, from the existing local Codex login.
+
+### Changed
+- Refresh current provider model IDs, prices, defaults, and lifecycle metadata for Anthropic, Google, Mistral, Groq, xAI, Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo, and AWS Bedrock.
+- Prefer local Codex authentication for quota sync while retaining the browser-account request as a compatibility fallback.
+
+### Fixed
+- Snapshot Firefox's cookie WAL and shared-memory files so recently updated login cookies are visible while Firefox is running.
+- Reassemble chunked Auth.js session cookies used by current ChatGPT sessions.
+- Feed live Codex quota windows into subscription cards instead of displaying only static plan presets.
+
 ## [12.0.1] — 2026-07-13
 
 ### Fixed

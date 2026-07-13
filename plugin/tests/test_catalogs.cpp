@@ -57,10 +57,12 @@ void CatalogsTest::providerCatalogLoads()
     QVERIFY(catalog.reviewItems().first().toMap().contains(QStringLiteral("reviewReason")));
 
     const QVariantList openAiModels = catalog.tokenModelsForProvider(QStringLiteral("openai"));
-    QVERIFY(openAiModels.size() >= 3);
-    const QVariantMap gpt54Pricing = catalog.pricing(QStringLiteral("openai"), QStringLiteral("gpt-5.4"));
-    QCOMPARE(gpt54Pricing.value(QStringLiteral("unit")).toString(), QStringLiteral("1M_tokens"));
-    QCOMPARE(gpt54Pricing.value(QStringLiteral("precision")).toString(), QStringLiteral("official_exact"));
+    QVERIFY(openAiModels.size() >= 7);
+    const QVariantMap gpt56Pricing = catalog.pricing(QStringLiteral("openai"), QStringLiteral("gpt-5.6-terra"));
+    QCOMPARE(gpt56Pricing.value(QStringLiteral("unit")).toString(), QStringLiteral("1M_tokens"));
+    QCOMPARE(gpt56Pricing.value(QStringLiteral("precision")).toString(), QStringLiteral("official_exact"));
+    QCOMPARE(gpt56Pricing.value(QStringLiteral("input")).toDouble(), 2.5);
+    QCOMPARE(gpt56Pricing.value(QStringLiteral("output")).toDouble(), 15.0);
     QVERIFY(!catalog.pricing(QStringLiteral("deepseek"), QStringLiteral("deepseek-v4-flash")).isEmpty());
     QCOMPARE(catalog.effectiveModelIdAt(QStringLiteral("deepseek"), QStringLiteral("deepseek-chat"),
                                         QDate(2026, 7, 23)), QStringLiteral("deepseek-chat"));
@@ -70,7 +72,7 @@ void CatalogsTest::providerCatalogLoads()
     QCOMPARE(openAi.value(QStringLiteral("stableId")).toString(), QStringLiteral("openai"));
     QVERIFY(openAi.value(QStringLiteral("capabilities")).toList().contains(QStringLiteral("cost")));
 
-    QVERIFY(qAbs(catalog.amountForModelUnit(QStringLiteral("googleveo"), QStringLiteral("veo-2"), QStringLiteral("video_second")) - 0.35) < 0.000001);
+    QVERIFY(qAbs(catalog.amountForModelUnit(QStringLiteral("googleveo"), QStringLiteral("veo-3.1-generate-preview"), QStringLiteral("video_second")) - 0.4) < 0.000001);
 }
 
 void CatalogsTest::subscriptionCatalogLoads()
@@ -79,7 +81,7 @@ void CatalogsTest::subscriptionCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 1);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.06.30"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.07.13"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(catalog.sourceConflictCount() > 0);

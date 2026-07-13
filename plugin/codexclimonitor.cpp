@@ -1,6 +1,7 @@
 #include "codexclimonitor.h"
 #include <QDir>
 #include <QDebug>
+#include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -10,6 +11,48 @@
 #include <KLocalizedString>
 
 #include "browsercookieextractor.h"
+
+namespace {
+double numericField(const QJsonObject &object, const QString &snakeName, const QString &camelName)
+{
+    const QJsonValue snake = object.value(snakeName);
+    if (snake.isDouble()) return snake.toDouble();
+    const QJsonValue camel = object.value(camelName);
+    return camel.isDouble() ? camel.toDouble() : -1.0;
+}
+
+QVariantMap codexQuotaWindow(const QJsonObject &window)
+{
+    const double usedPercent = numericField(window, QStringLiteral("used_percent"), QStringLiteral("usedPercent"));
+    const double windowSeconds = numericField(window, QStringLiteral("limit_window_seconds"), QStringLiteral("windowSeconds"));
+    const double resetAt = numericField(window, QStringLiteral("reset_at"), QStringLiteral("resetsAt"));
+    if (usedPercent < 0.0) return {};
+
+    const bool weekly = windowSeconds >= 6.0 * 24.0 * 60.0 * 60.0;
+    QVariantMap row;
+    row.insert(QStringLiteral("kind"), weekly ? QStringLiteral("rolling_weekly") : QStringLiteral("rolling_5h"));
+    row.insert(QStringLiteral("label"), weekly ? QStringLiteral("Weekly Codex limit") : QStringLiteral("5-hour Codex limit"));
+    row.insert(QStringLiteral("unit"), QStringLiteral("percent_remaining"));
+    row.insert(QStringLiteral("percentUsed"), qBound(0.0, usedPercent, 100.0));
+    row.insert(QStringLiteral("percentRemaining"), qBound(0.0, 100.0 - usedPercent, 100.0));
+    row.insert(QStringLiteral("source"), QStringLiteral("browser_sync"));
+    row.insert(QStringLiteral("precision"), QStringLiteral("browser_sync_actual"));
+    row.insert(QStringLiteral("visibleByDefault"), true);
+    if (resetAt > 0.0) {
+        const QDateTime reset = QDateTime::fromSecsSinceEpoch(static_cast<qint64>(resetAt), QTimeZone::UTC);
+        row.insert(QStringLiteral("resetAt"), reset.toString(Qt::ISODate));
+        qint64 remaining = QDateTime::currentDateTimeUtc().secsTo(reset);
+        if (remaining > 0) {
+            const qint64 days = remaining / 86400;
+            const qint64 hours = (remaining % 86400) / 3600;
+            row.insert(QStringLiteral("timeUntilReset"), days > 0
+                ? QStringLiteral("%1d %2h").arg(days).arg(hours)
+                : QStringLiteral("%1h %2m").arg(hours).arg((remaining % 3600) / 60));
+        }
+    }
+    return row;
+}
+}
 
 CodexCliMonitor::CodexCliMonitor(QObject *parent)
     : LocalActivityMonitorBase(parent)
@@ -60,6 +103,10 @@ void CodexCliMonitor::syncFromBrowser(const QString &cookieHeader, int browserTy
     setSyncing(true);
     setSyncStatus(QStringLiteral("Syncing..."));
 
+    if (!qEnvironmentVariableIsSet("PLASMA_AI_MONITOR_DEMO") && fetchCodexUsage(cookieHeader)) {
+        return;
+    }
+
     if (cookieHeader.isEmpty()) {
         setSyncing(false);
         setSyncStatus(i18n("Not logged in"));
@@ -70,6 +117,87 @@ void CodexCliMonitor::syncFromBrowser(const QString &cookieHeader, int browserTy
     }
 
     fetchAccountCheck(cookieHeader);
+}
+
+bool CodexCliMonitor::fetchCodexUsage(const QString &cookieHeader)
+{
+    QFile authFile(codexConfigDir() + QStringLiteral("/auth.json"));
+    if (!authFile.open(QIODevice::ReadOnly)) return false;
+
+    const QJsonObject auth = QJsonDocument::fromJson(authFile.readAll()).object();
+    const QJsonObject tokens = auth.value(QStringLiteral("tokens")).toObject();
+    const QString accessToken = tokens.value(QStringLiteral("access_token")).toString();
+    const QString accountId = tokens.value(QStringLiteral("account_id")).toString();
+    if (accessToken.isEmpty()) return false;
+
+    QNetworkRequest request(QUrl(QStringLiteral("https://chatgpt.com/backend-api/wham/usage")));
+    request.setRawHeader("Authorization", QByteArrayLiteral("Bearer ") + accessToken.toUtf8());
+    request.setRawHeader("Accept", "application/json");
+    request.setRawHeader("OpenAI-Beta", "codex-1");
+    request.setRawHeader("originator", "Codex CLI");
+    request.setRawHeader("User-Agent", "codex-cli");
+    if (!accountId.isEmpty()) request.setRawHeader("ChatGPT-Account-ID", accountId.toUtf8());
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
+    request.setTransferTimeout(30000);
+
+    QNetworkReply *reply = networkManager()->get(request);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, cookieHeader]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError) {
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            if ((status == 401 || status == 403) && !cookieHeader.isEmpty()) {
+                qWarning() << "CodexCliMonitor: Codex usage request rejected; falling back to browser account check, HTTP" << status;
+                fetchAccountCheck(cookieHeader);
+                return;
+            }
+            setSyncing(false);
+            setSyncStatus(i18n("Sync failed"));
+            Q_EMIT syncCompleted(false, reply->errorString());
+            return;
+        }
+
+        const QByteArray payload = reply->readAll();
+        const QJsonObject root = QJsonDocument::fromJson(payload).object();
+        const QVariantList windows = quotaWindowsFromUsagePayload(payload);
+        setSyncedQuotaWindows(windows);
+
+        const QString reportedPlan = root.value(QStringLiteral("plan_type")).toString().toLower();
+        if (!reportedPlan.isEmpty()) setPlanTier(reportedPlan);
+
+        const QJsonObject credits = root.value(QStringLiteral("credits")).toObject();
+        if (credits.value(QStringLiteral("has_credits")).toBool()) {
+            bool ok = false;
+            const double balance = credits.value(QStringLiteral("balance")).toString().toDouble(&ok);
+            if (ok) {
+                setRemainingCredits(qMax(0, qRound(balance)));
+                m_hasCreditsData = true;
+            }
+        }
+
+        setSyncing(false);
+        setLastSyncTime(QDateTime::currentDateTimeUtc());
+        if (windows.isEmpty()) {
+            setSyncStatus(i18n("Plan presets"));
+            Q_EMIT syncCompleted(true, i18n("Codex did not return live quota fields; showing configured plan presets."));
+        } else {
+            setSyncStatus(i18n("Synced"));
+            Q_EMIT syncCompleted(true, i18n("Codex limits synced successfully"));
+        }
+        Q_EMIT usageUpdated();
+    });
+    return true;
+}
+
+QVariantList CodexCliMonitor::quotaWindowsFromUsagePayload(const QByteArray &payload)
+{
+    const QJsonObject root = QJsonDocument::fromJson(payload).object();
+    const QJsonObject rateLimit = root.value(QStringLiteral("rate_limit")).toObject();
+    QVariantList windows;
+    const QVariantMap primary = codexQuotaWindow(rateLimit.value(QStringLiteral("primary_window")).toObject());
+    const QVariantMap secondary = codexQuotaWindow(rateLimit.value(QStringLiteral("secondary_window")).toObject());
+    if (!primary.isEmpty()) windows << primary;
+    if (!secondary.isEmpty()) windows << secondary;
+    return windows;
 }
 
 void CodexCliMonitor::fetchAccountCheck(const QString &cookieHeader)
