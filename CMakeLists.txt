@@ -31,6 +31,11 @@ find_package(KF6I18n REQUIRED)
 include(CTest)
 if(BUILD_TESTING)
     find_package(Qt6 REQUIRED COMPONENTS Test)
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+    add_test(
+        NAME demo_contract
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_demo_contract.py"
+    )
 endif()
 
 # Install the plasmoid package

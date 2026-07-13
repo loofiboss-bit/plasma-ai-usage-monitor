@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - Include typed `usage_api` gateway spend in provider cards, monthly exposure, and compact panel totals while preserving unavailable costs as `Unknown`.
 - Isolate demo and screenshot sessions from KWallet at the native secrets boundary and route descriptor adapters only to the deterministic mock endpoint.
+- Align the OpenRouter demo fixture with the native v13 `GET /key` payload and gate all launch-provider demo routes with an executable contract test.
 - Stabilize the DeepSeek probe regression test by waiting for its parallel read-only refresh to finish before starting a manual diagnostic.
 
 ### Release status
