@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Move OpenRouter monitoring to `/api/v1/key` and retain native daily, weekly, monthly, remaining-limit, and reset fields.
 - Stop presenting published Gemini and Veo caps as live remaining quota.
 - Display unavailable provider metrics as Unknown and document scheduled traffic in Trust Center.
+- Refresh the canonical KDE screenshots and deterministic demo fixtures around the four v13 launch providers.
+
+### Fixed
+- Include typed `usage_api` gateway spend in provider cards, monthly exposure, and compact panel totals while preserving unavailable costs as `Unknown`.
+- Isolate demo and screenshot sessions from KWallet at the native secrets boundary and route descriptor adapters only to the deterministic mock endpoint.
+- Stabilize the DeepSeek probe regression test by waiting for its parallel read-only refresh to finish before starting a manual diagnostic.
 
 ### Release status
 - Stable promotion remains blocked until the exact RC commit completes the required seven-day soak and Fedora 44 install/upgrade/remove plus live provider smoke checks pass.

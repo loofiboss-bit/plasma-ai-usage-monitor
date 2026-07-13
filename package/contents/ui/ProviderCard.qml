@@ -137,7 +137,7 @@ ColumnLayout {
                     spacing: Kirigami.Units.smallSpacing
 
                     PlasmaComponents.Label {
-                        text: Utils.formatMoney(card.backend?.cost ?? 0, card.backend?.currency || "USD")
+                        text: currentCostText()
                         font.bold: true
                         color: Kirigami.Theme.textColor
                     }
@@ -270,11 +270,12 @@ ColumnLayout {
                     }
                     Item { Layout.fillWidth: true }
                     PlasmaComponents.Label {
-                        text: Utils.formatMoney(card.backend?.cost ?? 0, card.backend?.currency || "USD")
+                        text: currentCostText()
                         font.bold: true
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.2
                         color: {
-                            var c = card.backend?.cost ?? 0;
+                            if (!currentCostAvailable()) return Kirigami.Theme.disabledTextColor;
+                            var c = currentCostValue();
                             if (c > 10) return Kirigami.Theme.negativeTextColor;
                             if (c > 5) return Kirigami.Theme.neutralTextColor;
                             return Kirigami.Theme.textColor;
@@ -375,6 +376,7 @@ ColumnLayout {
                 Repeater {
                     model: liveRateRows()
                     ColumnLayout {
+                        id: rateRow
                         Layout.fillWidth: true
                         visible: modelData.total > 0
                         spacing: 2
@@ -388,7 +390,7 @@ ColumnLayout {
                             }
                             Item { Layout.fillWidth: true }
                             PlasmaComponents.Label {
-                                text: formatNumber(parent.used) + " / " + formatNumber(modelData.total)
+                                text: formatNumber(rateRow.used) + " / " + formatNumber(modelData.total)
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                             }
                         }
@@ -561,12 +563,20 @@ ColumnLayout {
         var rows = [];
         var requestLimit = card.backend.metric("request_limit");
         var requestRemaining = card.backend.metric("request_remaining");
-        if (requestLimit.available && requestRemaining.available && Number(requestLimit.value) > 0)
-            rows.push({ label: i18n("Requests/min"), total: Number(requestLimit.value), remaining: Number(requestRemaining.value) });
+        var requestLimitValue = Number(requestLimit.value);
+        var requestRemainingValue = Number(requestRemaining.value);
+        if (requestLimit.available && requestRemaining.available
+                && Number.isFinite(requestLimitValue) && requestLimitValue > 0
+                && Number.isFinite(requestRemainingValue))
+            rows.push({ label: i18n("Requests/min"), total: requestLimitValue, remaining: requestRemainingValue });
         var tokenLimit = card.backend.metric("token_limit");
         var tokenRemaining = card.backend.metric("token_remaining");
-        if (tokenLimit.available && tokenRemaining.available && Number(tokenLimit.value) > 0)
-            rows.push({ label: i18n("Tokens/min"), total: Number(tokenLimit.value), remaining: Number(tokenRemaining.value) });
+        var tokenLimitValue = Number(tokenLimit.value);
+        var tokenRemainingValue = Number(tokenRemaining.value);
+        if (tokenLimit.available && tokenRemaining.available
+                && Number.isFinite(tokenLimitValue) && tokenLimitValue > 0
+                && Number.isFinite(tokenRemainingValue))
+            rows.push({ label: i18n("Tokens/min"), total: tokenLimitValue, remaining: tokenRemainingValue });
         return rows;
     }
 
@@ -627,10 +637,36 @@ ColumnLayout {
 
     function costHeading() {
         var source = card.backend?.costSource ?? "unknown";
-        if (source === "billing_api") return i18n("API Spend");
+        if (source === "billing_api" || source === "usage_api" || source === "actual_api") return i18n("API Spend");
         if (source === "estimated_from_usage") return i18n("Estimated Burn");
         if (source === "connectivity_probe") return i18n("Probe Cost");
         return (card.backend?.isEstimatedCost ?? false) ? i18n("Estimated Cost") : i18n("Cost");
+    }
+
+    function currentCostMetric() {
+        var metrics = card.backend?.metrics || [];
+        for (var i = metrics.length - 1; i >= 0; i--) {
+            var metric = metrics[i] || {};
+            if (metric["kind"] === "cost" && metric["window"] === "current")
+                return metric;
+        }
+        return {};
+    }
+
+    function currentCostAvailable() {
+        var metric = currentCostMetric();
+        return metric["available"] === true && Number.isFinite(Number(metric["value"]));
+    }
+
+    function currentCostValue() {
+        var metric = currentCostMetric();
+        return currentCostAvailable() ? Number(metric["value"]) : 0;
+    }
+
+    function currentCostText() {
+        if (!currentCostAvailable()) return i18n("Unknown");
+        var metric = currentCostMetric();
+        return Utils.formatMoney(Number(metric["value"]), metric["currency"] || card.backend?.currency || "USD");
     }
 
     function currentCatalogModel() {

@@ -2,9 +2,15 @@
 #include <QDebug>
 
 SecretsManager::SecretsManager(QObject *parent)
-    : QObject(parent)
+    : QObject(parent),
+      m_demoIsolated(qEnvironmentVariableIsSet("PLASMA_AI_MONITOR_DEMO"))
 {
-    openWallet();
+    // Demo and screenshot sessions are deterministic fixtures. They must not
+    // open KWallet, warm its cache, reveal which credentials exist, or mutate
+    // a real user's secrets.
+    if (!m_demoIsolated) {
+        openWallet();
+    }
 }
 
 SecretsManager::~SecretsManager()
@@ -22,8 +28,16 @@ int SecretsManager::secretReadCount() const
     return m_secretReadCount;
 }
 
+bool SecretsManager::isDemoIsolated() const
+{
+    return m_demoIsolated;
+}
+
 void SecretsManager::retryOpenWallet()
 {
+    if (m_demoIsolated) {
+        return;
+    }
     delete m_wallet;
     m_wallet = nullptr;
     if (m_walletOpen) {
@@ -114,6 +128,9 @@ bool SecretsManager::ensureFolder()
 
 void SecretsManager::storeKey(const QString &provider, const QString &key)
 {
+    if (m_demoIsolated) {
+        return;
+    }
     if (!m_walletOpen) {
         m_pendingOps.append({PendingOp::Store, provider, key});
         return;
@@ -134,6 +151,9 @@ void SecretsManager::storeKey(const QString &provider, const QString &key)
 
 QString SecretsManager::getKey(const QString &provider)
 {
+    if (m_demoIsolated) {
+        return {};
+    }
     if (!m_walletOpen || !ensureFolder()) {
         return QString();
     }
@@ -158,6 +178,9 @@ QString SecretsManager::getKey(const QString &provider)
 
 void SecretsManager::removeKey(const QString &provider)
 {
+    if (m_demoIsolated) {
+        return;
+    }
     if (!m_walletOpen) {
         m_pendingOps.append({PendingOp::Remove, provider, QString()});
         return;
@@ -178,6 +201,9 @@ void SecretsManager::removeKey(const QString &provider)
 
 bool SecretsManager::hasKey(const QString &provider)
 {
+    if (m_demoIsolated) {
+        return false;
+    }
     if (!m_walletOpen || !ensureFolder()) {
         return false;
     }

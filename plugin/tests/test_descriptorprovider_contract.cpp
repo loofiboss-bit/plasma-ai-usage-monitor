@@ -78,6 +78,26 @@ private:
     QList<QByteArray> m_requests;
 };
 
+class EnvironmentGuard final
+{
+public:
+    explicit EnvironmentGuard(const char *name)
+        : m_name(name), m_hadValue(qEnvironmentVariableIsSet(name)), m_value(qgetenv(name))
+    {
+    }
+
+    ~EnvironmentGuard()
+    {
+        if (m_hadValue) qputenv(m_name.constData(), m_value);
+        else qunsetenv(m_name.constData());
+    }
+
+private:
+    QByteArray m_name;
+    bool m_hadValue;
+    QByteArray m_value;
+};
+
 class DescriptorProviderContractTest final : public QObject
 {
     Q_OBJECT
@@ -90,6 +110,7 @@ private Q_SLOTS:
     void credentialsAreRequiredWithoutNetworkTraffic();
     void modelDiscoveryDeduplicatesAndKeepsFallback();
     void fireworksPaginationAndRequestBudget();
+    void demoModeUsesIsolatedMockEndpoint();
     void discoveryFailureKeepsFallbackAndRedactsSecret();
     void gatewayPreservesMixedCurrenciesAndZero();
     void staleGenerationIsDiscarded();
@@ -255,6 +276,29 @@ void DescriptorProviderContractTest::fireworksPaginationAndRequestBudget()
     QCOMPARE(backend.dataQuality(), QStringLiteral("connectivity_partial"));
     QCOMPARE(backend.capabilityStatus().value(QStringLiteral("model_discovery")).toMap()
                  .value(QStringLiteral("status")).toString(), QStringLiteral("partial"));
+}
+
+void DescriptorProviderContractTest::demoModeUsesIsolatedMockEndpoint()
+{
+    EnvironmentGuard demoGuard("PLASMA_AI_MONITOR_DEMO");
+    EnvironmentGuard baseGuard("PLASMA_AI_MONITOR_DEMO_BASE_URL");
+    ContractHttpServer server;
+    QVERIFY(server.listen());
+    server.respond(QStringLiteral("/models"), 200,
+                   QByteArray(R"({"data":[{"id":"demo-model"}]})"));
+    qputenv("PLASMA_AI_MONITOR_DEMO", QByteArrayLiteral("1"));
+    qputenv("PLASMA_AI_MONITOR_DEMO_BASE_URL", server.baseUrl().toUtf8());
+
+    DescriptorProvider backend(descriptor(QStringLiteral("fireworks")));
+    backend.setApiKey(QStringLiteral("demo-key"));
+    QSignalSpy updated(&backend, &ProviderBackend::dataUpdated);
+    backend.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(updated.count() > 0, 2000);
+
+    QVERIFY(backend.isConnected());
+    QCOMPARE(server.methods(), QStringList{QStringLiteral("GET")});
+    QCOMPARE(server.targets(), QStringList{QStringLiteral("/models")});
+    QCOMPARE(server.requests().first().count("demo-key"), 1);
 }
 
 void DescriptorProviderContractTest::discoveryFailureKeepsFallbackAndRedactsSecret()

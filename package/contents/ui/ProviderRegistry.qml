@@ -39,7 +39,7 @@ QtObject {
     function providerEnabled(descriptor) {
         var configKey = descriptor.configKey;
         if (demoMode) {
-            return ["openai", "google", "mistral", "deepseek", "groq", "openrouter"].indexOf(configKey) >= 0;
+            return ["litellm", "cerebras", "fireworks", "perplexity"].indexOf(configKey) >= 0;
         }
         return !!configuration[providerEnabledKey(descriptor)];
     }
@@ -173,7 +173,7 @@ QtObject {
         for (var i = 0; i < allProviders.length; i++) {
             if (allProviders[i].enabled && allProviders[i].backend && allProviders[i].backend.connected) {
                 var source = allProviders[i].backend.costSource || "unknown";
-                if (source === "billing_api" || source === "actual_api") {
+                if (source === "billing_api" || source === "usage_api" || source === "actual_api") {
                     Utils.addCurrencyTotal(totals,
                                            allProviders[i].backend.currency,
                                            allProviders[i].backend.cost);

@@ -23,6 +23,17 @@ Item {
     required property var jetbrainsAiMonitor
 
     function loadIntegrationSecrets() {
+        if (registry.demoMode) {
+            if (copilotMonitor) copilotMonitor.githubToken = "";
+            if (registry.bedrockBackend) {
+                registry.bedrockBackend.secretAccessKey = "";
+                registry.bedrockBackend.sessionToken = "";
+            }
+            webhookNotifier.slackWebhookUrl = "";
+            webhookNotifier.discordWebhookUrl = "";
+            return;
+        }
+
         if (copilotMonitor) {
             copilotMonitor.githubToken = secrets.getKey("copilot_github");
         }
@@ -48,7 +59,9 @@ Item {
         }
         if (provider.requiresApiKey !== false) {
             var keySlot = provider.secretKey || provider.configKey;
-            provider.backend.setApiKey(secrets.getKey(keySlot));
+            // Demo mode is deterministic and must never read a real wallet
+            // credential. The mock server accepts this non-secret sentinel.
+            provider.backend.setApiKey(registry.demoMode ? "demo-key" : secrets.getKey(keySlot));
         }
         if (shouldRefresh) {
             scheduler.refreshProvider(provider, reason, true);

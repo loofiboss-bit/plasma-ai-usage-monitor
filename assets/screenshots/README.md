@@ -9,6 +9,7 @@ Keep these filenames stable unless you also update every consumer:
 - `main-window.png`
 - `panel-view.png`
 - `settings-view.png`
+- `provider-intelligence.png`
 
 The current README and AppStream metadata already reference those names.
 
@@ -18,10 +19,19 @@ The current README and AppStream metadata already reference those names.
 
 Capture the expanded popup with:
 
-- multiple connected provider cards
-- visible cost and quota bars
+- all v13 launch-provider cards visible
+- actual spend and unavailable values labeled without fabricated zeroes
 - clean summary area
 - no errors, secrets, or placeholder-looking values
+
+### `provider-intelligence.png`
+
+Capture at least one expanded provider card with:
+
+- typed usage and cost source chips
+- an actual gateway spend value when the fixture provides one
+- a connectivity-only provider showing `Unknown` for unavailable metrics
+- last-success and last-attempt information
 
 ### `panel-view.png`
 
@@ -61,6 +71,6 @@ Prepare these for KDE Store even if they are not yet wired into README:
 1. launch the widget in the Fedora KDE demo VM
 2. start `python scripts/demo/mock_ai_usage_server.py`
 3. run Plasma with the demo flag: `PLASMA_AI_MONITOR_DEMO=1 plasmashell --replace &`
-4. capture the three canonical shots plus any optional store extras
+4. capture the four canonical shots plus any optional store extras
 5. review images at 100% scale before replacing files in this directory
 6. confirm README and AppStream still render the updated assets correctly

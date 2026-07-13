@@ -139,6 +139,14 @@ Current canonical asset names live under `assets/screenshots/` and are intention
 
 ![Plasma AI Usage Monitor main window](assets/screenshots/main-window.png)
 
+### Provider intelligence
+
+The detailed provider view distinguishes actual gateway spend from connectivity-only
+discovery. Unavailable usage and billing values remain `Unknown` rather than being
+rendered as zero.
+
+![Plasma AI Usage Monitor provider intelligence](assets/screenshots/provider-intelligence.png)
+
 ### Analyst view
 
 ![Plasma AI Usage Monitor analyst view](assets/screenshots/analyst-view.png)

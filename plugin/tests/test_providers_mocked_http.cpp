@@ -573,6 +573,7 @@ void ProvidersMockedHttpTest::deepSeekUsageAndBalance()
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
     QTRY_COMPARE_WITH_TIMEOUT(provider.balance(), 13.0, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!provider.isLoading(), 3000);
     provider.testConnectionNow();
     QTRY_COMPARE_WITH_TIMEOUT(provider.probeRequestCount(), 1, 3000);
 

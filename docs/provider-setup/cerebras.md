@@ -7,3 +7,8 @@
 ## Scheduled traffic
 
 The general adapter sends one authenticated, read-only `GET /v1/models` request. It proves connectivity and model availability only. Rate-limit headers are recorded from legitimate responses when a complete limit/remaining pair exists; no background completion is generated.
+
+## Provider card
+
+The canonical v13 provider screenshot demonstrates that Cerebras connectivity is
+reported without inventing usage or cost: [provider intelligence screenshot](../../assets/screenshots/provider-intelligence.png).

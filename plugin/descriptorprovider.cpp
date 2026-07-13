@@ -59,8 +59,8 @@ void DescriptorProvider::refreshImpl()
 
     const QVariantMap endpoint = m_descriptor.value(QStringLiteral("endpoint")).toMap();
     const QVariantMap safeRefresh = m_descriptor.value(QStringLiteral("safeRefresh")).toMap();
-    QString base = customBaseUrl().trimmed();
-    if (base.isEmpty()) base = endpoint.value(QStringLiteral("default")).toString();
+    const QByteArray defaultBase = endpoint.value(QStringLiteral("default")).toString().toUtf8();
+    QString base = effectiveBaseUrl(defaultBase.constData()).trimmed();
     while (base.endsWith(QLatin1Char('/'))) base.chop(1);
     const QString path = safeRefresh.value(QStringLiteral("path")).toString();
     if (base.isEmpty() || path.isEmpty()) {

@@ -109,6 +109,25 @@
       "tokens_remaining": 289800
     }
   },
+  "litellm": {
+    "spend_logs": [
+      {
+        "spend": 4.25,
+        "prompt_tokens": 18200,
+        "completion_tokens": 6400,
+        "currency": "USD"
+      }
+    ]
+  },
+  "cerebras": {
+    "models": ["llama-4-scout-17b-16e-instruct"]
+  },
+  "fireworks": {
+    "models": ["accounts/fireworks/models/llama-v3p3-70b-instruct"]
+  },
+  "perplexity": {
+    "models": ["perplexity/sonar", "perplexity/agent"]
+  },
   "claude_code": {
     "bootstrap": {
       "account": {

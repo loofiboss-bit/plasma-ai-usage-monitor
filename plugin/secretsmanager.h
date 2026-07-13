@@ -16,6 +16,7 @@ class SecretsManager : public QObject
     Q_OBJECT
     Q_PROPERTY(bool walletOpen READ isWalletOpen NOTIFY walletOpenChanged)
     Q_PROPERTY(int secretReadCount READ secretReadCount NOTIFY diagnosticsChanged)
+    Q_PROPERTY(bool demoIsolated READ isDemoIsolated CONSTANT)
 
 public:
     explicit SecretsManager(QObject *parent = nullptr);
@@ -23,6 +24,7 @@ public:
 
     bool isWalletOpen() const;
     int secretReadCount() const;
+    bool isDemoIsolated() const;
 
     Q_INVOKABLE void storeKey(const QString &provider, const QString &key);
     Q_INVOKABLE QString getKey(const QString &provider);
@@ -48,6 +50,7 @@ private:
 
     KWallet::Wallet *m_wallet = nullptr;
     bool m_walletOpen = false;
+    bool m_demoIsolated = false;
     QString m_folderName = QStringLiteral("ai-usage-monitor");
     QHash<QString, QString> m_secretCache;
     int m_secretReadCount = 0;

@@ -141,6 +141,14 @@ target_link_libraries(test_providerbackend
 
 add_test(NAME providerbackend COMMAND test_providerbackend)
 
+add_executable(test_secretsmanager
+    test_secretsmanager.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/secretsmanager.cpp
+)
+target_include_directories(test_secretsmanager PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_secretsmanager PRIVATE Qt6::Core Qt6::Test KF6::Wallet)
+add_test(NAME secretsmanager COMMAND test_secretsmanager)
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp

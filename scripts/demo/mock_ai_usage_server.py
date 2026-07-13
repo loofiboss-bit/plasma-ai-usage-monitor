@@ -212,6 +212,28 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"status": "ok"})
             return
 
+        if path == "/spend/logs":
+            self._send_json(self._provider("litellm").get("spend_logs", []))
+            return
+
+        if path == "/models":
+            model_ids = [
+                *self._provider("cerebras").get("models", []),
+                *self._provider("fireworks").get("models", []),
+            ]
+            self._send_json(
+                {
+                    "data": [{"id": model_id} for model_id in model_ids]
+                }
+            )
+            return
+
+        if path == "/v1/models":
+            self._send_json(
+                {"data": [{"id": model_id} for model_id in self._provider("perplexity").get("models", [])]}
+            )
+            return
+
         if path in {
             "/organization/usage/completions",
             "/mock/openai/v1/organization/usage/completions",
