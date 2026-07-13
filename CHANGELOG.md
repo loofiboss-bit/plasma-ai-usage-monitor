@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [12.0.1] — 2026-07-13
+
+### Fixed
+- Restore native QML plugin discovery in Fedora/system installs by shipping the Linux module as `libaiusagemonitorplugin.so` instead of the build-only filename accepted by the previous smoke harness.
+- Declare the tab delegate's required `modelData` property so the v12 popup renders without a Qt 6.11 `ReferenceError`.
+- Make the strict QML import smoke use only the actual installed Linux plugin filename, preventing this packaging regression from passing CI again.
+
 ## [12.0.0] — Unreleased
 
 ### Added

@@ -91,6 +91,12 @@ qt_add_qml_module(aiusagemonitorplugin
     SOURCES ${aiusagemonitor_SRCS} ${aiusagemonitor_HDRS}
 )
 
+# QQmlExtensionPlugin resolves native plugins as lib<name>.so on Linux.  Keep
+# the conventional prefix explicit because qt_add_qml_module() otherwise
+# produced aiusagemonitorplugin.so in Fedora packages, which the runtime could
+# not discover from qmldir.
+set_target_properties(aiusagemonitorplugin PROPERTIES PREFIX "lib")
+
 target_compile_definitions(aiusagemonitorplugin
     PRIVATE AIUSAGE_MONITOR_VERSION="${PROJECT_VERSION}"
 )
