@@ -36,6 +36,10 @@ if(BUILD_TESTING)
         NAME demo_contract
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_demo_contract.py"
     )
+    add_test(
+        NAME exact_tag_promotion
+        COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_verify_exact_tag.sh"
+    )
 endif()
 
 # Install the plasmoid package
