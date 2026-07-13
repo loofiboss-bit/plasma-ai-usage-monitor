@@ -47,7 +47,6 @@ private Q_SLOTS:
 
 private:
     void fetchModelInfo();
-    void applyKnownLimits();
 
     QString m_model = QStringLiteral("veo-3");
     QString m_tier = QStringLiteral("paid");

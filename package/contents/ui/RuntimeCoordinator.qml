@@ -78,25 +78,39 @@ Item {
             activeModel = backend.model;
         }
 
-        usageDatabase.recordSnapshot(
-            providerName,
-            backend.inputTokens,
-            backend.outputTokens,
-            backend.requestCount,
-            backend.cost,
-            backend.dailyCost,
-            backend.monthlyCost,
-            backend.rateLimitRequests,
-            backend.rateLimitRequestsRemaining,
-            backend.rateLimitTokens,
-            backend.rateLimitTokensRemaining,
-            activeModel,
-            backend.isEstimatedCost,
-            backend.costSource || "unknown",
-            backend.usageSource || "unknown",
-            backend.currency || "USD",
-            backend.dataQuality || "unknown"
-        );
+        var inputMetric = backend.metric ? backend.metric("input_tokens") : {};
+        var outputMetric = backend.metric ? backend.metric("output_tokens") : {};
+        var requestsMetric = backend.metric ? backend.metric("requests") : {};
+        var costMetric = backend.metric ? backend.metric("cost", "", "current") : {};
+
+        // v13 writes the nullable typed contract for every provider.  The old
+        // snapshot table remains a compatibility projection and is updated
+        // only when all of its non-nullable core fields are genuinely known.
+        if (inputMetric.available && outputMetric.available
+                && requestsMetric.available && costMetric.available) {
+            usageDatabase.recordSnapshot(
+                providerName,
+                backend.inputTokens,
+                backend.outputTokens,
+                backend.requestCount,
+                backend.cost,
+                backend.dailyCost,
+                backend.monthlyCost,
+                backend.rateLimitRequests,
+                backend.rateLimitRequestsRemaining,
+                backend.rateLimitTokens,
+                backend.rateLimitTokensRemaining,
+                activeModel,
+                backend.isEstimatedCost,
+                backend.costSource || "unknown",
+                backend.usageSource || "unknown",
+                backend.currency || "USD",
+                backend.dataQuality || "unknown"
+            );
+        }
+        if (backend.metrics !== undefined && backend.metrics.length > 0) {
+            usageDatabase.recordProviderMetrics(providerName, backend.metrics);
+        }
         syncMetricsPayload();
     }
 
@@ -141,24 +155,38 @@ Item {
             var dataQuality = labelValue(backend.dataQuality || "unknown");
             lines.push("ai_usage_provider_connected{provider=\"" + providerKey + "\"} " + (backend.connected ? "1" : "0"));
             lines.push("ai_usage_provider_source_info{provider=\"" + providerKey + "\",cost_source=\"" + costSource + "\",usage_source=\"" + usageSource + "\",currency=\"" + currency + "\",data_quality=\"" + dataQuality + "\"} 1");
-            lines.push("ai_usage_provider_cost{provider=\"" + providerKey + "\",cost_source=\"" + costSource + "\",currency=\"" + currency + "\"} " + (backend.cost || 0));
-            lines.push("ai_usage_provider_daily_cost{provider=\"" + providerKey + "\",cost_source=\"" + costSource + "\",currency=\"" + currency + "\"} " + (backend.dailyCost || 0));
-            lines.push("ai_usage_provider_monthly_cost{provider=\"" + providerKey + "\",cost_source=\"" + costSource + "\",currency=\"" + currency + "\"} " + (backend.monthlyCost || 0));
-            lines.push("ai_usage_provider_input_tokens{provider=\"" + providerKey + "\"} " + (backend.inputTokens || 0));
-            lines.push("ai_usage_provider_output_tokens{provider=\"" + providerKey + "\"} " + (backend.outputTokens || 0));
-            lines.push("ai_usage_provider_requests{provider=\"" + providerKey + "\"} " + (backend.requestCount || 0));
+            var typedMetrics = backend.metrics || [];
+            for (var metricIndex = 0; metricIndex < typedMetrics.length; metricIndex++) {
+                var metric = typedMetrics[metricIndex];
+                var metricLabels = "provider=\"" + providerKey
+                    + "\",kind=\"" + labelValue(metric.kind)
+                    + "\",unit=\"" + labelValue(metric.unit)
+                    + "\",currency=\"" + labelValue(metric.currency)
+                    + "\",source=\"" + labelValue(metric.source)
+                    + "\",quality=\"" + labelValue(metric.quality)
+                    + "\",scope=\"" + labelValue(metric.scope)
+                    + "\",window=\"" + labelValue(metric.window) + "\"";
+                lines.push("ai_usage_provider_metric_available{" + metricLabels + "} "
+                           + (metric.available ? "1" : "0"));
+                if (metric.available) {
+                    lines.push("ai_usage_provider_metric{" + metricLabels + "} " + Number(metric.value));
+                }
+            }
             lines.push("ai_usage_provider_probe_input_tokens{provider=\"" + providerKey + "\"} " + (backend.probeInputTokens || 0));
             lines.push("ai_usage_provider_probe_output_tokens{provider=\"" + providerKey + "\"} " + (backend.probeOutputTokens || 0));
             lines.push("ai_usage_provider_probe_requests{provider=\"" + providerKey + "\"} " + (backend.probeRequestCount || 0));
-            lines.push("ai_usage_provider_rate_limit_requests{provider=\"" + providerKey + "\"} " + (backend.rateLimitRequests || 0));
-            lines.push("ai_usage_provider_rate_limit_requests_remaining{provider=\"" + providerKey + "\"} " + (backend.rateLimitRequestsRemaining || 0));
-            lines.push("ai_usage_provider_rate_limit_tokens{provider=\"" + providerKey + "\"} " + (backend.rateLimitTokens || 0));
-            lines.push("ai_usage_provider_rate_limit_tokens_remaining{provider=\"" + providerKey + "\"} " + (backend.rateLimitTokensRemaining || 0));
-            lines.push("ai_usage_provider_last_refresh_seconds{provider=\"" + providerKey + "\"} " + (backend.lastRefreshed ? Date.parse(backend.lastRefreshed) / 1000 : 0));
-            if (backend.costSource === "billing_api" || backend.costSource === "actual_api") {
-                addCurrencyValue(apiSpend, currency, backend.cost || 0);
-                addCurrencyValue(apiSpendToday, currency, backend.dailyCost || 0);
-                addCurrencyValue(apiSpendMonth, currency, backend.monthlyCost || 0);
+            if (backend.lastRefreshed) {
+                lines.push("ai_usage_provider_last_refresh_seconds{provider=\"" + providerKey + "\"} "
+                           + Date.parse(backend.lastRefreshed) / 1000);
+            }
+            var currentCost = backend.metric ? backend.metric("cost", "", "current") : {};
+            var dailyCost = backend.metric ? backend.metric("cost", "", "day") : {};
+            var monthlyCost = backend.metric ? backend.metric("cost", "", "month") : {};
+            if ((currentCost.source === "billing_api" || currentCost.source === "usage_api")
+                    && currentCost.available) {
+                addCurrencyValue(apiSpend, currentCost.currency, currentCost.value);
+                if (dailyCost.available) addCurrencyValue(apiSpendToday, dailyCost.currency, dailyCost.value);
+                if (monthlyCost.available) addCurrencyValue(apiSpendMonth, monthlyCost.currency, monthlyCost.value);
             } else if (backend.costSource === "estimated_from_usage" || backend.isEstimatedCost) {
                 addCurrencyValue(estimatedBurn, currency,
                                  backend.estimatedMonthlyCost || backend.monthlyCost || backend.cost || 0);
@@ -228,20 +256,24 @@ Item {
         if (!backend) {
             return 0;
         }
-        var requestPercent = 0;
-        var tokenPercent = 0;
-        if ((backend.rateLimitRequests || 0) > 0) {
-            requestPercent = 100 - ((backend.rateLimitRequestsRemaining || 0) * 100 / backend.rateLimitRequests);
+        var requestPercent = -1;
+        var tokenPercent = -1;
+        var requestLimit = backend.metric ? backend.metric("request_limit") : {};
+        var requestRemaining = backend.metric ? backend.metric("request_remaining") : {};
+        var tokenLimit = backend.metric ? backend.metric("token_limit") : {};
+        var tokenRemaining = backend.metric ? backend.metric("token_remaining") : {};
+        if (requestLimit.available && requestRemaining.available && Number(requestLimit.value) > 0) {
+            requestPercent = 100 - (Number(requestRemaining.value) * 100 / Number(requestLimit.value));
         }
-        if ((backend.rateLimitTokens || 0) > 0) {
-            tokenPercent = 100 - ((backend.rateLimitTokensRemaining || 0) * 100 / backend.rateLimitTokens);
+        if (tokenLimit.available && tokenRemaining.available && Number(tokenLimit.value) > 0) {
+            tokenPercent = 100 - (Number(tokenRemaining.value) * 100 / Number(tokenLimit.value));
         }
         return Math.max(requestPercent, tokenPercent);
     }
 
     function evaluateProviderQuota(displayName, backend) {
         var usedPercent = providerRateLimitPercent(backend);
-        if (usedPercent >= (configuration.warningThreshold || 80)) {
+        if (usedPercent >= 0 && usedPercent >= (configuration.warningThreshold || 80)) {
             notificationController.handleQuotaWarning(displayName, Math.round(usedPercent));
         }
     }
@@ -357,6 +389,19 @@ Item {
             runtime.loadProviderApiKey(configKey, runtime.scheduler.refreshConfigurationChanged, true);
         }
 
+        function syncDescriptorProvider(configKey, shouldRefresh) {
+            var provider = runtime.registry.providerByConfigKey(configKey);
+            if (!provider || !provider.backend) return;
+            var backend = provider.backend;
+            if (backend.model !== undefined)
+                backend.model = runtime.configuration[configKey + "Model"] || "";
+            backend.customBaseUrl = runtime.configuration[configKey + "CustomBaseUrl"] || "";
+            backend.dailyBudget = (runtime.configuration[configKey + "DailyBudget"] || 0) / 100.0;
+            backend.monthlyBudget = (runtime.configuration[configKey + "MonthlyBudget"] || 0) / 100.0;
+            if (shouldRefresh)
+                runtime.loadProviderApiKey(configKey, runtime.scheduler.refreshConfigurationChanged, true);
+        }
+
         function onOpenaiEnabledChanged() { providerEnabledChanged("openai"); }
         function onAnthropicEnabledChanged() { providerEnabledChanged("anthropic"); }
         function onGoogleEnabledChanged() { providerEnabledChanged("google"); }
@@ -371,6 +416,27 @@ Item {
         function onGoogleveoEnabledChanged() { providerEnabledChanged("googleveo"); }
         function onAzureEnabledChanged() { providerEnabledChanged("azure"); }
         function onBedrockEnabledChanged() { providerEnabledChanged("bedrock"); }
+        function onLitellmEnabledChanged() { providerEnabledChanged("litellm"); }
+        function onCerebrasEnabledChanged() { providerEnabledChanged("cerebras"); }
+        function onFireworksEnabledChanged() { providerEnabledChanged("fireworks"); }
+        function onPerplexityEnabledChanged() { providerEnabledChanged("perplexity"); }
+
+        function onLitellmModelChanged() { syncDescriptorProvider("litellm", true); }
+        function onCerebrasModelChanged() { syncDescriptorProvider("cerebras", true); }
+        function onFireworksModelChanged() { syncDescriptorProvider("fireworks", true); }
+        function onPerplexityModelChanged() { syncDescriptorProvider("perplexity", true); }
+        function onLitellmCustomBaseUrlChanged() { syncDescriptorProvider("litellm", true); }
+        function onCerebrasCustomBaseUrlChanged() { syncDescriptorProvider("cerebras", true); }
+        function onFireworksCustomBaseUrlChanged() { syncDescriptorProvider("fireworks", true); }
+        function onPerplexityCustomBaseUrlChanged() { syncDescriptorProvider("perplexity", true); }
+        function onLitellmDailyBudgetChanged() { syncDescriptorProvider("litellm", false); }
+        function onLitellmMonthlyBudgetChanged() { syncDescriptorProvider("litellm", false); }
+        function onCerebrasDailyBudgetChanged() { syncDescriptorProvider("cerebras", false); }
+        function onCerebrasMonthlyBudgetChanged() { syncDescriptorProvider("cerebras", false); }
+        function onFireworksDailyBudgetChanged() { syncDescriptorProvider("fireworks", false); }
+        function onFireworksMonthlyBudgetChanged() { syncDescriptorProvider("fireworks", false); }
+        function onPerplexityDailyBudgetChanged() { syncDescriptorProvider("perplexity", false); }
+        function onPerplexityMonthlyBudgetChanged() { syncDescriptorProvider("perplexity", false); }
 
         function onClaudeCodeEnabledChanged() {
             if (runtime.claudeCodeMonitor.enabled) {

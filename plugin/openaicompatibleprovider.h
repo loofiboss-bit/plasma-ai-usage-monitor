@@ -10,10 +10,8 @@
  * Base class for OpenAI-compatible provider backends.
  *
  * Handles the common pattern of:
- * - POST /chat/completions with max_tokens=1 to read rate limit headers
- * - Parsing x-ratelimit-* response headers
- * - Parsing usage object from response body as widget probe traffic
- * - Probe-level token tracking kept separate from user usage and spend
+ * - GET /models for a safe, read-only scheduled connectivity refresh
+ * - Optional manual POST /chat/completions probe, never used by the scheduler
  *
  * Subclasses must provide: name(), iconName(), defaultModel(), baseUrl()
  * Subclasses can override refreshImpl() to add extra API calls (e.g., balance endpoint)
@@ -31,6 +29,7 @@ public:
     void setModel(const QString &model);
 
     void refreshImpl() override;
+    Q_INVOKABLE void testConnectionNow();
 
 Q_SIGNALS:
     void modelChanged();
@@ -51,7 +50,9 @@ protected:
     bool decrementPendingRequest();
 
 private:
-    void fetchRateLimits();
+    void fetchModels();
+    void fetchManualProbe();
+    void onModelsFinished(QNetworkReply *reply);
     void parseRateLimitHeaders(QNetworkReply *reply);
     void parseUsageBody(QNetworkReply *reply);
 

@@ -133,6 +133,13 @@ bool CatalogLoader::load()
         Q_EMIT statusChanged();
         return false;
     }
+    constexpr qint64 MaxCatalogBytes = 4 * 1024 * 1024;
+    if (file.size() <= 0 || file.size() > MaxCatalogBytes) {
+        m_diagnostics << QStringLiteral("Catalog size is outside the allowed 1..4194304 byte range");
+        qWarning() << "AI Usage Monitor:" << m_diagnostics.constLast();
+        Q_EMIT statusChanged();
+        return false;
+    }
 
     QJsonParseError error;
     const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
@@ -161,6 +168,10 @@ bool CatalogLoader::load()
     }
     if (!QDate::fromString(m_lastReviewed, Qt::ISODate).isValid()) {
         m_diagnostics << QStringLiteral("Catalog lastReviewed is not an ISO date");
+    }
+    if (!m_root.value(QStringLiteral("providers")).isArray()
+        && m_fileName.startsWith(QLatin1String("providers"))) {
+        m_diagnostics << QStringLiteral("Provider catalog must contain a providers array");
     }
 
     m_valid = m_diagnostics.isEmpty();

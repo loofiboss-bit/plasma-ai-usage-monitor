@@ -286,6 +286,40 @@ PlasmoidItem {
         budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
     }
 
+    ProviderManager {
+        id: providerManager
+
+        function configureDescriptorBackend(key) {
+            var backend = providerManager.backend(key);
+            if (!backend) return;
+            var modelKey = key + "Model";
+            var urlKey = key + "CustomBaseUrl";
+            if (backend.model !== undefined) backend.model = plasmoid.configuration[modelKey] || "";
+            backend.customBaseUrl = plasmoid.configuration[urlKey] || "";
+            backend.dailyBudget = (plasmoid.configuration[key + "DailyBudget"] || 0) / 100.0;
+            backend.monthlyBudget = (plasmoid.configuration[key + "MonthlyBudget"] || 0) / 100.0;
+            backend.budgetWarningPercent = plasmoid.configuration.budgetWarningPercent;
+        }
+
+        Component.onCompleted: {
+            registerBackend("openai", openaiBackend);
+            registerBackend("anthropic", anthropicBackend);
+            registerBackend("google", googleBackend);
+            registerBackend("mistral", mistralBackend);
+            registerBackend("deepseek", deepseekBackend);
+            registerBackend("groq", groqBackend);
+            registerBackend("xai", xaiBackend);
+            registerBackend("ollama", ollamaBackend);
+            registerBackend("openrouter", openrouterBackend);
+            registerBackend("together", togetherBackend);
+            registerBackend("cohere", cohereBackend);
+            registerBackend("googleveo", googleveoBackend);
+            registerBackend("azure", azureBackend);
+            registerBackend("bedrock", bedrockBackend);
+            ["litellm", "cerebras", "fireworks", "perplexity"].forEach(configureDescriptorBackend);
+        }
+    }
+
     BrowserSyncService {
         id: browserSyncService
         browserType: plasmoid.configuration.browserSyncBrowser
@@ -429,6 +463,7 @@ PlasmoidItem {
         googleveoBackend: googleveoBackend
         azureBackend: azureBackend
         bedrockBackend: bedrockBackend
+        providerManager: providerManager
 
         claudeCodeMonitor: claudeCodeMonitor
         codexCliMonitor: codexCliMonitor

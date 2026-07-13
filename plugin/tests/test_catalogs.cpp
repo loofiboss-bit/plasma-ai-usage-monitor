@@ -39,17 +39,58 @@ class CatalogsTest : public QObject
 
 private Q_SLOTS:
     void providerCatalogLoads();
+    void pricingSchemaV5EstimatesWithoutFalsePrecision();
     void subscriptionCatalogLoads();
     void staleCatalogDetection();
     void invalidCatalogExposesStatus();
 };
+
+void CatalogsTest::pricingSchemaV5EstimatesWithoutFalsePrecision()
+{
+    ProviderPricingCatalog catalog;
+    QVariantMap usage{{QStringLiteral("inputTokens"), 250000},
+                      {QStringLiteral("cachedInputTokens"), 100000},
+                      {QStringLiteral("outputTokens"), 10000},
+                      {QStringLiteral("modality"), QStringLiteral("text")},
+                      {QStringLiteral("serviceTier"), QStringLiteral("standard")}};
+    QVariantMap estimate = catalog.estimateCost(QStringLiteral("google"), QStringLiteral("gemini-2.5-pro"), usage);
+    QVERIFY(estimate.value(QStringLiteral("complete")).toBool());
+    QVERIFY(qAbs(estimate.value(QStringLiteral("amount")).toDouble() - 0.55) < 0.000001);
+    QCOMPARE(estimate.value(QStringLiteral("currency")).toString(), QStringLiteral("USD"));
+
+    usage.insert(QStringLiteral("serviceTier"), QStringLiteral("batch"));
+    estimate = catalog.estimateCost(QStringLiteral("google"), QStringLiteral("gemini-2.5-pro"), usage);
+    QVERIFY(estimate.value(QStringLiteral("complete")).toBool());
+    QVERIFY(qAbs(estimate.value(QStringLiteral("amount")).toDouble() - 0.275) < 0.000001);
+
+    usage.insert(QStringLiteral("serviceTier"), QStringLiteral("standard"));
+    usage.insert(QStringLiteral("additiveUsage"), QVariantMap{{QStringLiteral("google_search_grounding"), 2}});
+    estimate = catalog.estimateCost(QStringLiteral("google"), QStringLiteral("gemini-2.5-pro"), usage);
+    QVERIFY(!estimate.value(QStringLiteral("complete")).toBool());
+    QVERIFY(estimate.value(QStringLiteral("missingDimensions")).toStringList()
+                .contains(QStringLiteral("allowanceConsumed:google_search_grounding")));
+
+    usage.insert(QStringLiteral("allowanceConsumed"), QVariantMap{{QStringLiteral("google_search_grounding"), 1500}});
+    estimate = catalog.estimateCost(QStringLiteral("google"), QStringLiteral("gemini-2.5-pro"), usage);
+    QVERIFY(estimate.value(QStringLiteral("complete")).toBool());
+    QVERIFY(qAbs(estimate.value(QStringLiteral("amount")).toDouble() - 0.62) < 0.000001);
+
+    const QVariantMap incomplete = catalog.estimateCost(
+        QStringLiteral("google"), QStringLiteral("gemini-3.1-flash-lite"),
+        QVariantMap{{QStringLiteral("inputTokens"), 1000},
+                    {QStringLiteral("cachedInputTokens"), 500},
+                    {QStringLiteral("outputTokens"), 100}});
+    QVERIFY(!incomplete.value(QStringLiteral("complete")).toBool());
+    QVERIFY(incomplete.value(QStringLiteral("missingDimensions")).toStringList()
+                .contains(QStringLiteral("cachedInputRate")));
+}
 
 void CatalogsTest::providerCatalogLoads()
 {
     ProviderPricingCatalog catalog;
 
     QVERIFY(catalog.isValid());
-    QCOMPARE(catalog.schemaVersion(), 4);
+    QCOMPARE(catalog.schemaVersion(), 5);
     QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.07.13"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
@@ -114,7 +155,7 @@ void CatalogsTest::staleCatalogDetection()
     QFile file(dir.filePath(QStringLiteral("providers-v4.json")));
     QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
     file.write(R"JSON({
-        "schemaVersion": 4,
+        "schemaVersion": 5,
         "catalogVersion": "2026.01.01",
         "release": "8.0.0",
         "lastReviewed": "2026-01-01",

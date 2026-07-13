@@ -10,8 +10,8 @@
  * Anthropic provider backend.
  *
  * Anthropic does NOT have a usage/billing API.
- * This provider makes a lightweight count_tokens call to read
- * the rate limit headers from the response:
+ * Scheduled monitoring uses the read-only Models API. An explicit token-count
+ * diagnostic can read rate headers without being scheduled:
  *   - anthropic-ratelimit-requests-limit
  *   - anthropic-ratelimit-requests-remaining
  *   - anthropic-ratelimit-input-tokens-limit
@@ -36,15 +36,18 @@ public:
     void setModel(const QString &model);
 
     void refreshImpl() override;
+    Q_INVOKABLE void countTokensDiagnostic();
 
 Q_SIGNALS:
     void modelChanged();
 
 private Q_SLOTS:
     void onCountTokensReply(QNetworkReply *reply);
+    void onModelsReply(QNetworkReply *reply);
 
 private:
     void fetchRateLimits();
+    void fetchModels();
 
     QString m_model = QStringLiteral("claude-sonnet-4-20250514");
 

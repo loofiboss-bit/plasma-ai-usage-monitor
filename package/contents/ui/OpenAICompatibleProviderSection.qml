@@ -19,6 +19,7 @@ Kirigami.FormLayout {
     property string baseUrlLabel: i18n("Custom base URL:")
     property string baseUrlTooltip: i18n("Override the API endpoint for proxies or self-hosted gateways. Must start with https://")
     property string baseUrlPlaceholder: i18n("Leave empty for default")
+    property bool requiresApiKey: true
     property bool keyDirty: false
     property alias keyField: providerKeyField
 
@@ -37,6 +38,7 @@ Kirigami.FormLayout {
     }
 
     RowLayout {
+        visible: section.requiresApiKey
         Kirigami.FormData.label: section.keyLabel
         Layout.fillWidth: true
         spacing: Kirigami.Units.smallSpacing
@@ -110,7 +112,7 @@ Kirigami.FormLayout {
 
     QQC2.Label {
         visible: section.configPage.advancedMode && section.configPage.isInvalidUrl(baseUrlField.text)
-        text: i18n("URL must start with https:// or http://")
+        text: i18n("URL must use HTTPS; HTTP is allowed only for a loopback endpoint")
         color: Kirigami.Theme.negativeTextColor
         font.pointSize: Kirigami.Theme.smallFont.pointSize
         wrapMode: Text.WordWrap
@@ -118,9 +120,12 @@ Kirigami.FormLayout {
     }
 
     QQC2.Label {
-        visible: section.configPage.advancedMode && baseUrlField.text.toLowerCase().startsWith("http://")
-        text: i18n("Using HTTP is insecure. API keys will be sent unencrypted.")
-        color: Kirigami.Theme.negativeTextColor
+        visible: section.configPage.advancedMode
+                 && (baseUrlField.text.toLowerCase().startsWith("http://localhost")
+                     || baseUrlField.text.toLowerCase().startsWith("http://127.0.0.1")
+                     || baseUrlField.text.toLowerCase().startsWith("http://[::1]"))
+        text: i18n("Loopback HTTP is enabled for this explicitly local endpoint.")
+        color: Kirigami.Theme.neutralTextColor
         font.pointSize: Kirigami.Theme.smallFont.pointSize
         wrapMode: Text.WordWrap
         Layout.fillWidth: true

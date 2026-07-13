@@ -7,7 +7,10 @@ cd "$ROOT_DIR"
 tag="${1:-}"
 version="$(tr -d '[:space:]' < VERSION)"
 expected="v${version}"
-[[ "$tag" == "$expected" ]] || { echo "Expected exact tag ${expected}, got ${tag:-<none>}" >&2; exit 1; }
+if [[ "$tag" != "$expected" && ! "$tag" =~ ^v${version}-(alpha|beta|rc)\.[1-9][0-9]*$ ]]; then
+  echo "Expected ${expected} or a numbered alpha/beta/rc tag for that version, got ${tag:-<none>}" >&2
+  exit 1
+fi
 tag_commit="$(git rev-parse "${tag}^{commit}")"
 head_commit="$(git rev-parse HEAD)"
 [[ "$tag_commit" == "$head_commit" ]] || { echo "Tag ${tag} does not resolve to HEAD" >&2; exit 1; }

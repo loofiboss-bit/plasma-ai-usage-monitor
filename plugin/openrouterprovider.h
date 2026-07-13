@@ -9,7 +9,7 @@
  * Uses OpenAI-compatible API at openrouter.ai/api/v1.
  * - Rate limit info from response headers (x-ratelimit-*)
  * - Usage data from chat completion response body
- * - Credits balance from GET /api/v1/auth/key endpoint
+ * - Key-scoped usage and limits from GET /api/v1/key
  *
  * OpenRouter is a unified gateway to 600+ models from multiple providers.
  * Users select their model on the OpenRouter dashboard; we track the
@@ -23,6 +23,10 @@ class OpenRouterProvider : public OpenAICompatibleProvider
     Q_OBJECT
 
     Q_PROPERTY(double credits READ credits NOTIFY creditsChanged)
+    Q_PROPERTY(bool creditsAvailable READ creditsAvailable NOTIFY creditsChanged)
+    Q_PROPERTY(double usageDaily READ usageDaily NOTIFY usageWindowsChanged)
+    Q_PROPERTY(double usageWeekly READ usageWeekly NOTIFY usageWindowsChanged)
+    Q_PROPERTY(double usageMonthly READ usageMonthly NOTIFY usageWindowsChanged)
 
 public:
     explicit OpenRouterProvider(QObject *parent = nullptr);
@@ -31,11 +35,16 @@ public:
     QString iconName() const override { return QStringLiteral("globe"); }
 
     double credits() const;
+    bool creditsAvailable() const { return m_creditsAvailable; }
+    double usageDaily() const { return m_usageDaily; }
+    double usageWeekly() const { return m_usageWeekly; }
+    double usageMonthly() const { return m_usageMonthly; }
 
     void refreshImpl() override;
 
 Q_SIGNALS:
     void creditsChanged();
+    void usageWindowsChanged();
 
 protected:
     const char *defaultBaseUrl() const override { return BASE_URL; }
@@ -47,6 +56,10 @@ private:
     void fetchCredits();
 
     double m_credits = 0.0;
+    bool m_creditsAvailable = false;
+    double m_usageDaily = 0.0;
+    double m_usageWeekly = 0.0;
+    double m_usageMonthly = 0.0;
 
     static constexpr const char *BASE_URL = "https://openrouter.ai/api/v1";
 };

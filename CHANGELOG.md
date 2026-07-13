@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.0.0] — Unreleased
+
+### Added
+- Add Provider Metric Contract v2 with nullable values and source, quality, scope, window, observation, currency, and reset metadata.
+- Add transactional SQLite observation schema v4 with a pre-v13 backup and compatibility projections for existing QML.
+- Add Catalog v5 adapter profiles, a C++ `ProviderManager`, and descriptor-driven LiteLLM, Cerebras, Fireworks, and Perplexity integrations.
+- Add Gemini read-only dynamic model discovery and a release-blocking non-invasive monitoring gate.
+
+### Changed
+- Replace scheduled OpenAI-compatible and Azure completion probes with read-only model discovery; billable inference tests are explicit manual actions.
+- Move OpenRouter monitoring to `/api/v1/key` and retain native daily, weekly, monthly, remaining-limit, and reset fields.
+- Stop presenting published Gemini and Veo caps as live remaining quota.
+- Display unavailable provider metrics as Unknown and document scheduled traffic in Trust Center.
+
+### Release status
+- Stable promotion remains blocked until the exact RC commit completes the required seven-day soak and Fedora 44 install/upgrade/remove plus live provider smoke checks pass.
+
 ## [12.0.3] — 2026-07-13
 
 ### Fixed
@@ -36,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Declare the tab delegate's required `modelData` property so the v12 popup renders without a Qt 6.11 `ReferenceError`.
 - Make the strict QML import smoke use only the actual installed Linux plugin filename, preventing this packaging regression from passing CI again.
 
-## [12.0.0] — Unreleased
+## [12.0.0] — 2026-07-13
 
 ### Added
 - Add typed provider lifecycle, error, refresh reason, metric source and freshness contracts with deterministic retry scheduling.
@@ -54,7 +71,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Remove the non-functional Flatpak scaffold, tracked v7 release tarball, periodic secret polling and error-text control flow.
 
 ### Release status
-- Release candidate publication, Fedora 44 install/upgrade/rollback/remove verification, real screenshots and the required seven-day soak remain release gates.
+- Released through the v12.0.3 correctness line; historical RC verification is tracked in the release checklist.
 
 ## [11.0.0] — 2026-06-30
 

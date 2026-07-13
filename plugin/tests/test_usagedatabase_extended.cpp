@@ -10,6 +10,9 @@
 #include <QUuid>
 #include <QDir>
 #include <QFileInfo>
+#include <QFile>
+#include <QRegularExpression>
+#include <QTimeZone>
 
 #include "usagedatabase.h"
 
@@ -94,6 +97,31 @@ bool setCostSemantic(const QString &provider, const QString &semantic)
     QSqlDatabase::removeDatabase(connName);
     return ok;
 }
+
+bool installSqlFixture(const QString &fixturePath)
+{
+    QDir().mkpath(QFileInfo(databasePath()).absolutePath());
+    QFile fixture(fixturePath);
+    if (!fixture.open(QIODevice::ReadOnly | QIODevice::Text)) return false;
+    const QString connectionName = QStringLiteral("fixture_%1")
+        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    bool ok = true;
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        db.setDatabaseName(databasePath());
+        ok = db.open();
+        const QStringList statements = QString::fromUtf8(fixture.readAll()).split(QLatin1Char(';'), Qt::SkipEmptyParts);
+        for (const QString &statement : statements) {
+            if (!ok) break;
+            if (statement.trimmed().isEmpty()) continue;
+            QSqlQuery query(db);
+            ok = query.exec(statement.trimmed());
+        }
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    return ok;
+}
 } // namespace
 
 class UsageDatabaseExtendedTest : public QObject
@@ -108,7 +136,10 @@ private Q_SLOTS:
     void testExportCsvRfc4180Quoting();
     void testExportJson();
     void testSourceMetadataSchemaMigration();
-    void testObservationSchemaV3AndCurrencyIsolation();
+    void testObservationSchemaV4AndCurrencyIsolation();
+    void testNullableTypedMetricPersistence();
+    void testRealLegacyFixtureMigration_data();
+    void testRealLegacyFixtureMigration();
     void testSourceMetadataPersistenceAndExports();
     void testGetSummary();
     void testGetDailyCosts();
@@ -116,6 +147,75 @@ private Q_SLOTS:
     void testPruneOldData();
     void testDisabledRecording();
 };
+
+void UsageDatabaseExtendedTest::testRealLegacyFixtureMigration_data()
+{
+    QTest::addColumn<QString>("fixtureName");
+    QTest::addColumn<QString>("provider");
+    QTest::addColumn<QString>("source");
+    QTest::newRow("v11") << QStringLiteral("v11.sql") << QStringLiteral("OpenAI") << QStringLiteral("billing_api");
+    QTest::newRow("v12") << QStringLiteral("v12.sql") << QStringLiteral("OpenRouter") << QStringLiteral("actual_api");
+}
+
+void UsageDatabaseExtendedTest::testRealLegacyFixtureMigration()
+{
+    QFETCH(QString, fixtureName);
+    QFETCH(QString, provider);
+    QFETCH(QString, source);
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+    const QString fixture = QFINDTESTDATA(QStringLiteral("fixtures/database/") + fixtureName);
+    QVERIFY2(!fixture.isEmpty(), qPrintable(fixtureName));
+    QVERIFY(installSqlFixture(fixture));
+    {
+        UsageDatabase db;
+        db.init();
+    }
+    QVERIFY(QFileInfo::exists(databasePath() + QStringLiteral(".v13-backup")));
+
+    const QString connectionName = QStringLiteral("verify_fixture_%1")
+        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    qint64 observationCount = 0;
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        check.setDatabaseName(databasePath());
+        QVERIFY(check.open());
+        QSqlQuery query(check);
+        QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")) && query.next());
+        QCOMPARE(query.value(0).toInt(), 4);
+        query.prepare(QStringLiteral("SELECT COUNT(*), MIN(source) FROM observations WHERE provider=? AND metric_kind='cost'"));
+        query.addBindValue(provider);
+        QVERIFY(query.exec() && query.next());
+        observationCount = query.value(0).toLongLong();
+        QVERIFY(observationCount > 0);
+        QCOMPARE(query.value(1).toString(), source);
+        QVERIFY(query.exec(QStringLiteral("SELECT COUNT(*) FROM metric_source_mapping")) && query.next());
+        QVERIFY(query.value(0).toInt() >= 10);
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+
+    // A second initialization must not duplicate migrated history.
+    {
+        UsageDatabase db;
+        db.init();
+    }
+    const QString secondConnection = QStringLiteral("verify_idempotent_%1")
+        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), secondConnection);
+        check.setDatabaseName(databasePath());
+        QVERIFY(check.open());
+        QSqlQuery query(check);
+        query.prepare(QStringLiteral("SELECT COUNT(*) FROM observations WHERE provider=? AND metric_kind='cost'"));
+        query.addBindValue(provider);
+        QVERIFY(query.exec() && query.next());
+        QCOMPARE(query.value(0).toLongLong(), observationCount);
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(secondConnection);
+}
 
 void UsageDatabaseExtendedTest::testRetentionDaysClamping()
 {
@@ -152,7 +252,7 @@ void UsageDatabaseExtendedTest::testGetProviders()
     QVERIFY(providers.contains(QStringLiteral("Anthropic")));
 }
 
-void UsageDatabaseExtendedTest::testObservationSchemaV3AndCurrencyIsolation()
+void UsageDatabaseExtendedTest::testObservationSchemaV4AndCurrencyIsolation()
 {
     QTemporaryDir tmp;
     QVERIFY(tmp.isValid());
@@ -178,7 +278,20 @@ void UsageDatabaseExtendedTest::testObservationSchemaV3AndCurrencyIsolation()
         QSqlQuery query(check);
         QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")));
         QVERIFY(query.next());
-        QCOMPARE(query.value(0).toInt(), 3);
+        QCOMPARE(query.value(0).toInt(), 4);
+
+        QVERIFY(query.exec(QStringLiteral("PRAGMA table_info(observations)")));
+        bool nullableValue = false;
+        bool hasScope = false;
+        bool hasWindow = false;
+        while (query.next()) {
+            if (query.value(1).toString() == QLatin1String("value")) nullableValue = query.value(3).toInt() == 0;
+            if (query.value(1).toString() == QLatin1String("scope")) hasScope = true;
+            if (query.value(1).toString() == QLatin1String("window")) hasWindow = true;
+        }
+        QVERIFY(nullableValue);
+        QVERIFY(hasScope);
+        QVERIFY(hasWindow);
 
         QVERIFY(query.exec(QStringLiteral(
             "SELECT currency, value, semantic, source, data_quality, correlation_id "
@@ -194,9 +307,92 @@ void UsageDatabaseExtendedTest::testObservationSchemaV3AndCurrencyIsolation()
         QCOMPARE(query.value(0).toString(), QStringLiteral("USD"));
         QCOMPARE(query.value(1).toDouble(), 1.25);
         QVERIFY(!query.next());
+        QVERIFY(query.exec(QStringLiteral(
+            "SELECT normalized_source FROM metric_source_mapping WHERE legacy_source='estimated_from_usage'")));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toString(), QStringLiteral("estimated_pricing"));
         check.close();
     }
     QSqlDatabase::removeDatabase(connectionName);
+
+}
+
+void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+    UsageDatabase db;
+    db.init();
+    const QDateTime start(QDate(2026, 7, 13), QTime(0, 0), QTimeZone::UTC);
+    const QDateTime end = start.addDays(1);
+    QVariantMap unavailable{{QStringLiteral("kind"), QStringLiteral("token_remaining")},
+                            {QStringLiteral("available"), false},
+                            {QStringLiteral("unit"), QStringLiteral("token")},
+                            {QStringLiteral("source"), QStringLiteral("published_documentation")},
+                            {QStringLiteral("quality"), QStringLiteral("unknown")},
+                            {QStringLiteral("scope"), QStringLiteral("project")},
+                            {QStringLiteral("window"), QStringLiteral("day")},
+                            {QStringLiteral("periodStart"), start},
+                            {QStringLiteral("periodEnd"), end}};
+    QVariantMap actualZero = unavailable;
+    actualZero[QStringLiteral("kind")] = QStringLiteral("requests");
+    actualZero[QStringLiteral("available")] = true;
+    actualZero[QStringLiteral("value")] = 0;
+    actualZero[QStringLiteral("source")] = QStringLiteral("usage_api");
+    actualZero[QStringLiteral("quality")] = QStringLiteral("actual");
+    QVERIFY(db.recordProviderMetrics(QStringLiteral("Gemini"), {unavailable, actualZero}));
+
+    const QString connectionName = QStringLiteral("nullable_metrics_%1")
+        .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        check.setDatabaseName(databasePath());
+        QVERIFY(check.open());
+        QSqlQuery query(check);
+        QVERIFY(query.exec(QStringLiteral(
+            "SELECT metric_kind,value,interval_start_utc,interval_end_utc,scope,window,source "
+            "FROM observations WHERE provider='Gemini' ORDER BY id")));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toString(), QStringLiteral("token_remaining"));
+        QVERIFY(query.value(1).isNull());
+        QVERIFY(!query.value(2).isNull());
+        QVERIFY(!query.value(3).isNull());
+        QCOMPARE(query.value(4).toString(), QStringLiteral("project"));
+        QCOMPARE(query.value(5).toString(), QStringLiteral("day"));
+        QCOMPARE(query.value(6).toString(), QStringLiteral("published_documentation"));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toString(), QStringLiteral("requests"));
+        QCOMPARE(query.value(1).toDouble(), 0.0);
+        QVERIFY(!query.next());
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+
+    const QString exportDir = tmp.path() + QStringLiteral("/typed-export");
+    const QStringList exports = db.exportAllToDirectory(exportDir, {QStringLiteral("json"), QStringLiteral("csv")});
+    QCOMPARE(exports.size(), 4); // combined JSON plus observations/providers/tools CSV files
+    const QString jsonPath = exports.filter(QRegularExpression(QStringLiteral("\\.json$"))).value(0);
+    QFile jsonFile(jsonPath);
+    QVERIFY(jsonFile.open(QIODevice::ReadOnly));
+    const QJsonObject exportRoot = QJsonDocument::fromJson(jsonFile.readAll()).object();
+    const QJsonArray observations = exportRoot.value(QStringLiteral("observations")).toArray();
+    QCOMPARE(observations.size(), 2);
+    QVERIFY(observations.at(0).toObject().contains(QStringLiteral("value")));
+    QVERIFY(observations.at(0).toObject().value(QStringLiteral("value")).isNull());
+    QCOMPARE(observations.at(1).toObject().value(QStringLiteral("value")).toDouble(), 0.0);
+
+    const QString observationsCsv = exports.filter(QRegularExpression(QStringLiteral("observations-.*\\.csv$"))).value(0);
+    QFile csvFile(observationsCsv);
+    QVERIFY(csvFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    const QStringList csvLines = QString::fromUtf8(csvFile.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+    QCOMPARE(csvLines.size(), 3);
+    const QStringList nullFields = csvLines.at(1).trimmed().split(QLatin1Char(','), Qt::KeepEmptyParts);
+    const QStringList zeroFields = csvLines.at(2).trimmed().split(QLatin1Char(','), Qt::KeepEmptyParts);
+    QCOMPARE(nullFields.value(4), QStringLiteral("token_remaining"));
+    QVERIFY(nullFields.value(6).isEmpty());
+    QCOMPARE(zeroFields.value(4), QStringLiteral("requests"));
+    QCOMPARE(zeroFields.value(6), QStringLiteral("0"));
 }
 
 void UsageDatabaseExtendedTest::testGetToolNames()

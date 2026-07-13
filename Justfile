@@ -37,6 +37,12 @@ check:
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
     python3 scripts/check_qml_registered_types.py
+    python3 scripts/check_non_invasive_monitoring.py
+    python3 scripts/check_provider_capability_docs.py
+
+# Regenerate the provider capability matrix from Catalog v5
+generate-provider-docs:
+    python3 scripts/generate_provider_capabilities.py
 
 # Validate install prerequisites (dependencies + runtime commands)
 doctor:
@@ -66,6 +72,8 @@ release-check: build-debug
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
     python3 scripts/check_qml_registered_types.py
+    python3 scripts/check_non_invasive_monitoring.py
+    python3 scripts/check_provider_capability_docs.py
     PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --strict --build-dir build/debug --expected-version "$(< VERSION)"
     @if command -v appstreamcli >/dev/null 2>&1; then appstreamcli validate com.github.loofi.aiusagemonitor.metainfo.xml; else echo "Warning: appstreamcli not found, skipping validation. Run 'sudo dnf install appstream' on Fedora."; exit 1; fi
     @if command -v rpmlint >/dev/null 2>&1; then rpmlint plasma-ai-usage-monitor.spec; else echo "Warning: rpmlint not found, skipping validation. Run 'sudo dnf install rpmlint' on Fedora."; exit 1; fi

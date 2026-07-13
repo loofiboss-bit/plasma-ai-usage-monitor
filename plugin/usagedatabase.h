@@ -71,6 +71,7 @@ public:
     Q_INVOKABLE void recordRateLimitEvent(const QString &provider,
                                           const QString &eventType,
                                           int percentUsed);
+    Q_INVOKABLE bool recordProviderMetrics(const QString &provider, const QVariantList &metrics);
 
     /**
      * Query aggregated cost or token usage per day for the last 365 days.
@@ -232,6 +233,7 @@ private:
     void initDatabase();
     void createTables();
     bool migrateToObservationSchemaV3();
+    bool migrateToObservationSchemaV4();
     bool recordObservations(const QString &provider,
                             const QString &model,
                             qint64 inputTokens,

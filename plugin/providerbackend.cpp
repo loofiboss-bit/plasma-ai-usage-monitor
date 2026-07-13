@@ -6,6 +6,8 @@
 #include <QSet>
 #include <QLocale>
 #include <QTimeZone>
+#include <QMetaEnum>
+#include <QRegularExpression>
 
 namespace {
 ProviderBackend::NormalizedUsageCost normalizeOpenAiLikeUsage(const QJsonObject &payload)
@@ -307,6 +309,22 @@ QString ProviderBackend::costSource() const { return m_costSource; }
 QString ProviderBackend::usageSource() const { return m_usageSource; }
 QString ProviderBackend::currency() const { return m_currency; }
 QString ProviderBackend::dataQuality() const { return m_dataQuality; }
+QVariantList ProviderBackend::metrics() const { return m_metrics; }
+QVariantMap ProviderBackend::capabilityStatus() const { return m_capabilityStatus; }
+
+QVariantMap ProviderBackend::metric(const QString &kind,
+                                    const QString &scope,
+                                    const QString &window) const
+{
+    for (auto it = m_metrics.crbegin(); it != m_metrics.crend(); ++it) {
+        const QVariantMap candidate = it->toMap();
+        if (candidate.value(QStringLiteral("kind")).toString() != kind) continue;
+        if (!scope.isEmpty() && candidate.value(QStringLiteral("scope")).toString() != scope) continue;
+        if (!window.isEmpty() && candidate.value(QStringLiteral("window")).toString() != window) continue;
+        return candidate;
+    }
+    return {};
+}
 
 void ProviderBackend::setInputTokens(qint64 tokens)
 {
@@ -334,6 +352,12 @@ void ProviderBackend::setActualUsage(qint64 inputTokens, qint64 outputTokens, in
     m_inputTokens = m_actualInputTokens;
     m_outputTokens = m_actualOutputTokens;
     m_requestCount = m_actualRequestCount;
+    setProviderMetric(MetricKind::InputTokens, m_actualInputTokens, QStringLiteral("token"), QString(),
+                      QStringLiteral("api_key"), QStringLiteral("current"), MetricSource::UsageApi, QStringLiteral("actual"));
+    setProviderMetric(MetricKind::OutputTokens, m_actualOutputTokens, QStringLiteral("token"), QString(),
+                      QStringLiteral("api_key"), QStringLiteral("current"), MetricSource::UsageApi, QStringLiteral("actual"));
+    setProviderMetric(MetricKind::Requests, m_actualRequestCount, QStringLiteral("request"), QString(),
+                      QStringLiteral("api_key"), QStringLiteral("current"), MetricSource::UsageApi, QStringLiteral("actual"));
 }
 
 void ProviderBackend::setProbeUsage(qint64 inputTokens, qint64 outputTokens, int requestCount)
@@ -348,6 +372,7 @@ void ProviderBackend::setCostSource(const QString &source)
     static const QSet<QString> allowedSources = {
         QStringLiteral("actual_api"),
         QStringLiteral("billing_api"),
+        QStringLiteral("usage_api"),
         QStringLiteral("estimated_from_usage"),
         QStringLiteral("connectivity_probe"),
         QStringLiteral("self_tracked"),
@@ -356,6 +381,19 @@ void ProviderBackend::setCostSource(const QString &source)
     };
     const QString normalized = source.trimmed().isEmpty() ? QStringLiteral("unknown") : source.trimmed();
     m_costSource = allowedSources.contains(normalized) ? normalized : QStringLiteral("unknown");
+    const QString typedSource = m_costSource == QLatin1String("actual_api") ? QStringLiteral("usage_api")
+        : m_costSource == QLatin1String("estimated_from_usage") ? QStringLiteral("estimated_pricing")
+        : m_costSource;
+    bool changed = false;
+    for (QVariant &entry : m_metrics) {
+        QVariantMap metric = entry.toMap();
+        if (metric.value(QStringLiteral("kind")).toString() != QLatin1String("cost")) continue;
+        if (metric.value(QStringLiteral("source")).toString() == typedSource) continue;
+        metric.insert(QStringLiteral("source"), typedSource);
+        entry = metric;
+        changed = true;
+    }
+    if (changed) Q_EMIT metricsChanged();
 }
 
 void ProviderBackend::setUsageSource(const QString &source)
@@ -363,6 +401,9 @@ void ProviderBackend::setUsageSource(const QString &source)
     static const QSet<QString> allowedSources = {
         QStringLiteral("actual_api"),
         QStringLiteral("billing_api"),
+        QStringLiteral("usage_api"),
+        QStringLiteral("model_discovery_api"),
+        QStringLiteral("connectivity_read_only"),
         QStringLiteral("estimated_from_usage"),
         QStringLiteral("connectivity_probe"),
         QStringLiteral("self_tracked"),
@@ -371,6 +412,23 @@ void ProviderBackend::setUsageSource(const QString &source)
     };
     const QString normalized = source.trimmed().isEmpty() ? QStringLiteral("unknown") : source.trimmed();
     m_usageSource = allowedSources.contains(normalized) ? normalized : QStringLiteral("unknown");
+    const QString typedSource = m_usageSource == QLatin1String("actual_api") ? QStringLiteral("usage_api")
+        : m_usageSource == QLatin1String("model_discovery_api") ? QStringLiteral("connectivity_probe")
+        : m_usageSource == QLatin1String("connectivity_read_only") ? QStringLiteral("connectivity_probe")
+        : m_usageSource == QLatin1String("estimated_from_usage") ? QStringLiteral("estimated_pricing")
+        : m_usageSource;
+    bool changed = false;
+    for (QVariant &entry : m_metrics) {
+        QVariantMap metric = entry.toMap();
+        const QString kind = metric.value(QStringLiteral("kind")).toString();
+        if (kind != QLatin1String("input_tokens") && kind != QLatin1String("output_tokens")
+            && kind != QLatin1String("requests")) continue;
+        if (metric.value(QStringLiteral("source")).toString() == typedSource) continue;
+        metric.insert(QStringLiteral("source"), typedSource);
+        entry = metric;
+        changed = true;
+    }
+    if (changed) Q_EMIT metricsChanged();
 }
 
 void ProviderBackend::setCurrency(const QString &currency)
@@ -394,6 +452,8 @@ void ProviderBackend::setCost(double cost) {
     m_cost = cost;
     m_isEstimatedCost = false;
     setCostSource(QStringLiteral("actual_api"));
+    setProviderMetric(MetricKind::Cost, cost, m_currency, m_currency, QStringLiteral("api_key"),
+                      QStringLiteral("current"), MetricSource::UsageApi, QStringLiteral("actual"));
     checkBudgetLimits();
 }
 
@@ -517,19 +577,171 @@ int ProviderBackend::rateLimitRequestsRemaining() const { return m_rateLimitRequ
 int ProviderBackend::rateLimitTokensRemaining() const { return m_rateLimitTokensRemaining; }
 QString ProviderBackend::rateLimitResetTime() const { return m_rateLimitResetTime; }
 
-void ProviderBackend::setRateLimitRequests(int limit) { m_rateLimitRequests = limit; }
-void ProviderBackend::setRateLimitTokens(int limit) { m_rateLimitTokens = limit; }
-void ProviderBackend::setRateLimitRequestsRemaining(int remaining) { m_rateLimitRequestsRemaining = remaining; }
-void ProviderBackend::setRateLimitTokensRemaining(int remaining) { m_rateLimitTokensRemaining = remaining; }
-void ProviderBackend::setRateLimitResetTime(const QString &time) { m_rateLimitResetTime = time; }
+void ProviderBackend::setRateLimitRequests(int limit) {
+    m_rateLimitRequests = qMax(0, limit);
+    if (limit > 0) setProviderMetric(MetricKind::RequestLimit, limit, QStringLiteral("request"), QString(), QStringLiteral("api_key"), QStringLiteral("minute"), MetricSource::ResponseHeaders, QStringLiteral("actual"));
+    else clearProviderMetric(MetricKind::RequestLimit, QStringLiteral("api_key"), QStringLiteral("minute"));
+}
+void ProviderBackend::setRateLimitTokens(int limit) {
+    m_rateLimitTokens = qMax(0, limit);
+    if (limit > 0) setProviderMetric(MetricKind::TokenLimit, limit, QStringLiteral("token"), QString(), QStringLiteral("api_key"), QStringLiteral("minute"), MetricSource::ResponseHeaders, QStringLiteral("actual"));
+    else clearProviderMetric(MetricKind::TokenLimit, QStringLiteral("api_key"), QStringLiteral("minute"));
+}
+void ProviderBackend::setRateLimitRequestsRemaining(int remaining) {
+    m_rateLimitRequestsRemaining = qMax(0, remaining);
+    if (m_rateLimitRequests > 0) setProviderMetric(MetricKind::RequestRemaining, m_rateLimitRequestsRemaining, QStringLiteral("request"), QString(), QStringLiteral("api_key"), QStringLiteral("minute"), MetricSource::ResponseHeaders, QStringLiteral("actual"));
+    else clearProviderMetric(MetricKind::RequestRemaining, QStringLiteral("api_key"), QStringLiteral("minute"));
+}
+void ProviderBackend::setRateLimitTokensRemaining(int remaining) {
+    m_rateLimitTokensRemaining = qMax(0, remaining);
+    if (m_rateLimitTokens > 0) setProviderMetric(MetricKind::TokenRemaining, m_rateLimitTokensRemaining, QStringLiteral("token"), QString(), QStringLiteral("api_key"), QStringLiteral("minute"), MetricSource::ResponseHeaders, QStringLiteral("actual"));
+    else clearProviderMetric(MetricKind::TokenRemaining, QStringLiteral("api_key"), QStringLiteral("minute"));
+}
+void ProviderBackend::setRateLimitResetTime(const QString &time)
+{
+    m_rateLimitResetTime = time;
+    QDateTime reset = QDateTime::fromString(time, Qt::ISODate);
+    if (!reset.isValid()) {
+        static const QRegularExpression relative(QStringLiteral("^([0-9]+)(ms|s|m|h)$"));
+        const QRegularExpressionMatch match = relative.match(time.trimmed());
+        if (match.hasMatch()) {
+            const qint64 amount = match.captured(1).toLongLong();
+            const QString unit = match.captured(2);
+            qint64 milliseconds = amount;
+            if (unit == QLatin1String("s")) milliseconds *= 1000;
+            else if (unit == QLatin1String("m")) milliseconds *= 60 * 1000;
+            else if (unit == QLatin1String("h")) milliseconds *= 60 * 60 * 1000;
+            reset = QDateTime::currentDateTimeUtc().addMSecs(milliseconds);
+        }
+    }
+    if (!reset.isValid()) return;
+    bool changed = false;
+    for (QVariant &entry : m_metrics) {
+        QVariantMap metric = entry.toMap();
+        const QString kind = metric.value(QStringLiteral("kind")).toString();
+        if (kind != QLatin1String("request_limit") && kind != QLatin1String("request_remaining")
+            && kind != QLatin1String("token_limit") && kind != QLatin1String("token_remaining")) continue;
+        metric.insert(QStringLiteral("resetAt"), reset.toUTC());
+        entry = metric;
+        changed = true;
+    }
+    if (changed) Q_EMIT metricsChanged();
+}
+
+void ProviderBackend::setProviderMetric(MetricKind kind,
+                                        const QVariant &value,
+                                        const QString &unit,
+                                        const QString &currency,
+                                        const QString &scope,
+                                        const QString &window,
+                                        MetricSource source,
+                                        const QString &quality,
+                                        const QDateTime &resetAt,
+                                        const QDateTime &periodStart,
+                                        const QDateTime &periodEnd)
+{
+    const QString kindName = [kind]() {
+        switch (kind) {
+        case MetricKind::InputTokens: return QStringLiteral("input_tokens");
+        case MetricKind::OutputTokens: return QStringLiteral("output_tokens");
+        case MetricKind::Requests: return QStringLiteral("requests");
+        case MetricKind::Cost: return QStringLiteral("cost");
+        case MetricKind::CreditBalance: return QStringLiteral("credit_balance");
+        case MetricKind::RequestLimit: return QStringLiteral("request_limit");
+        case MetricKind::RequestRemaining: return QStringLiteral("request_remaining");
+        case MetricKind::TokenLimit: return QStringLiteral("token_limit");
+        case MetricKind::TokenRemaining: return QStringLiteral("token_remaining");
+        case MetricKind::Latency: return QStringLiteral("latency");
+        case MetricKind::ErrorRate: return QStringLiteral("error_rate");
+        }
+        return QStringLiteral("unknown");
+    }();
+    const QString sourceName = [source]() {
+        switch (source) {
+        case MetricSource::BillingApi: return QStringLiteral("billing_api");
+        case MetricSource::UsageApi: return QStringLiteral("usage_api");
+        case MetricSource::MetricsApi: return QStringLiteral("metrics_api");
+        case MetricSource::ResponseHeaders: return QStringLiteral("response_headers");
+        case MetricSource::PublishedDocumentation: return QStringLiteral("published_documentation");
+        case MetricSource::LocalObservation: return QStringLiteral("local_observation");
+        case MetricSource::EstimatedPricing: return QStringLiteral("estimated_pricing");
+        case MetricSource::ConnectivityProbe: return QStringLiteral("connectivity_probe");
+        case MetricSource::SelfTracked: return QStringLiteral("self_tracked");
+        case MetricSource::BrowserSync: return QStringLiteral("browser_sync");
+        }
+        return QStringLiteral("unknown");
+    }();
+    for (qsizetype i = m_metrics.size() - 1; i >= 0; --i) {
+        const QVariantMap current = m_metrics.at(i).toMap();
+        if (current.value(QStringLiteral("kind")).toString() == kindName
+            && current.value(QStringLiteral("scope")).toString() == scope
+            && current.value(QStringLiteral("window")).toString() == window
+            && (currency.isEmpty()
+                || current.value(QStringLiteral("currency")).toString() == currency)) {
+            m_metrics.removeAt(i);
+        }
+    }
+
+    QVariantMap metric;
+    metric.insert(QStringLiteral("kind"), kindName);
+    metric.insert(QStringLiteral("value"), value);
+    metric.insert(QStringLiteral("available"), value.isValid() && !value.isNull());
+    metric.insert(QStringLiteral("unit"), unit);
+    metric.insert(QStringLiteral("currency"), currency);
+    metric.insert(QStringLiteral("scope"), scope);
+    metric.insert(QStringLiteral("window"), window);
+    metric.insert(QStringLiteral("source"), sourceName);
+    metric.insert(QStringLiteral("quality"), quality);
+    metric.insert(QStringLiteral("observedAt"), QDateTime::currentDateTimeUtc());
+    metric.insert(QStringLiteral("resetAt"), resetAt);
+    metric.insert(QStringLiteral("periodStart"), periodStart);
+    metric.insert(QStringLiteral("periodEnd"), periodEnd);
+    m_metrics.append(metric);
+    Q_EMIT metricsChanged();
+}
+
+void ProviderBackend::setCapabilityStatus(const QString &capability,
+                                          const QString &status,
+                                          const QString &diagnostic)
+{
+    if (capability.trimmed().isEmpty()) return;
+    QVariantMap value;
+    value.insert(QStringLiteral("status"), status.trimmed().isEmpty()
+                     ? QStringLiteral("unknown") : status.trimmed());
+    value.insert(QStringLiteral("diagnostic"), diagnostic);
+    value.insert(QStringLiteral("observedAt"), QDateTime::currentDateTimeUtc());
+    if (m_capabilityStatus.value(capability).toMap() == value) return;
+    m_capabilityStatus.insert(capability, value);
+    Q_EMIT capabilityStatusChanged();
+}
+
+void ProviderBackend::clearProviderMetric(MetricKind kind, const QString &scope, const QString &window)
+{
+    setProviderMetric(kind, QVariant(), QString(), QString(), scope, window,
+                      MetricSource::LocalObservation, QStringLiteral("unknown"));
+}
 
 // --- Custom URL ---
 
 QString ProviderBackend::customBaseUrl() const { return m_customBaseUrl; }
 void ProviderBackend::setCustomBaseUrl(const QString &url)
 {
-    if (m_customBaseUrl != url) {
-        m_customBaseUrl = url;
+    QString normalized = url.trimmed();
+    while (normalized.endsWith(QLatin1Char('/'))) normalized.chop(1);
+    if (!normalized.isEmpty()) {
+        const QUrl parsed(normalized);
+        const bool loopbackHttp = parsed.scheme() == QLatin1String("http")
+            && (parsed.host() == QLatin1String("localhost")
+                || parsed.host() == QLatin1String("127.0.0.1")
+                || parsed.host() == QLatin1String("::1"));
+        if (parsed.scheme() != QLatin1String("https") && !loopbackHttp) {
+            qWarning() << "ProviderBackend:" << name()
+                       << "rejected a non-HTTPS non-loopback custom endpoint";
+            normalized.clear();
+        }
+    }
+    if (m_customBaseUrl != normalized) {
+        m_customBaseUrl = normalized;
         Q_EMIT customBaseUrlChanged();
     }
 }
@@ -552,16 +764,6 @@ QString ProviderBackend::effectiveBaseUrl(const char *defaultUrl) const
         QString url = m_customBaseUrl;
         while (url.endsWith(QLatin1Char('/'))) {
             url.chop(1);
-        }
-        // Warn if HTTP (not HTTPS) and not localhost
-        QUrl parsed(url);
-        if (parsed.scheme() == QLatin1String("http")
-            && parsed.host() != QLatin1String("localhost")
-            && parsed.host() != QLatin1String("127.0.0.1")
-            && parsed.host() != QLatin1String("::1")) {
-            qWarning() << "ProviderBackend:" << name()
-                       << "- custom URL uses insecure HTTP. API keys will be sent unencrypted:"
-                       << url;
         }
         return url;
     }
@@ -639,6 +841,9 @@ QNetworkRequest ProviderBackend::createRequest(const QUrl &url) const
 
 void ProviderBackend::parseRateLimitHeaders(QNetworkReply *reply, const char *prefix)
 {
+    const auto hasHeader = [&](const QByteArray &suffix) {
+        return !reply->rawHeader(QByteArray(prefix) + suffix).isEmpty();
+    };
     auto readHeader = [&](const QByteArray &suffix) -> int {
         QByteArray val = reply->rawHeader(QByteArray(prefix) + suffix);
         return val.isEmpty() ? 0 : val.toInt();
@@ -650,11 +855,11 @@ void ProviderBackend::parseRateLimitHeaders(QNetworkReply *reply, const char *pr
     int rlTokRemaining = readHeader("remaining-tokens");
     QString rlReset = QString::fromUtf8(reply->rawHeader(QByteArray(prefix) + "reset-requests"));
 
-    if (rlRequests > 0) {
+    if (rlRequests > 0 && hasHeader("remaining-requests")) {
         setRateLimitRequests(rlRequests);
         setRateLimitRequestsRemaining(rlReqRemaining);
     }
-    if (rlTokens > 0) {
+    if (rlTokens > 0 && hasHeader("remaining-tokens")) {
         setRateLimitTokens(rlTokens);
         setRateLimitTokensRemaining(rlTokRemaining);
     }
