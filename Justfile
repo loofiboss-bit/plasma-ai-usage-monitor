@@ -189,6 +189,10 @@ copr-submit TAG PROJECT="loofitheboss/plasma-ai-usage-monitor":
     mkdir -p dist
     bash scripts/copr_submit_build.sh --project "{{PROJECT}}" --tag "{{TAG}}" --output-dir dist
 
+# Verify clean Fedora 44 install plus v12.0.3 upgrade, rollback, and removal
+rpm-lifecycle-check V12_RPM V13_RPM:
+    bash scripts/test_fedora44_rpm_lifecycle.sh "{{V12_RPM}}" "{{V13_RPM}}"
+
 # Enable the COPR repository
 copr-enable:
     sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor

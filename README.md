@@ -250,25 +250,23 @@ git push origin main --tags
 gh release create vx.y.z ./plasma-ai-usage-monitor-x.y.z.tar.gz ./com.github.loofi.aiusagemonitor.plasmoid --title "vx.y.z"
 ```
 
-If you maintain the Fedora COPR package, the `loofitheboss/plasma-ai-usage-monitor`
-project is configured for SCM auto-rebuilds from `main` via GitHub webhooks.
-That means:
-
-- pushes to `main` can trigger a new COPR build
-- tag creation can also notify COPR, but the package tracks `main`, not the tag itself
-- GitHub release publishing is still manual because GitHub Actions are disabled
+The Fedora COPR package uses SCM source from `main`, but webhook rebuild is kept
+disabled during the v13 prerelease sequence. GitHub tag creation can trigger a
+COPR build with prerelease contents even when the package profile names `main`;
+that would expose an alpha, beta, or RC as a stable-looking RPM version.
 
 Typical maintainer release flow:
 
 1. merge the release commit to `main`
-2. create and push the `vx.y.z` tag
-3. publish the GitHub release manually
-4. verify that COPR picked up the release commit and started a build
+2. verify that `main`, the soaked RC commit, and the intended stable tag resolve to the same SHA
+3. create and push the `vx.y.z` stable tag
+4. publish the GitHub release from the tag workflow artifacts
+5. trigger COPR explicitly and verify the resulting source commit, RPM NEVRA, and repository metadata
 
 If you need to force or backfill a COPR build after the GitHub tag and release exist:
 
 ```bash
-just copr-submit PROJECT=loofitheboss/plasma-ai-usage-monitor
+just copr-submit vx.y.z PROJECT=loofitheboss/plasma-ai-usage-monitor
 ```
 
 The helper expects `copr-cli` plus a valid `~/.config/copr` API token file.
@@ -279,12 +277,12 @@ To verify the current package wiring:
 curl -s 'https://copr.fedorainfracloud.org/api_3/package/?ownername=loofitheboss&projectname=plasma-ai-usage-monitor&packagename=plasma-ai-usage-monitor&with_latest_build=true'
 ```
 
-The response should show:
+During prerelease development the response should show:
 
 - `"source_type": "scm"`
 - `"committish": "main"`
 - `"source_build_method": "make_srpm"`
-- `"auto_rebuild": true`
+- `"auto_rebuild": false`
 
 ---
 

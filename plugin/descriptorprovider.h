@@ -3,6 +3,8 @@
 
 #include "providerbackend.h"
 
+#include <QSet>
+
 class DescriptorProvider final : public ProviderBackend
 {
     Q_OBJECT
@@ -35,10 +37,15 @@ Q_SIGNALS:
 
 private:
     void handleReply(QNetworkReply *reply);
+    void requestPage(const QUrl &url, int generation);
+    void finalizeModelDiscovery(bool partial = false, const QString &reason = QString());
     QVariantMap m_descriptor;
     QString m_model;
     QVariantList m_discoveredModels;
+    QVariantList m_pendingDiscoveredModels;
+    QSet<QString> m_pendingModelIds;
     QDateTime m_modelsLastDiscovered;
+    int m_pageRequests = 0;
 };
 
 #endif

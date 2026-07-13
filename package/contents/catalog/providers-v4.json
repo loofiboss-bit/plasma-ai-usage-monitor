@@ -2105,7 +2105,7 @@
         "method": "GET",
         "path": "/models",
         "readOnly": true,
-        "requestBudget": 1,
+        "requestBudget": 3,
         "minimumIntervalSeconds": 300
       },
       "capabilities": [

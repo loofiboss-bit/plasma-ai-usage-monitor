@@ -464,6 +464,9 @@ void ProviderBackendTest::testRetryAfterNumericAndHttpDate()
 
     reply.setRetryAfter("Mon, 13 Jul 2026 12:02:00 GMT");
     QCOMPARE(provider.retryAfterForReply(&reply, now), now.addSecs(120));
+
+    reply.setRetryAfter("not-a-reset-time");
+    QVERIFY(!provider.retryAfterForReply(&reply, now).isValid());
 }
 
 void ProviderBackendTest::testNetworkErrorClassification()

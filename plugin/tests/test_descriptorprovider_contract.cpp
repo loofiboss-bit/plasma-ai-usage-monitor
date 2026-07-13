@@ -9,6 +9,8 @@
 #include <QTimer>
 #include <QUrl>
 
+#include <tuple>
+
 #include "descriptorprovider.h"
 #include "providerpricingcatalog.h"
 
@@ -84,8 +86,11 @@ private Q_SLOTS:
     void launchProvidersUseOneReadOnlyRequest();
     void statusAndSchemaFailuresAreTyped_data();
     void statusAndSchemaFailuresAreTyped();
+    void credentialsAreRequiredWithoutNetworkTraffic_data();
     void credentialsAreRequiredWithoutNetworkTraffic();
     void modelDiscoveryDeduplicatesAndKeepsFallback();
+    void fireworksPaginationAndRequestBudget();
+    void discoveryFailureKeepsFallbackAndRedactsSecret();
     void gatewayPreservesMixedCurrenciesAndZero();
     void staleGenerationIsDiscarded();
 };
@@ -131,26 +136,44 @@ void DescriptorProviderContractTest::launchProvidersUseOneReadOnlyRequest()
 
 void DescriptorProviderContractTest::statusAndSchemaFailuresAreTyped_data()
 {
+    QTest::addColumn<QString>("provider");
+    QTest::addColumn<QString>("path");
     QTest::addColumn<int>("status");
     QTest::addColumn<QByteArray>("body");
     QTest::addColumn<ProviderBackend::ProviderErrorKind>("kind");
-    QTest::newRow("401") << 401 << QByteArray("{}") << ProviderBackend::ProviderErrorKind::Authentication;
-    QTest::newRow("403") << 403 << QByteArray("{}") << ProviderBackend::ProviderErrorKind::Permission;
-    QTest::newRow("404") << 404 << QByteArray("{}") << ProviderBackend::ProviderErrorKind::Network;
-    QTest::newRow("429") << 429 << QByteArray("{}") << ProviderBackend::ProviderErrorKind::RateLimit;
-    QTest::newRow("500") << 500 << QByteArray("{}") << ProviderBackend::ProviderErrorKind::Server;
-    QTest::newRow("schema") << 200 << QByteArray(R"({"unexpected":true})") << ProviderBackend::ProviderErrorKind::Schema;
+    const QList<QPair<QString, QString>> providers = {
+        {QStringLiteral("litellm"), QStringLiteral("/spend/logs")},
+        {QStringLiteral("cerebras"), QStringLiteral("/models")},
+        {QStringLiteral("fireworks"), QStringLiteral("/models")},
+        {QStringLiteral("perplexity"), QStringLiteral("/v1/models")},
+    };
+    const QList<std::tuple<QString, int, QByteArray, ProviderBackend::ProviderErrorKind>> cases = {
+        {QStringLiteral("401"), 401, QByteArray("{}"), ProviderBackend::ProviderErrorKind::Authentication},
+        {QStringLiteral("403"), 403, QByteArray("{}"), ProviderBackend::ProviderErrorKind::Permission},
+        {QStringLiteral("404"), 404, QByteArray("{}"), ProviderBackend::ProviderErrorKind::Network},
+        {QStringLiteral("429"), 429, QByteArray("{}"), ProviderBackend::ProviderErrorKind::RateLimit},
+        {QStringLiteral("500"), 500, QByteArray("{}"), ProviderBackend::ProviderErrorKind::Server},
+        {QStringLiteral("schema"), 200, QByteArray(R"({"unexpected":true})"), ProviderBackend::ProviderErrorKind::Schema},
+    };
+    for (const auto &[provider, path] : providers) {
+        for (const auto &[label, status, body, kind] : cases) {
+            const QByteArray rowName = (provider + QLatin1Char('-') + label).toUtf8();
+            QTest::newRow(rowName.constData()) << provider << path << status << body << kind;
+        }
+    }
 }
 
 void DescriptorProviderContractTest::statusAndSchemaFailuresAreTyped()
 {
+    QFETCH(QString, provider);
+    QFETCH(QString, path);
     QFETCH(int, status);
     QFETCH(QByteArray, body);
     QFETCH(ProviderBackend::ProviderErrorKind, kind);
     ContractHttpServer server;
     QVERIFY(server.listen());
-    server.respond(QStringLiteral("/models"), status, body);
-    DescriptorProvider backend(descriptor(QStringLiteral("cerebras")));
+    server.respond(path, status, body);
+    DescriptorProvider backend(descriptor(provider));
     backend.setCustomBaseUrl(server.baseUrl());
     backend.setApiKey(QStringLiteral("secret"));
     QSignalSpy updated(&backend, &ProviderBackend::dataUpdated);
@@ -160,11 +183,20 @@ void DescriptorProviderContractTest::statusAndSchemaFailuresAreTyped()
     QVERIFY(!backend.isConnected());
 }
 
+void DescriptorProviderContractTest::credentialsAreRequiredWithoutNetworkTraffic_data()
+{
+    QTest::addColumn<QString>("provider");
+    QTest::newRow("litellm") << QStringLiteral("litellm");
+    QTest::newRow("cerebras") << QStringLiteral("cerebras");
+    QTest::newRow("fireworks") << QStringLiteral("fireworks");
+}
+
 void DescriptorProviderContractTest::credentialsAreRequiredWithoutNetworkTraffic()
 {
+    QFETCH(QString, provider);
     ContractHttpServer server;
     QVERIFY(server.listen());
-    DescriptorProvider backend(descriptor(QStringLiteral("cerebras")));
+    DescriptorProvider backend(descriptor(provider));
     backend.setCustomBaseUrl(server.baseUrl());
     backend.refresh();
     QCOMPARE(backend.errorKind(), ProviderBackend::ProviderErrorKind::Configuration);
@@ -187,6 +219,63 @@ void DescriptorProviderContractTest::modelDiscoveryDeduplicatesAndKeepsFallback(
     for (const QVariant &entry : backend.discoveredModels()) ids.insert(entry.toMap().value(QStringLiteral("id")).toString());
     QCOMPARE(ids.size(), backend.discoveredModels().size());
     QVERIFY(ids.contains(QStringLiteral("live")));
+    QVERIFY(ids.contains(QStringLiteral("llama-4-scout-17b-16e-instruct")));
+}
+
+void DescriptorProviderContractTest::fireworksPaginationAndRequestBudget()
+{
+    ContractHttpServer server;
+    QVERIFY(server.listen());
+    server.respond(QStringLiteral("/models"), 200,
+                   QByteArray(R"({"models":[{"name":"accounts/a/models/page-1"}],"nextPageToken":"token-2"})"));
+    server.respond(QStringLiteral("/models"), 200,
+                   QByteArray(R"({"models":[{"name":"accounts/a/models/page-2"}],"nextPageToken":"token-3"})"));
+    server.respond(QStringLiteral("/models"), 200,
+                   QByteArray(R"({"models":[{"name":"accounts/a/models/page-3"}],"nextPageToken":"token-4"})"));
+
+    DescriptorProvider backend(descriptor(QStringLiteral("fireworks")));
+    backend.setCustomBaseUrl(server.baseUrl());
+    backend.setApiKey(QStringLiteral("pagination-secret"));
+    QSignalSpy updated(&backend, &ProviderBackend::dataUpdated);
+    backend.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(updated.count() > 0, 2000);
+
+    QCOMPARE(server.methods(), QStringList({QStringLiteral("GET"), QStringLiteral("GET"), QStringLiteral("GET")}));
+    QCOMPARE(server.targets().size(), 3);
+    QVERIFY(server.targets().at(1).contains(QStringLiteral("pageToken=token-2")));
+    QVERIFY(server.targets().at(2).contains(QStringLiteral("pageToken=token-3")));
+    for (const QString &target : server.targets()) QVERIFY(!target.contains(QStringLiteral("pagination-secret")));
+    for (const QByteArray &request : server.requests()) QCOMPARE(request.count("pagination-secret"), 1);
+
+    QSet<QString> ids;
+    for (const QVariant &entry : backend.discoveredModels()) ids.insert(entry.toMap().value(QStringLiteral("id")).toString());
+    QVERIFY(ids.contains(QStringLiteral("accounts/a/models/page-1")));
+    QVERIFY(ids.contains(QStringLiteral("accounts/a/models/page-2")));
+    QVERIFY(ids.contains(QStringLiteral("accounts/a/models/page-3")));
+    QCOMPARE(backend.dataQuality(), QStringLiteral("connectivity_partial"));
+    QCOMPARE(backend.capabilityStatus().value(QStringLiteral("model_discovery")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("partial"));
+}
+
+void DescriptorProviderContractTest::discoveryFailureKeepsFallbackAndRedactsSecret()
+{
+    ContractHttpServer server;
+    QVERIFY(server.listen());
+    server.respond(QStringLiteral("/models"), 500, QByteArray(R"({"error":"server failure"})"));
+    DescriptorProvider backend(descriptor(QStringLiteral("cerebras")));
+    backend.setCustomBaseUrl(server.baseUrl());
+    backend.setApiKey(QStringLiteral("fallback-secret"));
+    QSignalSpy updated(&backend, &ProviderBackend::dataUpdated);
+    backend.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(updated.count() > 0, 2000);
+
+    QVERIFY(!backend.isConnected());
+    QCOMPARE(backend.errorKind(), ProviderBackend::ProviderErrorKind::Server);
+    QVERIFY(!backend.errorString().contains(QStringLiteral("fallback-secret")));
+    QVERIFY(!backend.capabilityStatus().value(QStringLiteral("scheduled_refresh")).toMap()
+                 .value(QStringLiteral("reason")).toString().contains(QStringLiteral("fallback-secret")));
+    QSet<QString> ids;
+    for (const QVariant &entry : backend.discoveredModels()) ids.insert(entry.toMap().value(QStringLiteral("id")).toString());
     QVERIFY(ids.contains(QStringLiteral("llama-4-scout-17b-16e-instruct")));
 }
 

@@ -22,7 +22,7 @@ This matrix is generated from the same Catalog v5 descriptors used by the widget
 | AWS Bedrock | Connectivity/model discovery only | `GET /foundation-models` | credential/account | 1 | No |
 | LiteLLM Proxy | Gateway aggregate usage and spend | `GET /spend/logs` | gateway | 1 | No |
 | Cerebras Inference | Connectivity/model discovery only | `GET /models` | credential/account | 1 | No |
-| Fireworks AI | Connectivity/model discovery only | `GET /models` | credential/account | 1 | No |
+| Fireworks AI | Connectivity/model discovery only | `GET /models` | credential/account | 3 | No |
 | Perplexity API | Connectivity/model discovery only | `GET /v1/models` | public | 1 | No |
 
 ## Capability semantics

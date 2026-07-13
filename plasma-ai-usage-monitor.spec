@@ -31,10 +31,11 @@ A native KDE Plasma 6 plasmoid that monitors AI API token usage,
 rate limits, costs, and budgets across multiple providers including
 OpenAI, Azure OpenAI, AWS Bedrock, Anthropic (Claude), Google Gemini,
 Mistral AI, DeepSeek, Groq, xAI (Grok), Ollama Cloud, OpenRouter,
-Together AI, Cohere, and Google Veo.
+Together AI, Cohere, Google Veo, LiteLLM Proxy, Cerebras Inference,
+Fireworks AI, and Perplexity API.
 
 Features:
-- Real-time rate limit monitoring for all providers
+- Capability-aware rate-limit monitoring where providers expose complete live pairs
 - Usage and cost tracking with historical trends
 - Catalog-backed cost estimation with local JSON metadata
 - Budget management with daily/monthly limits
