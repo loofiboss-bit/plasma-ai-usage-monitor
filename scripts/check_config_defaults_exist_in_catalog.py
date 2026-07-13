@@ -90,8 +90,9 @@ def main() -> None:
             )
 
         model = provider_models[model_id]
-        if model.get("deprecated") is True:
-            fail(f"{config_key} default '{model_id}' is deprecated")
+        lifecycle_status = model.get("lifecycle", {}).get("status", "")
+        if model.get("deprecated") is True or lifecycle_status in {"deprecated", "retired"}:
+            fail(f"{config_key} default '{model_id}' is {lifecycle_status or 'deprecated'}")
 
         pricing = model.get("pricing", {})
         if pricing.get("status") == "unknown" and model.get("allowUnknownDefault") is not True:

@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [12.0.3] — 2026-07-13
+
+### Fixed
+- Drive every provider model picker from Provider Catalog v4 so Settings no longer advertises stale or invalid Claude, Gemini, Groq, xAI, Ollama, OpenRouter, Cohere, or Veo model IDs.
+- Keep model pickers editable for custom gateways and newly released models while using the reviewed catalog as the visible source of truth.
+- Reject deprecated or retired provider defaults in the release gate and add a regression check requiring all 14 provider pickers to remain catalog-driven.
+
 ## [12.0.2] — 2026-07-13
 
 ### Added

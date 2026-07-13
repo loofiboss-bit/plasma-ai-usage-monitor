@@ -21,6 +21,18 @@ KCM.SimpleKCM {
         return !lower.startsWith("https://") && !lower.startsWith("http://");
     }
 
+    // Keep every visible model picker aligned with Provider Catalog v4.
+    // The fields stay editable so users can enter a newly released or custom
+    // gateway model before the next catalog refresh.
+    function catalogModelIds(providerKey) {
+        var rows = ProviderPricingCatalog.selectableModelsForProvider(providerKey);
+        var ids = [];
+        for (var i = 0; i < rows.length; ++i) {
+            if (rows[i].id) ids.push(rows[i].id);
+        }
+        return ids;
+    }
+
     property alias cfg_openaiEnabled: openaiSwitch.checked
     property alias cfg_openaiModel: openaiModelField.text
     property alias cfg_openaiProjectId: openaiProjectField.text
@@ -263,13 +275,16 @@ KCM.SimpleKCM {
             color: Kirigami.Theme.disabledTextColor; wrapMode: Text.WordWrap; Layout.fillWidth: true
         }
 
-        QQC2.TextField {
+        QQC2.ComboBox {
             id: openaiModelField
             Kirigami.FormData.label: i18n("Model filter:")
             enabled: openaiSwitch.checked
-            text: plasmoid.configuration.openaiModel
-            placeholderText: "gpt-5.4-pro"
+            editable: true
+            editText: plasmoid.configuration.openaiModel
+            model: providersPage.catalogModelIds("openai")
             Layout.fillWidth: true
+            onEditTextChanged: plasmoid.configuration.openaiModel = editText
+            property alias text: openaiModelField.editText
             QQC2.ToolTip.text: i18n("Only show usage for this model. Leave empty to show all models.")
             QQC2.ToolTip.visible: hovered
             QQC2.ToolTip.delay: 500
@@ -370,13 +385,16 @@ KCM.SimpleKCM {
             color: Kirigami.Theme.disabledTextColor; wrapMode: Text.WordWrap; Layout.fillWidth: true
         }
 
-        QQC2.TextField {
+        QQC2.ComboBox {
             id: azureModelField
             Kirigami.FormData.label: i18n("Model filter:")
             enabled: azureSwitch.checked
-            text: plasmoid.configuration.azureModel
-            placeholderText: "gpt-5.4-pro"
+            editable: true
+            editText: plasmoid.configuration.azureModel
+            model: providersPage.catalogModelIds("azure")
             Layout.fillWidth: true
+            onEditTextChanged: plasmoid.configuration.azureModel = editText
+            property alias text: azureModelField.editText
         }
 
         QQC2.TextField {
@@ -499,13 +517,16 @@ KCM.SimpleKCM {
             Layout.fillWidth: true
         }
 
-        QQC2.TextField {
+        QQC2.ComboBox {
             id: bedrockModelField
             Kirigami.FormData.label: i18n("Model ID:")
             enabled: bedrockSwitch.checked
-            text: plasmoid.configuration.bedrockModel
-            placeholderText: "anthropic.claude-3-5-sonnet-20240620-v1:0"
+            editable: true
+            editText: plasmoid.configuration.bedrockModel
+            model: providersPage.catalogModelIds("bedrock")
             Layout.fillWidth: true
+            onEditTextChanged: plasmoid.configuration.bedrockModel = editText
+            property alias text: bedrockModelField.editText
         }
 
         QQC2.TextField {
@@ -587,15 +608,7 @@ KCM.SimpleKCM {
             enabled: anthropicSwitch.checked
             editable: true
             editText: plasmoid.configuration.anthropicModel
-            model: [
-                "claude-opus-4.7",
-                "claude-sonnet-4.8",
-                "claude-mythos-preview",
-                "claude-sonnet-4-20250514",
-                "claude-opus-4-20250514",
-                "claude-haiku-4-20250514",
-                "claude-3-7-sonnet-20250219"
-            ]
+            model: providersPage.catalogModelIds("anthropic")
             onEditTextChanged: plasmoid.configuration.anthropicModel = editText
             property alias text: anthropicModelField.editText
         }
@@ -691,15 +704,7 @@ KCM.SimpleKCM {
             enabled: googleSwitch.checked
             editable: true
             editText: plasmoid.configuration.googleModel
-            model: [
-                "deep-research-preview-04-2026",
-                "gemini-3.1-flash-live",
-                "gemini-3.1-flash-tts",
-                "gemini-2.5-pro",
-                "gemini-2.5-flash",
-                "gemini-2.0-flash",
-                "gemini-1.5-pro"
-            ]
+            model: providersPage.catalogModelIds("google")
             onEditTextChanged: plasmoid.configuration.googleModel = editText
             property alias text: googleModelField.editText
         }
@@ -766,14 +771,7 @@ KCM.SimpleKCM {
             baseUrlProp: "cfg_mistralCustomBaseUrl"
             description: i18n("Rate limits and token usage via chat/completions endpoint")
             keyPlaceholder: i18n("Enter Mistral API key...")
-            modelOptions: [
-                "mistral-large-latest",
-                "mistral-medium-latest",
-                "mistral-small-latest",
-                "open-mistral-7b",
-                "open-mixtral-8x7b",
-                "codestral-latest"
-            ]
+            modelOptions: providersPage.catalogModelIds("mistral")
         }
 
         OpenAICompatibleProviderSection {
@@ -785,12 +783,7 @@ KCM.SimpleKCM {
             baseUrlProp: "cfg_deepseekCustomBaseUrl"
             description: i18n("Tracks rate limits, token usage, and account balance")
             keyPlaceholder: i18n("Enter DeepSeek API key...")
-            modelOptions: [
-                "deepseek-v4-flash",
-                "deepseek-v4-pro",
-                "deepseek-chat",
-                "deepseek-reasoner"
-            ]
+            modelOptions: providersPage.catalogModelIds("deepseek")
         }
 
         OpenAICompatibleProviderSection {
@@ -802,13 +795,7 @@ KCM.SimpleKCM {
             baseUrlProp: "cfg_groqCustomBaseUrl"
             description: i18n("OpenAI-compatible API with rate limit headers")
             keyPlaceholder: i18n("Enter Groq API key...")
-            modelOptions: [
-                "llama-3.3-70b-versatile",
-                "llama-3.1-70b-versatile",
-                "llama-3.1-8b-instant",
-                "mixtral-8x7b-32768",
-                "gemma2-9b-it"
-            ]
+            modelOptions: providersPage.catalogModelIds("groq")
         }
 
         OpenAICompatibleProviderSection {
@@ -820,12 +807,7 @@ KCM.SimpleKCM {
             baseUrlProp: "cfg_xaiCustomBaseUrl"
             description: i18n("OpenAI-compatible API for Grok models")
             keyPlaceholder: i18n("Enter xAI API key...")
-            modelOptions: [
-                "grok-3",
-                "grok-3-mini",
-                "grok-2",
-                "grok-2-mini"
-            ]
+            modelOptions: providersPage.catalogModelIds("xai")
         }
 
         OpenAICompatibleProviderSection {
@@ -838,12 +820,7 @@ KCM.SimpleKCM {
             description: i18n("Uses Ollama Cloud's OpenAI-compatible API at ollama.com/v1. Create an API key in your Ollama settings to monitor cloud usage from the widget.")
             keyPlaceholder: i18n("Create a key in ollama.com/settings")
             baseUrlTooltip: i18n("Override the Ollama Cloud API endpoint for proxies or gateways. Must start with https://")
-            modelOptions: [
-                "gpt-oss:120b",
-                "gpt-oss:20b",
-                "glm-5:cloud",
-                "deepseek-r1:671b"
-            ]
+            modelOptions: providersPage.catalogModelIds("ollama")
         }
 
         OpenAICompatibleProviderSection {
@@ -855,31 +832,7 @@ KCM.SimpleKCM {
             baseUrlProp: "cfg_openrouterCustomBaseUrl"
             description: i18n("Unified gateway to 600+ models. Shows credits balance and usage.")
             keyPlaceholder: i18n("sk-or-...")
-            modelOptions: [
-                "openai/gpt-5.4-pro",
-                "openai/gpt-5.4-thinking",
-                "openai/gpt-5.4-mini",
-                "openai/gpt-5.4-cyber",
-                "openai/o3",
-                "openai/o4-mini",
-                "anthropic/claude-opus-4.7",
-                "anthropic/claude-sonnet-4.8",
-                "anthropic/claude-mythos-preview",
-                "anthropic/claude-sonnet-4-20250514",
-                "google/gemini-3.1-flash-live",
-                "google/gemini-3.1-flash-tts",
-                "google/deep-research-preview-04-2026",
-                "google/gemini-2.5-pro",
-                "google/gemini-2.5-flash",
-                "meta-llama/llama-3.3-70b-instruct",
-                "meta-llama/llama-4-maverick",
-                "deepseek/deepseek-chat-v3",
-                "deepseek/deepseek-r1",
-                "x-ai/grok-3",
-                "x-ai/grok-3-mini",
-                "qwen/qwen-2.5-72b-instruct",
-                "mistralai/mistral-large"
-            ]
+            modelOptions: providersPage.catalogModelIds("openrouter")
         }
 
         OpenAICompatibleProviderSection {
@@ -891,19 +844,7 @@ KCM.SimpleKCM {
             baseUrlProp: "cfg_togetherCustomBaseUrl"
             description: i18n("Fast inference for open-source models (Llama, Qwen, DeepSeek)")
             keyPlaceholder: i18n("Enter Together AI API key...")
-            modelOptions: [
-                "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-                "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
-                "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
-                "meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8",
-                "meta-llama/Llama-4-Scout-17B-16E-Instruct",
-                "Qwen/Qwen2.5-72B-Instruct-Turbo",
-                "Qwen/Qwen2.5-7B-Instruct-Turbo",
-                "deepseek-ai/DeepSeek-V3",
-                "deepseek-ai/DeepSeek-R1",
-                "mistralai/Mixtral-8x7B-Instruct-v0.1",
-                "google/gemma-2-27b-it"
-            ]
+            modelOptions: providersPage.catalogModelIds("together")
         }
 
         OpenAICompatibleProviderSection {
@@ -915,15 +856,7 @@ KCM.SimpleKCM {
             baseUrlProp: "cfg_cohereCustomBaseUrl"
             description: i18n("Enterprise RAG and multilingual models via OpenAI-compatible API")
             keyPlaceholder: i18n("Enter Cohere API key...")
-            modelOptions: [
-                "command-a-03-2025",
-                "command-r-plus-08-2024",
-                "command-r-plus",
-                "command-r-08-2024",
-                "command-r",
-                "command-light",
-                "command"
-            ]
+            modelOptions: providersPage.catalogModelIds("cohere")
         }
 
         // ── Google Veo ──
@@ -985,10 +918,7 @@ KCM.SimpleKCM {
             enabled: googleveoSwitch.checked
             editable: true
             editText: plasmoid.configuration.googleveoModel
-            model: [
-                "veo-3",
-                "veo-2"
-            ]
+            model: providersPage.catalogModelIds("googleveo")
             onEditTextChanged: plasmoid.configuration.googleveoModel = editText
             property alias text: googleveoModelField.editText
         }
