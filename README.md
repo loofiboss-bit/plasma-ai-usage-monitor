@@ -22,7 +22,7 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current development release:** `v12.0.0 Reliability Core` makes refresh deterministic, provider state typed, history semantics explicit, and mixed-currency totals honest. The supported Fedora route remains the COPR package.
+> **Current development release:** `v12.0.1 Reliability Core` makes refresh deterministic, provider state typed, history semantics explicit, and mixed-currency totals honest. The supported Fedora route remains the COPR package.
 
 ## Quick Links
 

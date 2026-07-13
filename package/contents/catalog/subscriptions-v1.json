@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "2026.06.30",
-  "release": "12.0.0",
+  "release": "12.0.1",
   "lastReviewed": "2026-06-30",
   "runtimeScraping": false,
   "notes": "Static local metadata for shipped subscription defaults. Browser sync may override with actual account data. Do not scrape vendor pages at runtime. Entries were re-reviewed on 2026-06-30; review/conflict flags include user-visible reasons in Diagnostics.",

@@ -71,6 +71,7 @@ PlasmaExtras.Representation {
                 model: [i18n("Overview"), i18n("History"), i18n("Analyst")]
                 PlasmaComponents.ToolButton {
                     required property int index
+                    required property var modelData
                     Layout.fillWidth: true
                     text: modelData
                     checked: fullRoot.destination === index

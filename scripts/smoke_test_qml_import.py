@@ -45,15 +45,13 @@ def main():
         plugin_root = Path(args.build_dir).resolve() / "plugin"
         qmldir_candidates = list(plugin_root.rglob("qmldir"))
         qmldir_src = str(qmldir_candidates[0]) if qmldir_candidates else ""
-        candidates = list(plugin_root.rglob("aiusagemonitorplugin.so"))
-        candidates += list(plugin_root.rglob("libaiusagemonitorplugin.so"))
-        so_src = str(candidates[0]) if candidates else str(plugin_root / "aiusagemonitorplugin.so")
+        candidates = list(plugin_root.rglob("libaiusagemonitorplugin.so"))
+        so_src = str(candidates[0]) if candidates else str(plugin_root / "libaiusagemonitorplugin.so")
         
         if qmldir_src and os.path.exists(qmldir_src):
             shutil.copy(qmldir_src, os.path.join(module_path, "qmldir"))
         if os.path.exists(so_src):
             shutil.copy(so_src, os.path.join(module_path, "libaiusagemonitorplugin.so"))
-            shutil.copy(so_src, os.path.join(module_path, "aiusagemonitorplugin.so"))
             
         app = QGuiApplication(sys.argv[:1])
         engine = QQmlEngine()
