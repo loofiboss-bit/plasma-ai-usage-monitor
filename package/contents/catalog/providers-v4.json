@@ -1,10 +1,10 @@
 {
   "schemaVersion": 4,
   "catalogVersion": "2026.07.13",
-  "release": "12.0.1",
+  "release": "12.0.2",
   "lastReviewed": "2026-07-13",
   "runtimeScraping": false,
-  "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries were re-reviewed on 2026-06-30; manual-review flags remain visible when exact pricing or lifecycle state cannot be represented safely.",
+  "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries were re-reviewed on 2026-07-13; manual-review flags remain visible when exact pricing or lifecycle state cannot be represented safely.",
   "providers": [
     {
       "key": "openai",
@@ -14,6 +14,84 @@
       "needsManualReview": false,
       "sourceConflict": false,
       "models": [
+        {
+          "id": "gpt-5.6-sol",
+          "displayName": "GPT-5.6 Sol",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 5.0,
+            "cachedInput": 0.5,
+            "output": 30.0,
+            "batchDiscountPercent": 50,
+            "precision": "official_exact"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenAI API pricing",
+              "url": "https://platform.openai.com/docs/pricing",
+              "reviewedAt": "2026-07-13"
+            }
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
+        },
+        {
+          "id": "gpt-5.6-terra",
+          "displayName": "GPT-5.6 Terra",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.5,
+            "cachedInput": 0.25,
+            "output": 15.0,
+            "batchDiscountPercent": 50,
+            "precision": "official_exact"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenAI API pricing",
+              "url": "https://platform.openai.com/docs/pricing",
+              "reviewedAt": "2026-07-13"
+            }
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
+        },
+        {
+          "id": "gpt-5.6-luna",
+          "displayName": "GPT-5.6 Luna",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 1.0,
+            "cachedInput": 0.1,
+            "output": 6.0,
+            "batchDiscountPercent": 50,
+            "precision": "official_exact"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenAI API pricing",
+              "url": "https://platform.openai.com/docs/pricing",
+              "reviewedAt": "2026-07-13"
+            }
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
+        },
         {
           "id": "gpt-5.5",
           "displayName": "GPT-5.5",
@@ -187,24 +265,24 @@
       "sourceConflict": false,
       "models": [
         {
-          "id": "claude-opus-4.7",
-          "displayName": "Claude Opus 4.7",
+          "id": "claude-fable-5",
+          "displayName": "Claude Fable 5",
           "modalities": [
             "text"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 5.0,
-            "output": 25.0,
+            "input": 10.0,
+            "output": 50.0,
             "precision": "provider_catalog",
-            "cachedInput": 0.5
+            "cachedInput": 1.0
           },
           "sourceRefs": [
             {
               "label": "Anthropic Claude pricing",
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -212,79 +290,7 @@
           }
         },
         {
-          "id": "claude-sonnet-4.8",
-          "displayName": "Claude Sonnet 4.8",
-          "modalities": [
-            "text"
-          ],
-          "pricing": {
-            "currency": "USD",
-            "unit": "1M_tokens",
-            "input": 3.0,
-            "output": 15.0,
-            "precision": "provider_catalog"
-          },
-          "sourceRefs": [
-            {
-              "label": "Anthropic Claude pricing",
-              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-06-30"
-            }
-          ],
-          "lifecycle": {
-            "status": "active"
-          }
-        },
-        {
-          "id": "claude-sonnet-4-20250514",
-          "displayName": "Claude Sonnet 4",
-          "modalities": [
-            "text"
-          ],
-          "pricing": {
-            "currency": "USD",
-            "unit": "1M_tokens",
-            "input": 3.0,
-            "output": 15.0,
-            "precision": "provider_catalog"
-          },
-          "sourceRefs": [
-            {
-              "label": "Anthropic Claude pricing",
-              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-06-30"
-            }
-          ],
-          "lifecycle": {
-            "status": "active"
-          }
-        },
-        {
-          "id": "claude-haiku-4-20250514",
-          "displayName": "Claude Haiku 4",
-          "modalities": [
-            "text"
-          ],
-          "pricing": {
-            "currency": "USD",
-            "unit": "1M_tokens",
-            "input": 0.8,
-            "output": 4.0,
-            "precision": "provider_catalog"
-          },
-          "sourceRefs": [
-            {
-              "label": "Anthropic Claude pricing",
-              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-06-30"
-            }
-          ],
-          "lifecycle": {
-            "status": "active"
-          }
-        },
-        {
-          "id": "claude-opus-4.8",
+          "id": "claude-opus-4-8",
           "displayName": "Claude Opus 4.8",
           "modalities": [
             "text"
@@ -294,14 +300,14 @@
             "unit": "1M_tokens",
             "input": 5.0,
             "output": 25.0,
-            "precision": "provider_catalog",
-            "cachedInput": 0.5
+            "cachedInput": 0.5,
+            "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Anthropic Claude pricing",
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -309,57 +315,33 @@
           }
         },
         {
-          "id": "claude-sonnet-4.6",
-          "displayName": "Claude Sonnet 4.6",
+          "id": "claude-sonnet-5",
+          "displayName": "Claude Sonnet 5",
           "modalities": [
             "text"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 3.0,
-            "output": 15.0,
-            "precision": "provider_catalog",
-            "cachedInput": 0.3
+            "input": 2.0,
+            "output": 10.0,
+            "cachedInput": 0.2,
+            "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Anthropic Claude pricing",
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
-            "status": "active"
+            "status": "active",
+            "notes": "Introductory token pricing through 2026-08-31; standard pricing is $3 input and $15 output per million tokens afterward."
           }
         },
         {
-          "id": "claude-sonnet-4.5",
-          "displayName": "Claude Sonnet 4.5",
-          "modalities": [
-            "text"
-          ],
-          "pricing": {
-            "currency": "USD",
-            "unit": "1M_tokens",
-            "input": 3.0,
-            "output": 15.0,
-            "precision": "provider_catalog",
-            "cachedInput": 0.3
-          },
-          "sourceRefs": [
-            {
-              "label": "Anthropic Claude pricing",
-              "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-06-30"
-            }
-          ],
-          "lifecycle": {
-            "status": "active"
-          }
-        },
-        {
-          "id": "claude-haiku-4.5",
+          "id": "claude-haiku-4-5-20251001",
           "displayName": "Claude Haiku 4.5",
           "modalities": [
             "text"
@@ -369,14 +351,14 @@
             "unit": "1M_tokens",
             "input": 1.0,
             "output": 5.0,
-            "precision": "provider_catalog",
-            "cachedInput": 0.1
+            "cachedInput": 0.1,
+            "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Anthropic Claude pricing",
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -384,7 +366,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed official Anthropic pricing on 2026-06-30; kept manual review because current and legacy Claude model IDs coexist and data-residency/fast-mode modifiers are not represented in the local flat token table.",
+      "reviewReason": "Reviewed official Anthropic model IDs and pricing on 2026-07-13; kept manual review because Sonnet 5 introductory pricing expires on 2026-08-31 and data-residency/fast-mode modifiers are not represented in the local flat token table.",
       "stableId": "anthropic",
       "displayName": "Anthropic",
       "dbName": "Anthropic",
@@ -433,23 +415,23 @@
       "sourceConflict": false,
       "models": [
         {
-          "id": "gemini-3.1-flash-live",
-          "displayName": "Gemini 3.1 Flash Live",
+          "id": "gemini-3.1-flash-lite",
+          "displayName": "Gemini 3.1 Flash-Lite",
           "modalities": [
             "text"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 0.15,
-            "output": 0.6,
+            "input": 0.25,
+            "output": 1.5,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -529,7 +511,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed Google AI pricing on 2026-06-30; kept manual review because Gemini and Veo pricing varies by model, tier, media unit, and API surface.",
+      "reviewReason": "Reviewed Google AI pricing on 2026-07-13; kept manual review because Gemini pricing varies by model, tier, media unit, and API surface.",
       "stableId": "google",
       "displayName": "Google Gemini",
       "dbName": "Google",
@@ -626,23 +608,23 @@
           }
         },
         {
-          "id": "mistral-medium",
-          "displayName": "Mistral Medium",
+          "id": "mistral-medium-3-5",
+          "displayName": "Mistral Medium 3.5",
           "modalities": [
             "text"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 2.7,
-            "output": 8.1,
+            "input": 1.5,
+            "output": 7.5,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Mistral pricing",
               "url": "https://mistral.ai/products/la-plateforme#pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -674,7 +656,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed Mistral pricing on 2026-06-30; kept manual review because model aliases and current La Plateforme pricing need provider-by-provider reconciliation before exact labels are safe.",
+      "reviewReason": "Reviewed Mistral pricing on 2026-07-13; kept manual review because latest aliases can move independently of pinned model IDs.",
       "stableId": "mistral",
       "displayName": "Mistral AI",
       "dbName": "Mistral",
@@ -912,27 +894,31 @@
             }
           ],
           "lifecycle": {
-            "status": "active"
+            "status": "deprecated",
+            "replacement": "GPT OSS 120B or Qwen 3.6 27B",
+            "notes": "Groq announced shutdown for this model on 2026-08-16.",
+            "deprecationDate": "2026-08-16",
+            "replacementId": "openai/gpt-oss-120b"
           }
         },
         {
-          "id": "gemma-4-31b-it",
-          "displayName": "Gemma 4 31B IT",
+          "id": "openai/gpt-oss-120b",
+          "displayName": "GPT OSS 120B",
           "modalities": [
             "text"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 0.3,
-            "output": 0.3,
+            "input": 0.15,
+            "output": 0.6,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Groq models and pricing",
               "url": "https://console.groq.com/docs/models",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -940,7 +926,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed Groq model/pricing docs on 2026-06-30; kept manual review because Groq model availability and pricing are model-specific and can change independently of the widget release.",
+      "reviewReason": "Reviewed Groq model, pricing, and deprecation docs on 2026-07-13; kept manual review because availability can change independently of the widget release.",
       "stableId": "groq",
       "displayName": "Groq",
       "dbName": "Groq",
@@ -989,23 +975,24 @@
       "sourceConflict": false,
       "models": [
         {
-          "id": "grok-3",
-          "displayName": "Grok 3",
+          "id": "grok-4.5",
+          "displayName": "Grok 4.5",
           "modalities": [
             "text"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 3.0,
-            "output": 15.0,
+            "input": 2.0,
+            "cachedInput": 0.5,
+            "output": 6.0,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "xAI models and pricing",
               "url": "https://docs.x.ai/docs/models",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -1013,23 +1000,24 @@
           }
         },
         {
-          "id": "grok-3-mini",
-          "displayName": "Grok 3 mini",
+          "id": "grok-4.3",
+          "displayName": "Grok 4.3",
           "modalities": [
             "text"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 0.3,
-            "output": 0.5,
+            "input": 1.25,
+            "cachedInput": 0.2,
+            "output": 2.5,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "xAI models and pricing",
               "url": "https://docs.x.ai/docs/models",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -1085,7 +1073,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed xAI model docs on 2026-06-30; kept manual review until Grok pricing and model-retirement state are reconciled against shipped defaults.",
+      "reviewReason": "Reviewed xAI model and pricing docs on 2026-07-13; kept manual review because regional and high-context pricing modifiers are not represented in the flat token table.",
       "stableId": "xai",
       "displayName": "xAI / Grok",
       "dbName": "xAI",
@@ -1134,8 +1122,8 @@
       "sourceConflict": false,
       "models": [
         {
-          "id": "gpt-oss:120b",
-          "displayName": "GPT OSS 120B",
+          "id": "gpt-oss:120b-cloud",
+          "displayName": "GPT OSS 120B Cloud",
           "modalities": [
             "text"
           ],
@@ -1145,12 +1133,12 @@
             "precision": "unknown"
           },
           "allowUnknownDefault": true,
-          "unknownDefaultReason": "Ollama Cloud is a connectivity provider in v10; the default model is allowed because no stable public unit pricing is available and the UI labels it as probe-only or unknown pricing.",
+          "unknownDefaultReason": "Ollama Cloud pricing is plan-based; the default cloud model is allowed because no stable public per-token price is published and the UI labels it as unknown pricing.",
           "sourceRefs": [
             {
               "label": "Ollama Cloud pricing",
               "url": "https://ollama.com/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -1158,7 +1146,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed Ollama Cloud pricing on 2026-06-30; no stable public unit pricing was confirmed for the shipped cloud model, so pricing remains unknown.",
+      "reviewReason": "Reviewed Ollama Cloud model naming and plan pricing on 2026-07-13; no stable public per-token price is published, so pricing remains unknown.",
       "stableId": "ollama",
       "displayName": "Ollama Cloud",
       "dbName": "OllamaCloud",
@@ -1207,8 +1195,8 @@
       "sourceConflict": false,
       "models": [
         {
-          "id": "openai/gpt-5.4",
-          "displayName": "OpenAI GPT-5.4 via OpenRouter",
+          "id": "openai/gpt-5.6-terra",
+          "displayName": "OpenAI GPT-5.6 Terra via OpenRouter",
           "modalities": [
             "text"
           ],
@@ -1232,16 +1220,16 @@
           }
         },
         {
-          "id": "openai/gpt-5.4-pro",
-          "displayName": "OpenAI GPT-5.4 Pro via OpenRouter",
+          "id": "openai/gpt-5.6-sol",
+          "displayName": "OpenAI GPT-5.6 Sol via OpenRouter",
           "modalities": [
             "text"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 3.0,
-            "output": 12.0,
+            "input": 5.0,
+            "output": 30.0,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
@@ -1256,40 +1244,40 @@
           }
         },
         {
-          "id": "anthropic/claude-sonnet-4.8",
-          "displayName": "Claude Sonnet 4.8 via OpenRouter",
+          "id": "anthropic/claude-sonnet-5",
+          "displayName": "Claude Sonnet 5 via OpenRouter",
           "modalities": [
             "text"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 3.0,
-            "output": 15.0,
-            "precision": "provider_catalog"
-          },
-          "sourceRefs": [
-            {
-              "label": "OpenRouter model catalog",
-              "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-06-30"
-            }
-          ],
-          "lifecycle": {
-            "status": "active"
-          }
-        },
-        {
-          "id": "google/gemini-2.5-pro",
-          "displayName": "Gemini 2.5 Pro via OpenRouter",
-          "modalities": [
-            "text"
-          ],
-          "pricing": {
-            "currency": "USD",
-            "unit": "1M_tokens",
-            "input": 1.25,
+            "input": 2.0,
             "output": 10.0,
+            "precision": "provider_catalog"
+          },
+          "sourceRefs": [
+            {
+              "label": "OpenRouter model catalog",
+              "url": "https://openrouter.ai/models",
+              "reviewedAt": "2026-06-30"
+            }
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
+        },
+        {
+          "id": "google/gemini-3.1-pro-preview",
+          "displayName": "Gemini 3.1 Pro Preview via OpenRouter",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 2.0,
+            "output": 12.0,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
@@ -1354,7 +1342,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed OpenRouter model catalog on 2026-06-30; kept manual review because prices are provider-routed and can vary by selected route/model provider.",
+      "reviewReason": "Reviewed OpenRouter model catalog on 2026-07-13; kept manual review because prices are provider-routed and can vary by selected route/model provider.",
       "stableId": "openrouter",
       "displayName": "OpenRouter",
       "dbName": "OpenRouter",
@@ -1411,15 +1399,15 @@
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 0.88,
-            "output": 0.88,
+            "input": 1.04,
+            "output": 1.04,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Together AI pricing",
               "url": "https://www.together.ai/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -1451,7 +1439,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed Together AI pricing on 2026-06-30; kept manual review because official pricing is model/category-specific and shipped aliases need reconciliation.",
+      "reviewReason": "Reviewed Together AI model IDs and pricing on 2026-07-13; kept manual review because availability and category pricing can change independently.",
       "stableId": "together",
       "displayName": "Together AI",
       "dbName": "Together",
@@ -1500,8 +1488,8 @@
       "sourceConflict": false,
       "models": [
         {
-          "id": "command-a-03-2025",
-          "displayName": "Command A",
+          "id": "command-a-plus-05-2026",
+          "displayName": "Command A+",
           "modalities": [
             "text"
           ],
@@ -1516,7 +1504,7 @@
             {
               "label": "Cohere pricing",
               "url": "https://cohere.com/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -1524,7 +1512,7 @@
           }
         },
         {
-          "id": "command-r-plus",
+          "id": "command-r-plus-08-2024",
           "displayName": "Command R+",
           "modalities": [
             "text"
@@ -1532,15 +1520,15 @@
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 3.0,
-            "output": 15.0,
+            "input": 2.5,
+            "output": 10.0,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Cohere pricing",
               "url": "https://cohere.com/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -1548,7 +1536,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed Cohere pricing on 2026-06-30; kept manual review because current Command model aliases and pricing tiers need reconciliation with shipped defaults.",
+      "reviewReason": "Reviewed Cohere pinned model IDs and pricing on 2026-07-13; kept manual review because enterprise deployment pricing can differ from public API pricing.",
       "stableId": "cohere",
       "displayName": "Cohere",
       "dbName": "Cohere",
@@ -1597,22 +1585,22 @@
       "sourceConflict": false,
       "models": [
         {
-          "id": "veo-3",
-          "displayName": "Veo 3",
+          "id": "veo-3.1-generate-preview",
+          "displayName": "Veo 3.1",
           "modalities": [
             "video"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "video_second",
-            "amount": 0.5,
+            "amount": 0.4,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -1620,22 +1608,22 @@
           }
         },
         {
-          "id": "veo-2",
-          "displayName": "Veo 2",
+          "id": "veo-3.1-lite-generate-preview",
+          "displayName": "Veo 3.1 Lite",
           "modalities": [
             "video"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "video_second",
-            "amount": 0.35,
+            "amount": 0.05,
             "precision": "provider_catalog"
           },
           "sourceRefs": [
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -1643,7 +1631,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed Google AI pricing on 2026-06-30; kept manual review because video-generation pricing depends on model, API/product surface, and unit semantics.",
+      "reviewReason": "Reviewed Google Veo model IDs and pricing on 2026-07-13; kept manual review because resolution changes per-second pricing (defaults represent 720p).",
       "stableId": "googleveo",
       "displayName": "Google Veo",
       "dbName": "GoogleVeo",
@@ -1816,8 +1804,8 @@
       "sourceConflict": false,
       "models": [
         {
-          "id": "anthropic.claude-3-5-sonnet-20241022-v2:0",
-          "displayName": "Claude 3.5 Sonnet on Bedrock",
+          "id": "anthropic.claude-sonnet-4-20250514-v1:0",
+          "displayName": "Claude Sonnet 4 on Bedrock",
           "modalities": [
             "text"
           ],
@@ -1832,7 +1820,7 @@
             {
               "label": "Amazon Bedrock pricing",
               "url": "https://aws.amazon.com/bedrock/pricing/",
-              "reviewedAt": "2026-06-30"
+              "reviewedAt": "2026-07-13"
             }
           ],
           "lifecycle": {
@@ -1840,7 +1828,7 @@
           }
         }
       ],
-      "reviewReason": "Reviewed Amazon Bedrock pricing on 2026-06-30; kept manual review because Bedrock pricing is region, provider, and model specific.",
+      "reviewReason": "Reviewed Amazon Bedrock active model IDs on 2026-07-13; kept manual review because Bedrock pricing is region, provider, and model specific.",
       "stableId": "bedrock",
       "displayName": "AWS Bedrock",
       "dbName": "AWS Bedrock",

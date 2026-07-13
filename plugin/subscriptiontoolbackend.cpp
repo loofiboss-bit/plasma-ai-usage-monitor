@@ -708,6 +708,10 @@ QVariantList SubscriptionToolBackend::quotaWindows() const
         rows << row;
     };
 
+    for (const QVariant &value : m_syncedQuotaWindows) {
+        appendRow(value.toMap());
+    }
+
     if (m_hasSessionInfo) {
         QVariantMap row;
         row.insert(QStringLiteral("kind"), QStringLiteral("browser_session"));
@@ -815,6 +819,16 @@ QVariantList SubscriptionToolBackend::quotaWindows() const
     }
 
     return rows;
+}
+
+void SubscriptionToolBackend::setSyncedQuotaWindows(const QVariantList &windows)
+{
+    if (m_syncedQuotaWindows == windows) {
+        return;
+    }
+    m_syncedQuotaWindows = windows;
+    Q_EMIT quotaWindowsChanged();
+    Q_EMIT usageUpdated();
 }
 
 // --- Browser Sync ---

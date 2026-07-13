@@ -1,6 +1,6 @@
 # Roadmap — Plasma AI Usage Monitor
 
-> **Current version:** v12.0.1 (Reliability Core, in development)
+> **Current version:** v12.0.2 (Reliability Core, in development)
 > **Last updated:** 2026-07-13
 > **Direction:** Keep the widget desktop-native, local-first, and honest about data quality. Prefer setup clarity, diagnostics, export, notifications, and loopback integrations over backend/server expansion.
 

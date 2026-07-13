@@ -49,6 +49,7 @@ private Q_SLOTS:
     void browserSyncEmptyCookieDiagnostics();
     void browserSyncChromeEmptyCookieDiagnostics();
     void codexSyncWithoutLiveQuotaKeepsConfiguredPro();
+    void codexLiveQuotaPayload();
     void copilotBillingModeLabels();
 };
 
@@ -184,6 +185,11 @@ void SubscriptionToolsTest::copilotDetectActivityIncrementsUsage()
 
 void SubscriptionToolsTest::browserSyncEmptyCookieDiagnostics()
 {
+    QTemporaryDir tempHome;
+    QVERIFY(tempHome.isValid());
+    EnvVarGuard homeGuard("HOME");
+    qputenv("HOME", tempHome.path().toUtf8());
+
     ClaudeCodeMonitor claude;
     QSignalSpy claudeCompletedSpy(&claude, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy claudeDiagnosticSpy(&claude, &SubscriptionToolBackend::syncDiagnostic);
@@ -223,6 +229,11 @@ void SubscriptionToolsTest::browserSyncEmptyCookieDiagnostics()
 
 void SubscriptionToolsTest::browserSyncChromeEmptyCookieDiagnostics()
 {
+    QTemporaryDir tempHome;
+    QVERIFY(tempHome.isValid());
+    EnvVarGuard homeGuard("HOME");
+    qputenv("HOME", tempHome.path().toUtf8());
+
     ClaudeCodeMonitor claude;
     QSignalSpy claudeCompletedSpy(&claude, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy claudeDiagnosticSpy(&claude, &SubscriptionToolBackend::syncDiagnostic);
@@ -299,6 +310,26 @@ void SubscriptionToolsTest::codexSyncWithoutLiveQuotaKeepsConfiguredPro()
     QVERIFY(diagnosticSpy.count() >= 1);
     QCOMPARE(diagnosticSpy.takeFirst().at(1).toString(), QStringLiteral("no_live_quota"));
     QVERIFY(completedSpy.takeFirst().at(0).toBool());
+}
+
+void SubscriptionToolsTest::codexLiveQuotaPayload()
+{
+    const QByteArray payload = R"JSON({
+        "rate_limit": {
+            "primary_window": {"used_percent": 25.0, "limit_window_seconds": 18000, "reset_at": 4102444800},
+            "secondary_window": {"used_percent": 66.0, "limit_window_seconds": 604800, "reset_at": 4103049600}
+        }
+    })JSON";
+
+    const QVariantList windows = CodexCliMonitor::quotaWindowsFromUsagePayload(payload);
+    QCOMPARE(windows.size(), 2);
+    const QVariantMap primary = windows.at(0).toMap();
+    QCOMPARE(primary.value(QStringLiteral("kind")).toString(), QStringLiteral("rolling_5h"));
+    QCOMPARE(primary.value(QStringLiteral("percentRemaining")).toDouble(), 75.0);
+    const QVariantMap weekly = windows.at(1).toMap();
+    QCOMPARE(weekly.value(QStringLiteral("kind")).toString(), QStringLiteral("rolling_weekly"));
+    QCOMPARE(weekly.value(QStringLiteral("percentRemaining")).toDouble(), 34.0);
+    QVERIFY(!weekly.value(QStringLiteral("resetAt")).toString().isEmpty());
 }
 
 void SubscriptionToolsTest::copilotBillingModeLabels()

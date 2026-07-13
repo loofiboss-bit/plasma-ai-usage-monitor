@@ -648,14 +648,14 @@ void ProvidersMockedHttpTest::googleVeoKnownLimitsByTier()
 
     server.setResponse(
         QStringLiteral("GET"),
-        QStringLiteral("/v1beta/models/veo-2"),
+        QStringLiteral("/v1beta/models/veo-3.1-generate-preview"),
         200,
         modelInfoBody);
 
     GoogleVeoProvider provider;
     provider.setApiKey(QStringLiteral("test-key"));
     provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1beta"));
-    provider.setModel(QStringLiteral("veo-2"));
+    provider.setModel(QStringLiteral("veo-3.1-generate-preview"));
     provider.setTier(QStringLiteral("free"));
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
@@ -663,8 +663,8 @@ void ProvidersMockedHttpTest::googleVeoKnownLimitsByTier()
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
-    QCOMPARE(provider.rateLimitRequests(), 10);
-    QCOMPARE(provider.rateLimitRequestsRemaining(), 10);
+    QCOMPARE(provider.rateLimitRequests(), 5);
+    QCOMPARE(provider.rateLimitRequestsRemaining(), 5);
     QCOMPARE(provider.rateLimitTokens(), 0);
     QCOMPARE(provider.rateLimitTokensRemaining(), 0);
     assertProbeOnlyState(provider, 0, 0);
@@ -761,7 +761,7 @@ void ProvidersMockedHttpTest::googleVeoUsagePayloadEstimatedCost()
     QVERIFY(server.listen());
 
     const QByteArray modelInfoBody = R"JSON({
-        "name": "models/veo-2",
+        "name": "models/veo-3.1-generate-preview",
         "usage": {
             "prompt_tokens": 120000,
             "completion_tokens": 30000,
@@ -771,7 +771,7 @@ void ProvidersMockedHttpTest::googleVeoUsagePayloadEstimatedCost()
 
     server.setResponse(
         QStringLiteral("GET"),
-        QStringLiteral("/v1beta/models/veo-2"),
+        QStringLiteral("/v1beta/models/veo-3.1-generate-preview"),
         200,
         modelInfoBody,
         {
@@ -782,7 +782,7 @@ void ProvidersMockedHttpTest::googleVeoUsagePayloadEstimatedCost()
     GoogleVeoProvider provider;
     provider.setApiKey(QStringLiteral("test-key"));
     provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1beta"));
-    provider.setModel(QStringLiteral("veo-2"));
+    provider.setModel(QStringLiteral("veo-3.1-generate-preview"));
     provider.setTier(QStringLiteral("paid"));
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
@@ -806,7 +806,7 @@ void ProvidersMockedHttpTest::googleVeoDurationSecondsEstimatedCost()
     QVERIFY(server.listen());
 
     const QByteArray modelInfoBody = R"JSON({
-        "name": "models/veo-2",
+        "name": "models/veo-3.1-generate-preview",
         "usage": {
             "prompt_tokens": 10,
             "completion_tokens": 5,
@@ -816,7 +816,7 @@ void ProvidersMockedHttpTest::googleVeoDurationSecondsEstimatedCost()
 
     server.setResponse(
         QStringLiteral("GET"),
-        QStringLiteral("/v1beta/models/veo-2"),
+        QStringLiteral("/v1beta/models/veo-3.1-generate-preview"),
         200,
         modelInfoBody,
         {
@@ -827,7 +827,7 @@ void ProvidersMockedHttpTest::googleVeoDurationSecondsEstimatedCost()
     GoogleVeoProvider provider;
     provider.setApiKey(QStringLiteral("test-key"));
     provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1beta"));
-    provider.setModel(QStringLiteral("veo-2"));
+    provider.setModel(QStringLiteral("veo-3.1-generate-preview"));
     provider.setTier(QStringLiteral("paid"));
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
@@ -838,7 +838,7 @@ void ProvidersMockedHttpTest::googleVeoDurationSecondsEstimatedCost()
     QCOMPARE(provider.inputTokens(), 10);
     QCOMPARE(provider.outputTokens(), 5);
     QCOMPARE(provider.requestCount(), 1);
-    QVERIFY(qAbs(provider.cost() - 2.8) < 0.000001);
+    QCOMPARE(provider.cost(), 3.2);
     QVERIFY(provider.isEstimatedCost());
     QCOMPARE(provider.rateLimitRequests(), 44);
     QCOMPARE(provider.rateLimitRequestsRemaining(), 40);

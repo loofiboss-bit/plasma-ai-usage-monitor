@@ -14,11 +14,12 @@
  * 2. Watches ~/.codex/ for session activity
  * 3. Self-tracks usage counts in the local database
  * 4. Lets users set their plan tier to auto-fill limits
- * 5. (Optional) Syncs from browser cookies to get real-time data
+ * 5. (Optional) Syncs live quota from the local Codex login, with browser
+ *    account cookies as a compatibility fallback
  *
  * Pricing and quota presets live in subscriptions-v1.json.
  *
- * Browser sync fetches from ChatGPT internal API:
+ * Live sync fetches from ChatGPT internal APIs:
  * - 5-hour usage limit (primary)
  * - Weekly usage limit (secondary)
  * - Code review (tertiary)
@@ -44,8 +45,11 @@ public:
     Q_INVOKABLE int defaultLimitForPlan(const QString &plan) const override;
     Q_INVOKABLE int defaultSecondaryLimitForPlan(const QString &plan) const override;
 
-    // Browser sync
+    // Live sync
     Q_INVOKABLE void syncFromBrowser(const QString &cookieHeader, int browserType) override;
+
+    // Pure parser kept public for deterministic regression tests.
+    static QVariantList quotaWindowsFromUsagePayload(const QByteArray &payload);
 
     // Cost
     double subscriptionCost() const override;
@@ -66,6 +70,7 @@ protected:
 
 private:
     QString codexConfigDir() const;
+    bool fetchCodexUsage(const QString &cookieHeader);
     void fetchAccountCheck(const QString &cookieHeader);
 
     bool m_hasTertiary = false;

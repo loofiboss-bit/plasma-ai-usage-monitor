@@ -86,7 +86,7 @@
             <default>false</default>
         </entry>
         <entry name="openaiModel" type="String">
-            <default>gpt-5.4</default>
+            <default>gpt-5.6-terra</default>
         </entry>
         <entry name="openaiProjectId" type="String">
             <default></default>
@@ -117,7 +117,7 @@
             <default>us-east-1</default>
         </entry>
         <entry name="bedrockModel" type="String">
-            <default>anthropic.claude-3-5-sonnet-20241022-v2:0</default>
+            <default>anthropic.claude-sonnet-4-20250514-v1:0</default>
         </entry>
         <entry name="bedrockCustomBaseUrl" type="String">
             <default></default>
@@ -128,7 +128,7 @@
             <default>false</default>
         </entry>
         <entry name="anthropicModel" type="String">
-            <default>claude-sonnet-4-20250514</default>
+            <default>claude-sonnet-5</default>
         </entry>
         <entry name="anthropicCustomBaseUrl" type="String">
             <default></default>
@@ -139,7 +139,7 @@
             <default>false</default>
         </entry>
         <entry name="googleModel" type="String">
-            <default>gemini-2.0-flash</default>
+            <default>gemini-3.1-flash-lite</default>
         </entry>
         <entry name="googleTier" type="String">
             <default>free</default>
@@ -153,7 +153,7 @@
             <default>false</default>
         </entry>
         <entry name="mistralModel" type="String">
-            <default>mistral-large-latest</default>
+            <default>mistral-medium-3-5</default>
         </entry>
         <entry name="mistralCustomBaseUrl" type="String">
             <default></default>
@@ -175,7 +175,7 @@
             <default>false</default>
         </entry>
         <entry name="groqModel" type="String">
-            <default>llama-3.3-70b-versatile</default>
+            <default>openai/gpt-oss-120b</default>
         </entry>
         <entry name="groqCustomBaseUrl" type="String">
             <default></default>
@@ -186,7 +186,7 @@
             <default>false</default>
         </entry>
         <entry name="xaiModel" type="String">
-            <default>grok-3</default>
+            <default>grok-4.5</default>
         </entry>
         <entry name="xaiCustomBaseUrl" type="String">
             <default></default>
@@ -197,7 +197,7 @@
             <default>false</default>
         </entry>
         <entry name="ollamaModel" type="String">
-            <default>gpt-oss:120b</default>
+            <default>gpt-oss:120b-cloud</default>
         </entry>
         <entry name="ollamaCustomBaseUrl" type="String">
             <default></default>
@@ -208,7 +208,7 @@
             <default>false</default>
         </entry>
         <entry name="openrouterModel" type="String">
-            <default>openai/gpt-5.4-pro</default>
+            <default>openai/gpt-5.6-terra</default>
         </entry>
         <entry name="openrouterCustomBaseUrl" type="String">
             <default></default>
@@ -230,7 +230,7 @@
             <default>false</default>
         </entry>
         <entry name="cohereModel" type="String">
-            <default>command-a-03-2025</default>
+            <default>command-a-plus-05-2026</default>
         </entry>
         <entry name="cohereCustomBaseUrl" type="String">
             <default></default>
@@ -241,7 +241,7 @@
             <default>false</default>
         </entry>
         <entry name="googleveoModel" type="String">
-            <default>veo-3</default>
+            <default>veo-3.1-generate-preview</default>
         </entry>
         <entry name="googleveoTier" type="String">
             <default>paid</default>
