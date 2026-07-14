@@ -47,7 +47,11 @@ public:
     using ProviderBackend::updateEstimatedCost;
     using ProviderBackend::checkBudgetLimits;
     using ProviderBackend::isRetryableStatus;
+    using ProviderBackend::errorKindForNetworkReply;
     using ProviderBackend::retryAfterForReply;
+    using ProviderBackend::setProviderMetric;
+    using ProviderBackend::clearProviderMetric;
+    using ProviderBackend::setCapabilityStatus;
 };
 
 class ProviderBackendTest : public QObject
@@ -76,12 +80,84 @@ private Q_SLOTS:
     void testClearError();
     void testIsRetryableStatus();
     void testTypedErrorRetryability();
+    void testNetworkErrorClassification();
     void testRefreshCoalescingAndManualSupersede();
     void testRetryAfterNumericAndHttpDate();
     void testEffectiveBaseUrl();
     void testEffectiveBaseUrlTrailingSlash();
     void testTotalTokens();
+    void testNullableMetricContract();
+    void testMetricSourcePeriodAndCapabilityContract();
+    void testUnsafeCustomEndpointRejected();
 };
+
+void ProviderBackendTest::testMetricSourcePeriodAndCapabilityContract()
+{
+    TestProvider p;
+    const QDateTime start(QDate(2026, 7, 1), QTime(0, 0), QTimeZone::UTC);
+    const QDateTime end = start.addDays(1);
+    p.setProviderMetric(ProviderBackend::MetricKind::Cost, 1.25, QStringLiteral("USD"),
+                        QStringLiteral("USD"), QStringLiteral("project"), QStringLiteral("day"),
+                        ProviderBackend::MetricSource::BillingApi, QStringLiteral("actual"),
+                        end, start, end);
+    const QVariantMap metric = p.metric(QStringLiteral("cost"), QStringLiteral("project"), QStringLiteral("day"));
+    QCOMPARE(metric.value(QStringLiteral("source")).toString(), QStringLiteral("billing_api"));
+    QCOMPARE(metric.value(QStringLiteral("periodStart")).toDateTime(), start);
+    QCOMPARE(metric.value(QStringLiteral("periodEnd")).toDateTime(), end);
+    QCOMPARE(metric.value(QStringLiteral("resetAt")).toDateTime(), end);
+
+    p.setProviderMetric(ProviderBackend::MetricKind::RequestLimit, 1000,
+                        QStringLiteral("request"), QString(), QStringLiteral("project"),
+                        QStringLiteral("minute"), ProviderBackend::MetricSource::PublishedDocumentation,
+                        QStringLiteral("published_cap"));
+    p.clearProviderMetric(ProviderBackend::MetricKind::RequestRemaining,
+                          QStringLiteral("project"), QStringLiteral("minute"));
+    const QVariantMap published = p.metric(QStringLiteral("request_limit"), QStringLiteral("project"), QStringLiteral("minute"));
+    const QVariantMap remaining = p.metric(QStringLiteral("request_remaining"), QStringLiteral("project"), QStringLiteral("minute"));
+    QCOMPARE(published.value(QStringLiteral("source")).toString(), QStringLiteral("published_documentation"));
+    QCOMPARE(published.value(QStringLiteral("quality")).toString(), QStringLiteral("published_cap"));
+    QVERIFY(published.value(QStringLiteral("available")).toBool());
+    QVERIFY(!remaining.value(QStringLiteral("available")).toBool());
+
+    p.setCapabilityStatus(QStringLiteral("usage"), QStringLiteral("available"));
+    p.setCapabilityStatus(QStringLiteral("billing"), QStringLiteral("failed"), QStringLiteral("permission denied"));
+    QCOMPARE(p.capabilityStatus().value(QStringLiteral("usage")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("available"));
+    QCOMPARE(p.capabilityStatus().value(QStringLiteral("billing")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("failed"));
+}
+
+void ProviderBackendTest::testUnsafeCustomEndpointRejected()
+{
+    TestProvider p;
+    p.setCustomBaseUrl(QStringLiteral("http://account:secret@example.com/path?api_key=secret"));
+    QVERIFY(p.customBaseUrl().isEmpty());
+    p.setCustomBaseUrl(QStringLiteral("ftp://example.com/provider"));
+    QVERIFY(p.customBaseUrl().isEmpty());
+    p.setCustomBaseUrl(QStringLiteral("http://127.0.0.1:8080"));
+    QCOMPARE(p.customBaseUrl(), QStringLiteral("http://127.0.0.1:8080"));
+}
+
+void ProviderBackendTest::testNullableMetricContract()
+{
+    TestProvider p;
+    p.clearProviderMetric(ProviderBackend::MetricKind::TokenRemaining,
+                          QStringLiteral("project"), QStringLiteral("minute"));
+    QCOMPARE(p.metrics().size(), 1);
+    QVariantMap metric = p.metrics().first().toMap();
+    QCOMPARE(metric.value(QStringLiteral("kind")).toString(), QStringLiteral("token_remaining"));
+    QCOMPARE(metric.value(QStringLiteral("available")).toBool(), false);
+    QCOMPARE(metric.value(QStringLiteral("scope")).toString(), QStringLiteral("project"));
+    QCOMPARE(metric.value(QStringLiteral("window")).toString(), QStringLiteral("minute"));
+
+    p.setProviderMetric(ProviderBackend::MetricKind::TokenRemaining, 0,
+                        QStringLiteral("token"), QString(), QStringLiteral("project"),
+                        QStringLiteral("minute"), ProviderBackend::MetricSource::ResponseHeaders,
+                        QStringLiteral("actual"));
+    metric = p.metrics().first().toMap();
+    QCOMPARE(metric.value(QStringLiteral("available")).toBool(), true);
+    QCOMPARE(metric.value(QStringLiteral("value")).toInt(), 0);
+}
 
 void ProviderBackendTest::testBudgetWarningSignal()
 {
@@ -388,6 +464,36 @@ void ProviderBackendTest::testRetryAfterNumericAndHttpDate()
 
     reply.setRetryAfter("Mon, 13 Jul 2026 12:02:00 GMT");
     QCOMPARE(provider.retryAfterForReply(&reply, now), now.addSecs(120));
+
+    reply.setRetryAfter("not-a-reset-time");
+    QVERIFY(!provider.retryAfterForReply(&reply, now).isValid());
+}
+
+void ProviderBackendTest::testNetworkErrorClassification()
+{
+    class Reply final : public QNetworkReply {
+    public:
+        Reply()
+        {
+            setOpenMode(QIODevice::ReadOnly);
+            setFinished(true);
+        }
+        void abort() override {}
+        qint64 bytesAvailable() const override { return 0; }
+        void setNetworkError(QNetworkReply::NetworkError error) { setError(error, QStringLiteral("test error")); }
+        void setHttpStatus(int status) { setAttribute(QNetworkRequest::HttpStatusCodeAttribute, status); }
+    protected:
+        qint64 readData(char *, qint64) override { return -1; }
+    } reply;
+
+    reply.setNetworkError(QNetworkReply::TimeoutError);
+    QCOMPARE(TestProvider::errorKindForNetworkReply(&reply), ProviderBackend::ProviderErrorKind::Timeout);
+
+    reply.setNetworkError(QNetworkReply::HostNotFoundError);
+    QCOMPARE(TestProvider::errorKindForNetworkReply(&reply), ProviderBackend::ProviderErrorKind::Network);
+
+    reply.setHttpStatus(503);
+    QCOMPARE(TestProvider::errorKindForNetworkReply(&reply), ProviderBackend::ProviderErrorKind::Server);
 }
 
 void ProviderBackendTest::testDisconnectReconnectSignals()

@@ -7,8 +7,41 @@ import com.github.loofi.aiusagemonitor 1.0
 
 KCM.SimpleKCM {
     id: providersPage
+    ProviderCatalog { id: descriptorCatalog }
 
     property bool advancedMode: plasmoid.configuration.advancedSettingsMode
+    property string providerSearch: ""
+    property string capabilityFilter: "all"
+
+    function providerMatches(descriptor) {
+        var needle = providerSearch.trim().toLowerCase();
+        var textMatch = needle.length === 0
+            || descriptor.name.toLowerCase().indexOf(needle) >= 0
+            || descriptor.configKey.toLowerCase().indexOf(needle) >= 0;
+        if (!textMatch) return false;
+        if (capabilityFilter === "all") return true;
+        if (capabilityFilter === "actual") return descriptor.monitoringLevel.indexOf("actual") === 0;
+        if (capabilityFilter === "gateway") return descriptor.monitoringLevel === "gateway_aggregate";
+        if (capabilityFilter === "balance") return descriptor.monitoringLevel === "balance_connectivity";
+        return descriptor.monitoringLevel === "connectivity_only";
+    }
+
+    function monitoringLabel(level) {
+        if (level === "actual_usage_spend") return i18n("Actual account usage/spend");
+        if (level === "actual_key_usage") return i18n("Actual key usage/balance");
+        if (level === "gateway_aggregate") return i18n("Gateway aggregate");
+        if (level === "balance_connectivity") return i18n("Balance/connectivity");
+        return i18n("Connectivity/model discovery only");
+    }
+
+    function scheduledCalls(safeRefresh) {
+        var paths = safeRefresh.paths || [safeRefresh.path || ""];
+        var calls = [];
+        for (var i = 0; i < paths.length; i++) {
+            if (paths[i]) calls.push((safeRefresh.method || "GET") + " " + paths[i]);
+        }
+        return calls.join("; ");
+    }
 
     onAdvancedModeChanged: {
         plasmoid.configuration.advancedSettingsMode = advancedMode
@@ -18,10 +51,13 @@ KCM.SimpleKCM {
     function isInvalidUrl(url) {
         if (url.length === 0) return false;
         var lower = url.toLowerCase();
-        return !lower.startsWith("https://") && !lower.startsWith("http://");
+        return !lower.startsWith("https://")
+            && !lower.startsWith("http://localhost")
+            && !lower.startsWith("http://127.0.0.1")
+            && !lower.startsWith("http://[::1]");
     }
 
-    // Keep every visible model picker aligned with Provider Catalog v4.
+    // Keep every visible model picker aligned with Provider Catalog v5.
     // The fields stay editable so users can enter a newly released or custom
     // gateway model before the next catalog refresh.
     function catalogModelIds(providerKey) {
@@ -94,6 +130,19 @@ KCM.SimpleKCM {
     property string cfg_googleveoTier: "paid"
     property alias cfg_googleveoCustomBaseUrl: googleveoBaseUrlField.text
 
+    property bool cfg_litellmEnabled: plasmoid.configuration.litellmEnabled
+    property string cfg_litellmModel: plasmoid.configuration.litellmModel
+    property string cfg_litellmCustomBaseUrl: plasmoid.configuration.litellmCustomBaseUrl
+    property bool cfg_cerebrasEnabled: plasmoid.configuration.cerebrasEnabled
+    property string cfg_cerebrasModel: plasmoid.configuration.cerebrasModel
+    property string cfg_cerebrasCustomBaseUrl: plasmoid.configuration.cerebrasCustomBaseUrl
+    property bool cfg_fireworksEnabled: plasmoid.configuration.fireworksEnabled
+    property string cfg_fireworksModel: plasmoid.configuration.fireworksModel
+    property string cfg_fireworksCustomBaseUrl: plasmoid.configuration.fireworksCustomBaseUrl
+    property bool cfg_perplexityEnabled: plasmoid.configuration.perplexityEnabled
+    property string cfg_perplexityModel: plasmoid.configuration.perplexityModel
+    property string cfg_perplexityCustomBaseUrl: plasmoid.configuration.perplexityCustomBaseUrl
+
     // Track whether the user has actually edited each key field
     property bool openaiKeyDirty: false
     property bool anthropicKeyDirty: false
@@ -111,6 +160,9 @@ KCM.SimpleKCM {
     property bool bedrockAccessKeyDirty: false
     property bool bedrockSecretKeyDirty: false
     property bool bedrockSessionTokenDirty: false
+    property bool litellmKeyDirty: false
+    property bool cerebrasKeyDirty: false
+    property bool fireworksKeyDirty: false
 
     // ── KWallet Integration ──
     SecretsManager {
@@ -149,6 +201,9 @@ KCM.SimpleKCM {
             { name: "bedrock_access_key_id", field: bedrockAccessKeyField, dirtyProp: "bedrockAccessKeyDirty" },
             { name: "bedrock_secret_access_key", field: bedrockSecretKeyField, dirtyProp: "bedrockSecretKeyDirty" },
             { name: "bedrock_session_token", field: bedrockSessionTokenField, dirtyProp: "bedrockSessionTokenDirty" }
+            ,{ name: "litellm", field: litellmSection.keyField, dirtyProp: "litellmKeyDirty" }
+            ,{ name: "cerebras", field: cerebrasSection.keyField, dirtyProp: "cerebrasKeyDirty" }
+            ,{ name: "fireworks", field: fireworksSection.keyField, dirtyProp: "fireworksKeyDirty" }
         ];
 
         for (var i = 0; i < providers.length; i++) {
@@ -177,6 +232,9 @@ KCM.SimpleKCM {
             { name: "cohere", field: cohereSection.keyField, dirty: cohereSection.keyDirty },
             { name: "googleveo", field: googleveoKeyField, dirty: googleveoKeyDirty },
             { name: "azure", field: azureKeyField, dirty: azureKeyDirty },
+            { name: "litellm", field: litellmSection.keyField, dirty: litellmSection.keyDirty },
+            { name: "cerebras", field: cerebrasSection.keyField, dirty: cerebrasSection.keyDirty },
+            { name: "fireworks", field: fireworksSection.keyField, dirty: fireworksSection.keyDirty },
             { name: "bedrock_access_key_id", field: bedrockAccessKeyField, dirty: bedrockAccessKeyDirty },
             { name: "bedrock_secret_access_key", field: bedrockSecretKeyField, dirty: bedrockSecretKeyDirty },
             { name: "bedrock_session_token", field: bedrockSessionTokenField, dirty: bedrockSessionTokenDirty }
@@ -218,6 +276,64 @@ KCM.SimpleKCM {
             onCheckedChanged: providersPage.advancedMode = checked
             QQC2.ToolTip.text: i18n("Show advanced configuration options like custom base URLs and specific tiers.")
             QQC2.ToolTip.visible: hovered
+        }
+
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: i18n("Provider setup overview")
+        }
+
+        QQC2.TextField {
+            Kirigami.FormData.label: i18n("Search:")
+            placeholderText: i18n("Provider name")
+            text: providersPage.providerSearch
+            onTextChanged: providersPage.providerSearch = text
+            Layout.fillWidth: true
+        }
+
+        QQC2.ComboBox {
+            Kirigami.FormData.label: i18n("Monitoring level:")
+            textRole: "text"
+            valueRole: "value"
+            model: [
+                { text: i18n("All providers"), value: "all" },
+                { text: i18n("Actual usage/spend"), value: "actual" },
+                { text: i18n("Gateway/aggregate"), value: "gateway" },
+                { text: i18n("Balance/credits"), value: "balance" },
+                { text: i18n("Connectivity only"), value: "connectivity" }
+            ]
+            onActivated: providersPage.capabilityFilter = currentValue
+            Layout.fillWidth: true
+        }
+
+        ColumnLayout {
+            Kirigami.FormData.label: i18n("Matches:")
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+
+            Repeater {
+                model: descriptorCatalog.providers.filter(function(row) {
+                    return providersPage.providerMatches(row);
+                })
+
+                delegate: RowLayout {
+                    required property var modelData
+                    Layout.fillWidth: true
+
+                    QQC2.Switch {
+                        checked: !!plasmoid.configuration[modelData.enabledConfigKey]
+                        onToggled: plasmoid.configuration[modelData.enabledConfigKey] = checked
+                        text: modelData.name
+                    }
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        text: providersPage.monitoringLabel(modelData.monitoringLevel)
+                              + " · " + providersPage.scheduledCalls(modelData.safeRefresh)
+                        color: Kirigami.Theme.disabledTextColor
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
         }
         
 
@@ -315,7 +431,7 @@ KCM.SimpleKCM {
 
         QQC2.Label {
             visible: providersPage.isInvalidUrl(openaiBaseUrlField.text)
-            text: i18n("⚠ URL must start with https:// or http://")
+            text: i18n("⚠ Use HTTPS, or HTTP only for a local loopback address")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap
@@ -323,8 +439,9 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            visible: openaiBaseUrlField.text.toLowerCase().startsWith("http://")
-            text: i18n("⚠ Using HTTP is insecure. API keys will be sent unencrypted.")
+            visible: providersPage.isInvalidUrl(openaiBaseUrlField.text)
+                     && openaiBaseUrlField.text.toLowerCase().startsWith("http://")
+            text: i18n("⚠ External HTTP is blocked because it would expose API credentials.")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap
@@ -422,7 +539,7 @@ KCM.SimpleKCM {
 
         QQC2.Label {
             visible: providersPage.isInvalidUrl(azureBaseUrlField.text)
-            text: i18n("⚠ URL must start with https:// or http://")
+            text: i18n("⚠ Use HTTPS, or HTTP only for a local loopback address")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap
@@ -430,8 +547,9 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            visible: azureBaseUrlField.text.toLowerCase().startsWith("http://")
-            text: i18n("⚠ Using HTTP is insecure. API keys will be sent unencrypted.")
+            visible: providersPage.isInvalidUrl(azureBaseUrlField.text)
+                     && azureBaseUrlField.text.toLowerCase().startsWith("http://")
+            text: i18n("⚠ External HTTP is blocked because it would expose API credentials.")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap
@@ -628,7 +746,7 @@ KCM.SimpleKCM {
 
         QQC2.Label {
             visible: providersPage.isInvalidUrl(anthropicBaseUrlField.text)
-            text: i18n("⚠ URL must start with https:// or http://")
+            text: i18n("⚠ Use HTTPS, or HTTP only for a local loopback address")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap
@@ -636,8 +754,9 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            visible: anthropicBaseUrlField.text.toLowerCase().startsWith("http://")
-            text: i18n("⚠ Using HTTP is insecure. API keys will be sent unencrypted.")
+            visible: providersPage.isInvalidUrl(anthropicBaseUrlField.text)
+                     && anthropicBaseUrlField.text.toLowerCase().startsWith("http://")
+            text: i18n("⚠ External HTTP is blocked because it would expose API credentials.")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap
@@ -693,7 +812,7 @@ KCM.SimpleKCM {
 
         QQC2.Label {
             visible: googleSwitch.checked
-            text: i18n("Shows connectivity status and known tier limits")
+            text: i18n("Uses read-only Gemini model discovery; published caps are not live remaining quota")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor; wrapMode: Text.WordWrap; Layout.fillWidth: true
         }
@@ -746,7 +865,7 @@ KCM.SimpleKCM {
 
         QQC2.Label {
             visible: providersPage.isInvalidUrl(googleBaseUrlField.text)
-            text: i18n("⚠ URL must start with https:// or http://")
+            text: i18n("⚠ Use HTTPS, or HTTP only for a local loopback address")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap
@@ -754,8 +873,9 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            visible: googleBaseUrlField.text.toLowerCase().startsWith("http://")
-            text: i18n("⚠ Using HTTP is insecure. API keys will be sent unencrypted.")
+            visible: providersPage.isInvalidUrl(googleBaseUrlField.text)
+                     && googleBaseUrlField.text.toLowerCase().startsWith("http://")
+            text: i18n("⚠ External HTTP is blocked because it would expose API credentials.")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap
@@ -769,7 +889,7 @@ KCM.SimpleKCM {
             enabledProp: "cfg_mistralEnabled"
             modelProp: "cfg_mistralModel"
             baseUrlProp: "cfg_mistralCustomBaseUrl"
-            description: i18n("Rate limits and token usage via chat/completions endpoint")
+            description: i18n("Read-only model discovery; inference tests are manual and may consume quota")
             keyPlaceholder: i18n("Enter Mistral API key...")
             modelOptions: providersPage.catalogModelIds("mistral")
         }
@@ -857,6 +977,44 @@ KCM.SimpleKCM {
             description: i18n("Enterprise RAG and multilingual models via OpenAI-compatible API")
             keyPlaceholder: i18n("Enter Cohere API key...")
             modelOptions: providersPage.catalogModelIds("cohere")
+        }
+
+        OpenAICompatibleProviderSection {
+            id: litellmSection
+            configPage: providersPage
+            providerTitle: i18n("LiteLLM Proxy")
+            enabledProp: "cfg_litellmEnabled"; modelProp: "cfg_litellmModel"; baseUrlProp: "cfg_litellmCustomBaseUrl"
+            description: i18n("Read-only gateway spend and token aggregation. Custom HTTPS endpoint required; loopback HTTP may be enabled explicitly.")
+            keyPlaceholder: i18n("LiteLLM master or viewer key")
+            modelOptions: providersPage.catalogModelIds("litellm")
+        }
+        OpenAICompatibleProviderSection {
+            id: cerebrasSection
+            configPage: providersPage
+            providerTitle: i18n("Cerebras Inference")
+            enabledProp: "cfg_cerebrasEnabled"; modelProp: "cfg_cerebrasModel"; baseUrlProp: "cfg_cerebrasCustomBaseUrl"
+            description: i18n("Read-only model discovery; dedicated metrics remain capability-dependent.")
+            keyPlaceholder: i18n("Enter Cerebras API key")
+            modelOptions: providersPage.catalogModelIds("cerebras")
+        }
+        OpenAICompatibleProviderSection {
+            id: fireworksSection
+            configPage: providersPage
+            providerTitle: i18n("Fireworks AI")
+            enabledProp: "cfg_fireworksEnabled"; modelProp: "cfg_fireworksModel"; baseUrlProp: "cfg_fireworksCustomBaseUrl"
+            description: i18n("Read-only model discovery. Scheduled billing is disabled until permissions are validated.")
+            keyPlaceholder: i18n("Enter Fireworks API key; set account endpoint below")
+            modelOptions: providersPage.catalogModelIds("fireworks")
+        }
+        OpenAICompatibleProviderSection {
+            id: perplexitySection
+            configPage: providersPage
+            providerTitle: i18n("Perplexity API")
+            enabledProp: "cfg_perplexityEnabled"; modelProp: "cfg_perplexityModel"; baseUrlProp: "cfg_perplexityCustomBaseUrl"
+            description: i18n("Read-only Agent API model discovery; no automatic inference request.")
+            keyPlaceholder: i18n("Public model discovery requires no key")
+            requiresApiKey: false
+            modelOptions: providersPage.catalogModelIds("perplexity")
         }
 
         // ── Google Veo ──
@@ -960,7 +1118,7 @@ KCM.SimpleKCM {
 
         QQC2.Label {
             visible: providersPage.isInvalidUrl(googleveoBaseUrlField.text)
-            text: i18n("⚠ URL must start with https:// or http://")
+            text: i18n("⚠ Use HTTPS, or HTTP only for a local loopback address")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap
@@ -968,8 +1126,9 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            visible: googleveoBaseUrlField.text.toLowerCase().startsWith("http://")
-            text: i18n("⚠ Using HTTP is insecure. API keys will be sent unencrypted.")
+            visible: providersPage.isInvalidUrl(googleveoBaseUrlField.text)
+                     && googleveoBaseUrlField.text.toLowerCase().startsWith("http://")
+            text: i18n("⚠ External HTTP is blocked because it would expose API credentials.")
             color: Kirigami.Theme.negativeTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WordWrap

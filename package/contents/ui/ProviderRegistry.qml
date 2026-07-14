@@ -21,6 +21,7 @@ QtObject {
     required property var googleveoBackend
     required property var azureBackend
     required property var bedrockBackend
+    required property var providerManager
 
     required property var claudeCodeMonitor
     required property var codexCliMonitor
@@ -31,31 +32,14 @@ QtObject {
 
     property ProviderCatalog providerCatalog: ProviderCatalog {}
     readonly property bool demoMode: AppInfo.demoMode
-    readonly property var backendByConfigKey: ({
-        openai: openaiBackend,
-        anthropic: anthropicBackend,
-        google: googleBackend,
-        mistral: mistralBackend,
-        deepseek: deepseekBackend,
-        groq: groqBackend,
-        xai: xaiBackend,
-        ollama: ollamaBackend,
-        openrouter: openrouterBackend,
-        together: togetherBackend,
-        cohere: cohereBackend,
-        googleveo: googleveoBackend,
-        azure: azureBackend,
-        bedrock: bedrockBackend
-    })
-
     function backendForConfigKey(configKey) {
-        return backendByConfigKey[configKey] || null;
+        return providerManager.backend(configKey);
     }
 
     function providerEnabled(descriptor) {
         var configKey = descriptor.configKey;
         if (demoMode) {
-            return ["openai", "google", "mistral", "deepseek", "groq", "openrouter"].indexOf(configKey) >= 0;
+            return ["litellm", "cerebras", "fireworks", "perplexity"].indexOf(configKey) >= 0;
         }
         return !!configuration[providerEnabledKey(descriptor)];
     }
@@ -109,6 +93,10 @@ QtObject {
                 iconSource: Qt.resolvedUrl("../icons/providers/" + descriptor.configKey + ".svg"),
                 requiresApiKey: descriptor.requiresApiKey,
                 refreshInterval: providerRefreshInterval(descriptor),
+                minimumRefreshSeconds: descriptor.minimumRefreshSeconds,
+                requestBudget: descriptor.requestBudget,
+                monitoringLevel: descriptor.monitoringLevel,
+                safeRefresh: descriptor.safeRefresh,
                 notificationsEnabled: providerNotificationsEnabled(descriptor)
             });
         }
@@ -185,7 +173,7 @@ QtObject {
         for (var i = 0; i < allProviders.length; i++) {
             if (allProviders[i].enabled && allProviders[i].backend && allProviders[i].backend.connected) {
                 var source = allProviders[i].backend.costSource || "unknown";
-                if (source === "billing_api" || source === "actual_api") {
+                if (source === "billing_api" || source === "usage_api" || source === "actual_api") {
                     Utils.addCurrencyTotal(totals,
                                            allProviders[i].backend.currency,
                                            allProviders[i].backend.cost);

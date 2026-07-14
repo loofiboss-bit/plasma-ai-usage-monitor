@@ -24,7 +24,7 @@ KCM.SimpleKCM {
         "dashboardMode", "showOnlyProblems", "openaiRefreshInterval", "anthropicRefreshInterval", "googleRefreshInterval",
         "mistralRefreshInterval", "deepseekRefreshInterval", "groqRefreshInterval", "xaiRefreshInterval", "ollamaRefreshInterval",
         "openrouterRefreshInterval", "togetherRefreshInterval", "cohereRefreshInterval", "googleveoRefreshInterval", "azureRefreshInterval",
-        "bedrockRefreshInterval", "openaiEnabled", "openaiModel", "openaiProjectId", "openaiCustomBaseUrl",
+        "bedrockRefreshInterval", "litellmRefreshInterval", "cerebrasRefreshInterval", "fireworksRefreshInterval", "perplexityRefreshInterval", "openaiEnabled", "openaiModel", "openaiProjectId", "openaiCustomBaseUrl",
         "azureEnabled", "azureModel", "azureDeploymentId", "azureCustomBaseUrl", "bedrockEnabled",
         "bedrockRegion", "bedrockModel", "bedrockCustomBaseUrl", "anthropicEnabled", "anthropicModel",
         "anthropicCustomBaseUrl", "googleEnabled", "googleModel", "googleTier", "googleCustomBaseUrl",
@@ -33,18 +33,18 @@ KCM.SimpleKCM {
         "xaiModel", "xaiCustomBaseUrl", "ollamaEnabled", "ollamaModel", "ollamaCustomBaseUrl",
         "openrouterEnabled", "openrouterModel", "openrouterCustomBaseUrl", "togetherEnabled", "togetherModel",
         "togetherCustomBaseUrl", "cohereEnabled", "cohereModel", "cohereCustomBaseUrl", "googleveoEnabled",
-        "googleveoModel", "googleveoTier", "googleveoCustomBaseUrl", "alertsEnabled", "warningThreshold",
+        "googleveoModel", "googleveoTier", "googleveoCustomBaseUrl", "litellmEnabled", "litellmModel", "litellmCustomBaseUrl", "cerebrasEnabled", "cerebrasModel", "cerebrasCustomBaseUrl", "fireworksEnabled", "fireworksModel", "fireworksCustomBaseUrl", "perplexityEnabled", "perplexityModel", "perplexityCustomBaseUrl", "alertsEnabled", "warningThreshold",
         "criticalThreshold", "notifyOnError", "notifyOnBudgetWarning", "notifyOnDisconnect", "notifyOnReconnect",
         "notificationCooldownMinutes", "dndStartHour", "dndEndHour", "openaiNotificationsEnabled", "anthropicNotificationsEnabled",
         "googleNotificationsEnabled", "mistralNotificationsEnabled", "deepseekNotificationsEnabled", "groqNotificationsEnabled", "xaiNotificationsEnabled",
         "ollamaNotificationsEnabled", "openrouterNotificationsEnabled", "togetherNotificationsEnabled", "cohereNotificationsEnabled", "googleveoNotificationsEnabled",
-        "azureNotificationsEnabled", "bedrockNotificationsEnabled", "notifyOnUpdate", "updateCheckInterval", "slackWebhookEnabled",
+        "azureNotificationsEnabled", "bedrockNotificationsEnabled", "litellmNotificationsEnabled", "cerebrasNotificationsEnabled", "fireworksNotificationsEnabled", "perplexityNotificationsEnabled", "notifyOnUpdate", "updateCheckInterval", "slackWebhookEnabled",
         "discordWebhookEnabled", "webhookCooldownMinutes", "openaiDailyBudget", "openaiMonthlyBudget", "anthropicDailyBudget",
         "anthropicMonthlyBudget", "googleDailyBudget", "googleMonthlyBudget", "mistralDailyBudget", "mistralMonthlyBudget",
         "deepseekDailyBudget", "deepseekMonthlyBudget", "groqDailyBudget", "groqMonthlyBudget", "xaiDailyBudget",
         "xaiMonthlyBudget", "ollamaDailyBudget", "ollamaMonthlyBudget", "openrouterDailyBudget", "openrouterMonthlyBudget",
         "togetherDailyBudget", "togetherMonthlyBudget", "cohereDailyBudget", "cohereMonthlyBudget", "googleveoDailyBudget",
-        "googleveoMonthlyBudget", "azureDailyBudget", "azureMonthlyBudget", "bedrockDailyBudget", "bedrockMonthlyBudget",
+        "googleveoMonthlyBudget", "azureDailyBudget", "azureMonthlyBudget", "bedrockDailyBudget", "bedrockMonthlyBudget", "litellmDailyBudget", "litellmMonthlyBudget", "cerebrasDailyBudget", "cerebrasMonthlyBudget", "fireworksDailyBudget", "fireworksMonthlyBudget", "perplexityDailyBudget", "perplexityMonthlyBudget",
         "budgetWarningPercent", "historyEnabled", "historyRetentionDays", "analystIntensityMode", "analystNormalization",
         "prometheusEnabled", "prometheusPort", "autoExportEnabled", "autoExportDirectory", "autoExportIntervalMinutes",
         "autoExportFormat", "browserSyncEnabled", "browserSyncBrowser", "browserSyncProfile", "browserSyncInterval",
@@ -113,6 +113,30 @@ KCM.SimpleKCM {
             text: i18n("Connectivity and quota headers without exact provider billing data.")
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Background Traffic:")
+            text: i18n("Scheduled provider monitoring uses read-only GET endpoints only. Inference tests are manual and may consume quota or money.")
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
+        ColumnLayout {
+            Kirigami.FormData.label: i18n("Scheduled calls:")
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+            Repeater {
+                model: providerCatalog.providers
+                delegate: QQC2.Label {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    text: modelData.name + ": " + diagnosticsPage.scheduledCalls(modelData.safeRefresh)
+                          + " · " + modelData.minimumRefreshSeconds + "s minimum · read-only"
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+            }
         }
 
         QQC2.Label {
@@ -398,6 +422,12 @@ KCM.SimpleKCM {
                 icon.name: "edit-copy"
                 onClicked: clipboard.setText(buildSupportReport())
             }
+
+            QQC2.Button {
+                text: i18n("Copy capability report")
+                icon.name: "documentinfo"
+                onClicked: clipboard.setText(buildCapabilityReport())
+            }
         }
     }
 
@@ -444,15 +474,10 @@ KCM.SimpleKCM {
     }
 
     function enabledProviderCount() {
-        var keys = [
-            "openaiEnabled", "anthropicEnabled", "googleEnabled",
-            "mistralEnabled", "deepseekEnabled", "groqEnabled", "xaiEnabled",
-            "ollamaEnabled", "openrouterEnabled", "togetherEnabled", "cohereEnabled",
-            "googleveoEnabled", "azureEnabled", "bedrockEnabled"
-        ];
         var count = 0;
-        for (var i = 0; i < keys.length; i++) {
-            if (plasmoid.configuration[keys[i]]) {
+        var rows = providerCatalog.providers || [];
+        for (var i = 0; i < rows.length; i++) {
+            if (plasmoid.configuration[rows[i].enabledConfigKey]) {
                 count++;
             }
         }
@@ -465,7 +490,8 @@ KCM.SimpleKCM {
             "mistralCustomBaseUrl", "deepseekCustomBaseUrl", "groqCustomBaseUrl",
             "xaiCustomBaseUrl", "ollamaCustomBaseUrl", "openrouterCustomBaseUrl",
             "togetherCustomBaseUrl", "cohereCustomBaseUrl", "googleveoCustomBaseUrl",
-            "azureCustomBaseUrl", "bedrockCustomBaseUrl"
+            "azureCustomBaseUrl", "bedrockCustomBaseUrl", "litellmCustomBaseUrl",
+            "cerebrasCustomBaseUrl", "fireworksCustomBaseUrl", "perplexityCustomBaseUrl"
         ];
         var count = 0;
         for (var i = 0; i < keys.length; i++) {
@@ -478,6 +504,31 @@ KCM.SimpleKCM {
             }
         }
         return count;
+    }
+
+    function scheduledCalls(safeRefresh) {
+        var paths = safeRefresh.paths || [safeRefresh.path || ""];
+        var calls = [];
+        for (var i = 0; i < paths.length; i++) {
+            if (paths[i]) calls.push((safeRefresh.method || "GET") + " " + paths[i]);
+        }
+        return calls.join("; ");
+    }
+
+    function buildCapabilityReport() {
+        var lines = ["Plasma AI Usage Monitor Provider Capability Report", "Version: " + AppInfo.version];
+        var rows = providerCatalog.providers || [];
+        for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            lines.push(row.configKey
+                       + " enabled=" + (!!plasmoid.configuration[row.enabledConfigKey] ? "yes" : "no")
+                       + " level=" + row.monitoringLevel
+                       + " scheduled=\"" + scheduledCalls(row.safeRefresh) + "\""
+                       + " min_interval=" + row.minimumRefreshSeconds
+                       + " request_budget=" + row.requestBudget);
+        }
+        lines.push("Endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values are redacted.");
+        return lines.join("\n");
     }
 
     function buildSupportReport() {

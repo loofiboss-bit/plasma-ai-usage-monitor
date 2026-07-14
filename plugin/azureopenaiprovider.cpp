@@ -88,6 +88,15 @@ QUrl AzureOpenAIProvider::completionUrl() const
     return url;
 }
 
+QUrl AzureOpenAIProvider::modelsUrl() const
+{
+    QUrl url(QStringLiteral("%1/openai/models").arg(endpointBaseUrl()));
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("api-version"), m_apiVersion);
+    url.setQuery(query);
+    return url;
+}
+
 void AzureOpenAIProvider::refreshImpl()
 {
     if (!hasApiKey()) {
@@ -102,12 +111,29 @@ void AzureOpenAIProvider::refreshImpl()
         return;
     }
 
-    if (m_deploymentId.isEmpty()) {
-        setErrorDetails(i18n("No Azure deployment ID configured"), ProviderErrorKind::Configuration);
-        setConnected(false);
+    beginRefresh();
+    setLoading(true);
+    clearError();
+
+    QNetworkRequest request(modelsUrl());
+    request.setTransferTimeout(REQUEST_TIMEOUT_MS);
+    request.setRawHeader("api-key", apiKey().toUtf8());
+    const int gen = currentGeneration();
+    QNetworkReply *reply = networkManager()->get(request);
+    trackReply(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, gen]() {
+        if (!isCurrentGeneration(gen)) { reply->deleteLater(); return; }
+        onModelsReply(reply);
+    });
+}
+
+void AzureOpenAIProvider::testConnectionNow()
+{
+    if (!hasApiKey() || endpointBaseUrl().isEmpty() || m_deploymentId.isEmpty()) {
+        setErrorDetails(i18n("API key, endpoint, and deployment ID are required for a manual test"),
+                        ProviderErrorKind::Configuration);
         return;
     }
-
     beginRefresh();
     setLoading(true);
     clearError();
@@ -146,6 +172,34 @@ void AzureOpenAIProvider::refreshImpl()
         }
         onCompletionReply(reply);
     });
+}
+
+void AzureOpenAIProvider::onModelsReply(QNetworkReply *reply)
+{
+    const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (reply->error() != QNetworkReply::NoError) {
+        if (httpStatus == 401 || httpStatus == 403) {
+            setErrorDetails(i18n("Azure model listing is not permitted"),
+                            httpStatus == 401 ? ProviderErrorKind::Authentication : ProviderErrorKind::Permission,
+                            httpStatus);
+        } else if (httpStatus == 404) {
+            setErrorDetails(i18n("Azure model listing is unavailable; use the manual connection test if needed"),
+                            ProviderErrorKind::Unsupported, httpStatus);
+        } else {
+            setNetworkError(reply, i18n("Azure models API unavailable: %1", reply->errorString()));
+        }
+        setConnected(false);
+    } else {
+        reply->readAll();
+        setConnected(true);
+        setUsageSource(QStringLiteral("model_discovery_api"));
+        setCostSource(QStringLiteral("unknown"));
+        setDataQuality(QStringLiteral("connectivity_only"));
+    }
+    reply->deleteLater();
+    setLoading(false);
+    updateLastRefreshed();
+    Q_EMIT dataUpdated();
 }
 
 void AzureOpenAIProvider::onCompletionReply(QNetworkReply *reply)
@@ -219,7 +273,7 @@ void AzureOpenAIProvider::onCompletionReply(QNetworkReply *reply)
 
     setProbeUsage(m_sessionInputTokens, m_sessionOutputTokens, m_sessionRequestCount);
     setUsageSource(QStringLiteral("connectivity_probe"));
-    setCost(0.0);
+    clearProviderMetric(MetricKind::Cost, QStringLiteral("api_key"), QStringLiteral("current"));
     setCostSource(QStringLiteral("connectivity_probe"));
     setDataQuality(QStringLiteral("probe_only"));
     setDailyCost(0.0);

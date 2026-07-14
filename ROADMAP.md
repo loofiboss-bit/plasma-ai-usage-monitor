@@ -1,6 +1,6 @@
 # Roadmap — Plasma AI Usage Monitor
 
-> **Current version:** v12.0.3 (Reliability Core, in development)
+> **Current version:** v13.0.0 (Provider Intelligence, prerelease development)
 > **Last updated:** 2026-07-13
 > **Direction:** Keep the widget desktop-native, local-first, and honest about data quality. Prefer setup clarity, diagnostics, export, notifications, and loopback integrations over backend/server expansion.
 
@@ -20,7 +20,9 @@ The project stays focused on:
 
 | Version | Codename | Theme | Status |
 | ------- | -------- | ----- | ------ |
-| v12.0.0 | **Reliability Core** | Deterministic refresh, typed state, correct history, and release confidence | In development |
+| v13.0.0 | **Provider Intelligence** | Non-invasive monitoring, metric truth, provider adapters | Prerelease development |
+| v12.0.3 | **Reliability Core** | Catalog-driven provider model corrections | Released |
+| v12.0.0 | **Reliability Core** | Deterministic refresh, typed state, correct history, and release confidence | Released |
 | v11.0.0 | **Distribution & Catalog Truth** | RPM/COPR visibility, fresh catalogs, and release gates | Released |
 | v10.0.1 | **Accuracy Patch** | Provider card catalog singleton import fix for installed v10 packages | Released |
 | v10.0.0 | **Accuracy** | Cost correctness, probe honesty, source-aware history, and onboarding | Released |

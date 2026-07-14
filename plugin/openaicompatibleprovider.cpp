@@ -29,12 +29,38 @@ void OpenAICompatibleProvider::refreshImpl()
     setLoading(true);
     clearError();
     m_pendingRequests = 0;
-    fetchRateLimits();
+    fetchModels();
 }
 
-void OpenAICompatibleProvider::fetchRateLimits()
+void OpenAICompatibleProvider::fetchModels()
 {
-    // Use minimal chat completion to read rate limit headers
+    const QUrl url(QStringLiteral("%1/models").arg(effectiveBaseUrl(defaultBaseUrl())));
+    addPendingRequest();
+    const int gen = currentGeneration();
+    QNetworkReply *reply = networkManager()->get(createRequest(url));
+    trackReply(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, gen]() {
+        if (!isCurrentGeneration(gen)) { reply->deleteLater(); return; }
+        onModelsFinished(reply);
+    });
+}
+
+void OpenAICompatibleProvider::testConnectionNow()
+{
+    if (!hasApiKey()) {
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
+        return;
+    }
+    beginRefresh();
+    setLoading(true);
+    clearError();
+    m_pendingRequests = 0;
+    fetchManualProbe();
+}
+
+void OpenAICompatibleProvider::fetchManualProbe()
+{
+    // Explicit user action only. This request may consume quota or money.
     QUrl url(QStringLiteral("%1/chat/completions").arg(effectiveBaseUrl(defaultBaseUrl())));
 
     QNetworkRequest request = createRequest(url);
@@ -61,6 +87,32 @@ void OpenAICompatibleProvider::fetchRateLimits()
         if (!isCurrentGeneration(gen)) { reply->deleteLater(); return; }
         onCompletionFinished(reply);
     });
+}
+
+void OpenAICompatibleProvider::onModelsFinished(QNetworkReply *reply)
+{
+    decrementPendingRequest();
+    const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (reply->error() != QNetworkReply::NoError) {
+        if (httpStatus == 401) {
+            setErrorDetails(i18n("Invalid API key"), ProviderErrorKind::Authentication, httpStatus);
+        } else if (httpStatus == 403) {
+            setErrorDetails(i18n("Model listing is not permitted for this key"), ProviderErrorKind::Permission, httpStatus);
+        } else if (httpStatus == 404) {
+            setErrorDetails(i18n("This provider has no safe read-only monitoring endpoint"), ProviderErrorKind::Unsupported, httpStatus);
+        } else {
+            setNetworkError(reply, i18n("Models API unavailable: %1", reply->errorString()));
+        }
+        setConnected(false);
+    } else {
+        reply->readAll();
+        setConnected(true);
+        setUsageSource(QStringLiteral("connectivity_read_only"));
+        setCostSource(QStringLiteral("unknown"));
+        setDataQuality(QStringLiteral("connectivity_only"));
+    }
+    reply->deleteLater();
+    onAllRequestsDone();
 }
 
 void OpenAICompatibleProvider::parseRateLimitHeaders(QNetworkReply *reply)

@@ -1,6 +1,7 @@
 #include <QtTest>
 
 #include <QHash>
+#include <QSet>
 #include <QSignalSpy>
 #include <QHostAddress>
 #include <QTcpServer>
@@ -157,10 +158,12 @@ private Q_SLOTS:
     void openAiMalformedUsageAndNonUsdCostWarning();
     void openAiRetryAfterThenSuccess();
     void openAiAuthError();
+    void openAiPartialCapabilitySuccess();
     void anthropicRateLimitHeaders();
     void deepSeekUsageAndBalance();
     void openAiCompatibleProbeRefreshesDoNotAffectActualUsage();
     void googleKnownLimitsByTier();
+    void googleDiscoveryPaginatesDeduplicatesAndMergesFallback();
     void googleVeoKnownLimitsByTier();
     void googleVeoUsesHeaderLimitsWhenPresent();
     void googleVeoPartialHeadersFallbackToKnownLimits();
@@ -169,6 +172,7 @@ private Q_SLOTS:
     void googleVeoAuthError();
     void ollamaStaleGenerationDiscarded();
     void openRouterUsageAndCredits();
+    void openRouterMissingFieldsRemainUnavailable();
     void togetherAiUsageAndHeaders();
     void cohereUsageAndHeaders();
     void mistralUsageAndHeaders();
@@ -459,6 +463,35 @@ void ProvidersMockedHttpTest::openAiAuthError()
     QVERIFY(!provider.isRetryable());
 }
 
+void ProvidersMockedHttpTest::openAiPartialCapabilitySuccess()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponse(
+        QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"), 200,
+        QByteArrayLiteral(R"JSON({"data":[{"results":[{"input_tokens":12,"output_tokens":3,"num_model_requests":1}]}]})JSON"));
+    server.setResponseSequence(
+        QStringLiteral("GET"), QStringLiteral("/v1/organization/costs"),
+        {HttpStubServer::Response{403, QByteArrayLiteral("{}"), {}, 0},
+         HttpStubServer::Response{403, QByteArrayLiteral("{}"), {}, 0}});
+
+    OpenAIProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+
+    QVERIFY(provider.isConnected());
+    QCOMPARE(provider.actualInputTokens(), 12);
+    QCOMPARE(provider.capabilityStatus().value(QStringLiteral("usage")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("available"));
+    QCOMPARE(provider.capabilityStatus().value(QStringLiteral("daily_billing")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("failed"));
+    QCOMPARE(provider.capabilityStatus().value(QStringLiteral("monthly_billing")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("failed"));
+}
+
 void ProvidersMockedHttpTest::anthropicRateLimitHeaders()
 {
     HttpStubServer server;
@@ -484,7 +517,7 @@ void ProvidersMockedHttpTest::anthropicRateLimitHeaders()
     provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    provider.refresh();
+    provider.countTokensDiagnostic();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
@@ -529,6 +562,7 @@ void ProvidersMockedHttpTest::deepSeekUsageAndBalance()
             {"x-ratelimit-reset-requests", "20s"},
         });
     server.setResponse(QStringLiteral("GET"), QStringLiteral("/user/balance"), 200, balanceBody);
+    server.setResponse(QStringLiteral("GET"), QStringLiteral("/models"), 200, QByteArrayLiteral(R"JSON({"data":[]})JSON"));
 
     DeepSeekProvider provider;
     provider.setApiKey(QStringLiteral("test-key"));
@@ -538,6 +572,10 @@ void ProvidersMockedHttpTest::deepSeekUsageAndBalance()
     provider.refresh();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(provider.balance(), 13.0, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!provider.isLoading(), 3000);
+    provider.testConnectionNow();
+    QTRY_COMPARE_WITH_TIMEOUT(provider.probeRequestCount(), 1, 3000);
 
     assertProbeOnlyState(provider, 11, 9);
     QCOMPARE(provider.rateLimitRequests(), 120);
@@ -584,7 +622,7 @@ void ProvidersMockedHttpTest::openAiCompatibleProbeRefreshesDoNotAffectActualUsa
 
     for (int i = 0; i < 100; ++i) {
         const int expectedProbeCount = provider.probeRequestCount() + 1;
-        provider.refresh();
+        provider.testConnectionNow();
         QTRY_COMPARE_WITH_TIMEOUT(provider.probeRequestCount(), expectedProbeCount, 3000);
     }
 
@@ -613,10 +651,10 @@ void ProvidersMockedHttpTest::googleKnownLimitsByTier()
     QVERIFY(server.listen());
 
     server.setResponse(
-        QStringLiteral("POST"),
-        QStringLiteral("/v1beta/models/gemini-2.5-flash:countTokens"),
+        QStringLiteral("GET"),
+        QStringLiteral("/v1beta/models"),
         200,
-        QByteArrayLiteral(R"JSON({"totalTokens": 2})JSON"));
+        QByteArrayLiteral(R"JSON({"models":[{"name":"models/gemini-2.5-flash"}]})JSON"));
 
     GoogleProvider provider;
     provider.setApiKey(QStringLiteral("test-key"));
@@ -629,11 +667,39 @@ void ProvidersMockedHttpTest::googleKnownLimitsByTier()
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
-    QCOMPARE(provider.rateLimitRequests(), 2000);
-    QCOMPARE(provider.rateLimitRequestsRemaining(), 2000);
-    QCOMPARE(provider.rateLimitTokens(), 4000000);
-    QCOMPARE(provider.rateLimitTokensRemaining(), 4000000);
+    QCOMPARE(provider.rateLimitRequests(), 0);
+    QCOMPARE(provider.rateLimitRequestsRemaining(), 0);
+    QCOMPARE(provider.rateLimitTokens(), 0);
+    QCOMPARE(provider.rateLimitTokensRemaining(), 0);
+    QVERIFY(provider.selectedModelAvailable());
     QVERIFY(provider.isConnected());
+}
+
+void ProvidersMockedHttpTest::googleDiscoveryPaginatesDeduplicatesAndMergesFallback()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponseSequence(
+        QStringLiteral("GET"), QStringLiteral("/v1beta/models"),
+        {HttpStubServer::Response{200, QByteArrayLiteral(R"JSON({"models":[{"name":"models/live-a"}],"nextPageToken":"page-2"})JSON"), {}, 0},
+         HttpStubServer::Response{200, QByteArrayLiteral(R"JSON({"models":[{"name":"models/live-a"},{"name":"models/live-preview"}]})JSON"), {}, 0}});
+    GoogleProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1beta"));
+    provider.setModel(QStringLiteral("live-preview"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refreshModelsNow();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+    QCOMPARE(server.hitCount(QStringLiteral("/v1beta/models")), 2);
+    QSet<QString> ids;
+    for (const QVariant &entry : provider.discoveredModels())
+        ids.insert(entry.toMap().value(QStringLiteral("id")).toString());
+    QCOMPARE(ids.size(), provider.discoveredModels().size());
+    QVERIFY(ids.contains(QStringLiteral("live-a")));
+    QVERIFY(ids.contains(QStringLiteral("live-preview")));
+    QVERIFY(ids.contains(QStringLiteral("gemini-2.5-pro")));
+    QVERIFY(provider.selectedModelAvailable());
+    QVERIFY(!provider.selectedModelWarning().isEmpty());
 }
 
 void ProvidersMockedHttpTest::googleVeoKnownLimitsByTier()
@@ -663,8 +729,8 @@ void ProvidersMockedHttpTest::googleVeoKnownLimitsByTier()
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
-    QCOMPARE(provider.rateLimitRequests(), 5);
-    QCOMPARE(provider.rateLimitRequestsRemaining(), 5);
+    QCOMPARE(provider.rateLimitRequests(), 0);
+    QCOMPARE(provider.rateLimitRequestsRemaining(), 0);
     QCOMPARE(provider.rateLimitTokens(), 0);
     QCOMPARE(provider.rateLimitTokensRemaining(), 0);
     assertProbeOnlyState(provider, 0, 0);
@@ -746,11 +812,11 @@ void ProvidersMockedHttpTest::googleVeoPartialHeadersFallbackToKnownLimits()
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
-    // Missing remaining-requests header should fall back to known tier limits.
-    QCOMPARE(provider.rateLimitRequests(), 100);
-    QCOMPARE(provider.rateLimitRequestsRemaining(), 100);
-    QCOMPARE(provider.rateLimitTokens(), 0);
-    QCOMPARE(provider.rateLimitTokensRemaining(), 0);
+    // A partial header pair must remain unavailable, not become a published cap.
+    QCOMPARE(provider.rateLimitRequests(), 0);
+    QCOMPARE(provider.rateLimitRequestsRemaining(), 0);
+    QCOMPARE(provider.rateLimitTokens(), 12345);
+    QCOMPARE(provider.rateLimitTokensRemaining(), 12000);
     assertProbeOnlyState(provider, 0, 0);
     QVERIFY(provider.isConnected());
 }
@@ -930,9 +996,9 @@ void ProvidersMockedHttpTest::ollamaStaleGenerationDiscarded()
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
 
-    provider.refresh();
+    provider.testConnectionNow();
     QTest::qWait(50);
-    provider.refresh();
+    provider.testConnectionNow();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
     QTest::qWait(300);
@@ -948,34 +1014,21 @@ void ProvidersMockedHttpTest::openRouterUsageAndCredits()
     HttpStubServer server;
     QVERIFY(server.listen());
 
-    const QByteArray usageBody = R"JSON({
-        "usage": {
-            "prompt_tokens": 200,
-            "completion_tokens": 80
-        }
-    })JSON";
-
     const QByteArray creditsBody = R"JSON({
         "data": {
             "label": "my-key",
             "usage": 3.50,
-            "limit": 25.00
+            "usage_daily": 0.25,
+            "usage_weekly": 1.25,
+            "usage_monthly": 2.75,
+            "limit": 25.00,
+            "limit_remaining": 21.50,
+            "limit_reset": "monthly"
         }
     })JSON";
 
-    server.setResponse(
-        QStringLiteral("POST"),
-        QStringLiteral("/chat/completions"),
-        200,
-        usageBody,
-        {
-            {"x-ratelimit-limit-requests", "200"},
-            {"x-ratelimit-remaining-requests", "180"},
-            {"x-ratelimit-limit-tokens", "10000"},
-            {"x-ratelimit-remaining-tokens", "9500"},
-            {"x-ratelimit-reset-requests", "15s"},
-        });
-    server.setResponse(QStringLiteral("GET"), QStringLiteral("/auth/key"), 200, creditsBody);
+    server.setResponse(QStringLiteral("GET"), QStringLiteral("/models"), 200, QByteArrayLiteral(R"JSON({"data":[]})JSON"));
+    server.setResponse(QStringLiteral("GET"), QStringLiteral("/key"), 200, creditsBody);
 
     OpenRouterProvider provider;
     provider.setApiKey(QStringLiteral("test-key"));
@@ -986,17 +1039,39 @@ void ProvidersMockedHttpTest::openRouterUsageAndCredits()
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
-    assertProbeOnlyState(provider, 200, 80);
-    QCOMPARE(provider.rateLimitRequests(), 200);
-    QCOMPARE(provider.rateLimitRequestsRemaining(), 180);
-    QCOMPARE(provider.rateLimitTokens(), 10000);
-    QCOMPARE(provider.rateLimitTokensRemaining(), 9500);
-    QCOMPARE(provider.rateLimitResetTime(), QStringLiteral("15s"));
+    QCOMPARE(provider.probeRequestCount(), 0);
+    QCOMPARE(provider.cost(), 3.50);
+    QCOMPARE(provider.usageDaily(), 0.25);
+    QCOMPARE(provider.usageWeekly(), 1.25);
+    QCOMPARE(provider.usageMonthly(), 2.75);
+    QCOMPARE(provider.rateLimitRequests(), 0);
     QCOMPARE(provider.credits(), 21.50);
     QVERIFY(provider.isConnected());
 
-    QVERIFY(server.hitCount(QStringLiteral("/chat/completions")) >= 1);
-    QVERIFY(server.hitCount(QStringLiteral("/auth/key")) >= 1);
+    QCOMPARE(server.hitCount(QStringLiteral("/chat/completions")), 0);
+    QVERIFY(server.hitCount(QStringLiteral("/key")) >= 1);
+    QCOMPARE(server.hitCount(QStringLiteral("/models")), 0);
+}
+
+void ProvidersMockedHttpTest::openRouterMissingFieldsRemainUnavailable()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponse(QStringLiteral("GET"), QStringLiteral("/key"), 200,
+                       QByteArrayLiteral(R"JSON({"data":{"label":"limited-key"}})JSON"));
+    OpenRouterProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl());
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+    QVERIFY(provider.isConnected());
+    QVERIFY(!provider.creditsAvailable());
+    const QVariantMap credits = provider.metric(QStringLiteral("credit_balance"));
+    const QVariantMap daily = provider.metric(QStringLiteral("cost"), QStringLiteral("api_key"), QStringLiteral("day"));
+    QVERIFY(!credits.value(QStringLiteral("available")).toBool());
+    QVERIFY(!daily.value(QStringLiteral("available")).toBool());
+    QCOMPARE(server.hitCount(QStringLiteral("/key")), 1);
 }
 
 void ProvidersMockedHttpTest::togetherAiUsageAndHeaders()
@@ -1029,7 +1104,7 @@ void ProvidersMockedHttpTest::togetherAiUsageAndHeaders()
     provider.setCustomBaseUrl(server.baseUrl());
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    provider.refresh();
+    provider.testConnectionNow();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
@@ -1070,7 +1145,7 @@ void ProvidersMockedHttpTest::cohereUsageAndHeaders()
     provider.setCustomBaseUrl(server.baseUrl());
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    provider.refresh();
+    provider.testConnectionNow();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
@@ -1111,7 +1186,7 @@ void ProvidersMockedHttpTest::mistralUsageAndHeaders()
     provider.setCustomBaseUrl(server.baseUrl());
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    provider.refresh();
+    provider.testConnectionNow();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
@@ -1152,7 +1227,7 @@ void ProvidersMockedHttpTest::groqUsageAndHeaders()
     provider.setCustomBaseUrl(server.baseUrl());
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    provider.refresh();
+    provider.testConnectionNow();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
@@ -1193,7 +1268,7 @@ void ProvidersMockedHttpTest::xaiUsageAndHeaders()
     provider.setCustomBaseUrl(server.baseUrl());
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    provider.refresh();
+    provider.testConnectionNow();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
@@ -1240,7 +1315,7 @@ void ProvidersMockedHttpTest::azureProviderSuccess()
     provider.setCustomBaseUrl(server.baseUrl());
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    provider.refresh();
+    provider.testConnectionNow();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
@@ -1289,7 +1364,7 @@ void ProvidersMockedHttpTest::azureProviderMeteredCostPreferred()
     provider.setCustomBaseUrl(server.baseUrl());
 
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    provider.refresh();
+    provider.testConnectionNow();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
 
@@ -1319,7 +1394,7 @@ void ProvidersMockedHttpTest::azureProviderAuthError()
 
     QSignalSpy errorSpy(&provider, &ProviderBackend::errorChanged);
     QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
-    provider.refresh();
+    provider.testConnectionNow();
 
     QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
     QVERIFY(errorSpy.count() >= 1);

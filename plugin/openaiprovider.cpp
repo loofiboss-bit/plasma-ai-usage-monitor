@@ -71,6 +71,9 @@ void OpenAIProvider::refreshImpl()
     setLoading(true);
     clearError();
     m_pendingRequests = 0;
+    setCapabilityStatus(QStringLiteral("usage"), QStringLiteral("pending"));
+    setCapabilityStatus(QStringLiteral("daily_billing"), QStringLiteral("pending"));
+    setCapabilityStatus(QStringLiteral("monthly_billing"), QStringLiteral("pending"));
 
     fetchUsage();
     fetchCosts();
@@ -164,6 +167,8 @@ void OpenAIProvider::onUsageReply(QNetworkReply *reply)
                                         reply->errorString(),
                                         QString::number(httpStatus)));
         }
+        setCapabilityStatus(QStringLiteral("usage"), QStringLiteral("failed"),
+                            i18n("Usage data is unavailable"));
         reply->deleteLater();
         checkAllDone();
         return;
@@ -179,6 +184,8 @@ void OpenAIProvider::onUsageReply(QNetworkReply *reply)
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull()) {
         setErrorDetails(i18n("Failed to parse usage response"), ProviderErrorKind::Schema);
+        setCapabilityStatus(QStringLiteral("usage"), QStringLiteral("failed"),
+                            i18n("Usage response schema is invalid"));
         checkAllDone();
         return;
     }
@@ -203,6 +210,7 @@ void OpenAIProvider::onUsageReply(QNetworkReply *reply)
     setActualUsage(totalInput, totalOutput, totalRequests);
     setUsageSource(QStringLiteral("actual_api"));
     setDataQuality(QStringLiteral("actual_usage"));
+    setCapabilityStatus(QStringLiteral("usage"), QStringLiteral("available"));
     setConnected(true);
 
     checkAllDone();
@@ -225,6 +233,8 @@ void OpenAIProvider::onCostsReply(QNetworkReply *reply)
 
         // Non-fatal: usage data may still be available
         setNetworkError(reply, i18n("Costs API unavailable: %1", reply->errorString()));
+        setCapabilityStatus(QStringLiteral("daily_billing"), QStringLiteral("failed"),
+                            i18n("Daily billing data is unavailable"));
         reply->deleteLater();
         checkAllDone();
         return;
@@ -235,6 +245,8 @@ void OpenAIProvider::onCostsReply(QNetworkReply *reply)
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull()) {
         setErrorDetails(i18n("Failed to parse costs response"), ProviderErrorKind::Schema);
+        setCapabilityStatus(QStringLiteral("daily_billing"), QStringLiteral("failed"),
+                            i18n("Daily billing response schema is invalid"));
         checkAllDone();
         return;
     }
@@ -256,6 +268,7 @@ void OpenAIProvider::onCostsReply(QNetworkReply *reply)
     setCurrency(QStringLiteral("USD"));
     setDataQuality(QStringLiteral("actual_billing"));
     setDailyCost(totalCost); // 24h window = daily cost
+    setCapabilityStatus(QStringLiteral("daily_billing"), QStringLiteral("available"));
     checkAllDone();
 }
 
@@ -308,6 +321,8 @@ void OpenAIProvider::onMonthlyCostsReply(QNetworkReply *reply)
 
         // Non-fatal: daily cost data may still be available
         setNetworkError(reply, i18n("Monthly costs API unavailable: %1", reply->errorString()));
+        setCapabilityStatus(QStringLiteral("monthly_billing"), QStringLiteral("failed"),
+                            i18n("Monthly billing data is unavailable"));
         reply->deleteLater();
         checkAllDone();
         return;
@@ -318,6 +333,8 @@ void OpenAIProvider::onMonthlyCostsReply(QNetworkReply *reply)
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull()) {
         setErrorDetails(i18n("Failed to parse monthly costs response"), ProviderErrorKind::Schema);
+        setCapabilityStatus(QStringLiteral("monthly_billing"), QStringLiteral("failed"),
+                            i18n("Monthly billing response schema is invalid"));
         checkAllDone();
         return;
     }
@@ -338,6 +355,7 @@ void OpenAIProvider::onMonthlyCostsReply(QNetworkReply *reply)
     setCostSource(QStringLiteral("billing_api"));
     setCurrency(QStringLiteral("USD"));
     setDataQuality(QStringLiteral("actual_billing"));
+    setCapabilityStatus(QStringLiteral("monthly_billing"), QStringLiteral("available"));
     checkAllDone();
 }
 

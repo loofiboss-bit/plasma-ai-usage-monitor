@@ -10,10 +10,17 @@ CATALOG = ROOT / "package/contents/catalog/providers-v4.json"
 EXPECTED_KEYS = {
     "openai", "anthropic", "google", "mistral", "deepseek", "groq", "xai",
     "ollama", "openrouter", "together", "cohere", "googleveo", "azure",
-    "bedrock",
+    "bedrock", "litellm", "cerebras", "fireworks", "perplexity",
 }
 TOKEN_UNITS = {"1M_tokens"}
 NON_TOKEN_UNITS = {"generation", "image", "video_second", "credit", "request", "unknown", "not_applicable"}
+ADAPTER_TYPES = {"account_usage", "account_balance", "model_discovery", "gateway_usage"}
+MONITORING_LEVELS = {"actual_usage_spend", "actual_key_usage", "balance_connectivity", "gateway_aggregate", "connectivity_only"}
+METRIC_SOURCES = {
+    "billing_api", "usage_api", "metrics_api", "response_headers",
+    "published_documentation", "local_observation", "estimated_pricing",
+    "connectivity_probe", "model_discovery_api",
+}
 
 
 def fail(message: str) -> None:
@@ -48,8 +55,8 @@ def main() -> None:
     except json.JSONDecodeError as exc:
         fail(f"invalid JSON: {exc}")
 
-    if catalog.get("schemaVersion") != 4:
-        fail("schemaVersion must be 4")
+    if catalog.get("schemaVersion") != 5:
+        fail("schemaVersion must be 5")
     if catalog.get("runtimeScraping") is not False:
         fail("runtimeScraping must be false")
 
@@ -83,22 +90,41 @@ def main() -> None:
         for field in ("label", "dataQuality", "pricingFreshness"):
             if not provider.get(field):
                 fail(f"{key} missing {field}")
-        for field in ("stableId", "displayName", "dbName", "icon", "colorToken",
+        for field in ("stableId", "displayName", "dbName", "icon", "colorToken", "adapterType", "monitoringLevel",
                       "auth", "endpoint", "capabilities", "expectedSources",
                       "probePolicy", "reviewExpiresAt", "config"):
             if not provider.get(field):
                 fail(f"{key} missing v4 field {field}")
         if provider["stableId"] != key:
             fail(f"{key} stableId must match key")
+        if provider["adapterType"] not in ADAPTER_TYPES:
+            fail(f"{key} adapterType is invalid")
+        if provider["monitoringLevel"] not in MONITORING_LEVELS:
+            fail(f"{key} monitoringLevel is invalid")
+        if not isinstance(provider["capabilities"], list) or not provider["capabilities"]:
+            fail(f"{key} capabilities must be a non-empty list")
+        if not isinstance(provider["expectedSources"], list) or not set(provider["expectedSources"]) <= METRIC_SOURCES:
+            fail(f"{key} expectedSources contains an unknown Metric Contract source")
         auth = provider["auth"]
-        if not isinstance(auth, dict) or not auth.get("scheme") or not auth.get("credentialSlots"):
+        if not isinstance(auth, dict) or not auth.get("scheme") or "credentialSlots" not in auth:
             fail(f"{key} auth must declare scheme and credentialSlots")
+        if auth.get("scheme") != "none" and not auth.get("credentialSlots"):
+            fail(f"{key} authenticated profiles need credentialSlots")
         endpoint = provider["endpoint"]
         if not isinstance(endpoint, dict) or endpoint.get("customPolicy") not in {"allowed", "forbidden", "required"}:
             fail(f"{key} endpoint customPolicy is invalid")
         default_endpoint = endpoint.get("default", "")
         if default_endpoint and not default_endpoint.startswith("https://"):
             fail(f"{key} default endpoint must use HTTPS")
+        safe = provider.get("safeRefresh")
+        if not isinstance(safe, dict) or safe.get("method") != "GET" or safe.get("readOnly") is not True:
+            fail(f"{key} must declare a read-only GET safeRefresh")
+        if not safe.get("path") and not safe.get("paths"):
+            fail(f"{key} safeRefresh must declare path or paths")
+        if not isinstance(safe.get("requestBudget"), int) or not 1 <= safe["requestBudget"] <= 20:
+            fail(f"{key} safeRefresh requestBudget must be 1..20")
+        if not isinstance(safe.get("minimumIntervalSeconds"), int) or safe["minimumIntervalSeconds"] < 60:
+            fail(f"{key} safeRefresh minimumIntervalSeconds must be at least 60")
         expiry = require_iso_date(str(provider["reviewExpiresAt"]), f"{key} reviewExpiresAt")
         if expiry < date.today():
             fail(f"{key} review metadata expired on {expiry}")
@@ -143,6 +169,8 @@ def main() -> None:
                 fail(f"{key}/{model_id} missing pricing")
             if "precision" not in pricing:
                 fail(f"{key}/{model_id} pricing.precision missing")
+            if pricing.get("precision") not in {"official_exact", "official_range", "derived", "unknown"}:
+                fail(f"{key}/{model_id} pricing.precision is not a v5 precision value")
 
             status = pricing.get("status")
             unit = pricing.get("unit")
@@ -150,8 +178,16 @@ def main() -> None:
                 if "input" not in pricing or "output" not in pricing:
                     fail(f"{key}/{model_id} token pricing must include input and output")
                 for field in ("input", "output", "cachedInput"):
-                    if field in pricing and pricing[field] < 0:
+                    if field in pricing and pricing[field] is not None and pricing[field] < 0:
                         fail(f"{key}/{model_id} {field} must be non-negative")
+                if "contextTiers" in pricing and not isinstance(pricing["contextTiers"], list):
+                    fail(f"{key}/{model_id} pricing.contextTiers must be a list")
+                if "modalityRates" in pricing and not isinstance(pricing["modalityRates"], dict):
+                    fail(f"{key}/{model_id} pricing.modalityRates must be an object")
+                if "additiveFees" in pricing and not isinstance(pricing["additiveFees"], list):
+                    fail(f"{key}/{model_id} pricing.additiveFees must be a list")
+                if "batchDiscountPercent" in pricing and not 0 <= pricing["batchDiscountPercent"] <= 100:
+                    fail(f"{key}/{model_id} pricing.batchDiscountPercent must be 0..100")
             elif unit in NON_TOKEN_UNITS or status in {"unknown", "not_applicable"}:
                 if pricing.get("input") == 0.0 and pricing.get("output") == 0.0:
                     fail(f"{key}/{model_id} non-token pricing must not fake 0.0 token pricing")

@@ -29,7 +29,49 @@ void AnthropicProvider::refreshImpl()
     beginRefresh();
     setLoading(true);
     clearError();
-    fetchRateLimits();
+    fetchModels();
+}
+
+void AnthropicProvider::fetchModels()
+{
+    QNetworkRequest request = createRequest(QUrl(QStringLiteral("%1/models").arg(effectiveBaseUrl(BASE_URL))));
+    request.setRawHeader("Authorization", QByteArray());
+    request.setRawHeader("x-api-key", apiKey().toUtf8());
+    request.setRawHeader("anthropic-version", API_VERSION);
+    const int gen = currentGeneration();
+    QNetworkReply *reply = networkManager()->get(request);
+    trackReply(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, gen]() {
+        if (!isCurrentGeneration(gen)) { reply->deleteLater(); return; }
+        onModelsReply(reply);
+    });
+}
+
+void AnthropicProvider::countTokensDiagnostic()
+{
+    if (!hasApiKey()) {
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
+        return;
+    }
+    beginRefresh(); setLoading(true); clearError(); fetchRateLimits();
+}
+
+void AnthropicProvider::onModelsReply(QNetworkReply *reply)
+{
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (reply->error() != QNetworkReply::NoError) {
+        if (status == 401) setErrorDetails(i18n("Invalid API key"), ProviderErrorKind::Authentication, status);
+        else if (status == 403) setErrorDetails(i18n("Model listing is not permitted"), ProviderErrorKind::Permission, status);
+        else setNetworkError(reply, i18n("Anthropic models API unavailable: %1", reply->errorString()));
+        setConnected(false);
+    } else {
+        reply->readAll();
+        setConnected(true);
+        setUsageSource(QStringLiteral("model_discovery_api"));
+        setCostSource(QStringLiteral("unknown"));
+        setDataQuality(QStringLiteral("connectivity_only"));
+    }
+    reply->deleteLater(); setLoading(false); updateLastRefreshed(); Q_EMIT dataUpdated();
 }
 
 void AnthropicProvider::fetchRateLimits()
@@ -98,7 +140,8 @@ void AnthropicProvider::onCountTokensReply(QNetworkReply *reply)
     int reqRemaining = readHeader("anthropic-ratelimit-requests-remaining");
     QString reqReset = QString::fromUtf8(reply->rawHeader("anthropic-ratelimit-requests-reset"));
 
-    if (reqLimit > 0) {
+    const bool hasReqRemaining = !reply->rawHeader("anthropic-ratelimit-requests-remaining").isEmpty();
+    if (reqLimit > 0 && hasReqRemaining) {
         setRateLimitRequests(reqLimit);
         setRateLimitRequestsRemaining(reqRemaining);
     }
@@ -110,7 +153,9 @@ void AnthropicProvider::onCountTokensReply(QNetworkReply *reply)
     int outputRemaining = readHeader("anthropic-ratelimit-output-tokens-remaining");
     int tokenLimit = inputLimit + outputLimit;
     int tokenRemaining = inputRemaining + outputRemaining;
-    if (tokenLimit > 0) {
+    const bool hasInputRemaining = !reply->rawHeader("anthropic-ratelimit-input-tokens-remaining").isEmpty();
+    const bool hasOutputRemaining = !reply->rawHeader("anthropic-ratelimit-output-tokens-remaining").isEmpty();
+    if (tokenLimit > 0 && hasInputRemaining && hasOutputRemaining) {
         setRateLimitTokens(tokenLimit);
         setRateLimitTokensRemaining(tokenRemaining);
     }
@@ -119,7 +164,7 @@ void AnthropicProvider::onCountTokensReply(QNetworkReply *reply)
         // Parse RFC 3339 timestamp to a readable time
         QDateTime resetDt = QDateTime::fromString(reqReset, Qt::ISODate);
         if (resetDt.isValid()) {
-            setRateLimitResetTime(resetDt.toLocalTime().toString(QStringLiteral("hh:mm:ss")));
+            setRateLimitResetTime(resetDt.toUTC().toString(Qt::ISODate));
         } else {
             setRateLimitResetTime(reqReset);
         }

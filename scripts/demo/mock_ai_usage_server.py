@@ -212,6 +212,28 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"status": "ok"})
             return
 
+        if path == "/spend/logs":
+            self._send_json(self._provider("litellm").get("spend_logs", []))
+            return
+
+        if path == "/models":
+            model_ids = [
+                *self._provider("cerebras").get("models", []),
+                *self._provider("fireworks").get("models", []),
+            ]
+            self._send_json(
+                {
+                    "data": [{"id": model_id} for model_id in model_ids]
+                }
+            )
+            return
+
+        if path == "/v1/models":
+            self._send_json(
+                {"data": [{"id": model_id} for model_id in self._provider("perplexity").get("models", [])]}
+            )
+            return
+
         if path in {
             "/organization/usage/completions",
             "/mock/openai/v1/organization/usage/completions",
@@ -240,9 +262,24 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
             self._send_json({"is_available": True, "balance_infos": [{"total_balance": str(balance)}]})
             return
 
-        if path in {"/auth/key", "/mock/openrouter/auth/key"}:
+        if path in {"/key", "/mock/openrouter/key"}:
             credits = self._provider("openrouter").get("credits", {"usage": 0.0, "limit": 0.0})
-            self._send_json({"data": {"label": "demo-key", "usage": credits.get("usage", 0.0), "limit": credits.get("limit", 0.0)}})
+            usage = credits.get("usage", 0.0)
+            limit = credits.get("limit", 0.0)
+            self._send_json(
+                {
+                    "data": {
+                        "label": "demo-key",
+                        "usage": usage,
+                        "usage_daily": credits.get("usage_daily", 0.0),
+                        "usage_weekly": credits.get("usage_weekly", 0.0),
+                        "usage_monthly": credits.get("usage_monthly", usage),
+                        "limit": limit,
+                        "limit_remaining": credits.get("limit_remaining", max(0.0, limit - usage)),
+                        "limit_reset": credits.get("limit_reset", ""),
+                    }
+                }
+            )
             return
 
         if path == "/claude/api/bootstrap":

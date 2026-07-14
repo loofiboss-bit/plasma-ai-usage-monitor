@@ -20,17 +20,18 @@ void OpenRouterProvider::refreshImpl()
         return;
     }
 
-    // Call parent's refresh (chat completion for rate limits + usage)
-    OpenAICompatibleProvider::refreshImpl();
-
-    // Additionally fetch credits balance
+    // The native key endpoint is the scheduled source of truth.  Avoid an
+    // extra model-list request: a usage monitor should spend the smallest
+    // possible read-only request budget.
+    beginRefresh();
+    setLoading(true);
+    clearError();
     fetchCredits();
 }
 
 void OpenRouterProvider::fetchCredits()
 {
-    // OpenRouter credits endpoint: GET /api/v1/auth/key
-    QUrl url(QStringLiteral("%1/auth/key").arg(effectiveBaseUrl(defaultBaseUrl())));
+    QUrl url(QStringLiteral("%1/key").arg(effectiveBaseUrl(defaultBaseUrl())));
 
     QNetworkRequest request = createRequest(url);
 
@@ -50,8 +51,10 @@ void OpenRouterProvider::onCreditsReply(QNetworkReply *reply)
     decrementPendingRequest();
 
     if (reply->error() != QNetworkReply::NoError) {
-        // Non-fatal: rate limit data may still be available
+        setCapabilityStatus(QStringLiteral("key_usage"), QStringLiteral("failed"),
+                            i18n("OpenRouter key usage is unavailable"));
         setNetworkError(reply, i18n("Credits API unavailable: %1", reply->errorString()));
+        setConnected(false);
         onAllRequestsDone();
         return;
     }
@@ -60,13 +63,42 @@ void OpenRouterProvider::onCreditsReply(QNetworkReply *reply)
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (!doc.isNull()) {
         QJsonObject root = doc.object();
-        // OpenRouter response: { "data": { "label": "...", "usage": 0.5, "limit": 10.0, ... } }
         QJsonObject dataObj = root.value(QStringLiteral("data")).toObject();
-        double usage = dataObj.value(QStringLiteral("usage")).toDouble();
-        double limit = dataObj.value(QStringLiteral("limit")).toDouble();
-        // Credits remaining = limit - usage (if limit > 0)
-        m_credits = (limit > 0) ? (limit - usage) : 0.0;
+        const auto numericValue = [&dataObj](const QString &key) -> QVariant {
+            const QJsonValue value = dataObj.value(key);
+            return value.isDouble() ? QVariant(value.toDouble()) : QVariant();
+        };
+        const QVariant creditsValue = numericValue(QStringLiteral("limit_remaining"));
+        const QVariant dailyValue = numericValue(QStringLiteral("usage_daily"));
+        const QVariant weeklyValue = numericValue(QStringLiteral("usage_weekly"));
+        const QVariant monthlyValue = numericValue(QStringLiteral("usage_monthly"));
+        const QVariant allTimeValue = numericValue(QStringLiteral("usage"));
+
+        m_creditsAvailable = creditsValue.isValid();
+        if (m_creditsAvailable) m_credits = creditsValue.toDouble();
+        if (dailyValue.isValid()) { m_usageDaily = dailyValue.toDouble(); setDailyCost(m_usageDaily); }
+        if (weeklyValue.isValid()) m_usageWeekly = weeklyValue.toDouble();
+        if (monthlyValue.isValid()) { m_usageMonthly = monthlyValue.toDouble(); setMonthlyCost(m_usageMonthly); }
+        if (allTimeValue.isValid()) setCost(allTimeValue.toDouble());
+        setCostSource(QStringLiteral("usage_api"));
+        setUsageSource(QStringLiteral("usage_api"));
+        setCurrency(QStringLiteral("USD"));
+        setDataQuality(QStringLiteral("actual"));
+        setProviderMetric(MetricKind::CreditBalance, creditsValue, QStringLiteral("USD"), QStringLiteral("USD"),
+                          QStringLiteral("api_key"), QStringLiteral("current"), MetricSource::UsageApi, QStringLiteral("actual"));
+        setProviderMetric(MetricKind::Cost, dailyValue, QStringLiteral("USD"), QStringLiteral("USD"),
+                          QStringLiteral("api_key"), QStringLiteral("day"), MetricSource::UsageApi, QStringLiteral("actual"));
+        setProviderMetric(MetricKind::Cost, weeklyValue, QStringLiteral("USD"), QStringLiteral("USD"),
+                          QStringLiteral("api_key"), QStringLiteral("week"), MetricSource::UsageApi, QStringLiteral("actual"));
+        setProviderMetric(MetricKind::Cost, monthlyValue, QStringLiteral("USD"), QStringLiteral("USD"),
+                          QStringLiteral("api_key"), QStringLiteral("month"), MetricSource::UsageApi, QStringLiteral("actual"));
+        setProviderMetric(MetricKind::Cost, allTimeValue, QStringLiteral("USD"), QStringLiteral("USD"),
+                          QStringLiteral("api_key"), QStringLiteral("all_time"), MetricSource::UsageApi, QStringLiteral("actual"));
+        setRateLimitResetTime(dataObj.value(QStringLiteral("limit_reset")).toString());
+        setCapabilityStatus(QStringLiteral("key_usage"), QStringLiteral("available"));
+        setConnected(true);
         Q_EMIT creditsChanged();
+        Q_EMIT usageWindowsChanged();
     }
 
     onAllRequestsDone();

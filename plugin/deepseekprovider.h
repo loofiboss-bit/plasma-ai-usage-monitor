@@ -18,6 +18,8 @@ class DeepSeekProvider : public OpenAICompatibleProvider
     Q_OBJECT
 
     Q_PROPERTY(double balance READ balance NOTIFY balanceChanged)
+    Q_PROPERTY(bool balanceAvailable READ balanceAvailable NOTIFY balanceChanged)
+    Q_PROPERTY(QVariantMap balancesByCurrency READ balancesByCurrency NOTIFY balanceChanged)
 
 public:
     explicit DeepSeekProvider(QObject *parent = nullptr);
@@ -26,6 +28,8 @@ public:
     QString iconName() const override { return QStringLiteral("globe"); }
 
     double balance() const;
+    bool balanceAvailable() const { return m_balanceAvailable; }
+    QVariantMap balancesByCurrency() const { return m_balancesByCurrency; }
 
     void refreshImpl() override;
 
@@ -42,6 +46,8 @@ private:
     void fetchBalance();
 
     double m_balance = 0.0;
+    bool m_balanceAvailable = false;
+    QVariantMap m_balancesByCurrency;
 
     static constexpr const char *BASE_URL = "https://api.deepseek.com";
 };

@@ -40,6 +40,11 @@ Item {
                                                  popupOpen);
     }
 
+    function constrainedProviderInterval(provider) {
+        return Math.max(provider?.refreshInterval || 0,
+                        provider?.minimumRefreshSeconds || 0);
+    }
+
     function backoffMultiplier(provider) {
         if (!provider || !provider.backend) {
             return 1;
@@ -53,7 +58,7 @@ Item {
 
     function scheduledInterval(provider) {
         return refreshPolicy.scheduledIntervalMs(provider.configKey || "",
-                                                  provider.refreshInterval || 0,
+                                                  constrainedProviderInterval(provider),
                                                   configuration.refreshInterval || 60,
                                                   popupOpen,
                                                   provider.backend?.consecutiveErrors || 0,
@@ -62,7 +67,7 @@ Item {
 
     function nextSchedule(provider, base) {
         return refreshPolicy.nextScheduledRefresh(
-            base, provider.configKey || "", provider.refreshInterval || 0,
+            base, provider.configKey || "", constrainedProviderInterval(provider),
             configuration.refreshInterval || 60, popupOpen,
             provider.backend?.consecutiveErrors || 0,
             provider.backend?.retryable || false);
@@ -77,7 +82,7 @@ Item {
             return false;
         }
         return refreshPolicy.isFresh(provider.backend.lastSuccess,
-                                     provider.refreshInterval || 0,
+                                     constrainedProviderInterval(provider),
                                      configuration.refreshInterval || 60,
                                      popupOpen);
     }
