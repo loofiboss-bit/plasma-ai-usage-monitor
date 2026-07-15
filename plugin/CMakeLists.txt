@@ -6,6 +6,8 @@ set(aiusagemonitor_SRCS
     subscriptionplancatalog.cpp
     secretsmanager.cpp
     providerbackend.cpp
+    descriptorprovider.cpp
+    providermanager.cpp
     refreshschedulermodel.cpp
     openaicompatibleprovider.cpp
     openaiprovider.cpp
@@ -47,6 +49,8 @@ set(aiusagemonitor_HDRS
     subscriptionplancatalog.h
     secretsmanager.h
     providerbackend.h
+    descriptorprovider.h
+    providermanager.h
     refreshschedulermodel.h
     openaicompatibleprovider.h
     openaiprovider.h

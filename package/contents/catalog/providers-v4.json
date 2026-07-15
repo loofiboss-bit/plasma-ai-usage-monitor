@@ -1,7 +1,7 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "catalogVersion": "2026.07.13",
-  "release": "12.0.3",
+  "release": "13.0.0",
   "lastReviewed": "2026-07-13",
   "runtimeScraping": false,
   "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries were re-reviewed on 2026-07-13; manual-review flags remain visible when exact pricing or lifecycle state cannot be represented safely.",
@@ -218,6 +218,8 @@
         }
       ],
       "stableId": "openai",
+      "adapterType": "account_usage",
+      "monitoringLevel": "actual_usage_spend",
       "displayName": "OpenAI",
       "dbName": "OpenAI",
       "icon": "openai",
@@ -232,6 +234,7 @@
         "default": "https://api.openai.com/v1",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "paths": ["/organization/usage/completions", "/organization/costs"], "readOnly": true, "requestBudget": 4, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
         "usage",
@@ -242,7 +245,7 @@
         "billing_api",
         "usage_api",
         "response_headers",
-        "estimate"
+        "estimated_pricing"
       ],
       "probePolicy": "read_only_account_api",
       "reviewExpiresAt": "2026-08-27",
@@ -275,7 +278,7 @@
             "unit": "1M_tokens",
             "input": 10.0,
             "output": 50.0,
-            "precision": "provider_catalog",
+            "precision": "derived",
             "cachedInput": 1.0
           },
           "sourceRefs": [
@@ -301,7 +304,7 @@
             "input": 5.0,
             "output": 25.0,
             "cachedInput": 0.5,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -326,7 +329,7 @@
             "input": 2.0,
             "output": 10.0,
             "cachedInput": 0.2,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -352,7 +355,7 @@
             "input": 1.0,
             "output": 5.0,
             "cachedInput": 0.1,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -368,6 +371,8 @@
       ],
       "reviewReason": "Reviewed official Anthropic model IDs and pricing on 2026-07-13; kept manual review because Sonnet 5 introductory pricing expires on 2026-08-31 and data-residency/fast-mode modifiers are not represented in the local flat token table.",
       "stableId": "anthropic",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "Anthropic",
       "dbName": "Anthropic",
       "icon": "anthropic",
@@ -382,19 +387,17 @@
         "default": "https://api.anthropic.com/v1",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/models", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "manualRateLimits"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
         "response_headers",
-        "estimate"
+        "connectivity_probe"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "anthropic",
@@ -418,14 +421,26 @@
           "id": "gemini-3.1-flash-lite",
           "displayName": "Gemini 3.1 Flash-Lite",
           "modalities": [
-            "text"
+            "text",
+            "image",
+            "video",
+            "audio"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
             "input": 0.25,
+            "cachedInput": null,
             "output": 1.5,
-            "precision": "provider_catalog"
+            "batchDiscountPercent": 50,
+            "modalityRates": {
+              "text": {"input": 0.25, "output": 1.5},
+              "image": {"input": 0.25, "output": 1.5},
+              "video": {"input": 0.25, "output": 1.5},
+              "audio": {"input": 0.5, "output": 1.5}
+            },
+            "effectiveFrom": "2026-07-07",
+            "precision": "official_exact"
           },
           "sourceRefs": [
             {
@@ -435,21 +450,36 @@
             }
           ],
           "lifecycle": {
-            "status": "active"
+            "status": "active",
+            "releaseChannel": "preview"
           }
         },
         {
           "id": "gemini-2.5-pro",
           "displayName": "Gemini 2.5 Pro",
           "modalities": [
-            "text"
+            "text",
+            "image",
+            "video",
+            "audio"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
             "input": 1.25,
+            "cachedInput": 0.125,
             "output": 10.0,
-            "precision": "provider_catalog"
+            "batchDiscountPercent": 50,
+            "contextTiers": [
+              {"maxInputTokens": 200000, "input": 1.25, "cachedInput": 0.125, "output": 10.0},
+              {"minInputTokens": 200001, "input": 2.5, "cachedInput": 0.25, "output": 15.0}
+            ],
+            "additiveFees": [
+              {"kind": "google_search_grounding", "unit": "request", "amount": 0.035, "freeAllowance": 1500, "allowanceWindow": "day"},
+              {"kind": "google_maps_grounding", "unit": "request", "amount": 0.025, "freeAllowance": 10000, "allowanceWindow": "day"}
+            ],
+            "effectiveFrom": "2025-06-01",
+            "precision": "official_exact"
           },
           "sourceRefs": [
             {
@@ -466,14 +496,31 @@
           "id": "gemini-2.5-flash",
           "displayName": "Gemini 2.5 Flash",
           "modalities": [
-            "text"
+            "text",
+            "image",
+            "video",
+            "audio"
           ],
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 0.15,
-            "output": 0.6,
-            "precision": "provider_catalog"
+            "input": 0.3,
+            "cachedInput": 0.03,
+            "output": 2.5,
+            "batchDiscountPercent": 50,
+            "modalityRates": {
+              "text": {"input": 0.3, "cachedInput": 0.03, "output": 2.5},
+              "image": {"input": 0.3, "cachedInput": 0.03, "output": 2.5},
+              "video": {"input": 0.3, "cachedInput": 0.03, "output": 2.5},
+              "audio": {"input": 1.0, "cachedInput": 0.1, "output": 2.5}
+            },
+            "priorityRates": {"input": 0.54, "cachedInput": 0.054, "output": 4.5, "audioInput": 1.8, "audioCachedInput": 0.18},
+            "additiveFees": [
+              {"kind": "google_search_grounding", "unit": "request", "amount": 0.035, "freeAllowance": 1500, "allowanceWindow": "day"},
+              {"kind": "google_maps_grounding", "unit": "request", "amount": 0.025, "freeAllowance": 1500, "allowanceWindow": "day"}
+            ],
+            "effectiveFrom": "2025-06-01",
+            "precision": "official_exact"
           },
           "sourceRefs": [
             {
@@ -483,7 +530,9 @@
             }
           ],
           "lifecycle": {
-            "status": "active"
+            "status": "retired",
+            "deprecationDate": "2026-06-01",
+            "replacementId": "gemini-2.5-flash"
           }
         },
         {
@@ -497,7 +546,7 @@
             "unit": "1M_tokens",
             "input": 0.1,
             "output": 0.4,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -513,6 +562,8 @@
       ],
       "reviewReason": "Reviewed Google AI pricing on 2026-07-13; kept manual review because Gemini pricing varies by model, tier, media unit, and API surface.",
       "stableId": "google",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "Google Gemini",
       "dbName": "Google",
       "icon": "google",
@@ -527,19 +578,18 @@
         "default": "https://generativelanguage.googleapis.com/v1beta",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/models", "readOnly": true, "requestBudget": 20, "minimumIntervalSeconds": 300, "cacheTtlSeconds": 86400},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "estimatedCost"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "published_documentation",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "google",
@@ -570,7 +620,7 @@
             "unit": "1M_tokens",
             "input": 2.0,
             "output": 6.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -594,7 +644,7 @@
             "unit": "1M_tokens",
             "input": 2.0,
             "output": 6.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -618,7 +668,7 @@
             "unit": "1M_tokens",
             "input": 1.5,
             "output": 7.5,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -642,7 +692,7 @@
             "unit": "1M_tokens",
             "input": 0.2,
             "output": 0.6,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -658,6 +708,8 @@
       ],
       "reviewReason": "Reviewed Mistral pricing on 2026-07-13; kept manual review because latest aliases can move independently of pinned model IDs.",
       "stableId": "mistral",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "Mistral AI",
       "dbName": "Mistral",
       "icon": "mistral",
@@ -672,19 +724,17 @@
         "default": "https://api.mistral.ai/v1",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/models", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "manualProbe"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "mistral",
@@ -715,7 +765,7 @@
             "unit": "1M_tokens",
             "input": 0.14,
             "output": 0.28,
-            "precision": "provider_catalog",
+            "precision": "derived",
             "cachedInput": 0.0028
           },
           "sourceRefs": [
@@ -746,7 +796,7 @@
             "unit": "1M_tokens",
             "input": 0.435,
             "output": 0.87,
-            "precision": "provider_catalog",
+            "precision": "derived",
             "cachedInput": 0.003625
           },
           "sourceRefs": [
@@ -777,7 +827,7 @@
             "unit": "1M_tokens",
             "input": 0.14,
             "output": 0.28,
-            "precision": "provider_catalog",
+            "precision": "derived",
             "cachedInput": 0.0028
           },
           "sourceRefs": [
@@ -806,7 +856,7 @@
             "unit": "1M_tokens",
             "input": 0.55,
             "output": 2.19,
-            "precision": "provider_catalog",
+            "precision": "derived",
             "cachedInput": 0.0028
           },
           "sourceRefs": [
@@ -827,6 +877,8 @@
       ],
       "reviewReason": "Reviewed DeepSeek pricing on 2026-06-30; kept manual review because official input pricing distinguishes cache-hit and cache-miss rates while the local pricing table stores one cachedInput and one input value.",
       "stableId": "deepseek",
+      "adapterType": "account_balance",
+      "monitoringLevel": "balance_connectivity",
       "displayName": "DeepSeek",
       "dbName": "DeepSeek",
       "icon": "deepseek",
@@ -841,19 +893,19 @@
         "default": "https://api.deepseek.com/v1",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "paths": ["/models", "/user/balance"], "readOnly": true, "requestBudget": 2, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "creditBalance",
+        "manualProbe"
       ],
       "expectedSources": [
-        "billing_api",
         "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_balance_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "deepseek",
@@ -884,7 +936,7 @@
             "unit": "1M_tokens",
             "input": 0.59,
             "output": 0.79,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -912,7 +964,7 @@
             "unit": "1M_tokens",
             "input": 0.15,
             "output": 0.6,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -928,6 +980,8 @@
       ],
       "reviewReason": "Reviewed Groq model, pricing, and deprecation docs on 2026-07-13; kept manual review because availability can change independently of the widget release.",
       "stableId": "groq",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "Groq",
       "dbName": "Groq",
       "icon": "groq",
@@ -942,19 +996,17 @@
         "default": "https://api.groq.com/openai/v1",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/models", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "manualProbe"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "groq",
@@ -986,7 +1038,7 @@
             "input": 2.0,
             "cachedInput": 0.5,
             "output": 6.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1011,7 +1063,7 @@
             "input": 1.25,
             "cachedInput": 0.2,
             "output": 2.5,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1035,7 +1087,7 @@
             "unit": "1M_tokens",
             "input": 3.0,
             "output": 15.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1059,7 +1111,7 @@
             "unit": "1M_tokens",
             "input": 3.0,
             "output": 15.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1075,6 +1127,8 @@
       ],
       "reviewReason": "Reviewed xAI model and pricing docs on 2026-07-13; kept manual review because regional and high-context pricing modifiers are not represented in the flat token table.",
       "stableId": "xai",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "xAI / Grok",
       "dbName": "xAI",
       "icon": "xai",
@@ -1089,19 +1143,17 @@
         "default": "https://api.x.ai/v1",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/models", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "manualProbe"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "xai",
@@ -1148,6 +1200,8 @@
       ],
       "reviewReason": "Reviewed Ollama Cloud model naming and plan pricing on 2026-07-13; no stable public per-token price is published, so pricing remains unknown.",
       "stableId": "ollama",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "Ollama Cloud",
       "dbName": "OllamaCloud",
       "icon": "ollama",
@@ -1162,19 +1216,17 @@
         "default": "https://ollama.com/v1",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/models", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "manualProbe"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "ollama",
@@ -1206,7 +1258,7 @@
             "input": 2.5,
             "cachedInput": 0.25,
             "output": 15.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1230,7 +1282,7 @@
             "unit": "1M_tokens",
             "input": 5.0,
             "output": 30.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1254,7 +1306,7 @@
             "unit": "1M_tokens",
             "input": 2.0,
             "output": 10.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1278,7 +1330,7 @@
             "unit": "1M_tokens",
             "input": 2.0,
             "output": 12.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1303,7 +1355,7 @@
             "input": 0.14,
             "cachedInput": 0.0028,
             "output": 0.28,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1328,7 +1380,7 @@
             "input": 0.435,
             "cachedInput": 0.003625,
             "output": 0.87,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1344,6 +1396,8 @@
       ],
       "reviewReason": "Reviewed OpenRouter model catalog on 2026-07-13; kept manual review because prices are provider-routed and can vary by selected route/model provider.",
       "stableId": "openrouter",
+      "adapterType": "account_usage",
+      "monitoringLevel": "actual_key_usage",
       "displayName": "OpenRouter",
       "dbName": "OpenRouter",
       "icon": "openrouter",
@@ -1358,19 +1412,17 @@
         "default": "https://openrouter.ai/api/v1",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/key", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
         "usage",
         "cost",
-        "rateLimits"
+        "creditBalance"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "usage_api"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_key_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "openrouter",
@@ -1401,7 +1453,7 @@
             "unit": "1M_tokens",
             "input": 1.04,
             "output": 1.04,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1425,7 +1477,7 @@
             "unit": "1M_tokens",
             "input": 0.18,
             "output": 0.18,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1441,6 +1493,8 @@
       ],
       "reviewReason": "Reviewed Together AI model IDs and pricing on 2026-07-13; kept manual review because availability and category pricing can change independently.",
       "stableId": "together",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "Together AI",
       "dbName": "Together",
       "icon": "together",
@@ -1455,19 +1509,17 @@
         "default": "https://api.together.xyz/v1",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/models", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "manualProbe"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "together",
@@ -1498,7 +1550,7 @@
             "unit": "1M_tokens",
             "input": 2.5,
             "output": 10.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1522,7 +1574,7 @@
             "unit": "1M_tokens",
             "input": 2.5,
             "output": 10.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1538,6 +1590,8 @@
       ],
       "reviewReason": "Reviewed Cohere pinned model IDs and pricing on 2026-07-13; kept manual review because enterprise deployment pricing can differ from public API pricing.",
       "stableId": "cohere",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "Cohere",
       "dbName": "Cohere",
       "icon": "cohere",
@@ -1552,19 +1606,17 @@
         "default": "https://api.cohere.com/v2",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/models", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "manualProbe"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "cohere",
@@ -1594,7 +1646,7 @@
             "currency": "USD",
             "unit": "video_second",
             "amount": 0.4,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1617,7 +1669,7 @@
             "currency": "USD",
             "unit": "video_second",
             "amount": 0.05,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1633,6 +1685,8 @@
       ],
       "reviewReason": "Reviewed Google Veo model IDs and pricing on 2026-07-13; kept manual review because resolution changes per-second pricing (defaults represent 720p).",
       "stableId": "googleveo",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "Google Veo",
       "dbName": "GoogleVeo",
       "icon": "googleveo",
@@ -1647,19 +1701,17 @@
         "default": "https://generativelanguage.googleapis.com/v1beta",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/models/{model}", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "estimatedCost"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "googleveo",
@@ -1691,7 +1743,7 @@
             "input": 2.5,
             "cachedInput": 0.25,
             "output": 15.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1716,7 +1768,7 @@
             "input": 30.0,
             "cachedInput": 0.25,
             "output": 180.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1741,7 +1793,7 @@
             "input": 0.75,
             "cachedInput": 0.075,
             "output": 4.5,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1757,6 +1809,8 @@
       ],
       "reviewReason": "Reviewed Azure OpenAI pricing on 2026-06-30; kept manual review because Azure pricing varies by region, deployment type, and Azure model availability even when model names mirror OpenAI.",
       "stableId": "azure",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "Azure OpenAI",
       "dbName": "AzureOpenAI",
       "icon": "azure",
@@ -1771,19 +1825,17 @@
         "default": "",
         "customPolicy": "required"
       },
+      "safeRefresh": {"method": "GET", "path": "/openai/models?api-version={api_version}", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "manualProbe"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "azure",
@@ -1814,7 +1866,7 @@
             "unit": "1M_tokens",
             "input": 3.0,
             "output": 15.0,
-            "precision": "provider_catalog"
+            "precision": "derived"
           },
           "sourceRefs": [
             {
@@ -1830,6 +1882,8 @@
       ],
       "reviewReason": "Reviewed Amazon Bedrock active model IDs on 2026-07-13; kept manual review because Bedrock pricing is region, provider, and model specific.",
       "stableId": "bedrock",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
       "displayName": "AWS Bedrock",
       "dbName": "AWS Bedrock",
       "icon": "bedrock",
@@ -1843,22 +1897,20 @@
         ]
       },
       "endpoint": {
-        "default": "https://bedrock-runtime.{region}.amazonaws.com",
+        "default": "https://bedrock.{region}.amazonaws.com",
         "customPolicy": "allowed"
       },
+      "safeRefresh": {"method": "GET", "path": "/foundation-models", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
       "capabilities": [
         "connectivity",
-        "usage",
-        "cost",
-        "rateLimits"
+        "modelDiscovery",
+        "iamPermissionPreview"
       ],
       "expectedSources": [
-        "billing_api",
-        "usage_api",
-        "response_headers",
-        "estimate"
+        "connectivity_probe",
+        "estimated_pricing"
       ],
-      "probePolicy": "read_only_account_api",
+      "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",
       "config": {
         "key": "bedrock",
@@ -1868,6 +1920,318 @@
         "notifications": "bedrockNotificationsEnabled",
         "dailyBudget": "bedrockDailyBudget",
         "monthlyBudget": "bedrockMonthlyBudget"
+      }
+    },
+    {
+      "key": "litellm",
+      "stableId": "litellm",
+      "label": "LiteLLM Proxy",
+      "displayName": "LiteLLM Proxy",
+      "dbName": "LiteLLM Proxy",
+      "dataQuality": "actual-gateway-usage",
+      "pricingFreshness": "gateway-reported",
+      "needsManualReview": false,
+      "sourceConflict": false,
+      "icon": "litellm",
+      "colorToken": "#7C3AED",
+      "adapterType": "gateway_usage",
+      "monitoringLevel": "gateway_aggregate",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "litellm"
+        ]
+      },
+      "endpoint": {
+        "default": "",
+        "customPolicy": "required"
+      },
+      "safeRefresh": {
+        "method": "GET",
+        "path": "/spend/logs",
+        "readOnly": true,
+        "requestBudget": 1,
+        "minimumIntervalSeconds": 300
+      },
+      "capabilities": [
+        "connectivity",
+        "usage",
+        "cost"
+      ],
+      "expectedSources": [
+        "usage_api"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "models": [
+        {
+          "id": "gateway-default",
+          "displayName": "Gateway default",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "unit": "unknown",
+            "status": "unknown",
+            "precision": "unknown"
+          },
+          "sourceRefs": [
+            {
+              "label": "LiteLLM spend tracking",
+              "url": "https://docs.litellm.ai/docs/proxy/cost_tracking",
+              "reviewedAt": "2026-07-13"
+            }
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
+        }
+      ],
+      "config": {
+        "key": "litellm",
+        "enabled": "litellmEnabled",
+        "model": "litellmModel",
+        "refreshInterval": "litellmRefreshInterval",
+        "notifications": "litellmNotificationsEnabled",
+        "dailyBudget": "litellmDailyBudget",
+        "monthlyBudget": "litellmMonthlyBudget"
+      }
+    },
+    {
+      "key": "cerebras",
+      "stableId": "cerebras",
+      "label": "Cerebras Inference",
+      "displayName": "Cerebras Inference",
+      "dbName": "Cerebras",
+      "dataQuality": "connectivity-or-dedicated-metrics",
+      "pricingFreshness": "reviewed",
+      "needsManualReview": false,
+      "sourceConflict": false,
+      "icon": "cerebras",
+      "colorToken": "#F97316",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "cerebras"
+        ]
+      },
+      "endpoint": {
+        "default": "https://api.cerebras.ai/v1",
+        "customPolicy": "allowed"
+      },
+      "safeRefresh": {
+        "method": "GET",
+        "path": "/models",
+        "readOnly": true,
+        "requestBudget": 1,
+        "minimumIntervalSeconds": 300
+      },
+      "capabilities": [
+        "connectivity",
+        "modelDiscovery",
+        "rateLimits"
+      ],
+      "expectedSources": [
+        "model_discovery_api",
+        "response_headers"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "models": [
+        {
+          "id": "llama-4-scout-17b-16e-instruct",
+          "displayName": "Llama 4 Scout",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.1,
+            "output": 0.1,
+            "precision": "official_exact"
+          },
+          "sourceRefs": [
+            {
+              "label": "Cerebras inference documentation",
+              "url": "https://inference-docs.cerebras.ai/",
+              "reviewedAt": "2026-07-13"
+            }
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
+        }
+      ],
+      "config": {
+        "key": "cerebras",
+        "enabled": "cerebrasEnabled",
+        "model": "cerebrasModel",
+        "refreshInterval": "cerebrasRefreshInterval",
+        "notifications": "cerebrasNotificationsEnabled",
+        "dailyBudget": "cerebrasDailyBudget",
+        "monthlyBudget": "cerebrasMonthlyBudget"
+      }
+    },
+    {
+      "key": "fireworks",
+      "stableId": "fireworks",
+      "label": "Fireworks AI",
+      "displayName": "Fireworks AI",
+      "dbName": "Fireworks AI",
+      "dataQuality": "model-discovery",
+      "pricingFreshness": "reviewed",
+      "needsManualReview": true,
+      "reviewReason": "Scheduled spend remains disabled until a read-only billing fixture is validated.",
+      "sourceConflict": false,
+      "icon": "fireworks",
+      "colorToken": "#EF4444",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
+      "auth": {
+        "scheme": "bearer",
+        "credentialSlots": [
+          "fireworks"
+        ]
+      },
+      "endpoint": {
+        "default": "",
+        "customPolicy": "required",
+        "template": "https://api.fireworks.ai/v1/accounts/{account_id}"
+      },
+      "safeRefresh": {
+        "method": "GET",
+        "path": "/models",
+        "readOnly": true,
+        "requestBudget": 3,
+        "minimumIntervalSeconds": 300
+      },
+      "capabilities": [
+        "connectivity",
+        "modelDiscovery"
+      ],
+      "expectedSources": [
+        "model_discovery_api"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "models": [
+        {
+          "id": "accounts/fireworks/models/llama-v3p3-70b-instruct",
+          "displayName": "Llama 3.3 70B Instruct",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 0.9,
+            "output": 0.9,
+            "precision": "official_exact"
+          },
+          "sourceRefs": [
+            {
+              "label": "Fireworks model API",
+              "url": "https://docs.fireworks.ai/api-reference/list-models",
+              "reviewedAt": "2026-07-13"
+            }
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
+        }
+      ],
+      "config": {
+        "key": "fireworks",
+        "enabled": "fireworksEnabled",
+        "model": "fireworksModel",
+        "refreshInterval": "fireworksRefreshInterval",
+        "notifications": "fireworksNotificationsEnabled",
+        "dailyBudget": "fireworksDailyBudget",
+        "monthlyBudget": "fireworksMonthlyBudget"
+      }
+    },
+    {
+      "key": "perplexity",
+      "stableId": "perplexity",
+      "label": "Perplexity API",
+      "displayName": "Perplexity API",
+      "dbName": "Perplexity",
+      "dataQuality": "model-discovery",
+      "pricingFreshness": "reviewed",
+      "needsManualReview": false,
+      "sourceConflict": false,
+      "icon": "perplexity",
+      "colorToken": "#20B2AA",
+      "adapterType": "model_discovery",
+      "monitoringLevel": "connectivity_only",
+      "auth": {
+        "scheme": "none",
+        "credentialSlots": []
+      },
+      "endpoint": {
+        "default": "https://api.perplexity.ai",
+        "customPolicy": "allowed"
+      },
+      "safeRefresh": {
+        "method": "GET",
+        "path": "/v1/models",
+        "readOnly": true,
+        "requestBudget": 1,
+        "minimumIntervalSeconds": 300
+      },
+      "capabilities": [
+        "connectivity",
+        "modelDiscovery"
+      ],
+      "expectedSources": [
+        "model_discovery_api"
+      ],
+      "probePolicy": "read_only_account_api",
+      "reviewExpiresAt": "2026-08-27",
+      "models": [
+        {
+          "id": "perplexity/sonar",
+          "displayName": "Sonar",
+          "modalities": [
+            "text"
+          ],
+          "pricing": {
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "input": 1.0,
+            "output": 1.0,
+            "precision": "official_exact",
+            "additiveFees": [
+              {
+                "kind": "search_request",
+                "unit": "request",
+                "amount": 0.005
+              }
+            ]
+          },
+          "sourceRefs": [
+            {
+              "label": "Perplexity model discovery",
+              "url": "https://docs.perplexity.ai/api-reference/models-get",
+              "reviewedAt": "2026-07-13"
+            }
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
+        }
+      ],
+      "config": {
+        "key": "perplexity",
+        "enabled": "perplexityEnabled",
+        "model": "perplexityModel",
+        "refreshInterval": "perplexityRefreshInterval",
+        "notifications": "perplexityNotificationsEnabled",
+        "dailyBudget": "perplexityDailyBudget",
+        "monthlyBudget": "perplexityMonthlyBudget"
       }
     }
   ]

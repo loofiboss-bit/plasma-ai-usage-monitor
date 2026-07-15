@@ -2,6 +2,7 @@
 #include <KLocalizedString>
 #include <QNetworkRequest>
 #include <QDebug>
+#include <QMap>
 
 DeepSeekProvider::DeepSeekProvider(QObject *parent)
     : OpenAICompatibleProvider(parent)
@@ -20,8 +21,7 @@ void DeepSeekProvider::refreshImpl()
         return;
     }
 
-    // Call parent's refresh which sets loading, clears error,
-    // resets pending count, and kicks off chat completion request
+    // The shared scheduled refresh is a read-only model-list request.
     OpenAICompatibleProvider::refreshImpl();
 
     // Additionally fetch the balance (adds to pending count)
@@ -51,7 +51,8 @@ void DeepSeekProvider::onBalanceReply(QNetworkReply *reply)
     decrementPendingRequest();
 
     if (reply->error() != QNetworkReply::NoError) {
-        // Non-fatal: rate limit data may still be available
+        setCapabilityStatus(QStringLiteral("balance"), QStringLiteral("failed"),
+                            i18n("Balance is unavailable; model discovery may still succeed"));
         setNetworkError(reply, i18n("Balance API unavailable: %1", reply->errorString()));
         onAllRequestsDone();
         return;
@@ -63,7 +64,7 @@ void DeepSeekProvider::onBalanceReply(QNetworkReply *reply)
         QJsonObject root = doc.object();
         // DeepSeek balance response: { "is_available": true, "balance_infos": [...] }
         QJsonArray balances = root.value(QStringLiteral("balance_infos")).toArray();
-        double totalBalance = 0.0;
+        QMap<QString, double> totals;
         for (const QJsonValue &bal : balances) {
             QJsonObject b = bal.toObject();
             const QJsonValue balanceValue = b.value(QStringLiteral("total_balance"));
@@ -79,10 +80,22 @@ void DeepSeekProvider::onBalanceReply(QNetworkReply *reply)
                 }
             }
 
-            totalBalance += parsedBalance;
+            const QString currency = b.value(QStringLiteral("currency")).toString(QStringLiteral("UNKNOWN")).toUpper();
+            totals[currency] += parsedBalance;
         }
-        // Store remaining balance separately — this is NOT spending
-        m_balance = totalBalance;
+        m_balancesByCurrency.clear();
+        for (auto it = totals.cbegin(); it != totals.cend(); ++it) {
+            m_balancesByCurrency.insert(it.key(), it.value());
+            setProviderMetric(MetricKind::CreditBalance, it.value(), it.key(), it.key(),
+                              QStringLiteral("api_key"), QStringLiteral("current"),
+                              MetricSource::UsageApi, QStringLiteral("actual"));
+        }
+        // Preserve the legacy scalar only when a single currency makes it
+        // meaningful. Mixed balances remain separate in Metric Contract v2.
+        m_balanceAvailable = totals.size() == 1;
+        if (m_balanceAvailable) m_balance = totals.cbegin().value();
+        setCapabilityStatus(QStringLiteral("balance"),
+                            totals.isEmpty() ? QStringLiteral("unavailable") : QStringLiteral("available"));
         Q_EMIT balanceChanged();
     }
 

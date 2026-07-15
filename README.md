@@ -22,7 +22,7 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current development release:** `v12.0.3 Reliability Core` makes refresh deterministic, provider state typed, history semantics explicit, and mixed-currency totals honest. The supported Fedora route remains the COPR package.
+> **Current development release:** `v13.0.0 Provider Intelligence` makes scheduled provider monitoring read-only by default, preserves unavailable metrics as unknown, and drives provider capabilities from Catalog v5. The supported Fedora route remains the COPR package.
 
 ## Quick Links
 
@@ -34,14 +34,14 @@ A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, an
 > **VS Code note:** use **Remote - SSH** for the real Fedora KDE 44 VM workflow, or **Dev Containers** for a headless Fedora 44 build/test environment. The container is useful for build/test/mock-server work, but real Plasma UI validation still requires a Linux desktop session.
 > **Demo Mode:** Contributors can run the widget in a deterministic offline mode for testing and screenshots. In the Fedora KDE 44 guest, run `bash scripts/demo/setup_fedora_kde_test_env.sh --fedora 44 --install-missing`, then start `python scripts/demo/mock_ai_usage_server.py` and launch with `PLASMA_AI_MONITOR_DEMO=1 plasmawindowed com.github.loofi.aiusagemonitor`. If port 8080 is occupied, run the mock server with `--port 18080` and set `PLASMA_AI_MONITOR_DEMO_BASE_URL=http://127.0.0.1:18080`.
 
-**Supported providers:** OpenAI, Azure OpenAI, AWS Bedrock, Anthropic (Claude), Google Gemini, Mistral AI, DeepSeek, Groq, xAI (Grok), Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo
+**Supported providers:** OpenAI, Azure OpenAI, AWS Bedrock, Anthropic (Claude), Google Gemini, Mistral AI, DeepSeek, Groq, xAI (Grok), Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo, LiteLLM, Cerebras, Fireworks, and Perplexity
 
 **Supported subscription tools:** Claude Code, OpenAI Codex CLI, GitHub Copilot, Cursor, Windsurf, JetBrains AI
 
 ## Features
 
 - **Real-time monitoring** — Periodic background polling with configurable per-provider refresh intervals (default 5 min) and manual refresh
-- **14 AI providers** — OpenAI, Azure OpenAI, AWS Bedrock, Anthropic, Google Gemini, Mistral AI, DeepSeek, Groq, xAI/Grok, Ollama Cloud, OpenRouter, Together AI, Cohere, Google Veo
+- **18 AI providers** — Explicit catalog capability profiles for the existing providers plus LiteLLM, Cerebras, Fireworks, and Perplexity
 - **Token usage tracking** — Input/output tokens used, requests made, quota/tier limits
 - **Cost tracking** — API spend, subscription fees, estimated burn, and monthly exposure are labeled separately; OpenAI billing data uses the Costs API shape with source badges
 - **Budget management** — Per-provider daily/monthly budgets with configurable warning thresholds and notifications when budgets are exceeded
@@ -121,22 +121,15 @@ Settings → Subscriptions → Browser Sync.
 
 ## What Each Provider Reports
 
-| Metric                | OpenAI        | Anthropic | Google   | Mistral  | DeepSeek | Groq     | xAI      |
-| --------------------- | ------------- | --------- | -------- | -------- | -------- | -------- | -------- |
-| Token usage (in/out)  | Yes           | No        | No       | Yes      | Yes      | Yes      | Yes      |
-| Rate limits remaining | Yes           | Yes       | No\*     | Yes      | Yes      | Yes      | Yes      |
-| Cost / spending       | Yes (billing) | Est.\*\*  | Est.\*\* | Est.\*\* | Est.\*\* | Est.\*\* | Est.\*\* |
-| Request count         | Yes           | Yes       | No       | Yes      | Yes      | Yes      | Yes      |
-| Connection status     | Yes           | Yes       | Yes      | Yes      | Yes      | Yes      | Yes      |
-
-_\* Google Gemini displays known free-tier limits from documentation (static)._
-_\*\* Estimated from token usage and per-model pricing tables. Labeled "Est. Cost" in the UI with a tooltip._
+The exact capability matrix is generated from the same Catalog v5 descriptors used by the runtime and Settings UI: [provider-capabilities.md](docs/provider-capabilities.md). A provider may prove connectivity without exposing account usage or billing; unavailable values remain **Unknown** rather than becoming zero.
 
 - **OpenAI** has the richest data: real usage from `/organization/usage/completions`, dollar costs from `/organization/costs` and `/organization/costs` (monthly), and rate limits from response headers. Requires an **Admin API key**.
-- **Anthropic** has no usage/billing API. The widget pings `/v1/messages/count_tokens` (lightweight, no token cost) and reads the `anthropic-ratelimit-*` response headers for rate limit data. Cost is estimated from registered model pricing.
-- **Google Gemini** has no usage API and no rate limit headers. The widget verifies connectivity via `countTokens` and displays known free-tier limits from documentation. Cost is estimated from registered model pricing.
-- **Mistral AI, Groq, xAI** — These use an OpenAI-compatible API. The widget sends a minimal chat completion request (1 token), reads `x-ratelimit-*` response headers, and accumulates token usage. Cost is estimated from per-model pricing tables.
-- **DeepSeek** — Same as above, plus a separate balance endpoint (`/user/balance`) to fetch the prepaid account balance.
+- **Anthropic** schedules the read-only Models API. `count_tokens` remains an explicit diagnostic that may expose live rate headers.
+- **Gemini Developer API** schedules read-only `models.list`, caches discovery for 24 hours, and keeps `countTokens` as an explicit diagnostic. Published caps remain separate from live remaining quota.
+- **Mistral AI, Groq, xAI** — Scheduled refresh uses authenticated read-only model discovery. A minimal completion is available only as an explicit, potentially billable connection test.
+- **DeepSeek** — Uses the read-only `/user/balance` endpoint; multi-currency balances remain separate and manual inference tests stay isolated from account usage.
+- **LiteLLM** — Reads gateway spend logs and keeps each reported currency separate.
+- **Cerebras, Fireworks, and Perplexity** — Use read-only model discovery with shipped fallback models; model listing proves connectivity only, not usage or billing.
 
 ## Screenshots
 
@@ -145,6 +138,14 @@ Current canonical asset names live under `assets/screenshots/` and are intention
 ### Main window
 
 ![Plasma AI Usage Monitor main window](assets/screenshots/main-window.png)
+
+### Provider intelligence
+
+The detailed provider view distinguishes actual gateway spend from connectivity-only
+discovery. Unavailable usage and billing values remain `Unknown` rather than being
+rendered as zero.
+
+![Plasma AI Usage Monitor provider intelligence](assets/screenshots/provider-intelligence.png)
 
 ### Analyst view
 
@@ -257,25 +258,23 @@ git push origin main --tags
 gh release create vx.y.z ./plasma-ai-usage-monitor-x.y.z.tar.gz ./com.github.loofi.aiusagemonitor.plasmoid --title "vx.y.z"
 ```
 
-If you maintain the Fedora COPR package, the `loofitheboss/plasma-ai-usage-monitor`
-project is configured for SCM auto-rebuilds from `main` via GitHub webhooks.
-That means:
-
-- pushes to `main` can trigger a new COPR build
-- tag creation can also notify COPR, but the package tracks `main`, not the tag itself
-- GitHub release publishing is still manual because GitHub Actions are disabled
+The Fedora COPR package uses SCM source from `main`, but webhook rebuild is kept
+disabled during the v13 prerelease sequence. GitHub tag creation can trigger a
+COPR build with prerelease contents even when the package profile names `main`;
+that would expose an alpha, beta, or RC as a stable-looking RPM version.
 
 Typical maintainer release flow:
 
 1. merge the release commit to `main`
-2. create and push the `vx.y.z` tag
-3. publish the GitHub release manually
-4. verify that COPR picked up the release commit and started a build
+2. verify that `main`, the soaked RC commit, and the intended stable tag resolve to the same SHA
+3. create and push the `vx.y.z` stable tag
+4. publish the GitHub release from the tag workflow artifacts
+5. trigger COPR explicitly and verify the resulting source commit, RPM NEVRA, and repository metadata
 
 If you need to force or backfill a COPR build after the GitHub tag and release exist:
 
 ```bash
-just copr-submit PROJECT=loofitheboss/plasma-ai-usage-monitor
+just copr-submit vx.y.z PROJECT=loofitheboss/plasma-ai-usage-monitor
 ```
 
 The helper expects `copr-cli` plus a valid `~/.config/copr` API token file.
@@ -286,12 +285,12 @@ To verify the current package wiring:
 curl -s 'https://copr.fedorainfracloud.org/api_3/package/?ownername=loofitheboss&projectname=plasma-ai-usage-monitor&packagename=plasma-ai-usage-monitor&with_latest_build=true'
 ```
 
-The response should show:
+During prerelease development the response should show:
 
 - `"source_type": "scm"`
 - `"committish": "main"`
 - `"source_build_method": "make_srpm"`
-- `"auto_rebuild": true`
+- `"auto_rebuild": false`
 
 ---
 
@@ -439,7 +438,7 @@ Each provider has:
 - **Enable/disable** toggle
 - **API key** field — Keys are stored in KWallet. Use the eye icon to show/hide, and the clear button to remove a key.
 - **Model selector** — Choose which model to query (e.g., `gpt-5.4`, `claude-opus-4.7`, `gemini-3.1-flash-live`, `mistral-large-latest`, `deepseek-chat-v3`, `gemma-4-31b-it`, `grok-3`)
-- **Custom base URL** — Optional proxy/gateway URL override. Shows a security warning if you enter an `http://` (non-HTTPS) URL.
+- **Custom base URL** — Optional proxy/gateway URL override. HTTPS is required except for HTTP loopback development endpoints (`localhost`, `127.0.0.1`, or `[::1]`).
 - **Project ID** (OpenAI only) — Optional, to filter usage to a specific project
 
 ### Alerts
@@ -553,10 +552,10 @@ The QML plugin (`com.github.loofi.aiusagemonitor`) provides provider, catalog, t
 - **`AppInfo`** — QML singleton exposing the build version (`AppInfo.version`) so update checks and About pages stay in sync with CMake/package metadata.
 - **`SecretsManager`** — Wraps KWallet for secure API key storage. Uses wallet folder `"ai-usage-monitor"` with async open and a pending operations queue.
 - **`ProviderBackend`** (abstract) — Base class with properties for token usage, rate limits, cost tracking (real and estimated), budget management, error tracking, and custom base URL support. Includes per-model pricing tables and `updateEstimatedCost()` for token-based cost estimation. Signals for quota warnings, budget exceeded, provider disconnect/reconnect.
-- **`OpenAICompatibleProvider`** (abstract) — Intermediate base class for providers using OpenAI-compatible chat completions APIs. Handles sending a minimal completion request, parsing `x-ratelimit-*` headers, extracting token usage from response body, and calling `updateEstimatedCost()`. Subclasses only need to provide `name()`, `iconName()`, `defaultBaseUrl()`, and optionally override hooks.
+- **`OpenAICompatibleProvider`** (abstract) — Uses `GET /models` for scheduled connectivity and exposes a separate manual inference test with a cost/quota warning surface.
 - **`OpenAIProvider`** — Queries `GET /organization/usage/completions`, `GET /organization/costs`, and monthly costs. Reads `x-ratelimit-*` response headers. Requires an Admin API key.
-- **`AnthropicProvider`** — Pings `POST /v1/messages/count_tokens`. Reads `anthropic-ratelimit-*` headers. Registers pricing for Claude models.
-- **`GoogleProvider`** — Pings `POST /v1beta/models/{model}:countTokens`. Applies static known free-tier limits. Registers pricing for Gemini models.
+- **`AnthropicProvider`** — Schedules read-only model discovery; token counting and rate-header diagnostics are manual-only.
+- **`GoogleProvider`** — Discovers models through `GET /v1beta/models`, with a 24-hour cache and shipped fallback. `countTokens` is manual-only.
 - **`MistralProvider`** — Extends `OpenAICompatibleProvider`. Registers pricing for 6 Mistral models.
 - **`DeepSeekProvider`** — Extends `OpenAICompatibleProvider`. Also fetches prepaid balance from `/user/balance`. Registers pricing for deepseek-chat and deepseek-reasoner.
 - **`OllamaCloudProvider`** — Extends `OpenAICompatibleProvider`. Talks to `https://ollama.com/v1` using an Ollama API key and monitors usage from the OpenAI-compatible cloud API.
@@ -596,11 +595,11 @@ You need an **Admin API key** (not a regular one) to access the usage and costs 
 
 ### Anthropic
 
-A standard API key from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys). The widget uses a lightweight `count_tokens` call that consumes no tokens.
+A standard API key from [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys). Scheduled refresh uses read-only model discovery; token counting is an explicit diagnostic.
 
 ### Google Gemini
 
-A standard API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey). The widget only verifies connectivity and displays known tier limits.
+A standard API key from [aistudio.google.com/apikey](https://aistudio.google.com/apikey). The widget verifies connectivity with read-only model discovery and does not fabricate live remaining limits.
 
 ### Mistral AI
 

@@ -271,6 +271,41 @@ void UsageDatabase::createTables()
 
     if (!migrateToObservationSchemaV3()) {
         qWarning() << "UsageDatabase: observation schema v3 migration failed; legacy history remains intact";
+    } else if (!migrateToObservationSchemaV4()) {
+        qWarning() << "UsageDatabase: observation schema v4 migration failed; v3 history remains intact";
+    } else {
+        // Keep the original labels in migrated rows.  This explicit table is
+        // the stable compatibility contract used by exports and future
+        // migrations to interpret v11/v12 source names without rewriting
+        // historical evidence.
+        query.exec(QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS metric_source_mapping ("
+            " legacy_source TEXT PRIMARY KEY, normalized_source TEXT NOT NULL, meaning TEXT NOT NULL)"));
+        const QStringList mappings = {
+            QStringLiteral("actual_api|usage_api|Provider-reported usage"),
+            QStringLiteral("billing_api|billing_api|Provider-reported billing"),
+            QStringLiteral("usage_api|usage_api|Provider-reported usage"),
+            QStringLiteral("estimated_from_usage|estimated_pricing|Local pricing estimate"),
+            QStringLiteral("connectivity_probe|connectivity_probe|Manual connectivity probe"),
+            QStringLiteral("connectivity_read_only|connectivity_probe|Read-only connectivity check"),
+            QStringLiteral("model_discovery_api|connectivity_probe|Read-only model discovery"),
+            QStringLiteral("self_tracked|self_tracked|Local self-tracked value"),
+            QStringLiteral("browser_sync|browser_sync|Local browser-derived value"),
+            QStringLiteral("unknown|unknown|Unavailable or unknown source"),
+        };
+        QSqlQuery mappingQuery(m_db);
+        mappingQuery.prepare(QStringLiteral(
+            "INSERT OR IGNORE INTO metric_source_mapping(legacy_source,normalized_source,meaning) "
+            "VALUES(?,?,?)"));
+        for (const QString &mapping : mappings) {
+            const QStringList fields = mapping.split(QLatin1Char('|'));
+            mappingQuery.bindValue(0, fields.value(0));
+            mappingQuery.bindValue(1, fields.value(1));
+            mappingQuery.bindValue(2, fields.value(2));
+            if (!mappingQuery.exec()) {
+                qWarning() << "UsageDatabase: source mapping insert failed" << mappingQuery.lastError().text();
+            }
+        }
     }
 }
 
@@ -348,6 +383,58 @@ bool UsageDatabase::migrateToObservationSchemaV3()
     }
 
     if (!query.exec(QStringLiteral("PRAGMA user_version = 3"))) {
+        m_db.rollback();
+        return false;
+    }
+    return m_db.commit();
+}
+
+bool UsageDatabase::migrateToObservationSchemaV4()
+{
+    QSqlQuery versionQuery(m_db);
+    if (!versionQuery.exec(QStringLiteral("PRAGMA user_version")) || !versionQuery.next()) {
+        return false;
+    }
+    if (versionQuery.value(0).toInt() >= 4) {
+        return true;
+    }
+    versionQuery.finish();
+
+    const QString databasePath = m_db.databaseName();
+    const QString backupPath = databasePath + QStringLiteral(".v13-backup");
+    if (QFileInfo::exists(databasePath) && !QFileInfo::exists(backupPath)
+        && !QFile::copy(databasePath, backupPath)) {
+        qWarning() << "UsageDatabase: unable to create pre-v13 backup" << backupPath;
+        return false;
+    }
+    if (!m_db.transaction()) {
+        return false;
+    }
+
+    QSqlQuery query(m_db);
+    const QString createSql = QStringLiteral(
+        "CREATE TABLE observations_v4 ("
+        " id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " provider TEXT NOT NULL,"
+        " observed_at_utc DATETIME NOT NULL DEFAULT (datetime('now')),"
+        " interval_start_utc DATETIME, interval_end_utc DATETIME,"
+        " metric_kind TEXT NOT NULL, unit TEXT NOT NULL, value REAL NULL, currency TEXT,"
+        " semantic TEXT NOT NULL CHECK(semantic IN ('gauge','cumulative_counter','interval_total','local_estimate')),"
+        " source TEXT NOT NULL, data_quality TEXT NOT NULL DEFAULT 'unknown',"
+        " scope TEXT NOT NULL DEFAULT 'api_key', window TEXT NOT NULL DEFAULT 'current',"
+        " model_scope TEXT DEFAULT '', project_scope TEXT DEFAULT '', reset_at_utc DATETIME,"
+        " correlation_id TEXT NOT NULL)" );
+    if (!query.exec(createSql)
+        || !query.exec(QStringLiteral(
+            "INSERT INTO observations_v4(id,provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,model_scope,project_scope,correlation_id) "
+            "SELECT id,provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,model_scope,project_scope,correlation_id FROM observations"))
+        || !query.exec(QStringLiteral("DROP TABLE observations"))
+        || !query.exec(QStringLiteral("ALTER TABLE observations_v4 RENAME TO observations"))
+        || !query.exec(QStringLiteral(
+            "CREATE INDEX idx_observations_provider_time_source_currency "
+            "ON observations(provider, observed_at_utc, source, currency)"))
+        || !query.exec(QStringLiteral("PRAGMA user_version = 4"))) {
+        qWarning() << "UsageDatabase: v4 migration failed" << query.lastError().text();
         m_db.rollback();
         return false;
     }
@@ -525,6 +612,44 @@ bool UsageDatabase::recordObservations(const QString &provider,
         }
     }
     return true;
+}
+
+bool UsageDatabase::recordProviderMetrics(const QString &provider, const QVariantList &metrics)
+{
+    if (!m_enabled) return false;
+    initDatabase();
+    if (!m_initialized || !m_db.transaction()) return false;
+
+    const QString correlationId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "INSERT INTO observations(provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,window,reset_at_utc,correlation_id) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
+    for (const QVariant &entry : metrics) {
+        const QVariantMap metric = entry.toMap();
+        query.bindValue(0, provider);
+        query.bindValue(1, metric.value(QStringLiteral("observedAt"), QDateTime::currentDateTimeUtc()));
+        query.bindValue(2, metric.value(QStringLiteral("periodStart")));
+        query.bindValue(3, metric.value(QStringLiteral("periodEnd")));
+        query.bindValue(4, metric.value(QStringLiteral("kind"), QStringLiteral("unknown")));
+        query.bindValue(5, metric.value(QStringLiteral("unit"), QStringLiteral("unknown")));
+        query.bindValue(6, metric.value(QStringLiteral("available")).toBool()
+                              ? metric.value(QStringLiteral("value")) : QVariant());
+        query.bindValue(7, metric.value(QStringLiteral("currency")));
+        query.bindValue(8, metric.value(QStringLiteral("quality")).toString() == QLatin1String("estimated")
+                              ? QStringLiteral("local_estimate") : QStringLiteral("gauge"));
+        query.bindValue(9, metric.value(QStringLiteral("source"), QStringLiteral("unknown")));
+        query.bindValue(10, metric.value(QStringLiteral("quality"), QStringLiteral("unknown")));
+        query.bindValue(11, metric.value(QStringLiteral("scope"), QStringLiteral("api_key")));
+        query.bindValue(12, metric.value(QStringLiteral("window"), QStringLiteral("current")));
+        query.bindValue(13, metric.value(QStringLiteral("resetAt")));
+        query.bindValue(14, correlationId);
+        if (!query.exec()) {
+            m_db.rollback();
+            return false;
+        }
+    }
+    return m_db.commit();
 }
 
 void UsageDatabase::recordRateLimitEvent(const QString &provider,
@@ -1158,6 +1283,7 @@ QString UsageDatabase::exportJson(const QString &provider,
     }
 
     QJsonObject root;
+    root[QStringLiteral("schemaVersion")] = 4;
     root[QStringLiteral("provider")] = provider;
     root[QStringLiteral("from")] = from.toString(Qt::ISODate);
     root[QStringLiteral("to")] = to.toString(Qt::ISODate);
@@ -1190,7 +1316,7 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
         const QString jsonPath = dir.filePath(QStringLiteral("ai-usage-export-%1.json").arg(timestamp));
         QSaveFile jsonFile(jsonPath);
         if (jsonFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            jsonFile.write("{\n  \"schemaVersion\": 3,\n  \"exportedAt\": ");
+            jsonFile.write("{\n  \"schemaVersion\": 4,\n  \"exportedAt\": ");
             const QByteArray exportedAt = QJsonDocument(QJsonArray{
                 QDateTime::currentDateTimeUtc().toString(Qt::ISODate)}).toJson(QJsonDocument::Compact);
             jsonFile.write(exportedAt.mid(1, exportedAt.size() - 2));
@@ -1201,8 +1327,11 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
                 while (query.next()) {
                     QJsonObject row;
                     const QSqlRecord record = query.record();
-                    for (int i = 0; i < record.count(); ++i)
-                        row.insert(record.fieldName(i), QJsonValue::fromVariant(query.value(i)));
+                    for (int i = 0; i < record.count(); ++i) {
+                        row.insert(record.fieldName(i), query.isNull(i)
+                            ? QJsonValue(QJsonValue::Null)
+                            : QJsonValue::fromVariant(query.value(i)));
+                    }
                     if (!first) jsonFile.write(",\n");
                     jsonFile.write("    ");
                     jsonFile.write(QJsonDocument(row).toJson(QJsonDocument::Compact));
@@ -1218,6 +1347,14 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
                 "cost_source,usage_source,currency,data_quality FROM usage_snapshots ORDER BY id"));
             if (providersOk) streamJsonRows(providerQuery);
 
+            jsonFile.write("\n  ],\n  \"observations\": [\n");
+            QSqlQuery observationQuery(m_db);
+            observationQuery.setForwardOnly(true);
+            const bool observationsOk = observationQuery.exec(QStringLiteral(
+                "SELECT provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,window,model_scope,project_scope,reset_at_utc,correlation_id "
+                "FROM observations ORDER BY id"));
+            if (observationsOk) streamJsonRows(observationQuery);
+
             jsonFile.write("\n  ],\n  \"toolSnapshots\": [\n");
             QSqlQuery toolQuery(m_db);
             toolQuery.setForwardOnly(true);
@@ -1227,7 +1364,7 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
             if (toolsOk) streamJsonRows(toolQuery);
             jsonFile.write("\n  ]\n}\n");
 
-            if (providersOk && toolsOk && jsonFile.commit()) {
+            if (providersOk && observationsOk && toolsOk && jsonFile.commit()) {
                 writtenFiles.append(jsonPath);
             } else {
                 jsonFile.cancelWriting();
@@ -1236,6 +1373,21 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
     }
 
     if (requestedFormats.contains(QStringLiteral("csv"))) {
+        const QString observationsCsvPath = dir.filePath(QStringLiteral("ai-usage-observations-%1.csv").arg(timestamp));
+        QSaveFile observationsFile(observationsCsvPath);
+        if (observationsFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            observationsFile.write("provider,observed_at,interval_start,interval_end,metric_kind,unit,value,currency,semantic,source,data_quality,scope,window,model_scope,project_scope,reset_at,correlation_id\r\n");
+            QSqlQuery query(m_db); query.setForwardOnly(true);
+            const bool queryOk = query.exec(QStringLiteral(
+                "SELECT provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,window,model_scope,project_scope,reset_at_utc,correlation_id FROM observations ORDER BY id"));
+            while (queryOk && query.next()) {
+                QStringList fields; for (int i = 0; i < 17; ++i) fields.append(csvField(query.value(i).toString()));
+                observationsFile.write((fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
+            }
+            if (queryOk && observationsFile.commit()) writtenFiles.append(observationsCsvPath);
+            else observationsFile.cancelWriting();
+        }
+
         const QString providerCsvPath = dir.filePath(QStringLiteral("ai-usage-providers-%1.csv").arg(timestamp));
         QSaveFile providerFile(providerCsvPath);
         if (providerFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {

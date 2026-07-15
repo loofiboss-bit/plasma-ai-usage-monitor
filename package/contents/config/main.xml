@@ -78,6 +78,10 @@
         <entry name="bedrockRefreshInterval" type="Int">
             <default>0</default>
         </entry>
+        <entry name="litellmRefreshInterval" type="Int"><default>0</default></entry>
+        <entry name="cerebrasRefreshInterval" type="Int"><default>0</default></entry>
+        <entry name="fireworksRefreshInterval" type="Int"><default>0</default></entry>
+        <entry name="perplexityRefreshInterval" type="Int"><default>0</default></entry>
     </group>
 
     <group name="Providers">
@@ -249,6 +253,20 @@
         <entry name="googleveoCustomBaseUrl" type="String">
             <default></default>
         </entry>
+
+        <!-- Catalog v5 descriptor-driven providers -->
+        <entry name="litellmEnabled" type="Bool"><default>false</default></entry>
+        <entry name="litellmModel" type="String"><default>gateway-default</default></entry>
+        <entry name="litellmCustomBaseUrl" type="String"><default></default></entry>
+        <entry name="cerebrasEnabled" type="Bool"><default>false</default></entry>
+        <entry name="cerebrasModel" type="String"><default>llama-4-scout-17b-16e-instruct</default></entry>
+        <entry name="cerebrasCustomBaseUrl" type="String"><default></default></entry>
+        <entry name="fireworksEnabled" type="Bool"><default>false</default></entry>
+        <entry name="fireworksModel" type="String"><default>accounts/fireworks/models/llama-v3p3-70b-instruct</default></entry>
+        <entry name="fireworksCustomBaseUrl" type="String"><default></default></entry>
+        <entry name="perplexityEnabled" type="Bool"><default>false</default></entry>
+        <entry name="perplexityModel" type="String"><default>perplexity/sonar</default></entry>
+        <entry name="perplexityCustomBaseUrl" type="String"><default></default></entry>
     </group>
 
     <group name="Alerts">
@@ -331,6 +349,10 @@
         <entry name="bedrockNotificationsEnabled" type="Bool">
             <default>true</default>
         </entry>
+        <entry name="litellmNotificationsEnabled" type="Bool"><default>true</default></entry>
+        <entry name="cerebrasNotificationsEnabled" type="Bool"><default>true</default></entry>
+        <entry name="fireworksNotificationsEnabled" type="Bool"><default>true</default></entry>
+        <entry name="perplexityNotificationsEnabled" type="Bool"><default>true</default></entry>
         <!-- Update notifications -->
         <entry name="notifyOnUpdate" type="Bool">
             <default>true</default>
@@ -438,6 +460,14 @@
         <entry name="bedrockMonthlyBudget" type="Int">
             <default>0</default>
         </entry>
+        <entry name="litellmDailyBudget" type="Int"><default>0</default></entry>
+        <entry name="litellmMonthlyBudget" type="Int"><default>0</default></entry>
+        <entry name="cerebrasDailyBudget" type="Int"><default>0</default></entry>
+        <entry name="cerebrasMonthlyBudget" type="Int"><default>0</default></entry>
+        <entry name="fireworksDailyBudget" type="Int"><default>0</default></entry>
+        <entry name="fireworksMonthlyBudget" type="Int"><default>0</default></entry>
+        <entry name="perplexityDailyBudget" type="Int"><default>0</default></entry>
+        <entry name="perplexityMonthlyBudget" type="Int"><default>0</default></entry>
         <entry name="budgetWarningPercent" type="Int">
             <default>80</default>
             <label>Percentage of budget to trigger a warning</label>

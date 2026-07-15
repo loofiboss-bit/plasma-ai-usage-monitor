@@ -9,7 +9,7 @@ QtObject {
     readonly property string lastReviewed: ProviderPricingCatalog.lastReviewed
     readonly property bool runtimeScraping: ProviderPricingCatalog.runtimeScraping
 
-    // Provider identity and capabilities come exclusively from Catalog v4.
+    // Provider identity, adapter profile, and capabilities come from Catalog v5.
     // Only runtime backend association remains in ProviderRegistry.
     readonly property var providers: {
         var catalogProviders = ProviderPricingCatalog.providers();
@@ -28,6 +28,12 @@ QtObject {
                 endpoint: entry.endpoint,
                 capabilities: entry.capabilities || [],
                 expectedSources: entry.expectedSources || [],
+                safeRefresh: entry.safeRefresh || {},
+                minimumRefreshSeconds: (entry.safeRefresh || {}).minimumIntervalSeconds || 300,
+                requestBudget: (entry.safeRefresh || {}).requestBudget || 1,
+                monitoringLevel: entry.monitoringLevel || "connectivity_only",
+                adapterType: entry.adapterType || "model_discovery",
+                probePolicy: entry.probePolicy || "manual_only",
                 requiresApiKey: (entry.auth?.credentialSlots || []).length > 0,
                 supportsBudget: (entry.capabilities || []).indexOf("cost") >= 0,
                 enabledConfigKey: config.enabled,

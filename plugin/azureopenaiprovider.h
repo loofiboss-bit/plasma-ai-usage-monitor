@@ -6,8 +6,8 @@
 /**
  * Azure OpenAI provider backend.
  *
- * Uses Azure deployment-scoped chat completions endpoint:
- * POST {endpoint}/openai/deployments/{deploymentId}/chat/completions?api-version=...
+ * Scheduled refresh uses a read-only model-list endpoint. A deployment-scoped
+ * completion is available only as an explicit, potentially billable test.
  *
  * Notes:
  * - Authentication uses `api-key` header (not Bearer token)
@@ -39,6 +39,7 @@ public:
     void setApiVersion(const QString &apiVersion);
 
     void refreshImpl() override;
+    Q_INVOKABLE void testConnectionNow();
 
 Q_SIGNALS:
     void modelChanged();
@@ -47,10 +48,12 @@ Q_SIGNALS:
 
 private Q_SLOTS:
     void onCompletionReply(QNetworkReply *reply);
+    void onModelsReply(QNetworkReply *reply);
 
 private:
     QString endpointBaseUrl() const;
     QUrl completionUrl() const;
+    QUrl modelsUrl() const;
 
     QString m_model = QStringLiteral("gpt-5.4-pro");
     QString m_deploymentId;

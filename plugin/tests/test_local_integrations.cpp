@@ -72,7 +72,7 @@ void LocalIntegrationsTest::usageDatabaseExportsFiles()
     QVERIFY(dir.isValid());
 
     const QStringList files = db.exportAllToDirectory(dir.path(), {QStringLiteral("json"), QStringLiteral("csv")});
-    QCOMPARE(files.size(), 3);
+    QCOMPARE(files.size(), 4);
     for (const QString &path : files) {
         QVERIFY(QFileInfo::exists(path));
         QVERIFY(QFileInfo(path).size() > 0);

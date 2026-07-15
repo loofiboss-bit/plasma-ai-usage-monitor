@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        12.0.3
+Version:        13.0.0
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
 License:        GPL-3.0-or-later
@@ -31,10 +31,11 @@ A native KDE Plasma 6 plasmoid that monitors AI API token usage,
 rate limits, costs, and budgets across multiple providers including
 OpenAI, Azure OpenAI, AWS Bedrock, Anthropic (Claude), Google Gemini,
 Mistral AI, DeepSeek, Groq, xAI (Grok), Ollama Cloud, OpenRouter,
-Together AI, Cohere, and Google Veo.
+Together AI, Cohere, Google Veo, LiteLLM Proxy, Cerebras Inference,
+Fireworks AI, and Perplexity API.
 
 Features:
-- Real-time rate limit monitoring for all providers
+- Capability-aware rate-limit monitoring where providers expose complete live pairs
 - Usage and cost tracking with historical trends
 - Catalog-backed cost estimation with local JSON metadata
 - Budget management with daily/monthly limits
@@ -72,6 +73,9 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Mon Jul 13 2026 Loofi <loofi@github.com> - 13.0.0-1
+- Prepare v13.0.0 release
+
 * Mon Jul 13 2026 Loofi <loofi@github.com> - 12.0.3-1
 - Prepare v12.0.3 release
 

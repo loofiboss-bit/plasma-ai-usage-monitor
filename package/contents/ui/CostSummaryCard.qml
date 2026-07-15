@@ -30,7 +30,7 @@ ColumnLayout {
             var source = provider.backend.costSource || "unknown";
             var isEstimate = source === "estimated_from_usage" || provider.backend.isEstimatedCost;
             if (estimated !== isEstimate) continue;
-            if (!estimated && source !== "billing_api" && source !== "actual_api") continue;
+            if (!estimated && source !== "billing_api" && source !== "usage_api" && source !== "actual_api") continue;
             Utils.addCurrencyTotal(totals, provider.backend.currency, provider.backend[field] || 0);
         }
         return totals;
@@ -194,7 +194,7 @@ ColumnLayout {
                                 return modelData.backend.estimatedMonthlyCost || modelData.backend.monthlyCost || modelData.backend.cost || 0;
                             return 0;
                         }
-                        if (source !== "billing_api" && source !== "actual_api") return 0;
+                        if (source !== "billing_api" && source !== "usage_api" && source !== "actual_api") return 0;
                         if (costCard.costViewMode === 1) return modelData.backend.dailyCost ?? 0;
                         if (costCard.costViewMode === 2) return modelData.backend.monthlyCost ?? 0;
                         return modelData.backend.monthlyCost || modelData.backend.cost || 0;

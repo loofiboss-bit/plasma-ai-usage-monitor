@@ -10,11 +10,11 @@
  * Google Gemini provider backend.
  *
  * Google does NOT have a dedicated usage/billing API for the Gemini API.
- * This provider makes a lightweight countTokens call to verify connectivity
- * and extract any available metadata.
+ * Scheduled refresh uses the read-only models.list endpoint. countTokens is
+ * available only as an explicit diagnostic.
  *
- * Rate limits for the Gemini API are not exposed via response headers,
- * so we display known free-tier/paid-tier limits from documentation.
+ * Rate limits are not exposed as live remaining values. Published caps stay
+ * in catalog metadata and are never projected into compatibility fields.
  *
  * Endpoint: POST /v1beta/models/{model}:countTokens
  */
@@ -24,6 +24,10 @@ class GoogleProvider : public ProviderBackend
 
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY modelChanged)
     Q_PROPERTY(QString tier READ tier WRITE setTier NOTIFY tierChanged)
+    Q_PROPERTY(QVariantList discoveredModels READ discoveredModels NOTIFY discoveredModelsChanged)
+    Q_PROPERTY(QDateTime modelsLastDiscovered READ modelsLastDiscovered NOTIFY discoveredModelsChanged)
+    Q_PROPERTY(bool selectedModelAvailable READ selectedModelAvailable NOTIFY discoveredModelsChanged)
+    Q_PROPERTY(QString selectedModelWarning READ selectedModelWarning NOTIFY discoveredModelsChanged)
 
 public:
     explicit GoogleProvider(QObject *parent = nullptr);
@@ -38,20 +42,36 @@ public:
     void setTier(const QString &tier);
 
     void refreshImpl() override;
+    QVariantList discoveredModels() const { return m_discoveredModels; }
+    QDateTime modelsLastDiscovered() const { return m_modelsLastDiscovered; }
+    bool selectedModelAvailable() const;
+    QString selectedModelWarning() const;
+    Q_INVOKABLE void countTokensDiagnostic();
+    Q_INVOKABLE void refreshModelsNow();
 
 Q_SIGNALS:
     void modelChanged();
     void tierChanged();
+    void discoveredModelsChanged();
 
 private Q_SLOTS:
+    void onModelsReply(QNetworkReply *reply);
     void onCountTokensReply(QNetworkReply *reply);
 
 private:
     void fetchStatus();
-    void applyKnownLimits();
+    void fetchModels(const QString &pageToken = QString());
+    void finalizeModelDiscovery();
+    void loadDiscoveryCache();
+    void saveDiscoveryCache() const;
 
     QString m_model = QStringLiteral("gemini-2.0-flash");
     QString m_tier = QStringLiteral("free");
+    QVariantList m_discoveredModels;
+    QVariantList m_pendingLiveModels;
+    QStringList m_seenModelIds;
+    int m_discoveryPageCount = 0;
+    QDateTime m_modelsLastDiscovered;
 
     static constexpr const char *BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 };

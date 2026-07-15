@@ -141,6 +141,14 @@ target_link_libraries(test_providerbackend
 
 add_test(NAME providerbackend COMMAND test_providerbackend)
 
+add_executable(test_secretsmanager
+    test_secretsmanager.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/secretsmanager.cpp
+)
+target_include_directories(test_secretsmanager PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_secretsmanager PRIVATE Qt6::Core Qt6::Test KF6::Wallet)
+add_test(NAME secretsmanager COMMAND test_secretsmanager)
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp
@@ -180,6 +188,28 @@ target_link_libraries(test_catalogs
 )
 
 add_test(NAME catalogs COMMAND test_catalogs)
+
+add_executable(test_providermanager
+    test_providermanager.cpp
+    ${TEST_CATALOG_SRC}
+    ${CMAKE_SOURCE_DIR}/plugin/providerbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/descriptorprovider.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/providermanager.cpp
+)
+target_include_directories(test_providermanager PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_providermanager PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
+add_test(NAME providermanager COMMAND test_providermanager)
+
+add_executable(test_descriptorprovider_contract
+    test_descriptorprovider_contract.cpp
+    ${TEST_CATALOG_SRC}
+    ${CMAKE_SOURCE_DIR}/plugin/providerbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/descriptorprovider.cpp
+)
+target_include_directories(test_descriptorprovider_contract PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_descriptorprovider_contract PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
+add_test(NAME descriptorprovider_contract COMMAND test_descriptorprovider_contract)
+set_tests_properties(descriptorprovider_contract PROPERTIES TIMEOUT 15)
 
 # --- Local integrations / signer tests ---
 add_executable(test_local_integrations
@@ -253,4 +283,6 @@ add_test(NAME config_defaults_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/script
 add_test(NAME provider_ui_catalog_models COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_provider_ui_catalog_models.py)
 add_test(NAME subscription_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_subscription_catalog.py)
 add_test(NAME no_hardcoded_pricing COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_no_hardcoded_pricing.py)
+add_test(NAME non_invasive_monitoring COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_non_invasive_monitoring.py)
+add_test(NAME provider_capability_docs COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_provider_capability_docs.py)
 add_test(NAME config_portability COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_config_portability.py)

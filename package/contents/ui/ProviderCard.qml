@@ -137,7 +137,7 @@ ColumnLayout {
                     spacing: Kirigami.Units.smallSpacing
 
                     PlasmaComponents.Label {
-                        text: Utils.formatMoney(card.backend?.cost ?? 0, card.backend?.currency || "USD")
+                        text: currentCostText()
                         font.bold: true
                         color: Kirigami.Theme.textColor
                     }
@@ -214,7 +214,7 @@ ColumnLayout {
                         opacity: 0.7
                     }
                     PlasmaComponents.Label {
-                        text: formatNumber(card.backend?.inputTokens ?? 0)
+                        text: metricText("input_tokens", card.backend?.inputTokens ?? 0)
                         font.bold: true
                     }
                 }
@@ -227,7 +227,7 @@ ColumnLayout {
                         opacity: 0.7
                     }
                     PlasmaComponents.Label {
-                        text: formatNumber(card.backend?.outputTokens ?? 0)
+                        text: metricText("output_tokens", card.backend?.outputTokens ?? 0)
                         font.bold: true
                     }
                 }
@@ -240,7 +240,7 @@ ColumnLayout {
                         opacity: 0.7
                     }
                     PlasmaComponents.Label {
-                        text: formatNumber(card.backend?.requestCount ?? 0)
+                        text: metricText("requests", card.backend?.requestCount ?? 0)
                         font.bold: true
                     }
                 }
@@ -270,11 +270,12 @@ ColumnLayout {
                     }
                     Item { Layout.fillWidth: true }
                     PlasmaComponents.Label {
-                        text: Utils.formatMoney(card.backend?.cost ?? 0, card.backend?.currency || "USD")
+                        text: currentCostText()
                         font.bold: true
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.2
                         color: {
-                            var c = card.backend?.cost ?? 0;
+                            if (!currentCostAvailable()) return Kirigami.Theme.disabledTextColor;
+                            var c = currentCostValue();
                             if (c > 10) return Kirigami.Theme.negativeTextColor;
                             if (c > 5) return Kirigami.Theme.neutralTextColor;
                             return Kirigami.Theme.textColor;
@@ -352,7 +353,7 @@ ColumnLayout {
             // Rate Limits
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: !card.collapsed && (card.backend?.connected ?? false) && ((card.backend?.rateLimitRequests ?? 0) > 0 || (card.backend?.rateLimitTokens ?? 0) > 0)
+                visible: !card.collapsed && (card.backend?.connected ?? false) && liveRateRows().length > 0
                 spacing: Kirigami.Units.smallSpacing
 
                 RowLayout {
@@ -373,11 +374,9 @@ ColumnLayout {
                 }
 
                 Repeater {
-                    model: [
-                        { label: i18n("Requests/min"), total: card.backend?.rateLimitRequests ?? 0, remaining: card.backend?.rateLimitRequestsRemaining ?? 0 },
-                        { label: i18n("Tokens/min"), total: card.backend?.rateLimitTokens ?? 0, remaining: card.backend?.rateLimitTokensRemaining ?? 0 }
-                    ]
+                    model: liveRateRows()
                     ColumnLayout {
+                        id: rateRow
                         Layout.fillWidth: true
                         visible: modelData.total > 0
                         spacing: 2
@@ -391,7 +390,7 @@ ColumnLayout {
                             }
                             Item { Layout.fillWidth: true }
                             PlasmaComponents.Label {
-                                text: formatNumber(parent.used) + " / " + formatNumber(modelData.total)
+                                text: formatNumber(rateRow.used) + " / " + formatNumber(modelData.total)
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                             }
                         }
@@ -412,6 +411,57 @@ ColumnLayout {
                 }
             }
 
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: !card.collapsed && publishedLimitRows().length > 0
+                spacing: Kirigami.Units.smallSpacing
+
+                PlasmaComponents.Label {
+                    text: i18n("Published caps — not live remaining quota")
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    font.bold: true
+                    opacity: 0.8
+                }
+                Repeater {
+                    model: publishedLimitRows()
+                    PlasmaComponents.Label {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        text: modelData.label + ": " + formatNumber(modelData.value)
+                              + " / " + modelData.window
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        wrapMode: Text.WordWrap
+                        opacity: 0.7
+                    }
+                }
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                visible: !card.collapsed && ((typeof card.backend?.testConnectionNow === "function")
+                         || (typeof card.backend?.countTokensDiagnostic === "function")
+                         || (typeof card.backend?.refreshModelsNow === "function"))
+
+                PlasmaComponents.Button {
+                    visible: typeof card.backend?.refreshModelsNow === "function"
+                    text: i18n("Refresh models")
+                    icon.name: "view-refresh"
+                    onClicked: card.backend.refreshModelsNow()
+                }
+                PlasmaComponents.Button {
+                    visible: typeof card.backend?.testConnectionNow === "function"
+                    text: i18n("Test connection now — may consume quota or money")
+                    icon.name: "network-connect"
+                    onClicked: card.backend.testConnectionNow()
+                }
+                PlasmaComponents.Button {
+                    visible: typeof card.backend?.countTokensDiagnostic === "function"
+                    text: i18n("Run token diagnostic — may consume quota")
+                    icon.name: "tools-check-spelling"
+                    onClicked: card.backend.countTokensDiagnostic()
+                }
+            }
+
             // Footer
             ColumnLayout {
                 Layout.fillWidth: true
@@ -424,9 +474,11 @@ ColumnLayout {
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
                         text: {
-                            var lr = card.backend?.lastRefreshed;
-                            if (!lr) return i18n("Last refresh: never");
-                            return i18n("Last refresh: %1", formatRelativeTime(lr));
+                            var success = card.backend?.lastSuccess;
+                            var attempt = card.backend?.lastAttempt;
+                            return i18n("Last success: %1 · last attempt: %2",
+                                        success ? formatRelativeTime(success) : i18n("never"),
+                                        attempt ? formatRelativeTime(attempt) : i18n("never"));
                         }
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.5
@@ -454,6 +506,33 @@ ColumnLayout {
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
+                    visible: !!card.backend?.modelsLastDiscovered
+                    text: i18n("Live models discovered: %1", formatRelativeTime(card.backend.modelsLastDiscovered))
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: (card.backend?.selectedModelWarning || "") !== ""
+                    text: card.backend?.selectedModelWarning || ""
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    color: Kirigami.Theme.neutralTextColor
+                    wrapMode: Text.WordWrap
+                }
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: partialCapabilityText() !== ""
+                    text: partialCapabilityText()
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    color: Kirigami.Theme.neutralTextColor
+                    wrapMode: Text.WordWrap
+                }
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
                     visible: card.scheduler !== null && card.backend
                     text: i18n("Next refresh: %1%2",
                                nextRefreshText(),
@@ -470,16 +549,70 @@ ColumnLayout {
 
     function sourceLabel(source) {
         if (source === "billing_api") return i18n("Actual billing");
+        if (source === "usage_api") return i18n("Actual usage");
         if (source === "actual_api") return i18n("Actual usage");
         if (source === "estimated_from_usage") return i18n("Estimated");
         if (source === "connectivity_probe") return i18n("Probe only");
         if (source === "self_tracked") return i18n("Self-tracked");
         if (source === "browser_sync") return i18n("Browser sync");
         return i18n("Unknown");
+    }
+
+    function liveRateRows() {
+        if (!card.backend || typeof card.backend.metric !== "function") return [];
+        var rows = [];
+        var requestLimit = card.backend.metric("request_limit");
+        var requestRemaining = card.backend.metric("request_remaining");
+        var requestLimitValue = Number(requestLimit.value);
+        var requestRemainingValue = Number(requestRemaining.value);
+        if (requestLimit.available && requestRemaining.available
+                && Number.isFinite(requestLimitValue) && requestLimitValue > 0
+                && Number.isFinite(requestRemainingValue))
+            rows.push({ label: i18n("Requests/min"), total: requestLimitValue, remaining: requestRemainingValue });
+        var tokenLimit = card.backend.metric("token_limit");
+        var tokenRemaining = card.backend.metric("token_remaining");
+        var tokenLimitValue = Number(tokenLimit.value);
+        var tokenRemainingValue = Number(tokenRemaining.value);
+        if (tokenLimit.available && tokenRemaining.available
+                && Number.isFinite(tokenLimitValue) && tokenLimitValue > 0
+                && Number.isFinite(tokenRemainingValue))
+            rows.push({ label: i18n("Tokens/min"), total: tokenLimitValue, remaining: tokenRemainingValue });
+        return rows;
+    }
+
+    function publishedLimitRows() {
+        var metrics = card.backend?.metrics || [];
+        var rows = [];
+        for (var i = 0; i < metrics.length; i++) {
+            var metric = metrics[i];
+            if (!metric.available || metric.quality !== "published_cap") continue;
+            if (metric.kind === "request_limit")
+                rows.push({ label: i18n("Published request cap"), value: Number(metric.value), window: metric.window || i18n("documented window") });
+            else if (metric.kind === "token_limit")
+                rows.push({ label: i18n("Published token cap"), value: Number(metric.value), window: metric.window || i18n("documented window") });
+        }
+        return rows;
+    }
+
+    function partialCapabilityText() {
+        var statuses = card.backend?.capabilityStatus || {};
+        var available = [];
+        var failed = [];
+        var keys = Object.keys(statuses);
+        for (var i = 0; i < keys.length; i++) {
+            var row = statuses[keys[i]] || {};
+            if (row.status === "available") available.push(keys[i]);
+            else if (row.status === "failed" || row.status === "unavailable") failed.push(keys[i]);
+        }
+        if (available.length === 0 || failed.length === 0) return "";
+        return i18n("Partial data: %1 available; %2 unavailable",
+                    available.join(", "), failed.join(", "));
     }
 
     function usageLabel(source) {
         if (source === "actual_api") return i18n("Actual usage");
+        if (source === "usage_api") return i18n("Actual usage");
+        if (source === "model_discovery_api" || source === "connectivity_read_only") return i18n("Connectivity only");
         if (source === "connectivity_probe") return i18n("Probe only");
         if (source === "self_tracked") return i18n("Self-tracked");
         if (source === "browser_sync") return i18n("Browser sync");
@@ -487,12 +620,53 @@ ColumnLayout {
         return i18n("Unknown");
     }
 
+    function metricText(kind, legacyValue) {
+        var rows = card.backend?.metrics || [];
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i].kind === kind) {
+                return rows[i].available ? formatNumber(rows[i].value) : i18n("Unknown");
+            }
+        }
+        var source = card.backend?.usageSource || "unknown";
+        if (source === "unknown" || source === "connectivity_probe"
+                || source === "model_discovery_api" || source === "connectivity_read_only") {
+            return i18n("Unknown");
+        }
+        return formatNumber(legacyValue);
+    }
+
     function costHeading() {
         var source = card.backend?.costSource ?? "unknown";
-        if (source === "billing_api") return i18n("API Spend");
+        if (source === "billing_api" || source === "usage_api" || source === "actual_api") return i18n("API Spend");
         if (source === "estimated_from_usage") return i18n("Estimated Burn");
         if (source === "connectivity_probe") return i18n("Probe Cost");
         return (card.backend?.isEstimatedCost ?? false) ? i18n("Estimated Cost") : i18n("Cost");
+    }
+
+    function currentCostMetric() {
+        var metrics = card.backend?.metrics || [];
+        for (var i = metrics.length - 1; i >= 0; i--) {
+            var metric = metrics[i] || {};
+            if (metric["kind"] === "cost" && metric["window"] === "current")
+                return metric;
+        }
+        return {};
+    }
+
+    function currentCostAvailable() {
+        var metric = currentCostMetric();
+        return metric["available"] === true && Number.isFinite(Number(metric["value"]));
+    }
+
+    function currentCostValue() {
+        var metric = currentCostMetric();
+        return currentCostAvailable() ? Number(metric["value"]) : 0;
+    }
+
+    function currentCostText() {
+        if (!currentCostAvailable()) return i18n("Unknown");
+        var metric = currentCostMetric();
+        return Utils.formatMoney(Number(metric["value"]), metric["currency"] || card.backend?.currency || "USD");
     }
 
     function currentCatalogModel() {

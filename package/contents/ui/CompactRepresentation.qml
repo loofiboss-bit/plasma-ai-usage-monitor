@@ -20,7 +20,9 @@ MouseArea {
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
             if (provider && provider.enabled && provider.backend && provider.backend.connected
-                && (provider.backend.costSource === "billing_api" || provider.backend.costSource === "actual_api"))
+                && (provider.backend.costSource === "billing_api"
+                    || provider.backend.costSource === "usage_api"
+                    || provider.backend.costSource === "actual_api"))
                 Utils.addCurrencyTotal(totals, provider.backend.currency, provider.backend.cost ?? 0);
         }
         return totals;

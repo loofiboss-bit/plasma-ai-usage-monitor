@@ -11,6 +11,7 @@
 #include <QList>
 #include <QTimer>
 #include <QJsonObject>
+#include <QVariantList>
 #include <functional>
 
 /**
@@ -68,6 +69,8 @@ class ProviderBackend : public QObject
     Q_PROPERTY(QString usageSource READ usageSource NOTIFY dataUpdated)
     Q_PROPERTY(QString currency READ currency NOTIFY dataUpdated)
     Q_PROPERTY(QString dataQuality READ dataQuality NOTIFY dataUpdated)
+    Q_PROPERTY(QVariantList metrics READ metrics NOTIFY metricsChanged)
+    Q_PROPERTY(QVariantMap capabilityStatus READ capabilityStatus NOTIFY capabilityStatusChanged)
 
     // Rate limits
     Q_PROPERTY(int rateLimitRequests READ rateLimitRequests NOTIFY dataUpdated)
@@ -132,15 +135,34 @@ public:
     };
     Q_ENUM(RefreshReason)
 
+    enum class MetricKind {
+        InputTokens,
+        OutputTokens,
+        Requests,
+        Cost,
+        CreditBalance,
+        RequestLimit,
+        RequestRemaining,
+        TokenLimit,
+        TokenRemaining,
+        Latency,
+        ErrorRate
+    };
+    Q_ENUM(MetricKind)
+
     enum class MetricSource {
         BillingApi,
         UsageApi,
+        MetricsApi,
         ResponseHeaders,
+        PublishedDocumentation,
+        LocalObservation,
+        EstimatedPricing,
         ConnectivityProbe,
-        Estimate,
-        StaticDocumentation,
-        SelfTracked,
-        BrowserSync
+        Estimate = EstimatedPricing,
+        StaticDocumentation = PublishedDocumentation,
+        SelfTracked = 8,
+        BrowserSync = 9
     };
     Q_ENUM(MetricSource)
 
@@ -242,6 +264,11 @@ public:
     QString usageSource() const;
     QString currency() const;
     QString dataQuality() const;
+    QVariantList metrics() const;
+    QVariantMap capabilityStatus() const;
+    Q_INVOKABLE QVariantMap metric(const QString &kind,
+                                   const QString &scope = QString(),
+                                   const QString &window = QString()) const;
 
     // Rate limits
     int rateLimitRequests() const;
@@ -298,6 +325,8 @@ Q_SIGNALS:
     void customBaseUrlChanged();
     void stateChanged();
     void diagnosticsChanged();
+    void metricsChanged();
+    void capabilityStatusChanged();
     void providerDisconnected(const QString &provider);
     void providerReconnected(const QString &provider);
 
@@ -376,6 +405,21 @@ protected:
     void setRateLimitRequestsRemaining(int remaining);
     void setRateLimitTokensRemaining(int remaining);
     void setRateLimitResetTime(const QString &time);
+    void setProviderMetric(MetricKind kind,
+                           const QVariant &value,
+                           const QString &unit,
+                           const QString &currency,
+                           const QString &scope,
+                           const QString &window,
+                           MetricSource source,
+                           const QString &quality,
+                           const QDateTime &resetAt = QDateTime(),
+                           const QDateTime &periodStart = QDateTime(),
+                           const QDateTime &periodEnd = QDateTime());
+    void clearProviderMetric(MetricKind kind, const QString &scope = QString(), const QString &window = QString());
+    void setCapabilityStatus(const QString &capability,
+                             const QString &status,
+                             const QString &diagnostic = QString());
     void updateLastRefreshed();
 
     // Budget checking after cost update
@@ -401,6 +445,7 @@ private:
     QNetworkAccessManager *m_networkManager;
     QString m_apiKey;
     QString m_customBaseUrl;
+    QVariantMap m_capabilityStatus;
 
     bool m_connected = false;
     bool m_loading = false;
@@ -435,6 +480,7 @@ private:
     QString m_usageSource = QStringLiteral("unknown");
     QString m_currency = QStringLiteral("USD");
     QString m_dataQuality = QStringLiteral("unknown");
+    QVariantList m_metrics;
 
     double m_dailyBudget = 0.0;
     double m_monthlyBudget = 0.0;

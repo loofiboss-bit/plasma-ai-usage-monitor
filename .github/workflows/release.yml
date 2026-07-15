@@ -14,10 +14,17 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with: { fetch-depth: 0 }
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - run: test "v$(cat VERSION)" = "$GITHUB_REF_NAME"
+      - run: bash scripts/verify_exact_tag.sh "$GITHUB_REF_NAME"
       - run: mkdir -p dist && SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_source_tarball.sh --output-dir dist
       - run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_plasmoid.sh --output-dir dist
       - run: python3 scripts/generate_source_sbom.py --tag "$GITHUB_REF_NAME" --output dist/source.spdx.json
       - run: cd dist && sha256sum * > SHA256SUMS.txt
-      - run: gh release create "$GITHUB_REF_NAME" --verify-tag --draft --generate-notes dist/*
+      - name: Create exact-commit draft release
+        shell: bash
+        run: |
+          release_args=(--verify-tag --draft --generate-notes)
+          if [[ "$GITHUB_REF_NAME" != "v$(cat VERSION)" ]]; then
+            release_args+=(--prerelease)
+          fi
+          gh release create "$GITHUB_REF_NAME" "${release_args[@]}" dist/*
         env: { GH_TOKEN: '${{ github.token }}' }

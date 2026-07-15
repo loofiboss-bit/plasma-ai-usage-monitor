@@ -3,11 +3,14 @@
 #include <QNetworkRequest>
 #include <QUrlQuery>
 #include <QDebug>
+#include <QSettings>
+#include "providerpricingcatalog.h"
 
 GoogleProvider::GoogleProvider(QObject *parent)
     : ProviderBackend(parent)
 {
     registerCatalogPricing(QStringLiteral("google"));
+    loadDiscoveryCache();
 }
 
 QString GoogleProvider::model() const { return m_model; }
@@ -16,6 +19,7 @@ void GoogleProvider::setModel(const QString &model)
     if (m_model != model) {
         m_model = model;
         Q_EMIT modelChanged();
+        Q_EMIT discoveredModelsChanged();
     }
 }
 
@@ -39,12 +43,87 @@ void GoogleProvider::refreshImpl()
     beginRefresh();
     setLoading(true);
     clearError();
-    fetchStatus();
+    if (!m_discoveredModels.isEmpty() && selectedModelAvailable() && m_modelsLastDiscovered.isValid()
+        && m_modelsLastDiscovered.secsTo(QDateTime::currentDateTimeUtc()) < 24 * 60 * 60) {
+        setConnected(true);
+        setUsageSource(QStringLiteral("model_discovery_api"));
+        setDataQuality(QStringLiteral("connectivity_only"));
+        setLoading(false);
+        updateLastRefreshed();
+        Q_EMIT dataUpdated();
+        return;
+    }
+    fetchModels();
 }
 
-void GoogleProvider::fetchStatus()
+bool GoogleProvider::selectedModelAvailable() const
 {
-    // Use countTokens as a lightweight connectivity check
+    for (const QVariant &entry : m_discoveredModels) {
+        if (entry.toMap().value(QStringLiteral("id")).toString() == m_model) return true;
+    }
+    return false;
+}
+
+QString GoogleProvider::selectedModelWarning() const
+{
+    for (const QVariant &entry : m_discoveredModels) {
+        const QVariantMap row = entry.toMap();
+        if (row.value(QStringLiteral("id")).toString() != m_model) continue;
+        const QString status = row.value(QStringLiteral("lifecycle")).toMap()
+                                   .value(QStringLiteral("status")).toString();
+        if (status == QLatin1String("deprecated")) return i18n("The pinned model is deprecated");
+        if (m_model.contains(QLatin1String("preview"), Qt::CaseInsensitive))
+            return i18n("The pinned model is a preview model and may change");
+        return {};
+    }
+    return m_model.isEmpty() ? QString() : i18n("The pinned model was not returned by live discovery");
+}
+
+void GoogleProvider::refreshModelsNow()
+{
+    m_modelsLastDiscovered = QDateTime();
+    refresh();
+}
+
+void GoogleProvider::fetchModels(const QString &pageToken)
+{
+    if (pageToken.isEmpty()) {
+        m_pendingLiveModels.clear();
+        m_seenModelIds.clear();
+        m_discoveryPageCount = 0;
+    }
+    if (++m_discoveryPageCount > 20) {
+        setErrorDetails(i18n("Gemini model discovery exceeded the pagination budget"), ProviderErrorKind::Schema);
+        setLoading(false);
+        setConnected(false);
+        return;
+    }
+    QUrl url(QStringLiteral("%1/models").arg(effectiveBaseUrl(BASE_URL)));
+    QUrlQuery query;
+    query.addQueryItem(QStringLiteral("key"), apiKey());
+    query.addQueryItem(QStringLiteral("pageSize"), QStringLiteral("1000"));
+    if (!pageToken.isEmpty()) query.addQueryItem(QStringLiteral("pageToken"), pageToken);
+    url.setQuery(query);
+    QNetworkRequest request = createRequest(url);
+    request.setRawHeader("Authorization", QByteArray());
+    const int gen = currentGeneration();
+    QNetworkReply *reply = networkManager()->get(request);
+    trackReply(reply);
+    connect(reply, &QNetworkReply::finished, this, [this, reply, gen]() {
+        if (!isCurrentGeneration(gen)) { reply->deleteLater(); return; }
+        onModelsReply(reply);
+    });
+}
+
+void GoogleProvider::countTokensDiagnostic()
+{
+    if (!hasApiKey()) {
+        setErrorDetails(i18n("No API key configured"), ProviderErrorKind::Configuration);
+        return;
+    }
+    beginRefresh();
+    setLoading(true);
+    clearError();
     QUrl url(QStringLiteral("%1/models/%2:countTokens")
                  .arg(effectiveBaseUrl(BASE_URL), m_model));
 
@@ -77,6 +156,101 @@ void GoogleProvider::fetchStatus()
         if (!isCurrentGeneration(gen)) { reply->deleteLater(); return; }
         onCountTokensReply(reply);
     });
+}
+
+void GoogleProvider::onModelsReply(QNetworkReply *reply)
+{
+    const int httpStatus = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    const QByteArray data = reply->readAll();
+    if (reply->error() != QNetworkReply::NoError) {
+        if (httpStatus == 401 || httpStatus == 403) {
+            setErrorDetails(i18n("Gemini Developer API authentication failed"), ProviderErrorKind::Authentication, httpStatus);
+        } else if (httpStatus == 429) {
+            setErrorDetails(i18n("Rate limited"), ProviderErrorKind::RateLimit, httpStatus, retryAfterForReply(reply));
+        } else {
+            setNetworkError(reply, i18n("Gemini models API unavailable: %1", reply->errorString()));
+        }
+        setConnected(false);
+    } else {
+        const QJsonDocument doc = QJsonDocument::fromJson(data);
+        if (!doc.isObject()) {
+            setErrorDetails(i18n("Unexpected Gemini models response"), ProviderErrorKind::Schema);
+            setConnected(false);
+        } else {
+            const QJsonArray models = doc.object().value(QStringLiteral("models")).toArray();
+            for (const QJsonValue &entry : models) {
+                const QJsonObject object = entry.toObject();
+                QVariantMap row = object.toVariantMap();
+                QString id = object.value(QStringLiteral("name")).toString();
+                id.remove(QStringLiteral("models/"));
+                row.insert(QStringLiteral("id"), id);
+                if (id.isEmpty() || m_seenModelIds.contains(id)) continue;
+                m_seenModelIds.append(id);
+                row.insert(QStringLiteral("discoverySource"), QStringLiteral("live_api"));
+                m_pendingLiveModels.append(row);
+            }
+            const QString nextPageToken = doc.object().value(QStringLiteral("nextPageToken")).toString();
+            if (!nextPageToken.isEmpty()) {
+                reply->deleteLater();
+                fetchModels(nextPageToken);
+                return;
+            }
+            finalizeModelDiscovery();
+        }
+    }
+    reply->deleteLater();
+    setLoading(false);
+    updateLastRefreshed();
+    Q_EMIT dataUpdated();
+}
+
+void GoogleProvider::finalizeModelDiscovery()
+{
+    QVariantList merged = m_pendingLiveModels;
+    const QVariantList fallback = ProviderPricingCatalog::instance()->selectableModelsForProvider(QStringLiteral("google"));
+    for (const QVariant &entry : fallback) {
+        QVariantMap row = entry.toMap();
+        const QString id = row.value(QStringLiteral("id")).toString();
+        if (m_seenModelIds.contains(id)) continue;
+        row.insert(QStringLiteral("discoverySource"), QStringLiteral("shipped_catalog"));
+        merged.append(row);
+    }
+    m_discoveredModels = merged;
+    m_modelsLastDiscovered = QDateTime::currentDateTimeUtc();
+    saveDiscoveryCache();
+    Q_EMIT discoveredModelsChanged();
+    setConnected(true);
+    setUsageSource(QStringLiteral("model_discovery_api"));
+    setCostSource(QStringLiteral("unknown"));
+    setDataQuality(QStringLiteral("connectivity_only"));
+    setCapabilityStatus(QStringLiteral("model_discovery"), QStringLiteral("available"));
+}
+
+void GoogleProvider::loadDiscoveryCache()
+{
+    QSettings settings(QStringLiteral("loofi"), QStringLiteral("plasma-ai-usage-monitor"));
+    settings.beginGroup(QStringLiteral("providerDiscovery/google"));
+    m_modelsLastDiscovered = settings.value(QStringLiteral("observedAt")).toDateTime();
+    const QJsonDocument cached = QJsonDocument::fromJson(settings.value(QStringLiteral("models")).toByteArray());
+    if (cached.isArray()) m_discoveredModels = cached.array().toVariantList();
+    settings.endGroup();
+    if (m_discoveredModels.isEmpty()) {
+        m_discoveredModels = ProviderPricingCatalog::instance()->selectableModelsForProvider(QStringLiteral("google"));
+        for (QVariant &entry : m_discoveredModels) {
+            QVariantMap row = entry.toMap();
+            row.insert(QStringLiteral("discoverySource"), QStringLiteral("shipped_catalog"));
+            entry = row;
+        }
+    }
+}
+
+void GoogleProvider::saveDiscoveryCache() const
+{
+    QSettings settings(QStringLiteral("loofi"), QStringLiteral("plasma-ai-usage-monitor"));
+    settings.beginGroup(QStringLiteral("providerDiscovery/google"));
+    settings.setValue(QStringLiteral("observedAt"), m_modelsLastDiscovered);
+    settings.setValue(QStringLiteral("models"), QJsonDocument(QJsonArray::fromVariantList(m_discoveredModels)).toJson(QJsonDocument::Compact));
+    settings.endGroup();
 }
 
 void GoogleProvider::onCountTokensReply(QNetworkReply *reply)
@@ -113,10 +287,6 @@ void GoogleProvider::onCountTokensReply(QNetworkReply *reply)
         Q_UNUSED(totalTokens);
     }
 
-    // Google doesn't expose rate limit headers on the Gemini API,
-    // so we apply known documentation limits.
-    applyKnownLimits();
-
     setConnected(true);
     setUsageSource(QStringLiteral("connectivity_probe"));
     setCostSource(QStringLiteral("connectivity_probe"));
@@ -124,53 +294,4 @@ void GoogleProvider::onCountTokensReply(QNetworkReply *reply)
     setLoading(false);
     updateLastRefreshed();
     Q_EMIT dataUpdated();
-}
-
-void GoogleProvider::applyKnownLimits()
-{
-    // Known rate limits for Gemini API (as of 2025)
-    // Limits depend on model and pricing tier.
-    bool isPaid = (m_tier == QStringLiteral("paid"));
-
-    if (m_model.contains(QStringLiteral("flash"))) {
-        if (isPaid) {
-            setRateLimitRequests(2000);  // RPM for paid tier
-            setRateLimitRequestsRemaining(2000);
-            setRateLimitTokens(4000000); // 4M TPM
-            setRateLimitTokensRemaining(4000000);
-        } else {
-            setRateLimitRequests(15);  // RPM for free tier
-            setRateLimitRequestsRemaining(15);
-            setRateLimitTokens(1000000); // 1M TPM
-            setRateLimitTokensRemaining(1000000);
-        }
-    } else if (m_model.contains(QStringLiteral("pro"))) {
-        if (isPaid) {
-            setRateLimitRequests(1000);
-            setRateLimitRequestsRemaining(1000);
-            setRateLimitTokens(4000000);
-            setRateLimitTokensRemaining(4000000);
-        } else {
-            setRateLimitRequests(2);
-            setRateLimitRequestsRemaining(2);
-            setRateLimitTokens(32000);
-            setRateLimitTokensRemaining(32000);
-        }
-    } else {
-        // Generic defaults
-        if (isPaid) {
-            setRateLimitRequests(1000);
-            setRateLimitRequestsRemaining(1000);
-            setRateLimitTokens(4000000);
-            setRateLimitTokensRemaining(4000000);
-        } else {
-            setRateLimitRequests(15);
-            setRateLimitRequestsRemaining(15);
-            setRateLimitTokens(1000000);
-            setRateLimitTokensRemaining(1000000);
-        }
-    }
-
-    setRateLimitResetTime(isPaid ? QStringLiteral("N/A (paid tier limits)")
-                                 : QStringLiteral("N/A (free tier limits)"));
 }
