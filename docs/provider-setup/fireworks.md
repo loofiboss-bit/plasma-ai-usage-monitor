@@ -1,16 +1,21 @@
 # Fireworks AI setup
 
-1. Store a Fireworks API key in KWallet.
-2. Enter the account-scoped HTTPS base URL, for example the documented `/v1/accounts/{account_id}` base.
-3. Select a discovered or pinned model.
+Create an API key in the Fireworks AI account settings. In **Settings → Providers**, enable Fireworks, store the key, and enter the account-scoped base URL:
+
+~~~text
+https://api.fireworks.ai/v1/accounts/{account_id}
+~~~
+
+Replace `{account_id}` with your Fireworks account ID. Fireworks has no default endpoint in the widget, so the first refresh requires this field.
 
 ## Scheduled traffic
 
-The adapter sends one read-only `GET /models` request under the configured account base. It reports connectivity and model discovery only.
+The widget performs read-only model discovery. It can confirm credentials and model access, but it does not report account spend.
 
-Scheduled billing/spend collection is intentionally deferred until a real account fixture proves a stable read-only permission contract. The widget does not substitute an inference probe or undocumented dashboard endpoint.
+Fireworks billing remains disabled until a read-only billing contract is covered by deterministic fixtures. The widget does not estimate a live balance from documentation.
 
-## Provider card
+## Common failures
 
-The canonical v13 overview includes the Fireworks discovery-only state and its
-explicit unavailable cost: [provider overview screenshot](../../assets/screenshots/main-window.png).
+- **401 or 403:** the key is invalid or lacks model access.
+- **404:** the base URL is not a compatible Fireworks endpoint.
+- **Connected with unknown usage:** expected for the current monitoring level.

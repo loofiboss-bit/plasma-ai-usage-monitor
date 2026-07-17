@@ -1,83 +1,68 @@
-# Security Policy
+# Security policy
 
-## Reporting a Vulnerability
+## Report a vulnerability
 
-If you discover a security vulnerability in AI Usage Monitor, please report it responsibly:
+Use a private [GitHub Security Advisory](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/security/advisories/new). If GitHub advisories are unavailable, email **loofi@github.com**.
 
-1. **Email:** Send details to <loofi@github.com>
-2. **GitHub:** Open a [security advisory](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/security/advisories/new) (private by default)
+Do not open a public issue for a suspected vulnerability.
 
-Please include:
+Include:
 
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
+- affected version
+- clear reproduction steps
+- expected impact
+- logs or proof of concept with secrets removed
+- a suggested fix, if you have one
 
-We aim to respond within **48 hours** and release a fix within **7 days** for critical issues.
+The project aims to acknowledge reports within 48 hours. Fix timing depends on severity, reproducibility, and upstream dependencies.
 
-**Do not** open a public GitHub issue for security vulnerabilities.
+## Supported releases
 
-## Scope
+| Release line | Security updates |
+| --- | --- |
+| 13.x | Supported |
+| 12.x and older | Upgrade to the current 13.x release |
 
-The following components are in scope for security reports:
+## In scope
 
-| Component | Concern |
-|-----------|---------|
-| **KWallet integration** (`secretsmanager.cpp`) | API key storage and retrieval |
-| **Browser cookie extraction** (`browsercookieextractor.cpp`) | Firefox session cookie handling |
-| **Network requests** (all providers) | API key transmission, TLS enforcement |
-| **SQLite database** (`usagedatabase.cpp`) | Local data storage and access |
-| **Custom base URLs** | Proxy/gateway URL validation |
+- KWallet storage and secret lifetime
+- provider authentication and network requests
+- custom base URL validation
+- Browser Sync cookie handling
+- local SQLite history and exports
+- configuration import and export
+- loopback Prometheus server
+- Slack and Discord webhook handling
+- native plugin packaging and load paths
 
-## Security Design
+Reports about provider-side services, browser vulnerabilities, or KDE components should go to the affected upstream project unless this widget creates the exposure.
 
-### API Key Storage
+## Security boundaries
 
-- All API keys are stored in **KDE Wallet (KWallet)**, never written to config files on disk
-- Keys are accessed via the `SecretsManager` class using the wallet folder `"ai-usage-monitor"`
-- If KWallet is unavailable, the widget cannot store or retrieve keys — there is no insecure fallback
+### Secrets
 
-### Network Security
+Provider keys, personal access tokens, and webhook URLs are stored in KWallet. The widget has no plaintext fallback. Non-secret Plasma configuration and configuration exports contain only redacted availability or ordinary settings.
 
-- All provider API calls use **HTTPS** by default
-- Custom base URLs display an inline **security warning** if an `http://` (non-HTTPS) URL is entered
-- All network requests have a **30-second timeout**
-- Retry logic respects `Retry-After` headers from rate-limited responses
+### Provider traffic
 
-### Browser Cookie Handling
+Default provider endpoints use HTTPS. Remote custom endpoints must use HTTPS; plain HTTP is limited to loopback development addresses. Scheduled provider refreshes are read-only. Explicit manual inference tests may consume quota or money.
 
-- Cookie extraction reads Firefox's `cookies.sqlite` database in **read-only mode**
-- Temporary copies of the cookie database use **owner-only permissions** (0600)
-- Cookie data is used only for direct API calls to the same services — never stored, logged, or transmitted elsewhere
-- Browser sync is **disabled by default** and marked as experimental
+Requests use timeouts and the refresh scheduler respects retry guidance. Authentication, permission, configuration, and schema failures require user action instead of unlimited retries.
 
-### Data Privacy
+### Browser Sync Labs
 
-- **No telemetry** — the widget does not phone home or send analytics
-- **All data stays local** — usage history in SQLite, keys in KWallet
-- **No cloud sync** — all API calls go directly to provider endpoints
+Browser Sync is disabled by default. Cookie databases are read through a native boundary, and temporary copies use owner-only permissions. Cookie values do not enter QML, logs, diagnostics, history, or exports.
 
-### Build Security
+### Local data
 
-- CI builds with **warnings-as-errors** to catch potential issues
-- Version consistency checks prevent metadata drift
-- C++20 with modern compiler warnings enabled
+Usage history stays in a local SQLite database. The widget has no telemetry, hosted backend, or cloud sync. The optional Prometheus endpoint binds to 127.0.0.1.
 
-## Supported Versions
+Webhook alerts leave the computer by design and may contain provider status or budget context. The user chooses and controls the destination.
 
-| Version | Supported |
-|---------|-----------|
-| 2.x.x   | ✅ Yes    |
-| 1.x.x   | ❌ No     |
+### Diagnostics
 
-## Dependencies
+Copied support reports redact endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values. Users should still review reports before posting them publicly.
 
-Key runtime dependencies and their security relevance:
+## Build and release controls
 
-| Dependency | Purpose | Trust Level |
-|-----------|---------|-------------|
-| Qt 6 (Network, Sql) | HTTP requests, SQLite | Upstream (Qt Project) |
-| KWallet (KF6) | Secret storage | Upstream (KDE) |
-| KNotifications (KF6) | Desktop alerts | Upstream (KDE) |
-| SQLite | Usage history | Bundled in Qt |
+Release checks cover version consistency, provider and subscription catalogs, QML imports, package payload, non-invasive monitoring, deterministic provider contracts, AppStream metadata, RPM policy, checksums, and an SPDX source SBOM. Public packages are verified by readback after release.

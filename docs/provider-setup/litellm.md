@@ -1,16 +1,26 @@
 # LiteLLM Proxy setup
 
-1. Enter the HTTPS base URL of your LiteLLM Proxy. Loopback HTTP is accepted for an explicitly local gateway.
-2. Store a Proxy API key in KWallet.
-3. Enable the provider after confirming that the key may read spend logs.
+LiteLLM is a gateway integration. It can report aggregate spend for traffic that passed through the configured proxy.
+
+In **Settings → Providers**:
+
+1. enable LiteLLM Proxy
+2. enter the proxy base URL
+3. enter a key that can read the spend endpoint
+4. apply settings and refresh
+
+Use HTTPS for a remote proxy. Plain HTTP is allowed only for loopback development endpoints.
 
 ## Scheduled traffic
 
-The gateway adapter sends one read-only `GET /spend/logs` request per refresh. It reports aggregate input/output tokens, requests, and spend returned by the gateway. Currency buckets remain separate; mixed currencies are never summed.
+The widget reads the gateway spend log endpoint. It does not run inference and does not contact the upstream model providers directly.
 
-The widget does not execute proxy-provided code and does not make upstream inference calls.
+Spend can contain several currencies. The widget preserves each currency and does not add them together.
 
-## Provider card
+## Common failures
 
-The canonical v13 provider screenshot shows LiteLLM's typed actual usage and spend
-beside connectivity-only providers: [provider intelligence screenshot](../../assets/screenshots/provider-intelligence.png).
+- **401 or 403:** the gateway key cannot read spend logs.
+- **404:** the base URL does not point to a compatible LiteLLM proxy or the endpoint is disabled.
+- **Empty data:** no compatible spend rows exist for the gateway, time range, or key.
+
+Check LiteLLM access policy before replacing a working inference key with a broader administrative key.
