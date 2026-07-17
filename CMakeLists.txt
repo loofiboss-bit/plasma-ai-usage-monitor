@@ -37,6 +37,10 @@ if(BUILD_TESTING)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_demo_contract.py"
     )
     add_test(
+        NAME release_policy
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_release_policy.py"
+    )
+    add_test(
         NAME exact_tag_promotion
         COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_verify_exact_tag.sh"
     )

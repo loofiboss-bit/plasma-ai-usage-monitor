@@ -1,7 +1,7 @@
 # Roadmap — Plasma AI Usage Monitor
 
-> **Current version:** v13.0.0 (Provider Intelligence, prerelease development)
-> **Last updated:** 2026-07-13
+> **Current version:** v13.0.0 (Provider Intelligence, released)
+> **Last updated:** 2026-07-17
 > **Direction:** Keep the widget desktop-native, local-first, and honest about data quality. Prefer setup clarity, diagnostics, export, notifications, and loopback integrations over backend/server expansion.
 
 ## Product Direction
@@ -20,7 +20,7 @@ The project stays focused on:
 
 | Version | Codename | Theme | Status |
 | ------- | -------- | ----- | ------ |
-| v13.0.0 | **Provider Intelligence** | Non-invasive monitoring, metric truth, provider adapters | Prerelease development |
+| v13.0.0 | **Provider Intelligence** | Non-invasive monitoring, metric truth, provider adapters | Released |
 | v12.0.3 | **Reliability Core** | Catalog-driven provider model corrections | Released |
 | v12.0.0 | **Reliability Core** | Deterministic refresh, typed state, correct history, and release confidence | Released |
 | v11.0.0 | **Distribution & Catalog Truth** | RPM/COPR visibility, fresh catalogs, and release gates | Released |

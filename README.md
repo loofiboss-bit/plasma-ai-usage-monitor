@@ -22,7 +22,9 @@
 
 A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, and costs across multiple providers. Sits in your panel as a compact icon with a colored status badge and expands into a detailed popup with per-provider stats, usage history charts, and budget tracking. Also tracks subscription-based AI coding tool usage limits for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
 
-> **Current development release:** `v13.0.0 Provider Intelligence` makes scheduled provider monitoring read-only by default, preserves unavailable metrics as unknown, and drives provider capabilities from Catalog v5. The supported Fedora route remains the COPR package.
+> **Current release:** `v13.0.0 Provider Intelligence` makes scheduled provider monitoring read-only by default, preserves unavailable metrics as unknown, and drives provider capabilities from Catalog v5. The supported Fedora route remains the COPR package.
+
+Release validation is credential-free and deterministic. Maintainers do not need provider API keys or live vendor accounts to publish a verified release; users add their own keys only for providers they choose to enable at runtime.
 
 ## Quick Links
 
