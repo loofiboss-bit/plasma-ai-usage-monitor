@@ -1,63 +1,55 @@
-# Reliability Core architecture
+# Runtime and data architecture
 
-This document defines the v12 runtime and distribution contracts. They are
-release requirements, not implementation suggestions.
+This document describes the current v13 contracts. It is the technical boundary for provider adapters, history, secrets, and distribution.
 
 ## Refresh lifecycle
 
-`ProviderBackend::requestRefresh()` is the only public provider refresh entry
-point. It owns single-flight/coalescing, refresh reasons, cancellation,
-generation validation, timestamps, typed errors, retry metadata, freshness and
-terminal state. Adapters implement only `refreshImpl()` and parsing. Scheduled
-or popup refreshes coalesce; a manual request may supersede one older request.
-Replies from an invalid generation cannot mutate state or history.
+ProviderBackend::requestRefresh() is the public refresh entry point. It owns single-flight coalescing, refresh reasons, cancellation, generation checks, timestamps, typed errors, retry metadata, freshness, and terminal state. Adapters implement refreshImpl() and response parsing.
 
-The scheduler consumes `ProviderErrorKind`, `retryable`, `retryAfter`, and
-`Freshness`. It never parses localized error text. Backoff is capped and uses
-deterministic jitter. Authentication, permission, configuration and schema
-errors require user action. A successful primary endpoint with a failed
-secondary endpoint produces `Degraded`, preserving the valid metrics.
+Scheduled and popup refreshes coalesce. A manual request may supersede one older request. A reply from an invalid generation cannot change state or write history.
 
-## Observation schema v3
+The scheduler consumes typed error kind, retryability, Retry-After, and freshness. It does not parse localized UI text. Authentication, permission, configuration, and schema errors wait for user action. A failed secondary endpoint can produce a degraded state while preserving valid primary metrics.
 
-SQLite remains local and uses WAL mode. Schema v3 stores normalized
-observations with UTC interval boundaries, metric kind/unit, aggregation
-semantic, source, currency, quality, model/project scope and correlation ID.
-Calendar totals include only compatible `interval_total` observations. Gauges,
-cumulative counters and rolling windows are never relabeled as calendar-day
-spend. Migration is transactional and preserves a pre-v12 backup and the legacy
-table for rollback.
+Scheduled provider traffic is read-only. Explicit inference tests are separate actions and never run on the background schedule.
 
-Queries and exports run on worker instances. Large exports iterate forward-only
-SQL queries and write atomically, one row at a time, so memory use does not grow
-with history size. Mixed ISO currencies remain separate throughout storage,
-queries, UI, alerts and integrations; v12 performs no currency conversion.
+## Provider Metric Contract v2
 
-## Catalog v4
+Each metric carries its kind, nullable value, unit, source, quality, scope, time window, observation semantics, currency, reset metadata, and optional model or project scope.
 
-`providers-v4.json` owns identity, capabilities, authentication shape,
-endpoints, models, price units, metric/source expectations, lifecycle dates and
-review provenance. The C++ catalog model exposes that truth to QML. Backend
-object binding remains code, but QML must not duplicate capability facts.
-Lifecycle aliases are date-driven and migration is visible to the user.
+Unavailable values stay null. Connectivity cannot create zero usage. Published limits cannot become live remaining quota. Mixed currencies stay separate.
+
+ProviderManager and Catalog v5 descriptors own stable identity, adapter type, authentication slots, endpoints, models, capability claims, source expectations, and safe refresh policy. QML reads this catalog instead of maintaining a second provider truth table.
+
+The generated [provider capability matrix](../provider-capabilities.md) is checked against the shipped catalog during validation.
+
+## SQLite schema v4
+
+History stays local and uses WAL mode. Schema v4 stores normalized observations and permits null values. Migration from v3 is transactional, idempotent, and backed up before changes.
+
+Calendar totals include only compatible interval-total observations. Gauges, cumulative counters, and rolling windows are not relabeled as calendar totals. Queries preserve ISO currency and source quality.
+
+Large exports use worker instances, forward-only queries, and atomic output files so memory use does not grow with history size and partial files do not replace complete exports.
 
 ## Secret and browser boundaries
 
-KWallet values are cached after wallet open and invalidated per entry on
-write/remove. There is no periodic secret polling. QML receives only redacted
-availability and operation status. `BrowserSyncService` owns cookie extraction,
-authenticated requests, timeout and circuit breaking; cookie headers never
-cross the QML boundary or enter diagnostics, logs, history or exports.
+SecretsManager opens KWallet, caches secret availability, and invalidates individual entries after writes or removals. QML receives redacted availability and operation status, not raw secret lists.
+
+BrowserSyncService owns profile discovery, cookie extraction, authenticated requests, timeouts, and circuit breaking. Cookie headers do not cross into QML or enter diagnostics, logs, history, or exports. Browser Sync remains off by default.
+
+## Local integrations
+
+The Prometheus server binds to loopback. Scheduled JSON and CSV export writes to a user-selected local directory. Slack and Discord webhooks are explicit outbound integrations and use KWallet-stored URLs plus alert cooldowns.
+
+Configuration export uses schema v2 and excludes every secret-bearing field.
 
 ## Distribution contract
 
-COPR is the supported Fedora 44 package and contains both the plasmoid and the
-compiled QML plugin. A source build provides the same capability. The KDE Store
-`.plasmoid` contains only the frontend and requires a matching compiled plugin.
-Flatpak is unsupported because the removed scaffold did not package or exercise
-the native plugin. Release artifacts must come from an exact signed/tagged
-source commit, include checksums and an SPDX SBOM, and report the same version as
-`VERSION`.
+COPR is the supported Fedora package and contains both the Plasma package and compiled QML plugin. Source installation builds the same parts.
 
-An out-of-process D-Bus service is deferred to v13; v12 keeps the plugin
-in-process and local-first, with no telemetry, account or hosted backend.
+The KDE Store plasmoid contains the frontend, catalogs, icons, and metadata. It requires a matching compiled plugin. Flatpak remains unsupported because the removed scaffold did not package or exercise the native plugin.
+
+VERSION is canonical. Release validation checks package metadata, catalogs, RPM metadata, AppStream, the QML import, package payload, reproducible artifacts, checksums, and an SPDX source SBOM.
+
+## Deferred architecture
+
+The plugin remains in-process and local-first. A hosted backend, account system, cross-machine database, or standalone web dashboard is outside the current product boundary.

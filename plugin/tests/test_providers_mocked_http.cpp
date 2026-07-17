@@ -45,15 +45,42 @@ public:
                 QTcpSocket *socket = m_server.nextPendingConnection();
                 connect(socket, &QTcpSocket::readyRead, this, [this, socket]() {
                     m_buffers[socket] += socket->readAll();
-                    if (!m_buffers[socket].contains("\r\n\r\n")) {
+                    if (m_processedSockets.contains(socket)) {
                         return;
                     }
 
-                    const QList<QByteArray> lines = m_buffers[socket].split('\n');
+                    const QByteArray &buffer = m_buffers[socket];
+                    const qsizetype headerEnd = buffer.indexOf("\r\n\r\n");
+                    if (headerEnd < 0) {
+                        return;
+                    }
+
+                    const QList<QByteArray> lines = buffer.left(headerEnd).split('\n');
                     if (lines.isEmpty()) {
                         socket->disconnectFromHost();
                         return;
                     }
+
+                    qint64 contentLength = 0;
+                    for (const QByteArray &line : lines) {
+                        const QByteArray trimmed = line.trimmed();
+                        constexpr QByteArrayView contentLengthHeader("content-length:");
+                        if (trimmed.size() >= contentLengthHeader.size()
+                            && QByteArrayView(trimmed).first(contentLengthHeader.size())
+                                .compare(contentLengthHeader, Qt::CaseInsensitive) == 0) {
+                            bool ok = false;
+                            contentLength = trimmed.mid(sizeof("content-length:") - 1).trimmed().toLongLong(&ok);
+                            if (!ok || contentLength < 0) {
+                                socket->disconnectFromHost();
+                                return;
+                            }
+                            break;
+                        }
+                    }
+                    if (buffer.size() < headerEnd + 4 + contentLength) {
+                        return;
+                    }
+                    m_processedSockets.insert(socket);
 
                     const QList<QByteArray> firstLine = lines.first().trimmed().split(' ');
                     if (firstLine.size() < 2) {
@@ -103,7 +130,11 @@ public:
                     }
                 });
 
-                connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+                connect(socket, &QTcpSocket::disconnected, this, [this, socket]() {
+                    m_buffers.remove(socket);
+                    m_processedSockets.remove(socket);
+                    socket->deleteLater();
+                });
             }
         });
     }
@@ -142,6 +173,7 @@ public:
 private:
     QTcpServer m_server;
     QHash<QTcpSocket *, QByteArray> m_buffers;
+    QSet<QTcpSocket *> m_processedSockets;
     QHash<QString, Response> m_routes;
     QHash<QString, QList<Response>> m_routeSequences;
     QHash<QString, int> m_hitCount;

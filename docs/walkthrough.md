@@ -1,21 +1,26 @@
-## Walkthrough Status
+# Documentation map
 
-This file now acts as a lightweight bridge between the older sprint notes and the current docs set.
+## For users
 
-## Current Source of Truth
+- [User guide](user-guide/README.md)
+- [Installation](user-guide/installation.md)
+- [First setup](user-guide/getting-started.md)
+- [Understanding the data](user-guide/understanding-data.md)
+- [Provider setup](user-guide/providers.md)
+- [Subscription tools](user-guide/subscriptions.md)
+- [History and integrations](user-guide/history-and-integrations.md)
+- [Troubleshooting](user-guide/troubleshooting.md)
+- [Privacy and security](user-guide/privacy-and-security.md)
 
-- [README.md](../README.md) — product overview, install paths, and canonical screenshot references
-- [ROADMAP.md](../ROADMAP.md) — release sequencing and current stabilization scope
-- [docs/demo/fedora-kde-vm.md](demo/fedora-kde-vm.md) — live-test and screenshot environment workflow
-- [docs/store/submission-checklist.md](store/submission-checklist.md) — GitHub/KDE Store publication handoff pack
-- [assets/screenshots/README.md](../assets/screenshots/README.md) — screenshot quality rules and shot inventory
+## For contributors
 
-## Historical Note
+- [Contributing](../CONTRIBUTING.md)
+- [Runtime and data architecture](architecture/reliability-core.md)
+- [Provider capabilities](provider-capabilities.md)
+- [Demo and screenshot environment](demo/fedora-kde-vm.md)
+- [Screenshot playbook](../assets/screenshots/README.md)
+- [Store submission checklist](store/submission-checklist.md)
 
-Earlier sprint notes referenced repo-local file URLs and old version milestones. Those details have been retired so this document does not drift away from the current repository layout.
+## Historical material
 
-## Why This File Still Exists
-
-- keeps older links from going completely dark
-- points contributors to the current documentation map
-- avoids duplicating roadmap, release, and screenshot instructions in multiple places
+Release checklists, completed plans, and design notes remain in the repository as implementation evidence. They describe the version named in their filename and are not current setup instructions.

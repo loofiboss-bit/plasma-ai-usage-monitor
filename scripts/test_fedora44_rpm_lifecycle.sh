@@ -11,8 +11,16 @@ v12_rpm="$(realpath "$1")"
 v13_rpm="$(realpath "$2")"
 [[ -f "$v12_rpm" && -f "$v13_rpm" ]] || { echo "Both RPM paths must exist" >&2; exit 1; }
 
-expected_v12="12.0.3-1.fc44"
-expected_v13="$(<"$(dirname "$0")/../VERSION")-1.fc44"
+expected_v12="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$v12_rpm")"
+expected_v13="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$v13_rpm")"
+[[ "$expected_v12" == 12.0.3-* ]] || {
+  echo "Expected a v12.0.3 RPM, got $expected_v12" >&2
+  exit 1
+}
+[[ "$expected_v13" == "$(<"$(dirname "$0")/../VERSION")-"* ]] || {
+  echo "Expected a v$(<"$(dirname "$0")/../VERSION") RPM, got $expected_v13" >&2
+  exit 1
+}
 image="${FEDORA_CONTAINER_IMAGE:-fedora:44}"
 
 run_lifecycle() {

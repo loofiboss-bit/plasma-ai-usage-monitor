@@ -1,12 +1,17 @@
 # Perplexity API setup
 
-The launch profile is capability-limited and does not require a key for public model discovery. Choose an Agent API model returned by discovery or pin a custom model ID. Sonar remains available only as a compatibility choice where the account supports it.
+Enable Perplexity in **Settings → Providers**. The current model discovery route is public, so scheduled connectivity checks do not require a key.
+
+Choose a shipped model for display or manual testing. A custom base URL should normally remain empty.
 
 ## Scheduled traffic
 
-The adapter sends one public, read-only `GET /v1/models` request. It reports connectivity and model availability only. Request usage and cost exist only for real requests made by the user; the widget never generates a background inference request to manufacture those values.
+The widget reads the public model list. A successful response proves that the endpoint is available. It does not prove account access, usage, billing, or remaining quota.
 
-## Provider card
+Any explicit inference test is separate from the background refresh and requires suitable credentials. It may consume quota or money.
 
-The canonical v13 overview includes Perplexity's public discovery-only state and
-explicit unavailable metrics: [provider overview screenshot](../../assets/screenshots/main-window.png).
+## Common failures
+
+- **Network or TLS error:** the public endpoint could not be reached.
+- **404:** a custom base URL points to an incompatible service.
+- **Connected with unknown usage:** expected for the current monitoring level.
