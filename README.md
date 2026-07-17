@@ -24,7 +24,7 @@ A native KDE Plasma 6 plasmoid that monitors AI API token usage, rate limits, an
 
 > **Current release:** `v13.0.0 Provider Intelligence` makes scheduled provider monitoring read-only by default, preserves unavailable metrics as unknown, and drives provider capabilities from Catalog v5. The supported Fedora route remains the COPR package.
 
-Release validation is credential-free and deterministic. Maintainers do not need provider API keys or live vendor accounts to publish a verified release; users add their own keys only for providers they choose to enable at runtime.
+Release validation is credential-free and deterministic, and verified `main` commits publish directly to stable without required beta, RC, or timed soak stages. Maintainers do not need provider API keys or live vendor accounts to publish a verified release; users add their own keys only for providers they choose to enable at runtime.
 
 ## Quick Links
 
@@ -255,21 +255,20 @@ just fedora44-check
 bash scripts/package_source_tarball.sh --version x.y.z --output-dir .
 bash scripts/package_plasmoid.sh --output-dir .
 git commit -am "chore: release vx.y.z"
-git tag vx.y.z
-git push origin main --tags
-gh release create vx.y.z ./plasma-ai-usage-monitor-x.y.z.tar.gz ./com.github.loofi.aiusagemonitor.plasmoid --title "vx.y.z"
+git tag -a vx.y.z -m "vx.y.z"
+git push origin main
+git push origin vx.y.z
 ```
 
 The Fedora COPR package uses SCM source from `main`, but webhook rebuild is kept
-disabled during the v13 prerelease sequence. GitHub tag creation can trigger a
-COPR build with prerelease contents even when the package profile names `main`;
-that would expose an alpha, beta, or RC as a stable-looking RPM version.
+disabled so only an explicit, verified stable publication updates the RPM.
+The GitHub release workflow accepts only the canonical stable version tag.
 
 Typical maintainer release flow:
 
 1. merge the release commit to `main`
-2. verify that `main`, the soaked RC commit, and the intended stable tag resolve to the same SHA
-3. create and push the `vx.y.z` stable tag
+2. verify all deterministic gates without provider credentials, prereleases, or timed soak
+3. create an annotated `vx.y.z` stable tag on the exact `origin/main` SHA and push it directly
 4. publish the GitHub release from the tag workflow artifacts
 5. trigger COPR explicitly and verify the resulting source commit, RPM NEVRA, and repository metadata
 
@@ -287,7 +286,7 @@ To verify the current package wiring:
 curl -s 'https://copr.fedorainfracloud.org/api_3/package/?ownername=loofitheboss&projectname=plasma-ai-usage-monitor&packagename=plasma-ai-usage-monitor&with_latest_build=true'
 ```
 
-During prerelease development the response should show:
+The response should show:
 
 - `"source_type": "scm"`
 - `"committish": "main"`
