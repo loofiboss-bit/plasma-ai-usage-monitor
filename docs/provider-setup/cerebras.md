@@ -1,14 +1,15 @@
 # Cerebras Inference setup
 
-1. Store a Cerebras API key in KWallet.
-2. Select a shipped model or a model returned by live discovery.
-3. Dedicated-endpoint metrics require a separately scoped future profile; the general key is not silently granted broader access.
+Create an API key in the Cerebras Cloud console. In **Settings → Providers**, enable Cerebras, store the key, and keep the default base URL for the first refresh.
 
 ## Scheduled traffic
 
-The general adapter sends one authenticated, read-only `GET /v1/models` request. It proves connectivity and model availability only. Rate-limit headers are recorded from legitimate responses when a complete limit/remaining pair exists; no background completion is generated.
+The widget performs read-only model discovery. A successful response confirms that the key and endpoint work. Cerebras does not supply account usage or spend through this request, so those values remain unknown.
 
-## Provider card
+The shipped fallback model list is available when discovery fails, but a fallback model is not evidence of connectivity.
 
-The canonical v13 provider screenshot demonstrates that Cerebras connectivity is
-reported without inventing usage or cost: [provider intelligence screenshot](../../assets/screenshots/provider-intelligence.png).
+## Common failures
+
+- **401 or 403:** the key is invalid or lacks access.
+- **404:** the custom base URL is wrong.
+- **Connected with unknown spend:** expected for the current monitoring level.

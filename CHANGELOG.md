@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+- Replace the monolithic README with a task-based documentation entry point.
+- Add end-user guides for installation, first setup, data semantics, providers, subscription tools, history, integrations, troubleshooting, privacy, and security.
+- Refresh the contributor, architecture, security, roadmap, provider setup, and distribution documents for the v13 runtime.
+- Add version-controlled sources for the GitHub wiki.
+
 ## [13.0.0] — 2026-07-17
 
 ### Added
@@ -753,7 +759,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v11.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v13.0.0...HEAD
+[13.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.3...v13.0.0
+[12.0.3]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.2...v12.0.3
+[12.0.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.1...v12.0.2
+[12.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.0...v12.0.1
+[12.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v11.0.0...v12.0.0
 [11.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v10.0.1...v11.0.0
 [10.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v10.0.0...v10.0.1
 [10.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v9.0.0...v10.0.0
@@ -773,8 +784,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [5.1.3]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.1.2...v5.1.3
 [5.1.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.1.1...v5.1.2
 [5.1.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.1.0...v5.1.1
-[5.1.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v5.0.0...v5.1.0
-[5.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v3.9.0...v5.0.0
+[5.1.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v4.3.0...v5.1.0
 [3.9.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v3.8.1...v3.9.0
 [3.8.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v3.8.0...v3.8.1
 [3.8.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v3.7.0...v3.8.0
@@ -790,15 +800,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [3.1.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.9.0...v3.0.0
 [2.9.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.8.2...v2.9.0
-[2.8.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.8.1...v2.8.2
-[2.8.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.8.0...v2.8.1
+[2.8.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.8.0...v2.8.2
 [2.8.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.7.0...v2.8.0
-[2.7.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.6.0...v2.7.0
-[2.6.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.5.0...v2.6.0
-[2.5.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.4.0...v2.5.0
-[2.4.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.3.0...v2.4.0
+[2.7.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.3.0...v2.7.0
 [2.3.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v2.0.0...v2.1.0
-[2.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v1.0.0...v2.0.0
-[1.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v1.0.0
+[2.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v2.0.0

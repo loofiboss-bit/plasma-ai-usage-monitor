@@ -1,13 +1,14 @@
-# ADR: Flatpak is not a v12 distribution route
+# Flatpak distribution decision
 
-Status: accepted for v12.0.0
+Flatpak is not a supported distribution route.
 
-The former manifest copied only the Plasma QML package and did not build or ship
-the architecture-specific C++ QML plugin. Publishing it would therefore promise
-an installation route that cannot produce the complete widget.
+AI Usage Monitor needs a native Qt QML plugin in the host Plasma import path. The former frontend-only scaffold could package QML but could not provide or exercise that plugin, so it produced an incomplete installation.
 
-v12 removes that manifest from release validation and publication claims. A
-future Flatpak experiment must first document a viable Plasma host-integration
-model, build the plugin, install both payloads, and pass the same full plasmoid
-smoke and upgrade tests as COPR/source packages. Until then, COPR is the primary
-Fedora route and source builds are the supported portable route.
+Supported complete installations are:
+
+- Fedora COPR, which ships the Plasma package and compiled plugin
+- source build, which installs the same two parts
+
+The KDE Store plasmoid is also frontend-only and must be paired with a matching compiled plugin.
+
+Do not restore a Flatpak manifest until it can install the native module in a path Plasma loads, pass the QML import smoke test, and exercise the widget in a real Plasma session.
