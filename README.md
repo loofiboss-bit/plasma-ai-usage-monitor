@@ -275,7 +275,7 @@ Typical maintainer release flow:
 If you need to force or backfill a COPR build after the GitHub tag and release exist:
 
 ```bash
-just copr-submit vx.y.z PROJECT=loofitheboss/plasma-ai-usage-monitor
+just copr-submit vx.y.z loofitheboss/plasma-ai-usage-monitor
 ```
 
 The helper expects `copr-cli` plus a valid `~/.config/copr` API token file.
