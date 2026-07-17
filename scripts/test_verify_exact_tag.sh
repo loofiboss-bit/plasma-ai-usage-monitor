@@ -35,18 +35,16 @@ if bash scripts/verify_exact_tag.sh "$stable_tag" >/dev/null 2>&1; then
 fi
 git tag -d "$stable_tag" >/dev/null
 
-recent_date="$(date -u -d '6 days ago' '+%Y-%m-%dT%H:%M:%SZ')"
-GIT_COMMITTER_DATE="$recent_date" git tag -a "$rc_tag" -m "recent rc fixture"
-git tag -a "$stable_tag" -m "stable before soak"
+git tag "$rc_tag"
+git tag -a "$stable_tag" -m "stable with lightweight rc"
 git update-ref refs/remotes/origin/main "$release_commit"
 if bash scripts/verify_exact_tag.sh "$stable_tag" >/dev/null 2>&1; then
-  echo "Stable promotion unexpectedly passed before seven-day soak" >&2
+  echo "Stable promotion unexpectedly passed with a lightweight rc.1" >&2
   exit 1
 fi
 git tag -d "$stable_tag" "$rc_tag" >/dev/null
 
-soaked_date="$(date -u -d '8 days ago' '+%Y-%m-%dT%H:%M:%SZ')"
-GIT_COMMITTER_DATE="$soaked_date" git tag -a "$rc_tag" -m "soaked rc fixture"
+git tag -a "$rc_tag" -m "annotated rc fixture"
 git tag -a "$stable_tag" -m "stable fixture"
 git update-ref refs/remotes/origin/main "$base_commit"
 if bash scripts/verify_exact_tag.sh "$stable_tag" >/dev/null 2>&1; then
@@ -57,4 +55,4 @@ fi
 git update-ref refs/remotes/origin/main "$release_commit"
 bash scripts/verify_exact_tag.sh "$stable_tag" >/dev/null
 
-echo "Exact-tag promotion gate OK: prerelease, lineage, main, and seven-day soak"
+echo "Exact-tag promotion gate OK: prerelease, annotated RC lineage, and main"

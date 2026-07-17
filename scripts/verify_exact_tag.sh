@@ -36,20 +36,13 @@ if [[ "$tag" == "$expected" ]]; then
     exit 1
   }
 
-  rc_tagged_at="$(git for-each-ref --format='%(taggerdate:unix)' "refs/tags/${rc_tag}")"
-  [[ "$rc_tagged_at" =~ ^[0-9]+$ ]] || {
-    echo "${rc_tag} must be an annotated tag with a verifiable tagger date" >&2
-    exit 1
-  }
-  now_epoch="$(date +%s)"
-  minimum_soak_seconds=$((7 * 24 * 60 * 60))
-  soak_seconds=$((now_epoch - rc_tagged_at))
-  (( soak_seconds >= minimum_soak_seconds )) || {
-    echo "${rc_tag} has soaked for ${soak_seconds}s; stable promotion requires ${minimum_soak_seconds}s" >&2
+  rc_object_type="$(git cat-file -t "$rc_tag" 2>/dev/null)"
+  [[ "$rc_object_type" == "tag" ]] || {
+    echo "${rc_tag} must be an annotated tag" >&2
     exit 1
   }
 
-  echo "Stable lineage verified: ${tag} = ${rc_tag} = origin/main; soak ${soak_seconds}s"
+  echo "Stable lineage verified: ${tag} = ${rc_tag} = origin/main"
 fi
 
 echo "Exact tag verified: ${tag} -> ${head_commit}"

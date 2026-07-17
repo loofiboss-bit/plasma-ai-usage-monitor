@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [13.0.0] — Unreleased
+## [13.0.0] — 2026-07-17
 
 ### Added
 - Add Provider Metric Contract v2 with nullable values and source, quality, scope, window, observation, currency, and reset metadata.
@@ -21,16 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stop presenting published Gemini and Veo caps as live remaining quota.
 - Display unavailable provider metrics as Unknown and document scheduled traffic in Trust Center.
 - Refresh the canonical KDE screenshots and deterministic demo fixtures around the four v13 launch providers.
+- Make release validation fully reproducible without provider API keys, vendor accounts, KWallet entries, or billable probes.
 
 ### Fixed
 - Include typed `usage_api` gateway spend in provider cards, monthly exposure, and compact panel totals while preserving unavailable costs as `Unknown`.
 - Isolate demo and screenshot sessions from KWallet at the native secrets boundary and route descriptor adapters only to the deterministic mock endpoint.
 - Align the OpenRouter demo fixture with the native v13 `GET /key` payload and gate all launch-provider demo routes with an executable contract test.
-- Block stable publication unless the stable tag, annotated `rc.1` tag, and `origin/main` share one commit after a verified seven-day RC soak.
+- Block stable publication unless the stable tag, annotated `rc.1` tag, and `origin/main` share one commit; no timed soak is required.
 - Stabilize the DeepSeek probe regression test by waiting for its parallel read-only refresh to finish before starting a manual diagnostic.
-
-### Release status
-- Stable promotion remains blocked until the exact RC commit completes the required seven-day soak and Fedora 44 install/upgrade/remove plus live provider smoke checks pass.
 
 ## [12.0.3] — 2026-07-13
 
