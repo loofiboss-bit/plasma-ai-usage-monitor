@@ -70,6 +70,7 @@ Item {
     property alias usageDb: usageDatabase
     property alias refreshScheduler: refreshScheduler
     property alias sourceReadiness: sourceReadinessModel
+    property alias secretsManager: secrets
 
     property alias claudeCode: claudeCodeMonitor
     property alias codexCli: codexCliMonitor
@@ -143,6 +144,46 @@ Item {
         for (var j = 0; j < localTools.length; j++) {
             sourceReadinessModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
         }
+    }
+
+    function setGuidedSourceEnabled(stableId, enabled) {
+        var provider = providerRegistry.providerByConfigKey(stableId);
+        if (provider) {
+            plasmoid.configuration[provider.enabledKey] = enabled;
+            sourceReadinessModel.setSourceEnabled(stableId, enabled);
+            return true;
+        }
+
+        var localConfigKeys = {
+            "claude-code": "claudeCodeEnabled",
+            "codex-cli": "codexEnabled",
+            "github-copilot": "copilotEnabled",
+            "cursor": "cursorEnabled",
+            "windsurf": "windsurfEnabled",
+            "jetbrains-ai": "jetbrainsAiEnabled"
+        };
+        var key = localConfigKeys[stableId];
+        if (!key) return false;
+        plasmoid.configuration[key] = enabled;
+        return true;
+    }
+
+    function setGuidedSourceEndpoint(stableId, endpoint) {
+        var provider = providerRegistry.providerByConfigKey(stableId);
+        if (!provider || !provider.customBaseUrlKey) return endpoint.length === 0;
+        plasmoid.configuration[provider.customBaseUrlKey] = endpoint.trim();
+        if (provider.backend) provider.backend.customBaseUrl = endpoint.trim();
+        return true;
+    }
+
+    function hasGuidedSourceEndpoint(stableId) {
+        var provider = providerRegistry.providerByConfigKey(stableId);
+        return !!(provider && provider.backend && provider.backend.customBaseUrl
+                  && provider.backend.customBaseUrl.trim().length > 0);
+    }
+
+    function verifyGuidedSource(stableId) {
+        return sourceReadinessModel.verifySource(stableId);
     }
 
     function refreshAll() {

@@ -69,6 +69,7 @@ private Q_SLOTS:
     void staleDataHasSpecificAction();
     void credentialPropertyChangesInvalidateSource();
     void localToolStateTransitions();
+    void explicitVerificationUsesSafeReadOnlyContract();
     void candidateRankingIsDeterministic();
 };
 
@@ -245,6 +246,29 @@ void SourceReadinessModelTest::localToolStateTransitions()
              QStringLiteral("check_network"));
     tool.complete(true);
     QCOMPARE(state(), QStringLiteral("reporting_actual"));
+}
+
+void SourceReadinessModelTest::explicitVerificationUsesSafeReadOnlyContract()
+{
+    SourceReadinessModel model;
+    ReadinessTool tool;
+    model.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+    tool.setEnabled(true);
+    tool.setDetected(true);
+
+    QVERIFY(model.verifySource(QStringLiteral("codex-cli")));
+    const QVariantMap source = model.source(QStringLiteral("codex-cli"));
+    QCOMPARE(source.value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("reporting_estimate"));
+    QVERIFY(source.value(QStringLiteral("lastVerified")).toDateTime().isValid());
+
+    SourceReadinessModel disabledModel;
+    ReadinessProvider disabledProvider;
+    disabledModel.registerProviderBackend(QStringLiteral("openai"), &disabledProvider);
+    QVERIFY(!disabledModel.verifySource(QStringLiteral("openai")));
+
+    const QVariantMap liteLlm = disabledModel.source(QStringLiteral("litellm"));
+    QVERIFY(liteLlm.value(QStringLiteral("customEndpointRequired")).toBool());
 }
 
 void SourceReadinessModelTest::candidateRankingIsDeterministic()

@@ -171,6 +171,17 @@ add_test(
             -platform offscreen
 )
 
+add_executable(test_guidedsetup_qml
+    test_guidedsetup_qml.cpp
+)
+target_link_libraries(test_guidedsetup_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME guidedsetup_qml
+    COMMAND test_guidedsetup_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/onboarding"
+            -platform offscreen
+)
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp

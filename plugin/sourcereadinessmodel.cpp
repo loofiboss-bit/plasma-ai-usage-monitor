@@ -102,6 +102,7 @@ QVariant SourceReadinessModel::data(const QModelIndex &index, int role) const
     case EnabledRole: return snapshot.enabled;
     case LastVerifiedRole: return snapshot.lastVerified;
     case SafeVerificationRole: return entry.safeVerification;
+    case CustomEndpointRequiredRole: return entry.customEndpointRequired;
     case ReadinessStateRole: return QVariant::fromValue(snapshot.state);
     case ReadinessStateKeyRole: return stateKey(snapshot.state);
     case NextActionRole: return QVariant::fromValue(snapshot.nextAction);
@@ -126,6 +127,7 @@ QHash<int, QByteArray> SourceReadinessModel::roleNames() const
         {EnabledRole, "enabled"},
         {LastVerifiedRole, "lastVerified"},
         {SafeVerificationRole, "safeVerification"},
+        {CustomEndpointRequiredRole, "customEndpointRequired"},
         {ReadinessStateRole, "readinessState"},
         {ReadinessStateKeyRole, "readinessStateKey"},
         {NextActionRole, "nextAction"},
@@ -193,6 +195,38 @@ void SourceReadinessModel::setSourceEnabled(const QString &stableId, bool enable
     updateRow(row);
 }
 
+bool SourceReadinessModel::verifySource(const QString &stableId)
+{
+    const int row = rowForId(stableId);
+    if (row < 0) return false;
+
+    SourceEntry &entry = m_sources[row];
+    if (!entry.safeVerification || !entry.enabled) return false;
+
+    if (entry.kind == SourceKind::Provider) {
+        auto *backend = qobject_cast<ProviderBackend *>(entry.backend.data());
+        if (!backend || !providerCredentialsConfigured(entry, backend)
+            || (entry.customEndpointRequired && backend->customBaseUrl().isEmpty())) {
+            updateRow(row);
+            return false;
+        }
+        return backend->requestRefresh(ProviderBackend::RefreshReason::Manual);
+    }
+
+    auto *tool = qobject_cast<SubscriptionToolBackend *>(entry.backend.data());
+    if (!tool) return false;
+    entry.localDiagnosticCode.clear();
+    tool->checkToolInstalled();
+    if (!tool->isInstalled()) {
+        updateRow(row);
+        return false;
+    }
+    tool->detectActivity();
+    entry.localVerification = QDateTime::currentDateTimeUtc();
+    updateRow(row);
+    return true;
+}
+
 int SourceReadinessModel::rowForId(const QString &stableId) const
 {
     for (int row = 0; row < m_sources.size(); ++row) {
@@ -211,7 +245,8 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
         result.installed = tool && tool->isInstalled();
         result.enabled = tool ? tool->isEnabled() : entry.enabled;
         result.setupRank = result.installed ? 0 : 300;
-        if (tool) result.lastVerified = latest(tool->lastSyncTime(), tool->lastActivity());
+        if (tool) result.lastVerified = latest(latest(tool->lastSyncTime(), tool->lastActivity()),
+                                               entry.localVerification);
 
         if (!result.enabled) {
             result.state = SourceState::Disabled;
@@ -244,7 +279,8 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
         } else if (tool && tool->lastSyncTime().isValid()) {
             result.state = SourceState::ReportingActual;
             result.nextAction = NextAction::None;
-        } else if (tool && (tool->lastActivity().isValid() || tool->usageCount() > 0)) {
+        } else if (tool && (tool->lastActivity().isValid() || tool->usageCount() > 0
+                            || entry.localVerification.isValid())) {
             result.state = SourceState::ReportingEstimate;
             result.nextAction = NextAction::None;
         } else {

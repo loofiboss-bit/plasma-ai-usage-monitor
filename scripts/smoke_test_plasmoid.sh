@@ -7,6 +7,7 @@ PREFIX="$(mktemp -d)"
 LOG_DIR="${ROOT_DIR}/.demo-output/plasmoid-smoke"
 FIXTURE_DIR="${ROOT_DIR}/scripts/fixtures/bootstrap"
 mkdir -p "$LOG_DIR"
+mkdir -p "$PREFIX/config" "$PREFIX/cache"
 trap 'rm -rf "$PREFIX"' EXIT
 
 cmake --install "$BUILD_DIR" --prefix "$PREFIX"
@@ -20,12 +21,16 @@ run_smoke() {
   local label="$1"
   local view="$2"
   local import_path="$3"
+  local scale_factor="${4:-1}"
   local log_file="${LOG_DIR}/${label}.log"
 
   set +e
   XDG_DATA_HOME="${PREFIX}/share" \
   XDG_DATA_DIRS="${PREFIX}/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \
+  XDG_CONFIG_HOME="${PREFIX}/config" \
+  XDG_CACHE_HOME="${PREFIX}/cache" \
   QML2_IMPORT_PATH="$import_path" \
+  QT_SCALE_FACTOR="$scale_factor" \
   PLASMA_AI_MONITOR_DEMO=1 \
   PLASMA_AI_MONITOR_SMOKE_VIEW="$view" \
   timeout 6s plasmawindowed com.github.loofi.aiusagemonitor >"$log_file" 2>&1
@@ -47,8 +52,12 @@ for view in overview history analyst; do
   run_smoke "$view" "$view" "$qml_path"
 done
 
+for scale_factor in 1 1.25 1.5 2; do
+  run_smoke "onboarding-scale-${scale_factor//./-}" "onboarding" "$qml_path" "$scale_factor"
+done
+
 run_smoke "plugin-unavailable" "overview" "${FIXTURE_DIR}/plugin-unavailable:${qml_path}"
 run_smoke "plugin-older" "overview" "${FIXTURE_DIR}/plugin-older:${qml_path}"
 run_smoke "plugin-newer" "overview" "${FIXTURE_DIR}/plugin-newer:${qml_path}"
 
-echo "Full plasmoid smoke passed: Overview, History, Analyst, plugin unavailable, plugin older, plugin newer"
+echo "Full plasmoid smoke passed: main views, Guided First Success at 100/125/150/200%, and plugin recovery modes"

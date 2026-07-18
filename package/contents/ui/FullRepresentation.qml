@@ -16,6 +16,7 @@ PlasmaExtras.Representation {
                             : AppInfo.smokeView === "analyst" ? 2 : 0
 
     readonly property bool hasConfiguration: {
+        if (AppInfo.smokeView === "onboarding") return false;
         var providers = root.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
             if (providers[i].enabled) return true;
@@ -26,6 +27,10 @@ PlasmaExtras.Representation {
         }
         return AppInfo.demoMode;
     }
+    readonly property bool showGuidedSetup: plasmoid.configuration.setupWizardInProgress
+        || (!fullRoot.hasConfiguration
+            && !plasmoid.configuration.setupWizardCompleted
+            && !plasmoid.configuration.setupWizardDismissed)
 
     header: PlasmaExtras.PlasmoidHeading {
         RowLayout {
@@ -50,6 +55,12 @@ PlasmaExtras.Representation {
             }
             PlasmaComponents.ToolButton {
                 activeFocusOnTab: true
+                icon.name: "tools-wizard"
+                onClicked: onboardingFlow.startAgain()
+                PlasmaComponents.ToolTip { text: i18n("Run guided setup again") }
+            }
+            PlasmaComponents.ToolButton {
+                activeFocusOnTab: true
                 icon.name: "configure"
                 onClicked: plasmoid.internalAction("configure").trigger()
                 PlasmaComponents.ToolTip { text: i18n("Configure") }
@@ -65,7 +76,7 @@ PlasmaExtras.Representation {
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
             spacing: Kirigami.Units.smallSpacing
-            visible: fullRoot.hasConfiguration
+            visible: !fullRoot.showGuidedSetup
 
             Repeater {
                 model: [i18n("Overview"), i18n("History"), i18n("Analyst")]
@@ -81,19 +92,42 @@ PlasmaExtras.Representation {
             }
         }
 
-        Kirigami.Separator { Layout.fillWidth: true; visible: fullRoot.hasConfiguration }
+        Kirigami.Separator { Layout.fillWidth: true; visible: !fullRoot.showGuidedSetup }
 
         Onboarding.OnboardingFlow {
+            id: onboardingFlow
             Layout.fillWidth: true
             Layout.fillHeight: true
-            visible: !fullRoot.hasConfiguration
+            visible: fullRoot.showGuidedSetup
+            runtime: root
+            readinessModel: root.sourceReadiness
+            secretStore: root.secretsManager
+            configuration: plasmoid.configuration
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.margins: Kirigami.Units.smallSpacing
+            visible: !fullRoot.showGuidedSetup
+                  && !fullRoot.hasConfiguration
+                  && plasmoid.configuration.setupWizardDismissed
+
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                wrapMode: Text.WordWrap
+                text: i18n("Setup was skipped. No source has been verified yet.")
+            }
+            PlasmaComponents.Button {
+                text: i18n("Resume setup")
+                onClicked: onboardingFlow.resume()
+            }
         }
 
         Loader {
             id: destinationLoader
             Layout.fillWidth: true
             Layout.fillHeight: true
-            active: fullRoot.hasConfiguration
+            active: !fullRoot.showGuidedSetup
             asynchronous: fullRoot.destination !== 0
             source: fullRoot.destination === 0 ? "views/OverviewView.qml"
                   : fullRoot.destination === 1 ? "views/HistoryView.qml"
@@ -103,7 +137,7 @@ PlasmaExtras.Representation {
         PlasmaComponents.Label {
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
-            visible: fullRoot.hasConfiguration
+            visible: !fullRoot.showGuidedSetup
             horizontalAlignment: Text.AlignHCenter
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             opacity: 0.6

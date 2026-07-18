@@ -61,6 +61,7 @@ public:
         EnabledRole,
         LastVerifiedRole,
         SafeVerificationRole,
+        CustomEndpointRequiredRole,
         ReadinessStateRole,
         ReadinessStateKeyRole,
         NextActionRole,
@@ -82,6 +83,7 @@ public:
     Q_INVOKABLE void registerProviderBackend(const QString &stableId, QObject *backend);
     Q_INVOKABLE void registerLocalTool(const QString &stableId, QObject *backend);
     Q_INVOKABLE void setSourceEnabled(const QString &stableId, bool enabled);
+    Q_INVOKABLE bool verifySource(const QString &stableId);
 
 Q_SIGNALS:
     void sourceChanged(const QString &stableId);
@@ -100,6 +102,7 @@ private:
         bool customEndpointRequired = false;
         bool enabled = false;
         QString localDiagnosticCode;
+        QDateTime localVerification;
         QPointer<QObject> backend;
     };
 

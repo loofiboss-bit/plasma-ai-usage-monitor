@@ -23,7 +23,8 @@ KCM.SimpleKCM {
     CopilotMonitor { id: copilotDetector; Component.onCompleted: checkToolInstalled() }
 
     readonly property var portableConfigKeys: [
-        "refreshInterval", "compactDisplayMode", "setupWizardCompleted", "setupWizardDismissed", "advancedSettingsMode",
+        "refreshInterval", "compactDisplayMode", "setupWizardCompleted", "setupWizardDismissed",
+        "setupWizardInProgress", "setupWizardStep", "setupWizardGoal", "setupWizardSourceId", "advancedSettingsMode",
         "dashboardMode", "showOnlyProblems", "openaiRefreshInterval", "anthropicRefreshInterval", "googleRefreshInterval",
         "mistralRefreshInterval", "deepseekRefreshInterval", "groqRefreshInterval", "xaiRefreshInterval", "ollamaRefreshInterval",
         "openrouterRefreshInterval", "togetherRefreshInterval", "cohereRefreshInterval", "googleveoRefreshInterval", "azureRefreshInterval",

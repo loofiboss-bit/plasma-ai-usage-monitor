@@ -22,6 +22,22 @@
             <default>false</default>
             <label>Whether the first-run setup wizard was dismissed</label>
         </entry>
+        <entry name="setupWizardInProgress" type="Bool">
+            <default>false</default>
+            <label>Whether guided setup should resume in the widget</label>
+        </entry>
+        <entry name="setupWizardStep" type="Int">
+            <default>0</default>
+            <label>Last resumable guided setup step</label>
+        </entry>
+        <entry name="setupWizardGoal" type="String">
+            <default></default>
+            <label>Selected guided setup goal</label>
+        </entry>
+        <entry name="setupWizardSourceId" type="String">
+            <default></default>
+            <label>Selected guided setup source identifier</label>
+        </entry>
         <entry name="advancedSettingsMode" type="Bool">
             <default>false</default>
             <label>Whether advanced settings mode is enabled in config</label>
