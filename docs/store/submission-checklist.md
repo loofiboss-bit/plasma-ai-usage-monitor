@@ -1,4 +1,4 @@
-## GitHub and KDE Store Submission Checklist
+## v14 GitHub and KDE Store submission checklist
 
 Use this checklist after the stabilization work and screenshot refresh are complete.
 
@@ -18,43 +18,44 @@ Prepare the same assets for the manual GitHub release pack:
 - `com.github.loofi.aiusagemonitor.plasmoid`
 - updated README screenshots
 - changelog section for the release
-- release notes that call out the source-backed catalogs, quota-window UI, and public-provider packaging model
+- release notes that explain Guided first success, truthful result labels, and native-plugin recovery
 - confirm the COPR package still points at GitHub SCM on `main`; keep auto-rebuild disabled so prerelease tags cannot publish stable RPMs
 
 ## KDE Store listing notes
 
 Use wording that highlights the value of the widget without overpromising the current packaging model.
 
-### Suggested short description
+### Short description
 
-Native KDE Plasma widget for monitoring AI provider usage, costs, limits, and subscription-tool quotas from the panel.
+Verify provider-reported AI usage and spend, local coding-tool activity, and read-only connection checks from the Plasma panel.
 
 ### Suggested longer positioning points
 
-- multi-provider AI cost and rate-limit visibility without a proxy or SaaS gateway
-- local history, export, compare analytics, budgets, and notifications
-- subscription-tool tracking for Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI
-- privacy-conscious local workflow with secure key storage in KWallet
+- Guided first success configures and verifies one useful source
+- reporting data, balances, local estimates, and connectivity stay distinct
+- local history, Analyst, exports, budgets, and notifications
+- local-first storage with secrets in KWallet and no hosted backend
+- the Store archive is the frontend; install the matching native plugin first from COPR or a source build
 
 ## Screenshot inventory
 
-Keep the existing filenames stable so README and AppStream links continue to work:
+Upload the eight reviewed Breeze Dark captures from the same isolated demo-user session:
 
+- `assets/screenshots/guided-first-success.png`
+- `assets/screenshots/verified-success.png`
 - `assets/screenshots/main-window.png`
-- `assets/screenshots/panel-view.png`
+- `assets/screenshots/provider-intelligence.png`
 - `assets/screenshots/settings-view.png`
-
-If the store allows additional images, also prepare:
-
-- history/compare analytics view
-- subscriptions and budget/limits view
+- `assets/screenshots/history-view.png`
+- `assets/screenshots/analyst-view.png`
+- `assets/screenshots/panel-view.png`
 
 ## Manual publication sequence
 
 1. verify the target version in `ROADMAP.md`, `package/metadata.json`, `com.github.loofi.aiusagemonitor.metainfo.xml`, `CMakeLists.txt`, and `plasma-ai-usage-monitor.spec`
 2. push the release commit and tag
 3. create the GitHub release manually and attach the tarball and `.plasmoid` artifacts
-4. submit the exact stable tag explicitly with `just copr-submit v13.0.0 loofitheboss/plasma-ai-usage-monitor`
+4. submit the exact stable tag explicitly with `just copr-submit v14.0.0 loofitheboss/plasma-ai-usage-monitor`
 5. confirm the COPR build succeeded before announcing the release
 6. update the README-linked screenshots if filenames stayed stable but content changed
 7. upload the refreshed screenshot set and listing copy to KDE Store
