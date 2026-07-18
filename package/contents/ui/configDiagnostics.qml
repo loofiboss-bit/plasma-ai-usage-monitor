@@ -25,6 +25,8 @@ KCM.SimpleKCM {
     readonly property var portableConfigKeys: [
         "refreshInterval", "compactDisplayMode", "setupWizardCompleted", "setupWizardDismissed",
         "setupWizardInProgress", "setupWizardStep", "setupWizardGoal", "setupWizardSourceId", "advancedSettingsMode",
+        "settingsVerificationRequestId", "settingsVerificationCompletedRequestId", "settingsVerificationSourceId",
+        "settingsVerificationState", "settingsVerificationMessage", "settingsVerificationTimestamp",
         "dashboardMode", "showOnlyProblems", "openaiRefreshInterval", "anthropicRefreshInterval", "googleRefreshInterval",
         "mistralRefreshInterval", "deepseekRefreshInterval", "groqRefreshInterval", "xaiRefreshInterval", "ollamaRefreshInterval",
         "openrouterRefreshInterval", "togetherRefreshInterval", "cohereRefreshInterval", "googleveoRefreshInterval", "azureRefreshInterval",

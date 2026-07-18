@@ -4,6 +4,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
+import ".." as AppUi
 
 ColumnLayout {
     required property var controller
@@ -35,21 +36,17 @@ ColumnLayout {
     Repeater {
         model: controller.requiredCredentialSlots
 
-        ColumnLayout {
+        AppUi.CredentialEditor {
             required property string modelData
+            Kirigami.FormData.label: controller.credentialLabel(modelData) + ":"
             Layout.fillWidth: true
-            spacing: Kirigami.Units.smallSpacing
-
-            PlasmaComponents.Label { text: controller.credentialLabel(modelData) }
-            PlasmaComponents.TextField {
-                Layout.fillWidth: true
-                echoMode: TextInput.Password
-                placeholderText: controller.hasStoredCredential(modelData)
-                               ? i18n("Saved in KDE Wallet — leave blank to keep")
-                               : i18n("Required")
-                Accessible.name: controller.credentialLabel(modelData)
-                onTextChanged: controller.setCredential(modelData, text)
-            }
+            label: controller.credentialLabel(modelData)
+            editable: controller.secretStore && controller.secretStore.walletOpen
+            showClearAction: false
+            placeholderText: controller.hasStoredCredential(modelData)
+                ? i18n("Saved in KDE Wallet — leave blank to keep")
+                : i18n("Required")
+            onCredentialEdited: function(value) { controller.setCredential(modelData, value); }
         }
     }
 

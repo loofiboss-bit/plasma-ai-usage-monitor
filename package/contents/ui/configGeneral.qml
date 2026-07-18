@@ -12,6 +12,7 @@ KCM.SimpleKCM {
 
     property alias cfg_refreshInterval: refreshSlider.value
     property string cfg_compactDisplayMode: plasmoid.configuration.compactDisplayMode
+    property bool cfg_advancedSettingsMode: plasmoid.configuration.advancedSettingsMode
 
     property int cfg_openaiRefreshInterval: plasmoid.configuration.openaiRefreshInterval
     property int cfg_anthropicRefreshInterval: plasmoid.configuration.anthropicRefreshInterval
@@ -33,6 +34,9 @@ KCM.SimpleKCM {
     property int cfg_perplexityRefreshInterval: plasmoid.configuration.perplexityRefreshInterval
 
     property ProviderCatalog providerCatalog: ProviderCatalog {}
+    readonly property var enabledProviders: providerCatalog.providers.filter(function(provider) {
+        return !!plasmoid.configuration[provider.enabledConfigKey];
+    })
 
     function refreshValue(refreshConfigKey) {
         return generalPage["cfg_" + refreshConfigKey];
@@ -52,66 +56,6 @@ KCM.SimpleKCM {
 
     Kirigami.FormLayout {
         anchors.fill: parent
-
-        Kirigami.Separator {
-            Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Presets")
-        }
-        
-        RowLayout {
-            Kirigami.FormData.label: i18n("Apply preset:")
-            spacing: Kirigami.Units.smallSpacing
-
-            QQC2.ComboBox {
-                id: presetCombo
-                Layout.fillWidth: true
-                model: [
-                    { text: i18n("Select a preset..."), value: "none" },
-                    { text: i18n("Solo Developer"), value: "solo" },
-                    { text: i18n("Multi-Provider"), value: "multi" },
-                    { text: i18n("Local-First"), value: "local" },
-                    { text: i18n("Budget Watch"), value: "budget" }
-                ]
-                textRole: "text"
-                valueRole: "value"
-            }
-
-            QQC2.Button {
-                text: i18n("Apply")
-                enabled: presetCombo.currentIndex > 0
-                onClicked: {
-                    var preset = presetCombo.currentValue;
-                    if (preset === "solo") {
-                        generalPage.cfg_compactDisplayMode = "cost";
-                        plasmoid.configuration.advancedSettingsMode = false;
-                        plasmoid.configuration.alertsEnabled = true;
-                    } else if (preset === "multi") {
-                        generalPage.cfg_compactDisplayMode = "count";
-                        plasmoid.configuration.advancedSettingsMode = true;
-                    } else if (preset === "local") {
-                        generalPage.cfg_compactDisplayMode = "count";
-                        plasmoid.configuration.openaiEnabled = false;
-                        plasmoid.configuration.anthropicEnabled = false;
-                        plasmoid.configuration.googleEnabled = false;
-                        plasmoid.configuration.ollamaEnabled = true;
-                    } else if (preset === "budget") {
-                        generalPage.cfg_compactDisplayMode = "dailycost";
-                        plasmoid.configuration.budgetWarningPercent = 75;
-                        plasmoid.configuration.notifyOnBudgetWarning = true;
-                    }
-                    presetCombo.currentIndex = 0;
-                }
-            }
-        }
-        
-        QQC2.Label {
-            text: i18n("Applying a preset adjusts UI modes and alert defaults. It will not overwrite your API keys.")
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            color: Kirigami.Theme.disabledTextColor
-            wrapMode: Text.WordWrap
-            Layout.fillWidth: true
-        }
-
 
         ColumnLayout {
             Kirigami.FormData.label: i18n("Default refresh interval:")
@@ -177,13 +121,25 @@ KCM.SimpleKCM {
             }
         }
 
+        QQC2.Switch {
+            Kirigami.FormData.label: i18n("Advanced settings:")
+            checked: generalPage.cfg_advancedSettingsMode
+            text: i18n("Show per-source scheduling controls")
+            Accessible.name: i18n("Show advanced scheduling settings")
+            onToggled: generalPage.cfg_advancedSettingsMode = checked
+        }
+
         Kirigami.Separator {
+            visible: generalPage.cfg_advancedSettingsMode
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Per-Provider Refresh Intervals")
+            Kirigami.FormData.label: i18n("Advanced scheduling")
         }
 
         QQC2.Label {
-            text: i18n("Set to 0 to use the default interval above. Otherwise, each provider refreshes on its own schedule.")
+            visible: generalPage.cfg_advancedSettingsMode
+            text: generalPage.enabledProviders.length > 0
+                ? i18n("Only enabled sources are shown. Set an interval to 0 to use the default above.")
+                : i18n("Enable a provider source to configure its individual refresh interval.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -191,7 +147,7 @@ KCM.SimpleKCM {
         }
 
         Repeater {
-            model: providerCatalog.providers
+            model: generalPage.cfg_advancedSettingsMode ? generalPage.enabledProviders : []
 
             ColumnLayout {
                 spacing: 2
@@ -204,6 +160,7 @@ KCM.SimpleKCM {
                     to: 1800
                     stepSize: 60
                     value: generalPage.refreshValue(modelData.refreshConfigKey)
+                    Accessible.name: i18n("Refresh interval for %1", modelData.label)
                     onValueChanged: generalPage.setRefreshValue(modelData.refreshConfigKey, value)
                 }
 

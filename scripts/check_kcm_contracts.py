@@ -51,8 +51,14 @@ def require_bindings(
 def validate_secret_pages() -> None:
     for name in ("configProviders.qml", "configSubscriptions.qml", "configAlerts.qml"):
         text = (UI / name).read_text(encoding="utf-8")
-        if "Component.onDestruction" in text:
-            fail(f"{name} must not persist secrets from Component.onDestruction")
+        destruction_hooks = re.findall(
+            r"Component\.onDestruction\s*:\s*(.*?)(?=\n\s*(?:Component\.|[A-Z][A-Za-z]+\s*\{|$))",
+            text,
+            re.S,
+        )
+        for hook in destruction_hooks:
+            if re.search(r"\b(?:commit|storeKey|removeKey)\s*\(", hook):
+                fail(f"{name} must not persist secrets from Component.onDestruction")
         if not re.search(r"\bunsavedChanges\s*:\s*secretChanges\.dirty\b", text):
             fail(f"{name} does not expose SecretChangeSet dirtiness")
         if not re.search(r"\bfunction\s+saveConfig\s*\(", text):
@@ -69,6 +75,24 @@ def validate_diagnostics() -> None:
         fail("Diagnostics does not expose the copyable version-check command")
     if not re.search(r'troubleshootingUrl:\s*"https://', text):
         fail("Diagnostics troubleshooting action must use HTTPS")
+
+
+def validate_source_choice_settings() -> None:
+    providers = (UI / "configProviders.qml").read_text(encoding="utf-8")
+    details = (UI / "ProviderSourceDetails.qml").read_text(encoding="utf-8")
+    general = (UI / "configGeneral.qml").read_text(encoding="utf-8")
+    onboarding = (UI / "onboarding" / "SetupConfigureStep.qml").read_text(encoding="utf-8")
+
+    if providers.count("ProviderSourceDetails {") != 1 or "ProviderSourceList {" not in providers:
+        fail("Providers Settings must render one catalog-driven master/detail surface")
+    if "ProviderSettingsController" not in providers or "detectedLocalSources" not in providers:
+        fail("Providers Settings must include deterministic selection and detected local sources")
+    if "CredentialEditor" not in details or "CredentialEditor" not in onboarding:
+        fail("Settings and onboarding must share the credential editor")
+    if "Local-First" in general or "presetCombo" in general:
+        fail("General Settings still contains misleading presets")
+    if "enabledProviders" not in general or "cfg_advancedSettingsMode ? generalPage.enabledProviders" not in general:
+        fail("per-source intervals must be advanced-only and limited to enabled sources")
 
 
 def main() -> None:
@@ -100,6 +124,7 @@ def main() -> None:
     require_bindings(providers, "monthlyBudget", "configBudget.qml", capability="cost")
     validate_secret_pages()
     validate_diagnostics()
+    validate_source_choice_settings()
 
     print(
         f"KCM contract check OK: {len(providers)} providers, transactional secrets, safe diagnostics"

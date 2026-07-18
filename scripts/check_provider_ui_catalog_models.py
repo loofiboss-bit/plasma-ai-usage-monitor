@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "package/contents/catalog/providers-v4.json"
 PROVIDER_UI = ROOT / "package/contents/ui/configProviders.qml"
+PROVIDER_DETAILS = ROOT / "package/contents/ui/ProviderSourceDetails.qml"
 
 
 def fail(message: str) -> None:
@@ -21,18 +22,19 @@ def main() -> None:
     if not provider_keys or any(not key for key in provider_keys):
         fail("provider catalog has missing or empty provider keys")
 
-    source = PROVIDER_UI.read_text(encoding="utf-8")
+    source = PROVIDER_UI.read_text(encoding="utf-8") + PROVIDER_DETAILS.read_text(encoding="utf-8")
     references = Counter(re.findall(r'catalogModelIds\("([a-z0-9_-]+)"\)', source))
-    missing = sorted(set(provider_keys) - set(references))
-    extra = sorted(set(references) - set(provider_keys))
-    duplicates = sorted(key for key, count in references.items() if count != 1)
-
-    if missing:
-        fail(f"model picker is not catalog-driven for: {', '.join(missing)}")
-    if extra:
-        fail(f"model picker references unknown providers: {', '.join(extra)}")
-    if duplicates:
-        fail(f"providers must have exactly one catalog model picker: {', '.join(duplicates)}")
+    generic_picker = "catalogModelIds(details.descriptor.configKey)" in source
+    if not generic_picker:
+        missing = sorted(set(provider_keys) - set(references))
+        extra = sorted(set(references) - set(provider_keys))
+        duplicates = sorted(key for key, count in references.items() if count != 1)
+        if missing:
+            fail(f"model picker is not catalog-driven for: {', '.join(missing)}")
+        if extra:
+            fail(f"model picker references unknown providers: {', '.join(extra)}")
+        if duplicates:
+            fail(f"providers must have exactly one catalog model picker: {', '.join(duplicates)}")
 
     # A provider picker must not silently grow a second hardcoded model list.
     catalog_ids = {

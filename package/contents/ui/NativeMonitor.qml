@@ -7,6 +7,8 @@ import "Utils.js" as Utils
 Item {
     id: root
     property string modelMigrationNotice: ""
+    property int pendingSettingsVerificationId: 0
+    property string pendingSettingsVerificationSourceId: ""
     readonly property string pluginVersion: AppInfo.version
     readonly property bool pluginVersionMismatch: {
         var required = plasmoid.metaData?.version || "";
@@ -184,6 +186,51 @@ Item {
 
     function verifyGuidedSource(stableId) {
         return sourceReadinessModel.verifySource(stableId);
+    }
+
+    function settingsVerificationMessage(source) {
+        var state = source.readinessStateKey || "failed";
+        if (state === "reporting_actual")
+            return i18n("Verification succeeded and returned supported usage or spend data.");
+        if (state === "reporting_estimate")
+            return i18n("Verification succeeded and returned estimated or local activity data.");
+        if (state === "connected_connectivity_only")
+            return i18n("Verification succeeded. This source confirms connectivity only.");
+        if (state === "degraded")
+            return source.nextActionText || i18n("Verification completed with degraded data.");
+        return source.nextActionText || i18n("Verification failed. Review the source configuration and retry.");
+    }
+
+    function finishSettingsVerification(source) {
+        if (!source || source.stableId !== pendingSettingsVerificationSourceId) return;
+        var state = source.readinessStateKey || "failed";
+        if (state === "verifying" || state === "ready_to_verify") return;
+        plasmoid.configuration.settingsVerificationState = state;
+        plasmoid.configuration.settingsVerificationMessage = root.settingsVerificationMessage(source);
+        plasmoid.configuration.settingsVerificationTimestamp = new Date().toISOString();
+        plasmoid.configuration.settingsVerificationCompletedRequestId = pendingSettingsVerificationId;
+        pendingSettingsVerificationId = 0;
+        pendingSettingsVerificationSourceId = "";
+    }
+
+    function processSettingsVerificationRequest() {
+        var requestId = Number(plasmoid.configuration.settingsVerificationRequestId || 0);
+        var completedId = Number(plasmoid.configuration.settingsVerificationCompletedRequestId || 0);
+        var sourceId = plasmoid.configuration.settingsVerificationSourceId || "";
+        if (requestId <= completedId || !sourceId) return;
+
+        pendingSettingsVerificationId = requestId;
+        pendingSettingsVerificationSourceId = sourceId;
+        plasmoid.configuration.settingsVerificationState = "verifying";
+        plasmoid.configuration.settingsVerificationMessage = i18n("Running the safe read-only scheduled check…");
+        plasmoid.configuration.settingsVerificationTimestamp = "";
+
+        Qt.callLater(function() {
+            runtimeCoordinator.loadProviderApiKey(
+                sourceId, refreshScheduler.refreshCredentialChanged, false);
+            var started = sourceReadinessModel.verifySource(sourceId);
+            if (!started) root.finishSettingsVerification(sourceReadinessModel.source(sourceId));
+        });
     }
 
     function refreshAll() {
@@ -383,6 +430,11 @@ Item {
 
     SourceReadinessModel {
         id: sourceReadinessModel
+
+        onSourceChanged: function(stableId) {
+            if (stableId === root.pendingSettingsVerificationSourceId)
+                root.finishSettingsVerification(sourceReadinessModel.source(stableId));
+        }
     }
 
     BrowserSyncService {
@@ -490,6 +542,7 @@ Item {
         function onCerebrasEnabledChanged() { root.syncReadinessEnabled("cerebras"); }
         function onFireworksEnabledChanged() { root.syncReadinessEnabled("fireworks"); }
         function onPerplexityEnabledChanged() { root.syncReadinessEnabled("perplexity"); }
+        function onSettingsVerificationRequestIdChanged() { root.processSettingsVerificationRequest(); }
 
         function onClaudeCodePlanIdChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
         function onClaudeCodePlanChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
@@ -616,6 +669,7 @@ Item {
 
     Component.onCompleted: {
         root.configureSourceReadiness();
+        root.processSettingsVerificationRequest();
         var saved = plasmoid.configuration.deepseekModel || "";
         var effective = ProviderPricingCatalog.effectiveModelId("deepseek", saved);
         if (saved && effective !== saved) {

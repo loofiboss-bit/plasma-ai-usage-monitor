@@ -38,6 +38,7 @@ QtObject {
                 supportsBudget: (entry.capabilities || []).indexOf("cost") >= 0,
                 enabledConfigKey: config.enabled,
                 modelConfigKey: config.model,
+                customBaseUrlConfigKey: (config.key || entry.stableId) + "CustomBaseUrl",
                 refreshConfigKey: config.refreshInterval,
                 notificationsConfigKey: config.notifications,
                 dailyBudgetConfigKey: config.dailyBudget,

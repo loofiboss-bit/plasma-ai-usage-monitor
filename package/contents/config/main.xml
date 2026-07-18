@@ -42,6 +42,30 @@
             <default>false</default>
             <label>Whether advanced settings mode is enabled in config</label>
         </entry>
+        <entry name="settingsVerificationRequestId" type="Int">
+            <default>0</default>
+            <label>Monotonic request identifier for provider verification from Settings</label>
+        </entry>
+        <entry name="settingsVerificationCompletedRequestId" type="Int">
+            <default>0</default>
+            <label>Last Settings verification request completed by the runtime</label>
+        </entry>
+        <entry name="settingsVerificationSourceId" type="String">
+            <default></default>
+            <label>Provider source selected for Settings verification</label>
+        </entry>
+        <entry name="settingsVerificationState" type="String">
+            <default></default>
+            <label>Typed readiness state returned by Settings verification</label>
+        </entry>
+        <entry name="settingsVerificationMessage" type="String">
+            <default></default>
+            <label>Redacted Settings verification result</label>
+        </entry>
+        <entry name="settingsVerificationTimestamp" type="String">
+            <default></default>
+            <label>UTC timestamp for the last Settings verification result</label>
+        </entry>
         <entry name="dashboardMode" type="String">
             <default>operator</default>
             <label>Popup mode: simple, operator, or analyst</label>
