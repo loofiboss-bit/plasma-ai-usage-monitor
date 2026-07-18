@@ -222,6 +222,17 @@ target_include_directories(test_providermanager PRIVATE ${CMAKE_SOURCE_DIR}/plug
 target_link_libraries(test_providermanager PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
 add_test(NAME providermanager COMMAND test_providermanager)
 
+add_executable(test_sourcereadinessmodel
+    test_sourcereadinessmodel.cpp
+    ${TEST_CATALOG_SRC}
+    ${CMAKE_SOURCE_DIR}/plugin/providerbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/subscriptiontoolbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/sourcereadinessmodel.cpp
+)
+target_include_directories(test_sourcereadinessmodel PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_sourcereadinessmodel PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
+add_test(NAME sourcereadinessmodel COMMAND test_sourcereadinessmodel)
+
 add_executable(test_descriptorprovider_contract
     test_descriptorprovider_contract.cpp
     ${TEST_CATALOG_SRC}

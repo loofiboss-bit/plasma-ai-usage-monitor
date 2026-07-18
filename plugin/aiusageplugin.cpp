@@ -5,6 +5,7 @@
 #include "secretsmanager.h"
 #include "providerbackend.h"
 #include "providermanager.h"
+#include "sourcereadinessmodel.h"
 #include "refreshschedulermodel.h"
 #include "openaiprovider.h"
 #include "azureopenaiprovider.h"
@@ -58,6 +59,7 @@ void AiUsagePlugin::registerTypes(const char *uri)
     qmlRegisterType<SecretsManager>(uri, 1, 0, "SecretsManager");
     qmlRegisterType<RefreshSchedulerModel>(uri, 1, 0, "RefreshSchedulerModel");
     qmlRegisterType<ProviderManager>(uri, 1, 0, "ProviderManager");
+    qmlRegisterType<SourceReadinessModel>(uri, 1, 0, "SourceReadinessModel");
     qmlRegisterType<OpenAIProvider>(uri, 1, 0, "OpenAIProvider");
     qmlRegisterType<AzureOpenAIProvider>(uri, 1, 0, "AzureOpenAIProvider");
     qmlRegisterType<AnthropicProvider>(uri, 1, 0, "AnthropicProvider");

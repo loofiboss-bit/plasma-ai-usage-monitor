@@ -69,6 +69,7 @@ Item {
     property alias bedrock: bedrockBackend
     property alias usageDb: usageDatabase
     property alias refreshScheduler: refreshScheduler
+    property alias sourceReadiness: sourceReadinessModel
 
     property alias claudeCode: claudeCodeMonitor
     property alias codexCli: codexCliMonitor
@@ -116,6 +117,31 @@ Item {
 
         if (monitor.hasSecondaryLimit) {
             monitor.secondaryUsageLimit = monitor.defaultSecondaryLimitForPlan(resolvedPlan);
+        }
+    }
+
+    function syncReadinessEnabled(stableId) {
+        var provider = providerRegistry.providerByConfigKey(stableId);
+        sourceReadinessModel.setSourceEnabled(stableId, provider ? provider.enabled : false);
+    }
+
+    function configureSourceReadiness() {
+        var providers = providerRegistry.allProviders || [];
+        for (var i = 0; i < providers.length; i++) {
+            sourceReadinessModel.registerProviderBackend(providers[i].configKey, providers[i].backend);
+            sourceReadinessModel.setSourceEnabled(providers[i].configKey, providers[i].enabled);
+        }
+
+        var localTools = [
+            { stableId: "claude-code", backend: claudeCodeMonitor },
+            { stableId: "codex-cli", backend: codexCliMonitor },
+            { stableId: "github-copilot", backend: copilotMonitor },
+            { stableId: "cursor", backend: cursorMonitor },
+            { stableId: "windsurf", backend: windsurfMonitor },
+            { stableId: "jetbrains-ai", backend: jetbrainsAiMonitor }
+        ];
+        for (var j = 0; j < localTools.length; j++) {
+            sourceReadinessModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
         }
     }
 
@@ -314,6 +340,10 @@ Item {
         }
     }
 
+    SourceReadinessModel {
+        id: sourceReadinessModel
+    }
+
     BrowserSyncService {
         id: browserSyncService
         browserType: plasmoid.configuration.browserSyncBrowser
@@ -400,6 +430,25 @@ Item {
 
     Connections {
         target: plasmoid.configuration
+
+        function onOpenaiEnabledChanged() { root.syncReadinessEnabled("openai"); }
+        function onAnthropicEnabledChanged() { root.syncReadinessEnabled("anthropic"); }
+        function onGoogleEnabledChanged() { root.syncReadinessEnabled("google"); }
+        function onMistralEnabledChanged() { root.syncReadinessEnabled("mistral"); }
+        function onDeepseekEnabledChanged() { root.syncReadinessEnabled("deepseek"); }
+        function onGroqEnabledChanged() { root.syncReadinessEnabled("groq"); }
+        function onXaiEnabledChanged() { root.syncReadinessEnabled("xai"); }
+        function onOllamaEnabledChanged() { root.syncReadinessEnabled("ollama"); }
+        function onOpenrouterEnabledChanged() { root.syncReadinessEnabled("openrouter"); }
+        function onTogetherEnabledChanged() { root.syncReadinessEnabled("together"); }
+        function onCohereEnabledChanged() { root.syncReadinessEnabled("cohere"); }
+        function onGoogleveoEnabledChanged() { root.syncReadinessEnabled("googleveo"); }
+        function onAzureEnabledChanged() { root.syncReadinessEnabled("azure"); }
+        function onBedrockEnabledChanged() { root.syncReadinessEnabled("bedrock"); }
+        function onLitellmEnabledChanged() { root.syncReadinessEnabled("litellm"); }
+        function onCerebrasEnabledChanged() { root.syncReadinessEnabled("cerebras"); }
+        function onFireworksEnabledChanged() { root.syncReadinessEnabled("fireworks"); }
+        function onPerplexityEnabledChanged() { root.syncReadinessEnabled("perplexity"); }
 
         function onClaudeCodePlanIdChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
         function onClaudeCodePlanChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
@@ -525,6 +574,7 @@ Item {
     property Component fullRepresentationComponent: FullRepresentation {}
 
     Component.onCompleted: {
+        root.configureSourceReadiness();
         var saved = plasmoid.configuration.deepseekModel || "";
         var effective = ProviderPricingCatalog.effectiveModelId("deepseek", saved);
         if (saved && effective !== saved) {

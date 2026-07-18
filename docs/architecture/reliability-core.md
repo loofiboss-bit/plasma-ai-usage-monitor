@@ -1,6 +1,6 @@
 # Runtime and data architecture
 
-This document describes the current v13 contracts. It is the technical boundary for provider adapters, history, secrets, and distribution.
+This document describes the current runtime contracts. It is the technical boundary for provider adapters, source readiness, history, secrets, and distribution.
 
 ## Refresh lifecycle
 
@@ -21,6 +21,28 @@ Unavailable values stay null. Connectivity cannot create zero usage. Published l
 ProviderManager and Catalog v5 descriptors own stable identity, adapter type, authentication slots, endpoints, models, capability claims, source expectations, and safe refresh policy. QML reads this catalog instead of maintaining a second provider truth table.
 
 The generated [provider capability matrix](../provider-capabilities.md) is checked against the shipped catalog during validation.
+
+## Source readiness contract
+
+`SourceReadinessModel` is the single QML-facing readiness authority for all 18
+providers and 6 local tools. Each source appears once with a stable ID, source
+kind, monitoring level, required credential slots, local installation state,
+enabled state, last verified time, safe verification capability, and a redacted
+next action.
+
+The stable states are `disabled`, `unavailable_locally`,
+`needs_configuration`, `ready_to_verify`, `verifying`,
+`connected_connectivity_only`, `reporting_estimate`, `reporting_actual`,
+`degraded`, and `failed`. Connectivity never implies useful usage or spend.
+Actual and estimated metrics are classified from Metric Contract v2 sources.
+Provider failures are classified from `ProviderErrorKind`; localized error text
+is not parsed. Local sync diagnostics use stable diagnostic codes and never
+expose cookies or credential values.
+
+Setup ranking is deterministic: detected local tools come first, then actual
+usage/spend and gateway sources, then balance/connectivity sources, and finally
+local tools that are not detected. Onboarding, Settings, Overview, and
+Diagnostics must consume this model instead of independently deriving status.
 
 ## SQLite schema v4
 

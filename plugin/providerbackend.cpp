@@ -775,9 +775,9 @@ QString ProviderBackend::effectiveBaseUrl(const char *defaultUrl) const
 QDateTime ProviderBackend::lastRefreshed() const { return m_lastRefreshed; }
 int ProviderBackend::refreshCount() const { return m_refreshCount; }
 
-void ProviderBackend::updateLastRefreshed()
+void ProviderBackend::updateLastRefreshed(const QDateTime &when)
 {
-    m_lastRefreshed = QDateTime::currentDateTime();
+    m_lastRefreshed = when.isValid() ? when : QDateTime::currentDateTime();
     m_lastSuccess = m_lastRefreshed.toUTC();
     m_refreshCount++;
     Q_EMIT stateChanged();

@@ -420,7 +420,7 @@ protected:
     void setCapabilityStatus(const QString &capability,
                              const QString &status,
                              const QString &diagnostic = QString());
-    void updateLastRefreshed();
+    void updateLastRefreshed(const QDateTime &when = QDateTime());
 
     // Budget checking after cost update
     void checkBudgetLimits();

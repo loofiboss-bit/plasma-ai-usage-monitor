@@ -8,6 +8,7 @@ set(aiusagemonitor_SRCS
     providerbackend.cpp
     descriptorprovider.cpp
     providermanager.cpp
+    sourcereadinessmodel.cpp
     refreshschedulermodel.cpp
     openaicompatibleprovider.cpp
     openaiprovider.cpp
@@ -51,6 +52,7 @@ set(aiusagemonitor_HDRS
     providerbackend.h
     descriptorprovider.h
     providermanager.h
+    sourcereadinessmodel.h
     refreshschedulermodel.h
     openaicompatibleprovider.h
     openaiprovider.h
