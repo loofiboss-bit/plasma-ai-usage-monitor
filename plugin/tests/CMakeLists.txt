@@ -193,6 +193,17 @@ add_test(
             -platform offscreen
 )
 
+add_executable(test_overview_qml
+    test_overview_qml.cpp
+)
+target_link_libraries(test_overview_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME overview_qml
+    COMMAND test_overview_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/overview"
+            -platform offscreen
+)
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp

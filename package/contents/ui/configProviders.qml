@@ -133,6 +133,7 @@ KCM.SimpleKCM {
         id: settingsController
         descriptors: providersPage.settingsSources
         configuration: providersPage
+        selectedSourceId: plasmoid.configuration.settingsVerificationSourceId || ""
         onConfigurationEdited: providersPage.configurationChanged()
     }
 

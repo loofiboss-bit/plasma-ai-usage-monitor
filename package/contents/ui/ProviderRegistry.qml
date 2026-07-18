@@ -105,6 +105,7 @@ QtObject {
 
     readonly property var allSubscriptionTools: [
         {
+            stableId: "claude-code",
             name: "Claude Code",
             monitor: claudeCodeMonitor,
             enabled: demoMode || configuration.claudeCodeEnabled,
@@ -112,6 +113,7 @@ QtObject {
             iconSource: Qt.resolvedUrl("../icons/tools/claude-code.svg")
         },
         {
+            stableId: "codex-cli",
             name: "Codex CLI",
             monitor: codexCliMonitor,
             enabled: demoMode || configuration.codexEnabled,
@@ -119,6 +121,7 @@ QtObject {
             iconSource: Qt.resolvedUrl("../icons/tools/codex-cli.svg")
         },
         {
+            stableId: "github-copilot",
             name: "GitHub Copilot",
             monitor: copilotMonitor,
             enabled: demoMode || configuration.copilotEnabled,
@@ -126,6 +129,7 @@ QtObject {
             iconSource: Qt.resolvedUrl("../icons/tools/copilot.svg")
         },
         {
+            stableId: "cursor",
             name: "Cursor",
             monitor: cursorMonitor,
             enabled: configuration.cursorEnabled,
@@ -133,6 +137,7 @@ QtObject {
             iconSource: Qt.resolvedUrl("../icons/tools/cursor.svg")
         },
         {
+            stableId: "windsurf",
             name: "Windsurf",
             monitor: windsurfMonitor,
             enabled: configuration.windsurfEnabled,
@@ -140,6 +145,7 @@ QtObject {
             iconSource: Qt.resolvedUrl("../icons/tools/windsurf.svg")
         },
         {
+            stableId: "jetbrains-ai",
             name: "JetBrains AI",
             monitor: jetbrainsAiMonitor,
             enabled: configuration.jetbrainsAiEnabled,

@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
@@ -11,6 +13,9 @@ ColumnLayout {
     property var providers: []
     property var subscriptionTools: []
     readonly property bool narrowCard: costCard.width < Kirigami.Units.gridUnit * 14
+    readonly property bool hasMeaningfulData: hasCompatibleProviderCost() || subscriptionFees > 0
+
+    visible: hasMeaningfulData
 
     readonly property double subscriptionFees: {
         var total = 0;
@@ -27,6 +32,7 @@ ColumnLayout {
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
             if (!provider.enabled || !provider.backend || !provider.backend.connected) continue;
+            if (!Utils.hasCompatibleCostData(provider.backend)) continue;
             var source = provider.backend.costSource || "unknown";
             var isEstimate = source === "estimated_from_usage" || provider.backend.isEstimatedCost;
             if (estimated !== isEstimate) continue;
@@ -34,6 +40,15 @@ ColumnLayout {
             Utils.addCurrencyTotal(totals, provider.backend.currency, provider.backend[field] || 0);
         }
         return totals;
+    }
+
+    function hasCompatibleProviderCost() {
+        for (var i = 0; i < providers.length; i++) {
+            var provider = providers[i];
+            if (!provider.enabled || !provider.backend || !provider.backend.connected) continue;
+            if (Utils.hasCompatibleCostData(provider.backend)) return true;
+        }
+        return false;
     }
 
     function mergedTotals() {
@@ -44,7 +59,7 @@ ColumnLayout {
         for (var i = 0; i < currencies.length; i++) Utils.addCurrencyTotal(totals, currencies[i], actual[currencies[i]]);
         currencies = Object.keys(estimates);
         for (var j = 0; j < currencies.length; j++) Utils.addCurrencyTotal(totals, currencies[j], estimates[currencies[j]]);
-        Utils.addCurrencyTotal(totals, "USD", subscriptionFees);
+        if (subscriptionFees > 0) Utils.addCurrencyTotal(totals, "USD", subscriptionFees);
         return totals;
     }
 
@@ -69,6 +84,7 @@ ColumnLayout {
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
             if (!provider.enabled || !provider.backend || !provider.backend.connected) continue;
+            if (!Utils.hasCompatibleCostData(provider.backend)) continue;
             var source = provider.backend.costSource || "unknown";
             if (source === "estimated_from_usage" || provider.backend.isEstimatedCost) {
                 Utils.addCurrencyTotal(totals, provider.backend.currency,
@@ -187,6 +203,7 @@ ColumnLayout {
                     Layout.fillWidth: true
                     readonly property double providerCost: {
                         if (!modelData.backend) return 0;
+                        if (!Utils.hasCompatibleCostData(modelData.backend)) return 0;
                         var source = modelData.backend.costSource || "unknown";
                         if (costCard.costViewMode === 3) return 0;
                         if (costCard.costViewMode === 4) {

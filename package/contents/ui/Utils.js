@@ -7,31 +7,82 @@
  * @param {number} n - The number to format
  * @returns {string} Formatted string (e.g., "1.2M", "5.3K", "42")
  */
-function formatNumber(n) {
-    if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
-    if (n >= 1000) return (n / 1000).toFixed(1) + "K";
-    return Math.round(n).toString();
+function formatNumber(n, locale) {
+    var value = Number(n);
+    if (!Number.isFinite(value)) return "";
+    var activeLocale = locale || Qt.locale();
+    var magnitude = Math.abs(value);
+    if (magnitude >= 1000000)
+        return (value / 1000000).toLocaleString(activeLocale, "f", 1) + "\u202fM";
+    if (magnitude >= 1000)
+        return (value / 1000).toLocaleString(activeLocale, "f", 1) + "\u202fK";
+    return Math.round(value).toLocaleString(activeLocale, "f", 0);
 }
 
-function formatMoney(value, currency) {
+function formatMoney(value, currency, locale) {
     var code = (currency || "USD").toUpperCase();
-    return Number(value || 0).toLocaleCurrencyString(Qt.locale(), code);
+    var amount = Number(value);
+    if (!Number.isFinite(amount)) return "";
+    var formatted = amount.toLocaleCurrencyString(locale || Qt.locale(), code);
+    return formatted.replace(/ (?!$)/g, "\u00a0");
 }
 
 function addCurrencyTotal(totals, currency, value) {
     var code = (currency || "USD").toUpperCase();
-    totals[code] = (totals[code] || 0) + Number(value || 0);
+    var amount = Number(value);
+    if (!Number.isFinite(amount)) return;
+    totals[code] = (totals[code] || 0) + amount;
 }
 
 function formatCurrencyTotals(totals) {
     var currencies = Object.keys(totals || {}).sort();
-    if (currencies.length === 0) return formatMoney(0, "USD");
+    if (currencies.length === 0) return "\u2014";
     var parts = [];
     for (var i = 0; i < currencies.length; i++) {
         var currency = currencies[i];
         parts.push(formatMoney(totals[currency], currency));
     }
     return parts.join(" + ");
+}
+
+function providerOutcomeBadgeKeys(usageSource, costSource, monitoringLevel, qualityClass) {
+    var keys = [];
+    function appendUnique(key) {
+        if (key !== "" && keys.indexOf(key) < 0) keys.push(key);
+    }
+
+    if (usageSource === "actual_api" || usageSource === "usage_api") {
+        appendUnique(monitoringLevel === "gateway_aggregate" ? "gateway_usage"
+            : monitoringLevel === "actual_key_usage" ? "key_usage" : "provider_usage");
+    } else if (usageSource === "estimated_from_usage") appendUnique("estimated_usage");
+    else if (usageSource === "self_tracked") appendUnique("self_tracked");
+    else if (usageSource === "browser_sync") appendUnique("browser_sync");
+    else if (["model_discovery_api", "connectivity_read_only", "connectivity_probe"].indexOf(usageSource) >= 0)
+        appendUnique("connectivity_only");
+
+    if (costSource === "billing_api" || costSource === "usage_api" || costSource === "actual_api")
+        appendUnique(monitoringLevel === "gateway_aggregate" ? "gateway_spend" : "provider_spend");
+    else if (costSource === "estimated_from_usage") appendUnique("estimated_cost");
+    else if (costSource === "connectivity_probe") appendUnique("connectivity_only");
+
+    if (keys.length === 0 && qualityClass === "balance") appendUnique("provider_balance");
+    if (keys.length === 0 && qualityClass === "connectivity") appendUnique("connectivity_only");
+    return keys;
+}
+
+function hasCompatibleCostData(backend) {
+    if (!backend) return false;
+    var metrics = backend.metrics || [];
+    var sawCostMetric = false;
+    for (var i = 0; i < metrics.length; i++) {
+        var metric = metrics[i] || {};
+        if (metric.kind !== "cost") continue;
+        sawCostMetric = true;
+        if (metric.available === true && Number.isFinite(Number(metric.value))) return true;
+    }
+    if (sawCostMetric) return false;
+    return ["billing_api", "usage_api", "actual_api", "estimated_from_usage"]
+        .indexOf(backend.costSource || "unknown") >= 0;
 }
 
 /**

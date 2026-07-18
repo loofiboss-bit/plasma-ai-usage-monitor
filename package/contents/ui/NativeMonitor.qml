@@ -188,6 +188,23 @@ Item {
         return sourceReadinessModel.verifySource(stableId);
     }
 
+    function fixOverviewSource(stableId, actionKey, sourceKindKey) {
+        var retryActions = ["verify_source", "refresh_stale_data", "check_network", "retry_later"];
+        if (retryActions.indexOf(actionKey) >= 0) {
+            runtimeCoordinator.loadProviderApiKey(
+                stableId, refreshScheduler.refreshCredentialChanged, false);
+            if (sourceReadinessModel.verifySource(stableId)) return true;
+        }
+
+        plasmoid.configuration.settingsVerificationSourceId = stableId;
+        var configureAction = plasmoid.internalAction("configure");
+        if (configureAction) {
+            configureAction.trigger();
+            return true;
+        }
+        return false;
+    }
+
     function settingsVerificationMessage(source) {
         var state = source.readinessStateKey || "failed";
         if (state === "reporting_actual")

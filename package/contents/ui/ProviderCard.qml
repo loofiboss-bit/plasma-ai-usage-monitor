@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
@@ -15,6 +17,7 @@ ColumnLayout {
     required property string providerIcon
     required property string providerColor
     required property var backend
+    property var readiness: ({})
     property var scheduler: null
     property bool showCost: false
     property bool showUsage: false
@@ -88,12 +91,15 @@ ColumnLayout {
                         text: {
                             if (!card.backend) return i18n("Not Available");
                             if (card.backend.loading) return i18n("Loading...");
-                            if (card.backend.error) return i18n("Error");
-                            if (card.backend.connected) {
-                                let parts = [i18n("Connected")];
-                                if (card.backend.model) parts.push(card.backend.model);
-                                return parts.join(" • ");
-                            }
+                            if (card.readiness.readinessStateKey === "reporting_actual")
+                                return card.readiness.qualityClass === "balance"
+                                    ? i18n("Reporting provider balance") : i18n("Reporting actual data");
+                            if (card.readiness.readinessStateKey === "reporting_estimate")
+                                return i18n("Reporting estimated or local data");
+                            if (card.readiness.readinessStateKey === "connected_connectivity_only")
+                                return i18n("Connectivity verified only");
+                            if (card.backend.error) return i18n("Needs attention");
+                            if (card.backend.connected) return i18n("Connected");
                             return i18n("Disconnected");
                         }
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -106,12 +112,12 @@ ColumnLayout {
                         spacing: Kirigami.Units.smallSpacing
                         visible: card.backend
 
-                        SourceBadge {
-                            text: sourceLabel(card.backend?.costSource ?? "unknown")
-                        }
-
-                        SourceBadge {
-                            text: usageLabel(card.backend?.usageSource ?? "unknown")
+                        Repeater {
+                            model: outcomeBadges()
+                            SourceBadge {
+                                required property string modelData
+                                text: card.badgeLabel(modelData)
+                            }
                         }
 
                         SourceBadge {
@@ -134,6 +140,7 @@ ColumnLayout {
                 // Collapsed Summary
                 RowLayout {
                     visible: card.collapsed && card.showCost && (card.backend?.connected ?? false)
+                             && card.hasAvailableCostData()
                     spacing: Kirigami.Units.smallSpacing
 
                     PlasmaComponents.Label {
@@ -149,6 +156,9 @@ ColumnLayout {
                     display: PlasmaComponents.AbstractButton.IconOnly
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: Kirigami.Units.iconSizes.small
+                    Accessible.name: card.collapsed
+                        ? i18n("Expand %1 details", card.providerName)
+                        : i18n("Collapse %1 details", card.providerName)
                     onClicked: card.collapsed = !card.collapsed
                     PlasmaComponents.ToolTip { text: card.collapsed ? i18n("Expand") : i18n("Collapse") }
                 }
@@ -186,6 +196,7 @@ ColumnLayout {
                             activeFocusOnTab: true
                             icon.name: "view-refresh"
                             display: PlasmaComponents.AbstractButton.IconOnly
+                            Accessible.name: i18n("Retry %1", card.providerName)
                             PlasmaComponents.ToolTip { text: i18n("Retry") }
                             onClicked: if (card.backend) card.backend.requestRefresh(3)
                         }
@@ -202,11 +213,13 @@ ColumnLayout {
             GridLayout {
                 Layout.fillWidth: true
                 visible: !card.collapsed && card.showUsage && (card.backend?.connected ?? false)
+                         && card.hasAvailableUsageMetrics()
                 columns: card.narrowCard ? 1 : 3
                 columnSpacing: Kirigami.Units.largeSpacing
                 rowSpacing: Kirigami.Units.smallSpacing
 
                 ColumnLayout {
+                    visible: card.metricAvailable("input_tokens")
                     spacing: 0
                     PlasmaComponents.Label {
                         text: i18n("Input Tokens")
@@ -220,6 +233,7 @@ ColumnLayout {
                 }
 
                 ColumnLayout {
+                    visible: card.metricAvailable("output_tokens")
                     spacing: 0
                     PlasmaComponents.Label {
                         text: i18n("Output Tokens")
@@ -233,6 +247,7 @@ ColumnLayout {
                 }
 
                 ColumnLayout {
+                    visible: card.metricAvailable("requests")
                     spacing: 0
                     PlasmaComponents.Label {
                         text: i18n("Requests")
@@ -250,6 +265,7 @@ ColumnLayout {
             ColumnLayout {
                 Layout.fillWidth: true
                 visible: !card.collapsed && card.showCost && (card.backend?.connected ?? false)
+                         && (card.hasAvailableCostData() || card.balanceRows().length > 0)
                 spacing: Kirigami.Units.smallSpacing
 
                 PlasmaComponents.Label {
@@ -263,6 +279,7 @@ ColumnLayout {
 
                 RowLayout {
                     Layout.fillWidth: true
+                    visible: card.hasAvailableCostData()
                     PlasmaComponents.Label {
                         text: costHeading()
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -283,29 +300,22 @@ ColumnLayout {
                     }
                 }
 
-                PlasmaComponents.Label {
-                    Layout.fillWidth: true
-                    visible: (card.backend?.costSource ?? "") === "connectivity_probe"
-                    text: i18n("Connection check only — this provider does not expose account usage. Cost is not billing spend.")
-                    font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    color: Kirigami.Theme.disabledTextColor
-                    wrapMode: Text.WordWrap
-                }
-
-                // DeepSeek Balance
-                RowLayout {
-                    Layout.fillWidth: true
-                    visible: card.providerName === "DeepSeek" && (card.backend?.balance ?? 0) > 0
-                    PlasmaComponents.Label {
-                        text: i18n("Balance")
-                        font.pointSize: Kirigami.Theme.smallFont.pointSize
-                        opacity: 0.7
-                    }
-                    Item { Layout.fillWidth: true }
-                    PlasmaComponents.Label {
-                        text: Utils.formatMoney(card.backend?.balance ?? 0, card.backend?.currency || "USD")
-                        font.bold: true
-                        color: (card.backend?.balance ?? 0) < 5 ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.positiveTextColor
+                Repeater {
+                    model: card.balanceRows()
+                    RowLayout {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        PlasmaComponents.Label {
+                            text: i18n("Available balance")
+                            font.pointSize: Kirigami.Theme.smallFont.pointSize
+                            opacity: 0.7
+                        }
+                        Item { Layout.fillWidth: true }
+                        PlasmaComponents.Label {
+                            text: Utils.formatMoney(modelData.value, modelData.currency)
+                            font.bold: true
+                            color: Kirigami.Theme.textColor
+                        }
                     }
                 }
 
@@ -317,7 +327,8 @@ ColumnLayout {
                     ]
                     ColumnLayout {
                         Layout.fillWidth: true
-                        visible: modelData.budget > 0 && !(card.backend?.budgetCurrencyMismatch ?? false)
+                        visible: card.hasAvailableCostData() && modelData.budget > 0
+                                 && !(card.backend?.budgetCurrencyMismatch ?? false)
                         spacing: 2
                         RowLayout {
                             Layout.fillWidth: true
@@ -348,6 +359,20 @@ ColumnLayout {
                         }
                     }
                 }
+            }
+
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                visible: !card.collapsed && (card.backend?.connected ?? false)
+                         && !card.hasAvailableUsageMetrics()
+                         && !card.hasAvailableCostData()
+                         && card.balanceRows().length === 0
+                text: card.readiness.readinessStateKey === "connected_connectivity_only"
+                    ? i18n("Connection verified. This source does not expose compatible token, spend, or balance metrics.")
+                    : i18n("No compatible usage or spend metric is available yet. Refresh the source or review its permissions.")
+                color: Kirigami.Theme.disabledTextColor
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                wrapMode: Text.WordWrap
             }
 
             // Rate Limits
@@ -547,17 +572,6 @@ ColumnLayout {
         }
     }
 
-    function sourceLabel(source) {
-        if (source === "billing_api") return i18n("Actual billing");
-        if (source === "usage_api") return i18n("Actual usage");
-        if (source === "actual_api") return i18n("Actual usage");
-        if (source === "estimated_from_usage") return i18n("Estimated");
-        if (source === "connectivity_probe") return i18n("Probe only");
-        if (source === "self_tracked") return i18n("Self-tracked");
-        if (source === "browser_sync") return i18n("Browser sync");
-        return i18n("Unknown");
-    }
-
     function liveRateRows() {
         if (!card.backend || typeof card.backend.metric !== "function") return [];
         var rows = [];
@@ -609,28 +623,75 @@ ColumnLayout {
                     available.join(", "), failed.join(", "));
     }
 
-    function usageLabel(source) {
-        if (source === "actual_api") return i18n("Actual usage");
-        if (source === "usage_api") return i18n("Actual usage");
-        if (source === "model_discovery_api" || source === "connectivity_read_only") return i18n("Connectivity only");
-        if (source === "connectivity_probe") return i18n("Probe only");
-        if (source === "self_tracked") return i18n("Self-tracked");
-        if (source === "browser_sync") return i18n("Browser sync");
-        if (source === "estimated_from_usage") return i18n("Estimated");
-        return i18n("Unknown");
+    function outcomeBadges() {
+        return Utils.providerOutcomeBadgeKeys(
+            card.backend?.usageSource ?? "unknown",
+            card.backend?.costSource ?? "unknown",
+            card.readiness.monitoringLevel || card.modelData?.monitoringLevel || "",
+            card.readiness.qualityClass || "");
+    }
+
+    function badgeLabel(key) {
+        if (key === "gateway_usage") return i18n("Gateway usage");
+        if (key === "key_usage") return i18n("API key usage");
+        if (key === "provider_usage") return i18n("Provider usage");
+        if (key === "gateway_spend") return i18n("Gateway-reported spend");
+        if (key === "provider_spend") return i18n("Provider-reported spend");
+        if (key === "estimated_usage") return i18n("Estimated usage");
+        if (key === "estimated_cost") return i18n("Estimated cost");
+        if (key === "self_tracked") return i18n("Self-tracked");
+        if (key === "browser_sync") return i18n("Browser sync");
+        if (key === "provider_balance") return i18n("Provider balance");
+        return i18n("Connectivity only");
+    }
+
+    function metricRow(kind) {
+        var rows = card.backend?.metrics || [];
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i].kind === kind) return rows[i];
+        }
+        return ({});
+    }
+
+    function metricAvailable(kind) {
+        var row = metricRow(kind);
+        if (row.kind !== undefined) return row.available === true && Number.isFinite(Number(row.value));
+        if ((card.backend?.metrics || []).length > 0) return false;
+        var source = card.backend?.usageSource || "unknown";
+        var compatible = ["actual_api", "usage_api", "estimated_from_usage", "self_tracked", "browser_sync"];
+        return compatible.indexOf(source) >= 0;
+    }
+
+    function hasAvailableUsageMetrics() {
+        return metricAvailable("input_tokens") || metricAvailable("output_tokens")
+            || metricAvailable("requests");
+    }
+
+    function hasAvailableCostData() {
+        return Utils.hasCompatibleCostData(card.backend);
+    }
+
+    function balanceRows() {
+        var metrics = card.backend?.metrics || [];
+        var rows = [];
+        for (var i = 0; i < metrics.length; i++) {
+            var metric = metrics[i];
+            if (metric.kind === "credit_balance" && metric.available === true
+                    && Number.isFinite(Number(metric.value))) {
+                rows.push({ value: Number(metric.value), currency: metric.currency || "USD" });
+            }
+        }
+        return rows;
     }
 
     function metricText(kind, legacyValue) {
-        var rows = card.backend?.metrics || [];
-        for (var i = 0; i < rows.length; i++) {
-            if (rows[i].kind === kind) {
-                return rows[i].available ? formatNumber(rows[i].value) : i18n("Unknown");
-            }
-        }
+        var row = metricRow(kind);
+        if (row.kind !== undefined) return row.available ? formatNumber(row.value) : "";
+        if ((card.backend?.metrics || []).length > 0) return "";
         var source = card.backend?.usageSource || "unknown";
         if (source === "unknown" || source === "connectivity_probe"
                 || source === "model_discovery_api" || source === "connectivity_read_only") {
-            return i18n("Unknown");
+            return "";
         }
         return formatNumber(legacyValue);
     }
@@ -655,18 +716,21 @@ ColumnLayout {
 
     function currentCostAvailable() {
         var metric = currentCostMetric();
-        return metric["available"] === true && Number.isFinite(Number(metric["value"]));
+        if (metric["available"] === true && Number.isFinite(Number(metric["value"]))) return true;
+        return hasAvailableCostData();
     }
 
     function currentCostValue() {
         var metric = currentCostMetric();
-        return currentCostAvailable() ? Number(metric["value"]) : 0;
+        if (metric["available"] === true && Number.isFinite(Number(metric["value"])))
+            return Number(metric["value"]);
+        return hasAvailableCostData() ? Number(card.backend?.cost || 0) : 0;
     }
 
     function currentCostText() {
-        if (!currentCostAvailable()) return i18n("Unknown");
+        if (!currentCostAvailable()) return "";
         var metric = currentCostMetric();
-        return Utils.formatMoney(Number(metric["value"]), metric["currency"] || card.backend?.currency || "USD");
+        return Utils.formatMoney(currentCostValue(), metric["currency"] || card.backend?.currency || "USD");
     }
 
     function currentCatalogModel() {

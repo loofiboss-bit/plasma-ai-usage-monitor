@@ -15,6 +15,7 @@ bool isActualMetricSource(const QString &source)
     static const QSet<QString> actualSources{
         QStringLiteral("billing_api"),
         QStringLiteral("usage_api"),
+        QStringLiteral("actual_api"),
         QStringLiteral("metrics_api"),
         QStringLiteral("browser_sync")
     };
@@ -25,6 +26,7 @@ bool isEstimatedMetricSource(const QString &source)
 {
     static const QSet<QString> estimatedSources{
         QStringLiteral("estimated_pricing"),
+        QStringLiteral("estimated_from_usage"),
         QStringLiteral("local_observation"),
         QStringLiteral("self_tracked")
     };

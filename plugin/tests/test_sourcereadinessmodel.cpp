@@ -25,6 +25,7 @@ public:
     using ProviderBackend::setErrorDetails;
     using ProviderBackend::setLoading;
     using ProviderBackend::setProviderMetric;
+    using ProviderBackend::setUsageSource;
     using ProviderBackend::updateLastRefreshed;
 
 Q_SIGNALS:
@@ -64,6 +65,7 @@ class SourceReadinessModelTest : public QObject
 private Q_SLOTS:
     void catalogContainsEverySourceExactlyOnce();
     void providerStateTransitions();
+    void actualApiAliasReportsActualData();
     void typedErrorsHaveDistinctActions_data();
     void typedErrorsHaveDistinctActions();
     void staleDataHasSpecificAction();
@@ -141,6 +143,21 @@ void SourceReadinessModelTest::providerStateTransitions()
     provider.updateLastRefreshed();
     provider.setErrorDetails(QStringLiteral("offline"), ProviderBackend::ProviderErrorKind::Network);
     QCOMPARE(state(), QStringLiteral("degraded"));
+}
+
+void SourceReadinessModelTest::actualApiAliasReportsActualData()
+{
+    SourceReadinessModel model;
+    ReadinessProvider provider;
+    model.registerProviderBackend(QStringLiteral("openrouter"), &provider);
+    model.setSourceEnabled(QStringLiteral("openrouter"), true);
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setUsageSource(QStringLiteral("actual_api"));
+    provider.setConnected(true);
+
+    QCOMPARE(model.source(QStringLiteral("openrouter"))
+                 .value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("reporting_actual"));
 }
 
 void SourceReadinessModelTest::typedErrorsHaveDistinctActions_data()
