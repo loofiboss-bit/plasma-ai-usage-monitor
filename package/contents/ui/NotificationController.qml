@@ -229,8 +229,21 @@ Item {
             return;
         }
 
-        subscriptionNotification.text = i18n("%1: %2% of usage limit reached",
-                                             toolName, Math.round(percentUsed));
+        var constrainedModels = [];
+        if (toolName === "Google Antigravity") {
+            var tools = registry.allSubscriptionTools || [];
+            for (var i = 0; i < tools.length; i++) {
+                if (tools[i].name !== toolName || !tools[i].monitor) continue;
+                var rows = tools[i].monitor.quotaWindows || [];
+                for (var j = 0; j < rows.length; j++) {
+                    if ((rows[j].percentUsed || 0) >= configuration.warningThreshold)
+                        constrainedModels.push(rows[j].label);
+                }
+            }
+        }
+        subscriptionNotification.text = constrainedModels.length > 0
+            ? i18n("%1: %2% used across %3", toolName, Math.round(percentUsed), constrainedModels.join(", "))
+            : i18n("%1: %2% of usage limit reached", toolName, Math.round(percentUsed));
         subscriptionNotification.urgency = percentUsed >= configuration.criticalThreshold
             ? Notification.CriticalUrgency
             : Notification.NormalUrgency;

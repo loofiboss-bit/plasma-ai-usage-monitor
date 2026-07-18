@@ -74,12 +74,23 @@ ColumnLayout {
         elide: Text.ElideRight
     }
 
+    PlasmaComponents.Label {
+        Layout.fillWidth: true
+        visible: (quotaRow.rowData?.availabilityReason || "").length > 0
+        text: quotaRow.rowData?.availabilityReason || ""
+        font.pointSize: Kirigami.Theme.smallFont.pointSize
+        color: Kirigami.Theme.neutralTextColor
+        wrapMode: Text.Wrap
+    }
+
     function hasProgress() {
         return rowData && rowData.percentUsed !== undefined && rowData.percentUsed !== null;
     }
 
     function valueText() {
         if (!rowData) return i18n("Unknown");
+        if (rowData.availability === "disabled") return i18n("Unavailable");
+        if (rowData.precision === "availability_only") return i18n("Available");
         var unit = rowData.unit || "";
         if (rowData.used !== undefined && rowData.limit !== undefined && rowData.limit > 0) {
             return rowData.used + " / " + rowData.limit;

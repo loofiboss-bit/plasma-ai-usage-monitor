@@ -80,7 +80,7 @@ private Q_SLOTS:
 void SourceReadinessModelTest::catalogContainsEverySourceExactlyOnce()
 {
     SourceReadinessModel model;
-    QCOMPARE(model.rowCount(), 24);
+    QCOMPARE(model.rowCount(), 25);
 
     QSet<QString> ids;
     int providers = 0;
@@ -99,7 +99,7 @@ void SourceReadinessModelTest::catalogContainsEverySourceExactlyOnce()
         QVERIFY(model.data(index, SourceReadinessModel::SafeVerificationRole).toBool());
     }
     QCOMPARE(providers, 18);
-    QCOMPARE(tools, 6);
+    QCOMPARE(tools, 7);
 
     const QVariantMap openAi = model.source(QStringLiteral("openai"));
     QCOMPARE(openAi.value(QStringLiteral("requiredCredentialSlots")).toStringList(),

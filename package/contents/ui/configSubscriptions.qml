@@ -21,6 +21,11 @@ KCM.SimpleKCM {
     property alias cfg_browserSyncInterval: browserSyncIntervalSpin.value
     property string cfg_browserSyncProfile: plasmoid.configuration.browserSyncProfile || ""
 
+    // ── Google Antigravity ──
+    property alias cfg_antigravityEnabled: antigravitySwitch.checked
+    property alias cfg_antigravityNotifications: antigravityNotifySwitch.checked
+    property alias cfg_antigravityRefreshInterval: antigravityRefreshSpin.value
+
     // ── Claude Code ──
     property alias cfg_claudeCodeEnabled: claudeCodeSwitch.checked
     property alias cfg_claudeCodePlan: claudeCodePlanCombo.currentIndex
@@ -183,6 +188,14 @@ KCM.SimpleKCM {
         Component.onCompleted: checkToolInstalled()
     }
 
+    AntigravityMonitor {
+        id: antigravityDetector
+        Component.onCompleted: {
+            checkToolInstalled()
+            if (plasmoid.configuration.antigravityEnabled) refreshQuota()
+        }
+    }
+
     // ── KWallet Integration for Copilot token ──
     SecretsManager {
         id: secrets
@@ -268,14 +281,78 @@ KCM.SimpleKCM {
         QQC2.Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: i18n("Track usage limits for AI coding tools with fixed subscription quotas. "
-                     + "These tools don't expose public APIs for quota checking, so usage is "
-                     + "tracked locally via filesystem monitoring and manual counting.")
+            text: i18n("Track subscription quotas for AI coding tools. Most tools use local activity estimates; "
+                     + "supported authenticated sources such as Antigravity local can report live quota windows.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
         }
 
         // ══════════════════════════════════════════════
+        // ── Google Antigravity ──
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: i18n("Google Antigravity")
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Google Antigravity:")
+            QQC2.Switch {
+                id: antigravitySwitch
+                checked: plasmoid.configuration.antigravityEnabled
+                text: antigravityDetector.installed ? i18n("Installed") : i18n("Not installed")
+            }
+            QQC2.Button {
+                text: antigravityDetector.syncing ? i18n("Refreshing…") : i18n("Refresh / Test connection")
+                enabled: !antigravityDetector.syncing
+                icon.name: "view-refresh"
+                onClicked: antigravityDetector.refreshQuota()
+            }
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Detected plan:")
+            text: antigravityDetector.detectedPlanLabel || i18n("Detected automatically")
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Daemon status:")
+            text: antigravityDetector.connectionState
+                  + (antigravityDetector.readinessCode ? " (" + antigravityDetector.readinessCode + ")" : "")
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Last successful sync:")
+            text: antigravityDetector.lastSuccessfulRefresh
+                  ? Qt.formatDateTime(antigravityDetector.lastSuccessfulRefresh, Qt.DefaultLocaleShortDate)
+                  : i18n("Never")
+        }
+
+        QQC2.SpinBox {
+            id: antigravityRefreshSpin
+            Kirigami.FormData.label: i18n("Refresh interval:")
+            from: 60
+            to: 3600
+            stepSize: 60
+            value: Math.max(60, plasmoid.configuration.antigravityRefreshInterval || 300)
+            enabled: antigravitySwitch.checked
+            textFromValue: function(value) { return i18n("%1 seconds", value); }
+        }
+
+        QQC2.Switch {
+            id: antigravityNotifySwitch
+            Kirigami.FormData.label: i18n("Notifications:")
+            text: i18n("Warn when model quota is low")
+            checked: plasmoid.configuration.antigravityNotifications
+            enabled: antigravitySwitch.checked
+        }
+
+        Kirigami.InlineMessage {
+            Layout.fillWidth: true
+            type: Kirigami.MessageType.Information
+            visible: true
+            text: i18n("Antigravity must be installed, running, and signed in. The monitor reads only plan and model quota from its authenticated localhost daemon; credentials and prompts are never exported.")
+        }
+
         // ── Claude Code ──
         // ══════════════════════════════════════════════
 

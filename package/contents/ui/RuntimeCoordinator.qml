@@ -21,6 +21,7 @@ Item {
     required property var cursorMonitor
     required property var windsurfMonitor
     required property var jetbrainsAiMonitor
+    required property var antigravityMonitor
 
     function loadIntegrationSecrets() {
         if (registry.demoMode) {
@@ -492,6 +493,13 @@ Item {
         function onJetbrainsAiEnabledChanged() {
             if (runtime.jetbrainsAiMonitor.enabled) {
                 runtime.jetbrainsAiMonitor.checkToolInstalled();
+            }
+        }
+
+        function onAntigravityEnabledChanged() {
+            if (runtime.antigravityMonitor.enabled) {
+                runtime.antigravityMonitor.checkToolInstalled();
+                runtime.antigravityMonitor.refreshQuota();
             }
         }
     }

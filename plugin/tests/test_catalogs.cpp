@@ -122,7 +122,7 @@ void CatalogsTest::subscriptionCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 1);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.07.13"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.07.18"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(catalog.sourceConflictCount() > 0);
@@ -134,6 +134,9 @@ void CatalogsTest::subscriptionCatalogLoads()
     QCOMPARE(catalog.planIdForLabel(QStringLiteral("codex-cli"), QStringLiteral("Pro $100")), QStringLiteral("pro_100"));
     QCOMPARE(catalog.planLabelForId(QStringLiteral("github-copilot"), QStringLiteral("pro_plus")), QStringLiteral("Pro+"));
     QCOMPARE(catalog.planLabelForId(QStringLiteral("cursor"), QStringLiteral("pro_plus")), QStringLiteral("Pro+"));
+    QCOMPARE(catalog.planLabelForId(QStringLiteral("google-antigravity"), QStringLiteral("ultra_20x")),
+             QStringLiteral("Google AI Ultra 20x"));
+    QVERIFY(catalog.quotaWindows(QStringLiteral("google-antigravity"), QStringLiteral("pro")).isEmpty());
     QVERIFY(!catalog.quotaWindows(QStringLiteral("claude-code"), QStringLiteral("pro")).isEmpty());
 
     const QVariantList copilotProPlusRows = catalog.quotaWindows(QStringLiteral("github-copilot"), QStringLiteral("pro_plus"));

@@ -7,8 +7,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "package/contents/catalog/subscriptions-v1.json"
-EXPECTED_TOOLS = {"claude-code", "codex-cli", "github-copilot", "cursor", "windsurf", "jetbrains-ai"}
-EXACT_PRECISIONS = {"official_exact", "browser_sync_actual", "provider_api"}
+EXPECTED_TOOLS = {"google-antigravity", "claude-code", "codex-cli", "github-copilot", "cursor", "windsurf", "jetbrains-ai"}
+EXACT_PRECISIONS = {"official_exact", "browser_sync_actual", "provider_api", "local_daemon_actual"}
 
 
 def fail(message: str) -> None:

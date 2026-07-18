@@ -29,11 +29,28 @@ QtObject {
     required property var cursorMonitor
     required property var windsurfMonitor
     required property var jetbrainsAiMonitor
+    required property var antigravityMonitor
 
     property ProviderCatalog providerCatalog: ProviderCatalog {}
     readonly property bool demoMode: AppInfo.demoMode
     function backendForConfigKey(configKey) {
-        return providerManager.backend(configKey);
+        switch (configKey) {
+        case "openai": return registry.openaiBackend;
+        case "anthropic": return registry.anthropicBackend;
+        case "google": return registry.googleBackend;
+        case "mistral": return registry.mistralBackend;
+        case "deepseek": return registry.deepseekBackend;
+        case "groq": return registry.groqBackend;
+        case "xai": return registry.xaiBackend;
+        case "ollama": return registry.ollamaBackend;
+        case "openrouter": return registry.openrouterBackend;
+        case "together": return registry.togetherBackend;
+        case "cohere": return registry.cohereBackend;
+        case "googleveo": return registry.googleveoBackend;
+        case "azure": return registry.azureBackend;
+        case "bedrock": return registry.bedrockBackend;
+        default: return registry.providerManager.backend(configKey);
+        }
     }
 
     function providerEnabled(descriptor) {
@@ -105,11 +122,21 @@ QtObject {
 
     readonly property var allSubscriptionTools: [
         {
+            stableId: "google-antigravity",
+            name: "Google Antigravity",
+            monitor: antigravityMonitor,
+            enabled: configuration.antigravityEnabled,
+            notify: configuration.antigravityNotifications,
+            syncAction: "local",
+            iconSource: Qt.resolvedUrl("../icons/tools/antigravity.svg")
+        },
+        {
             stableId: "claude-code",
             name: "Claude Code",
             monitor: claudeCodeMonitor,
             enabled: demoMode || configuration.claudeCodeEnabled,
             notify: configuration.claudeCodeNotifications,
+            syncAction: "browser",
             iconSource: Qt.resolvedUrl("../icons/tools/claude-code.svg")
         },
         {
@@ -118,6 +145,7 @@ QtObject {
             monitor: codexCliMonitor,
             enabled: demoMode || configuration.codexEnabled,
             notify: configuration.codexNotifications,
+            syncAction: "browser",
             iconSource: Qt.resolvedUrl("../icons/tools/codex-cli.svg")
         },
         {

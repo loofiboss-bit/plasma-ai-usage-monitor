@@ -1,4 +1,4 @@
-## v14 GitHub and KDE Store submission checklist
+## v14.1 GitHub and KDE Store submission checklist
 
 Use this checklist after the stabilization work and screenshot refresh are complete.
 
@@ -18,7 +18,7 @@ Prepare the same assets for the manual GitHub release pack:
 - `com.github.loofi.aiusagemonitor.plasmoid`
 - updated README screenshots
 - changelog section for the release
-- release notes that explain Guided first success, truthful result labels, and native-plugin recovery
+- release notes that explain Google Antigravity monitoring, dynamic model quotas, and the local-daemon security boundary
 - confirm the COPR package still points at GitHub SCM on `main`; keep auto-rebuild disabled so prerelease tags cannot publish stable RPMs
 
 ## KDE Store listing notes
@@ -54,8 +54,8 @@ Upload the eight reviewed Breeze Dark captures from the same isolated demo-user 
 
 1. verify the target version in `ROADMAP.md`, `package/metadata.json`, `com.github.loofi.aiusagemonitor.metainfo.xml`, `CMakeLists.txt`, and `plasma-ai-usage-monitor.spec`
 2. push the release commit and tag
-3. create the GitHub release manually and attach the tarball and `.plasmoid` artifacts
-4. submit the exact stable tag explicitly with `just copr-submit v14.0.0 loofitheboss/plasma-ai-usage-monitor`
+3. publish the draft GitHub release created by the exact-tag workflow and verify its assets
+4. submit the exact stable tag explicitly with `just copr-submit v14.1.0 loofitheboss/plasma-ai-usage-monitor`
 5. confirm the COPR build succeeded before announcing the release
 6. update the README-linked screenshots if filenames stayed stable but content changed
 7. upload the refreshed screenshot set and listing copy to KDE Store

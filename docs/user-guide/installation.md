@@ -56,7 +56,7 @@ On Fedora, the installer can add missing build dependencies:
 ./scripts/install_bootstrap.sh --method source --install-missing
 ~~~
 
-The build requires CMake, a C++20 compiler, Qt 6, Plasma 6 development files, Extra CMake Modules, KWallet, KI18n, KNotifications, OpenSSL, and SQLite support from Qt.
+The build requires CMake, a C++20 compiler, Qt 6, Plasma 6 development files, Extra CMake Modules, KWallet, KI18n, KNotifications, OpenSSL, Protobuf compiler/development files, and SQLite support from Qt.
 
 ## Manual source build
 

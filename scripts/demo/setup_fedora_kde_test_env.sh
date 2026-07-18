@@ -66,7 +66,7 @@ for pkg in \
   cmake extra-cmake-modules gcc-c++ just python3 python3-pip python3-venv firefox \
   qt6-qtbase qt6-qtbase-devel qt6-qtdeclarative-devel libplasma-devel \
   kf6-kwallet-devel kf6-ki18n-devel kf6-knotifications-devel kf6-kcoreaddons-devel \
-  openssl-devel libsecret-devel appstream rpmlint plasma-workspace; do
+  openssl-devel protobuf-compiler protobuf-devel libsecret-devel appstream rpmlint plasma-workspace; do
   if ! rpm -q "$pkg" >/dev/null 2>&1; then
     missing+=("$pkg")
   fi

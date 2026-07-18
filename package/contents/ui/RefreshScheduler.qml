@@ -16,6 +16,7 @@ Item {
     required property var claudeCodeMonitor
     required property var codexCliMonitor
     required property var copilotMonitor
+    required property var antigravityMonitor
     required property var usageDatabase
     required property bool popupOpen
 
@@ -31,6 +32,7 @@ Item {
     onPopupOpenChanged: {
         if (popupOpen) {
             refreshStaleProviders(refreshPopupOpened);
+            refreshAntigravity(false);
         }
     }
 
@@ -127,6 +129,18 @@ Item {
         }
     }
 
+    function antigravityIsFresh() {
+        var last = antigravityMonitor?.lastSuccessfulRefresh;
+        if (!last) return false;
+        var ageMs = Date.now() - new Date(last).getTime();
+        return ageMs < Math.max(60, configuration.antigravityRefreshInterval || 300) * 1000;
+    }
+
+    function refreshAntigravity(force) {
+        if (!configuration.antigravityEnabled || !antigravityMonitor) return;
+        if (force || !antigravityIsFresh()) antigravityMonitor.refreshQuota();
+    }
+
     Instantiator {
         model: scheduler.registry.allProviders
 
@@ -154,6 +168,13 @@ Item {
         running: scheduler.configuration.browserSyncEnabled
         repeat: true
         onTriggered: scheduler.performBrowserSync()
+    }
+
+    Timer {
+        interval: Math.max(60, scheduler.configuration.antigravityRefreshInterval || 300) * 1000
+        running: scheduler.configuration.antigravityEnabled
+        repeat: true
+        onTriggered: scheduler.refreshAntigravity(true)
     }
 
     Timer {

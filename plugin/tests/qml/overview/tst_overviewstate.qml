@@ -29,6 +29,44 @@ TestCase {
         Monitor.CostSummaryCard { width: 800 }
     }
 
+    QtObject {
+        id: fakeAntigravity
+        property bool installed: true
+        property bool limitReached: false
+        property string planTier: "pro"
+        property string detectedPlanLabel: "Google AI Pro"
+        property string syncSourceLabel: "Antigravity local"
+        property string connectionState: "stale"
+        property bool syncEnabled: true
+        property bool syncing: false
+        property string syncStatus: "Stale — timeout"
+        property var quotaWindows: [
+            { label: "Gemini High", modelFamily: "google", percentUsed: 20, percentRemaining: 80, badge: "Live" },
+            { label: "Claude Sonnet", modelFamily: "anthropic", availability: "disabled",
+              availabilityReason: "Temporarily unavailable", precision: "availability_only", badge: "Unavailable" },
+            { label: "GPT-OSS", modelFamily: "openai", precision: "availability_only", badge: "Available" }
+        ]
+        function availablePlans() { return ["Google AI Pro"]; }
+        function planIdForLabel(label) { return label === "Google AI Pro" ? "pro" : "unknown"; }
+    }
+
+    Component {
+        id: subscriptionCardComponent
+        Monitor.SubscriptionToolCard {
+            width: 800
+            modelData: ({ stableId: "google-antigravity" })
+            toolName: "Google Antigravity"
+            toolIcon: "applications-science"
+            toolColor: "#4285f4"
+            monitor: fakeAntigravity
+        }
+    }
+
+    Component {
+        id: quotaRowComponent
+        Monitor.QuotaRow { width: 800; rowData: ({}) }
+    }
+
     function loadFixture(fixture) {
         fakeReadiness.rows = fixture.sources;
         overviewState.providers = fixture.providers;
@@ -152,5 +190,29 @@ TestCase {
         card.costViewMode = 1;
         compare(card.providerRows.length, 1);
         compare(card.subscriptionRows.length, 0);
+    }
+
+    function test_antigravityCardUsesLocalSourceAndDetectedPlan() {
+        var card = createTemporaryObject(subscriptionCardComponent, testCase);
+        verify(card);
+        compare(card.syncSourceText, "Antigravity local");
+        compare(card.displayPlanTier(), "Google AI Pro");
+        verify(card.stale);
+    }
+
+    function test_antigravityAvailabilityRowsDoNotInventProgress() {
+        var unavailable = createTemporaryObject(quotaRowComponent, testCase, {
+            rowData: fakeAntigravity.quotaWindows[1]
+        });
+        verify(unavailable);
+        verify(!unavailable.hasProgress());
+        compare(unavailable.valueText(), "Unavailable");
+
+        var available = createTemporaryObject(quotaRowComponent, testCase, {
+            rowData: fakeAntigravity.quotaWindows[2]
+        });
+        verify(available);
+        verify(!available.hasProgress());
+        compare(available.valueText(), "Available");
     }
 }

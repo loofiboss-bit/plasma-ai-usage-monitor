@@ -194,6 +194,8 @@ ColumnLayout {
                             ]
 
                             PlasmaComponents.ToolButton {
+                                required property var modelData
+
                                 text: modelData.label
                                 checked: costCard.costViewMode === modelData.mode
                                 onClicked: costCard.costViewMode = modelData.mode

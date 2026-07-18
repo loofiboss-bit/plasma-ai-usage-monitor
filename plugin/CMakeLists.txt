@@ -34,6 +34,7 @@ set(aiusagemonitor_SRCS
     cursormonitor.cpp
     windsurfmonitor.cpp
     jetbrainsaimonitor.cpp
+    antigravitymonitor.cpp
     browsercookieextractor.cpp
     browsersyncservice.cpp
     awssigv4signer.cpp
@@ -79,6 +80,7 @@ set(aiusagemonitor_HDRS
     cursormonitor.h
     windsurfmonitor.h
     jetbrainsaimonitor.h
+    antigravitymonitor.h
     browsercookieextractor.h
     browsersyncservice.h
     awssigv4signer.h
@@ -86,6 +88,18 @@ set(aiusagemonitor_HDRS
     localmetricsserver.h
     webhooknotifier.h
 )
+
+protobuf_generate_cpp(ANTIGRAVITY_PROTO_SRCS ANTIGRAVITY_PROTO_HDRS
+    ${CMAKE_CURRENT_SOURCE_DIR}/proto/antigravity_local.proto
+)
+
+add_library(antigravityprotocol STATIC
+    ${ANTIGRAVITY_PROTO_SRCS}
+    ${ANTIGRAVITY_PROTO_HDRS}
+)
+set_target_properties(antigravityprotocol PROPERTIES POSITION_INDEPENDENT_CODE ON)
+target_include_directories(antigravityprotocol PUBLIC ${CMAKE_CURRENT_BINARY_DIR})
+target_link_libraries(antigravityprotocol PUBLIC protobuf::libprotobuf)
 
 qt_add_qml_module(aiusagemonitorplugin
     URI com.github.loofi.aiusagemonitor
@@ -119,6 +133,7 @@ target_link_libraries(aiusagemonitorplugin
     KF6::Wallet
     KF6::Notifications
     KF6::I18n
+    antigravityprotocol
     ${CMAKE_DL_LIBS}
 )
 

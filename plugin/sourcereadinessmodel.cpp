@@ -76,7 +76,8 @@ SourceReadinessModel::SourceReadinessModel(QObject *parent)
         entry.stableId = descriptor.value(QStringLiteral("key")).toString();
         entry.displayName = descriptor.value(QStringLiteral("label")).toString();
         entry.kind = SourceKind::LocalTool;
-        entry.monitoringLevel = QStringLiteral("local_activity_estimate");
+        entry.monitoringLevel = entry.stableId == QLatin1String("google-antigravity")
+            ? QStringLiteral("actual_quota") : QStringLiteral("local_activity_estimate");
         entry.safeVerification = true;
         if (!entry.stableId.isEmpty()) m_sources.append(entry);
     }
@@ -264,17 +265,21 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
             result.nextAction = NextAction::WaitForVerification;
         } else if (!entry.localDiagnosticCode.isEmpty()) {
             result.errorCode = entry.localDiagnosticCode;
-            if (entry.localDiagnosticCode == QLatin1String("not_logged_in")) {
+            if (entry.localDiagnosticCode == QLatin1String("not_logged_in")
+                || entry.localDiagnosticCode == QLatin1String("not_signed_in")) {
                 result.state = SourceState::Failed;
                 result.nextAction = NextAction::SignIn;
             } else if (entry.localDiagnosticCode == QLatin1String("permission_denied")) {
                 result.state = SourceState::Failed;
                 result.nextAction = NextAction::GrantReadOnlyPermission;
             } else if (entry.localDiagnosticCode == QLatin1String("not_supported")
-                       || entry.localDiagnosticCode == QLatin1String("unsupported_metric")) {
+                       || entry.localDiagnosticCode == QLatin1String("unsupported_metric")
+                       || entry.localDiagnosticCode == QLatin1String("unsupported_version")) {
                 result.state = SourceState::Failed;
                 result.nextAction = NextAction::ReviewUnsupportedMetric;
-            } else if (entry.localDiagnosticCode == QLatin1String("network_error")) {
+            } else if (entry.localDiagnosticCode == QLatin1String("network_error")
+                       || entry.localDiagnosticCode == QLatin1String("tls_error")
+                       || entry.localDiagnosticCode == QLatin1String("timeout")) {
                 result.state = result.lastVerified.isValid() ? SourceState::Degraded : SourceState::Failed;
                 result.nextAction = NextAction::CheckNetwork;
             } else {

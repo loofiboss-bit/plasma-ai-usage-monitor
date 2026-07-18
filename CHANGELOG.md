@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [14.1.0] — 2026-07-18
+
+### Added
+- Add opt-in Google Antigravity subscription monitoring through its authenticated local daemon.
+- Detect Standard, Pro, Ultra, Ultra 5x, Ultra 20x, Enterprise, and unknown plans automatically.
+- Show every daemon-reported model variant with live remaining quota, reset time, availability, source, and freshness.
+- Add Antigravity readiness, connection testing, refresh scheduling, stale-snapshot recovery, and grouped quota warnings.
+
+### Changed
+- Generalize subscription cards so browser and local-daemon sync sources use accurate labels and refresh actions.
+- Require Protobuf development tooling for the minimal generated Antigravity message contract without adding gRPC++.
+
+### Fixed
+- Keep native provider backends stable when resolving provider configuration keys.
+- Declare the cost-view delegate model explicitly for Qt 6.11 bound-component behavior.
+
 ## [14.0.1] — 2026-07-18
 
 ### Fixed

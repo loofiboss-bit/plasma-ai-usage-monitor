@@ -1,0 +1,77 @@
+syntax = "proto3";
+
+package exa.language_server_pb;
+
+option optimize_for = LITE_RUNTIME;
+
+// Minimal, read-only projection of Antigravity's local language-server
+// contract. Unknown upstream fields are intentionally ignored by protobuf.
+service LanguageServerService {
+  rpc GetUserStatus(GetUserStatusRequest) returns (GetUserStatusResponse);
+}
+
+message GetUserStatusRequest {}
+
+message GetUserStatusResponse {
+  UserStatus user_status = 1;
+  PlanInfo plan_info = 2;
+}
+
+message UserStatus {
+  PlanInfo plan_info = 12;
+  PlanStatus plan_status = 13;
+  CascadeModelConfigData cascade_model_config_data = 33;
+  string g1_tier = 35;
+  UserTier user_tier = 36;
+}
+
+message PlanStatus {
+  PlanInfo plan_info = 1;
+}
+
+message PlanInfo {
+  int32 teams_tier = 1;
+  string plan_name = 2;
+  bool is_enterprise = 16;
+  repeated AllowedModelConfig cascade_allowed_models_config = 21;
+}
+
+message UserTier {
+  string id = 1;
+  string name = 2;
+}
+
+message CascadeModelConfigData {
+  repeated ClientModelConfig client_model_configs = 1;
+}
+
+message ClientModelConfig {
+  string label = 1;
+  ModelOrAlias model_or_alias = 2;
+  bool disabled = 4;
+  int32 provider = 10;
+  repeated int32 allowed_tiers = 12;
+  string description = 14;
+  QuotaInfo quota_info = 15;
+  string tag_title = 16;
+  string tag_description = 17;
+}
+
+message AllowedModelConfig {
+  ModelOrAlias model_or_alias = 1;
+}
+
+message ModelOrAlias {
+  int32 model = 1;
+  int32 alias = 2;
+}
+
+message QuotaInfo {
+  optional float remaining_fraction = 1;
+  Timestamp reset_time = 2;
+}
+
+message Timestamp {
+  int64 seconds = 1;
+  int32 nanos = 2;
+}

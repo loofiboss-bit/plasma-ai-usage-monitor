@@ -65,7 +65,8 @@ KCM.SimpleKCM {
         "googleveoMonthlyBudget", "azureDailyBudget", "azureMonthlyBudget", "bedrockDailyBudget", "bedrockMonthlyBudget", "litellmDailyBudget", "litellmMonthlyBudget", "cerebrasDailyBudget", "cerebrasMonthlyBudget", "fireworksDailyBudget", "fireworksMonthlyBudget", "perplexityDailyBudget", "perplexityMonthlyBudget",
         "budgetWarningPercent", "historyEnabled", "historyRetentionDays", "analystIntensityMode", "analystNormalization",
         "prometheusEnabled", "prometheusPort", "autoExportEnabled", "autoExportDirectory", "autoExportIntervalMinutes",
-        "autoExportFormat", "browserSyncEnabled", "browserSyncBrowser", "browserSyncProfile", "browserSyncInterval",
+        "autoExportFormat", "antigravityEnabled", "antigravityNotifications", "antigravityRefreshInterval",
+        "browserSyncEnabled", "browserSyncBrowser", "browserSyncProfile", "browserSyncInterval",
         "claudeCodeEnabled", "claudeCodePlan", "claudeCodePlanId", "claudeCodeCustomLimit", "claudeCodeNotifications",
         "codexEnabled", "codexPlan", "codexPlanId", "codexCustomLimit", "codexNotifications",
         "copilotEnabled", "copilotPlan", "copilotPlanId", "copilotCustomLimit", "copilotBillingMode",
@@ -630,6 +631,7 @@ KCM.SimpleKCM {
             if (rows[i].configKey === stableId) return rows[i].name;
         }
         var localNames = {
+            "google-antigravity": "Google Antigravity",
             "claude-code": "Claude Code", "codex-cli": "Codex CLI",
             "github-copilot": "GitHub Copilot", "cursor": "Cursor",
             "windsurf": "Windsurf", "jetbrains-ai": "JetBrains AI"
@@ -655,6 +657,11 @@ KCM.SimpleKCM {
             "configuration": i18n("configuration incomplete"),
             "authentication": i18n("authentication failed"),
             "not_logged_in": i18n("not signed in"),
+            "not_signed_in": i18n("not signed in"),
+            "daemon_not_running": i18n("local daemon is not running"),
+            "unsupported_version": i18n("installed version is not supported"),
+            "tls_error": i18n("local TLS verification failed"),
+            "timeout": i18n("local daemon timed out"),
             "permission": i18n("permission denied"),
             "permission_denied": i18n("permission denied"),
             "unsupported_metric": i18n("metric unsupported"),

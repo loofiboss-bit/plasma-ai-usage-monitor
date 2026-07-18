@@ -555,6 +555,18 @@
     </group>
 
     <group name="Subscriptions">
+        <!-- Google Antigravity local subscription quota -->
+        <entry name="antigravityEnabled" type="Bool">
+            <default>false</default>
+        </entry>
+        <entry name="antigravityNotifications" type="Bool">
+            <default>true</default>
+        </entry>
+        <entry name="antigravityRefreshInterval" type="Int">
+            <default>300</default>
+            <label>Antigravity local quota refresh interval in seconds (minimum 60)</label>
+        </entry>
+
         <!-- Browser Sync (experimental) -->
         <entry name="browserSyncEnabled" type="Bool">
             <default>false</default>
