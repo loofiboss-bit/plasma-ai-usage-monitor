@@ -23,7 +23,7 @@ QQC2.ScrollView {
                 if (overview.contentItem) {
                     overview.contentItem.contentY = Math.min(
                         overview.contentHeight - overview.availableHeight,
-                        Kirigami.Units.gridUnit * 20);
+                        Kirigami.Units.gridUnit * 9);
                 }
             });
         }

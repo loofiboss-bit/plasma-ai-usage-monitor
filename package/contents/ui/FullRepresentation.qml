@@ -71,8 +71,6 @@ PlasmaExtras.Representation {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
-        visible: AppInfo.smokeView !== "panel"
-
         RowLayout {
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
@@ -151,37 +149,12 @@ PlasmaExtras.Representation {
         }
     }
 
-    Rectangle {
-        anchors.fill: parent
-        visible: AppInfo.smokeView === "panel"
-        color: Kirigami.Theme.backgroundColor
-
-        Rectangle {
-            anchors.centerIn: parent
-            width: parent.width * 0.92
-            height: Kirigami.Units.gridUnit * 5
-            radius: height / 2
-            color: Qt.darker(Kirigami.Theme.backgroundColor, 1.35)
-            border.width: 1
-            border.color: Qt.alpha(Kirigami.Theme.textColor, 0.22)
-
-            Loader {
-                anchors.centerIn: parent
-                width: parent.width * 0.42
-                height: parent.height * 0.62
-                sourceComponent: root.compactRepresentationComponent
-            }
-        }
-    }
-
     Component.onCompleted: {
         if (AppInfo.smokeView === "settings") {
             Qt.callLater(function() {
                 var configureAction = plasmoid.internalAction("configure");
                 if (configureAction) configureAction.trigger();
             });
-        } else if (AppInfo.smokeView === "panel") {
-            plasmoid.configuration.compactDisplayMode = "cost";
         }
     }
 }

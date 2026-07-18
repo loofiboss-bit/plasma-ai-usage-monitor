@@ -1,18 +1,22 @@
 {
   "version": "14.0.0",
-  "sessionId": "3c7f3f39-6ecc-492e-831c-bb66c9c507e3",
+  "sessionId": "f69a1d8a-596a-4332-a819-394de1f02357",
   "fixtureSha256": "468295c833203fbb8779de720d874c9432f6d6a323f49029fc63f46fbe06ec6e",
   "plasmaSession": "Fedora KDE Plasma",
   "theme": "Breeze Dark",
   "environment": "isolated demo user",
+  "captureCommit": "working-tree-3168bda",
+  "capturedAt": "2026-07-18T12:53:01Z",
+  "plasmaVersion": "6.7.3",
+  "scale": "100%",
   "assets": {
-    "guided-first-success.png": "0ce15785785f1fbbb02208c332b71e359443fb2e6a6a6028f746bbff8325c1cd",
-    "verified-success.png": "2dd8458b584b2a814b6c0265eb212f7bc15f14d33d96b39be80bb53bf94ded00",
-    "main-window.png": "1e7267a8ce51434d39a71674f6fb765d676ad645ccfe110da14b6ae200902951",
-    "provider-intelligence.png": "72c29cfdafef69b7ca3c8e68a007b1399441b6a866d86504b433d681968dca53",
-    "settings-view.png": "ae4270b54df0f71a98f655bf514a9d07bd845ad032ce7eeda4b5b3533347f1c7",
-    "history-view.png": "31b4df2a02cd736c18fda29a364c5055a33b6e7bb4181334722a2f1ea83b01b4",
-    "analyst-view.png": "4c50eb1b2d1710daafe92df78b668d824757970488dc91243f66997a9c3fb126",
-    "panel-view.png": "84ef3c81c030eb836f68e0c32b22dc7ff1ecfac8ab6fc2188e988f929d0bdcfa"
+    "guided-first-success.png": "df21f36510256ea1a86937fb8fab969229e2a634c8626545b819096cfadf1af8",
+    "verified-success.png": "0b1347e5181afd0bdab8fc77dda6b3e6b91d96f8613e989c037e7670d55cf04d",
+    "main-window.png": "11378daffe899db19f05423ae0e1724b7316c4dfe2d2bdd0453ca20a0c87815d",
+    "provider-intelligence.png": "b84f5b255ed06b49b27444fffbcde8afcaa1ca9c8ae309502eb782c3b9a98509",
+    "settings-view.png": "b1429bc636819140ced2f8e4b6209fe131120f7e0daa7ad7b6c86718d3664100",
+    "history-view.png": "b8fb7d8802fccf29049636a4e7285fc53bd1b58134bb93f4872ee1fabfa11b3c",
+    "analyst-view.png": "060ddd19b0ebdc2c238c612d1af37198ab9b14cc27d51634ed054b90e63f091c",
+    "panel-view.png": "9dede10db68b280d2b40f660c3cd685043f9e716757deb12dd18c3c575da7a29"
   }
 }

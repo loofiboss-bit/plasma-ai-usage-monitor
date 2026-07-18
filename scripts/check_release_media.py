@@ -47,6 +47,9 @@ if manifest.get("theme") != "Breeze Dark":
     fail("manifest must record the Breeze Dark capture theme")
 if manifest.get("environment") != "isolated demo user":
     fail("manifest must record the isolated demo-user environment")
+for key in ("captureCommit", "capturedAt", "plasmaVersion", "scale"):
+    if not manifest.get(key):
+        fail(f"manifest must record {key}")
 
 expected_fixture = hashlib.sha256(
     (ROOT / "scripts" / "demo" / "showcase_preset.json").read_bytes()
