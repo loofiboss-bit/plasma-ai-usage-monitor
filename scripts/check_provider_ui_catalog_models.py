@@ -9,6 +9,25 @@ ROOT = Path(__file__).resolve().parents[1]
 CATALOG = ROOT / "package/contents/catalog/providers-v4.json"
 PROVIDER_UI = ROOT / "package/contents/ui/configProviders.qml"
 PROVIDER_DETAILS = ROOT / "package/contents/ui/ProviderSourceDetails.qml"
+PROVIDER_REGISTRY = ROOT / "package/contents/ui/ProviderRegistry.qml"
+COST_SUMMARY = ROOT / "package/contents/ui/CostSummaryCard.qml"
+
+NATIVE_BACKENDS = {
+    "openai",
+    "anthropic",
+    "google",
+    "mistral",
+    "deepseek",
+    "groq",
+    "xai",
+    "ollama",
+    "openrouter",
+    "together",
+    "cohere",
+    "googleveo",
+    "azure",
+    "bedrock",
+}
 
 
 def fail(message: str) -> None:
@@ -46,6 +65,22 @@ def main() -> None:
     embedded_ids = sorted(model_id for model_id in catalog_ids if f'"{model_id}"' in source)
     if embedded_ids:
         fail(f"hardcoded catalog model IDs remain in provider UI: {', '.join(embedded_ids)}")
+
+    registry = PROVIDER_REGISTRY.read_text(encoding="utf-8")
+    missing_backends = sorted(
+        key
+        for key in NATIVE_BACKENDS
+        if f'case "{key}": return registry.{key}Backend;' not in registry
+    )
+    if missing_backends:
+        fail(f"native provider backends are not stable in the registry: {', '.join(missing_backends)}")
+
+    cost_summary = COST_SUMMARY.read_text(encoding="utf-8")
+    mode_delegate = re.search(
+        r"PlasmaComponents\.ToolButton\s*\{(?P<body>.*?)\n\s*\}", cost_summary, re.S
+    )
+    if not mode_delegate or "required property var modelData" not in mode_delegate.group("body"):
+        fail("cost view mode delegate must declare modelData under bound component behavior")
 
     print(f"Provider UI catalog check OK: {len(provider_keys)} model pickers are catalog-driven")
 

@@ -30,6 +30,7 @@
 #include "cursormonitor.h"
 #include "windsurfmonitor.h"
 #include "jetbrainsaimonitor.h"
+#include "antigravitymonitor.h"
 #include "browsersyncservice.h"
 #include "bedrockprovider.h"
 #include "localmetricsserver.h"
@@ -84,6 +85,7 @@ void AiUsagePlugin::registerTypes(const char *uri)
     qmlRegisterType<CursorMonitor>(uri, 1, 0, "CursorMonitor");
     qmlRegisterType<WindsurfMonitor>(uri, 1, 0, "WindsurfMonitor");
     qmlRegisterType<JetBrainsAiMonitor>(uri, 1, 0, "JetBrainsAiMonitor");
+    qmlRegisterType<AntigravityMonitor>(uri, 1, 0, "AntigravityMonitor");
 
     // Browser Sync keeps cookie values behind the C++ boundary.
     qmlRegisterType<BrowserSyncService>(uri, 1, 0, "BrowserSyncService");

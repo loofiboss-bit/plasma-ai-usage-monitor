@@ -57,7 +57,7 @@ check_cmd() {
   fi
 }
 
-required_cmds=(cmake g++ kpackagetool6)
+required_cmds=(cmake g++ kpackagetool6 protoc)
 warning_cmds=(plasmashell plasmawindowed qmllint kwallet-query secret-tool aws)
 
 missing_required=()
@@ -86,6 +86,8 @@ fedora_packages=(
   kf6-knotifications-devel
   kf6-kcoreaddons-devel
   openssl-devel
+  protobuf-compiler
+  protobuf-devel
   libsecret-devel
 )
 

@@ -77,6 +77,7 @@ KCM.SimpleKCM {
     property bool cfg_cursorEnabled: plasmoid.configuration.cursorEnabled
     property bool cfg_windsurfEnabled: plasmoid.configuration.windsurfEnabled
     property bool cfg_jetbrainsAiEnabled: plasmoid.configuration.jetbrainsAiEnabled
+    property bool cfg_antigravityEnabled: plasmoid.configuration.antigravityEnabled
 
     readonly property bool advancedMode: cfg_advancedSettingsMode
     readonly property bool walletOpen: secrets.walletOpen
@@ -98,9 +99,12 @@ KCM.SimpleKCM {
     CursorMonitor { id: cursorDetector; Component.onCompleted: checkToolInstalled() }
     WindsurfMonitor { id: windsurfDetector; Component.onCompleted: checkToolInstalled() }
     JetBrainsAiMonitor { id: jetbrainsDetector; Component.onCompleted: checkToolInstalled() }
+    AntigravityMonitor { id: antigravityDetector; Component.onCompleted: checkToolInstalled() }
 
     readonly property var detectedLocalSources: {
         var candidates = [
+            { key: "google-antigravity", name: "Google Antigravity", enabled: "antigravityEnabled", monitor: antigravityDetector,
+              monitoringLevel: "actual_quota" },
             { key: "claude-code", name: "Claude Code", enabled: "claudeCodeEnabled", monitor: claudeDetector },
             { key: "codex-cli", name: "Codex CLI", enabled: "codexEnabled", monitor: codexDetector },
             { key: "github-copilot", name: "GitHub Copilot", enabled: "copilotEnabled", monitor: copilotDetector },
@@ -116,7 +120,7 @@ KCM.SimpleKCM {
                 configKey: row.key,
                 name: row.name,
                 sourceKind: "local_tool",
-                monitoringLevel: "local_activity_estimate",
+                monitoringLevel: row.monitoringLevel || "local_activity_estimate",
                 enabledConfigKey: row.enabled,
                 modelConfigKey: "",
                 customBaseUrlConfigKey: "",

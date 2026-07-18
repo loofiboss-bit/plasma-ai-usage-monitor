@@ -60,6 +60,15 @@
 
   <releases>
 
+    <release version="14.1.0" date="2026-07-18">
+      <description>
+        <ul>
+          <li>Add opt-in Google Antigravity plan and per-model quota monitoring from the authenticated local daemon.</li>
+          <li>Detect the account plan and display dynamically reported Gemini, Claude, and GPT-OSS model variants.</li>
+          <li>Add local-daemon readiness, refresh scheduling, stale data handling, and grouped quota warnings.</li>
+        </ul>
+      </description>
+    </release>
     <release version="14.0.1" date="2026-07-18"/>
     <release version="14.0.0" date="2026-07-18">
       <description>

@@ -129,8 +129,8 @@ public:
     int usageCount() const;
     int usageLimit() const;
     void setUsageLimit(int limit);
-    double percentUsed() const;
-    bool isLimitReached() const;
+    virtual double percentUsed() const;
+    virtual bool isLimitReached() const;
     virtual QString periodLabel() const = 0;
     int warningThreshold() const;
     void setWarningThreshold(int threshold);

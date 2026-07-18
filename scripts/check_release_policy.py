@@ -17,8 +17,8 @@ def fail(message: str) -> None:
 
 
 version = (ROOT / "VERSION").read_text().strip()
-if not re.fullmatch(r"14\.0\.\d+", version):
-    fail(f"phase 7 requires a stable v14 release, got {version}")
+if not re.fullmatch(r"14\.\d+\.\d+", version):
+    fail(f"release policy requires a stable v14 release, got {version}")
 
 checklist_path = ROOT / f"docs/release/v{version}-checklist.md"
 if not checklist_path.is_file():
@@ -29,9 +29,9 @@ required_policy = (
     "and never block publication."
 )
 if required_policy not in checklist:
-    fail("v14 checklist must declare provider credentials non-blocking")
+    fail("current v14 checklist must declare provider credentials non-blocking")
 if f"Publish `v{version}` directly from the verified `main` commit" not in checklist:
-    fail("v14 checklist must require direct stable publication")
+    fail("current v14 checklist must require direct stable publication")
 
 release_surfaces = [
     ".github/workflows/release.yml",

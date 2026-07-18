@@ -5,6 +5,7 @@ Subscription cards combine local activity with plan limits. Treat those figures 
 ## Supported tools
 
 - Claude Code
+- Google Antigravity
 - Codex CLI
 - GitHub Copilot
 - Cursor
@@ -13,11 +14,19 @@ Subscription cards combine local activity with plan limits. Treat those figures 
 
 Open **Settings → Subscriptions** and enable the tools you use. The detection status checks installed binaries and known local state directories.
 
+## Google Antigravity
+
+Antigravity monitoring is opt-in and currently supports the Linux desktop app. Antigravity must be installed, running, and signed in. The widget detects the plan automatically and shows one row for every model variant returned for the account, including eligible Claude and GPT-OSS models. Models without quota progress remain visible as available, and temporarily disabled models keep their reported reason.
+
+The monitor calls only the local, read-only `GetUserStatus` RPC over pinned TLS. It does not start Antigravity, sign in, read OAuth tokens, prompts, conversations, logs, or other cache data. The daemon CSRF value is kept in memory and sent only to the validated loopback process. It is never logged, persisted, diagnosed, or exported.
+
+Model access and quotas are dynamic, so the catalog does not contain a fixed model matrix or numeric limits. If a temporary error occurs after a successful refresh, the last snapshot remains visible as **Stale**. Use **Refresh / Test connection** after restarting or updating Antigravity.
+
 ## Local tracking
 
 Local monitors watch tool-specific state for activity. They do not read a public vendor quota API. Plan presets supply the window and limit, and the card counts activity against that local model.
 
-Choose the correct plan. Use a custom limit only when your account differs from the shipped preset.
+Choose the correct plan for locally tracked tools. Antigravity is the exception: its plan is detected automatically and has no custom-limit control.
 
 ## Codex CLI
 

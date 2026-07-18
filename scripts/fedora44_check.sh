@@ -85,7 +85,7 @@ for pkg in \
   cmake extra-cmake-modules gcc-c++ qt6-qtbase qt6-qtbase-devel \
   qt6-qtdeclarative-devel libplasma-devel kf6-kwallet-devel \
   kf6-ki18n-devel kf6-knotifications-devel kf6-kcoreaddons-devel \
-  openssl-devel appstream rpmlint; do
+  openssl-devel protobuf-compiler protobuf-devel appstream rpmlint; do
   check_rpm "$pkg"
 done
 

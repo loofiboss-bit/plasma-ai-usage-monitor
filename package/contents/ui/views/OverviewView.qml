@@ -176,12 +176,12 @@ QQC2.ScrollView {
                 Layout.fillWidth: true
             }
             PlasmaComponents.ToolButton {
-                visible: plasmoid.configuration.browserSyncEnabled
+                visible: plasmoid.configuration.browserSyncEnabled || plasmoid.configuration.antigravityEnabled
                 icon.name: "view-refresh"
                 activeFocusOnTab: true
-                Accessible.name: i18n("Request Browser Sync")
-                onClicked: root.performBrowserSync()
-                PlasmaComponents.ToolTip { text: i18n("Request Browser Sync") }
+                Accessible.name: i18n("Refresh subscription quotas")
+                onClicked: root.refreshSubscriptionTools()
+                PlasmaComponents.ToolTip { text: i18n("Refresh subscription quotas") }
             }
         }
 
@@ -198,7 +198,7 @@ QQC2.ScrollView {
                 toolColor: modelData.monitor?.toolColor || Kirigami.Theme.textColor
                 monitor: modelData.monitor || null
                 collapsed: false
-                onSyncRequested: root.performBrowserSync()
+                onSyncRequested: root.refreshSubscriptionTool(modelData)
             }
         }
 

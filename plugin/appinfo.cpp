@@ -147,7 +147,8 @@ const QSet<QString> &sourceIds()
                                          QStringLiteral("github-copilot"),
                                          QStringLiteral("cursor"),
                                          QStringLiteral("windsurf"),
-                                         QStringLiteral("jetbrains-ai")};
+                                         QStringLiteral("jetbrains-ai"),
+                                         QStringLiteral("google-antigravity")};
     return values;
 }
 

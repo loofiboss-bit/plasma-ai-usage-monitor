@@ -82,6 +82,7 @@ Item {
     property alias cursor: cursorMonitor
     property alias windsurf: windsurfMonitor
     property alias jetbrainsAi: jetbrainsAiMonitor
+    property alias antigravity: antigravityMonitor
     property alias intelligenceEngine: analystIntelligence
 
     readonly property var allProviders: providerRegistry.allProviders
@@ -127,7 +128,17 @@ Item {
 
     function syncReadinessEnabled(stableId) {
         var provider = providerRegistry.providerByConfigKey(stableId);
-        sourceReadinessModel.setSourceEnabled(stableId, provider ? provider.enabled : false);
+        if (provider) {
+            sourceReadinessModel.setSourceEnabled(stableId, provider.enabled);
+            return;
+        }
+        var tools = providerRegistry.allSubscriptionTools || [];
+        for (var i = 0; i < tools.length; i++) {
+            if (tools[i].stableId === stableId) {
+                sourceReadinessModel.setSourceEnabled(stableId, tools[i].enabled);
+                return;
+            }
+        }
     }
 
     function configureSourceReadiness() {
@@ -138,6 +149,7 @@ Item {
         }
 
         var localTools = [
+            { stableId: "google-antigravity", backend: antigravityMonitor },
             { stableId: "claude-code", backend: claudeCodeMonitor },
             { stableId: "codex-cli", backend: codexCliMonitor },
             { stableId: "github-copilot", backend: copilotMonitor },
@@ -159,6 +171,7 @@ Item {
         }
 
         var localConfigKeys = {
+            "google-antigravity": "antigravityEnabled",
             "claude-code": "claudeCodeEnabled",
             "codex-cli": "codexEnabled",
             "github-copilot": "copilotEnabled",
@@ -291,6 +304,20 @@ Item {
 
     function performBrowserSync() {
         refreshScheduler.performBrowserSync();
+    }
+
+    function refreshSubscriptionTool(descriptor) {
+        if (!descriptor) return;
+        if (descriptor.syncAction === "local" && descriptor.monitor) {
+            descriptor.monitor.refreshQuota();
+            return;
+        }
+        refreshScheduler.performBrowserSync();
+    }
+
+    function refreshSubscriptionTools() {
+        refreshScheduler.performBrowserSync();
+        refreshScheduler.refreshAntigravity(true);
     }
 
     function generateAnalystInsight() {
@@ -574,6 +601,18 @@ Item {
         }
     }
 
+    AntigravityMonitor {
+        id: antigravityMonitor
+        enabled: plasmoid.configuration.antigravityEnabled
+        warningThreshold: plasmoid.configuration.warningThreshold
+        criticalThreshold: plasmoid.configuration.criticalThreshold
+
+        Component.onCompleted: {
+            checkToolInstalled();
+            if (enabled) Qt.callLater(refreshQuota);
+        }
+    }
+
     Connections {
         target: plasmoid.configuration
 
@@ -596,6 +635,10 @@ Item {
         function onFireworksEnabledChanged() { root.syncReadinessEnabled("fireworks"); }
         function onPerplexityEnabledChanged() { root.syncReadinessEnabled("perplexity"); }
         function onSettingsVerificationRequestIdChanged() { root.processSettingsVerificationRequest(); }
+        function onAntigravityEnabledChanged() {
+            root.syncReadinessEnabled("google-antigravity");
+            if (plasmoid.configuration.antigravityEnabled) antigravityMonitor.refreshQuota();
+        }
 
         function onClaudeCodePlanIdChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
         function onClaudeCodePlanChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
@@ -661,6 +704,7 @@ Item {
         cursorMonitor: cursorMonitor
         windsurfMonitor: windsurfMonitor
         jetbrainsAiMonitor: jetbrainsAiMonitor
+        antigravityMonitor: antigravityMonitor
     }
 
     NotificationController {
@@ -679,6 +723,7 @@ Item {
         claudeCodeMonitor: claudeCodeMonitor
         codexCliMonitor: codexCliMonitor
         copilotMonitor: copilotMonitor
+        antigravityMonitor: antigravityMonitor
         usageDatabase: usageDatabase
         popupOpen: !!plasmoid.expanded
     }
@@ -699,6 +744,7 @@ Item {
         cursorMonitor: cursorMonitor
         windsurfMonitor: windsurfMonitor
         jetbrainsAiMonitor: jetbrainsAiMonitor
+        antigravityMonitor: antigravityMonitor
     }
 
     UpdateChecker {

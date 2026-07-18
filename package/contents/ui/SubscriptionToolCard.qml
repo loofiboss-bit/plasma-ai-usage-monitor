@@ -16,6 +16,10 @@ ColumnLayout {
     required property var monitor
     property bool collapsed: false
     readonly property bool narrowCard: toolCard.width < Kirigami.Units.gridUnit * 14
+    readonly property string syncSourceText: toolCard.monitor?.syncSourceLabel
+                                                || ((toolCard.monitor?.syncEnabled ?? false)
+                                                    ? i18n("Browser sync") : i18n("Self-tracked"))
+    readonly property bool stale: toolCard.monitor?.connectionState === "stale"
 
     spacing: 0
 
@@ -98,7 +102,7 @@ ColumnLayout {
                         spacing: Kirigami.Units.smallSpacing
 
                         SourceBadge {
-                            text: (toolCard.monitor?.syncEnabled ?? false) ? i18n("Browser sync") : i18n("Self-tracked")
+                            text: toolCard.syncSourceText
                         }
 
                         SourceBadge {
@@ -208,6 +212,7 @@ ColumnLayout {
     signal syncRequested()
     function triggerSync() { syncRequested(); }
     function displayPlanTier() {
+        if (toolCard.monitor?.detectedPlanLabel) return toolCard.monitor.detectedPlanLabel;
         if (!toolCard.monitor || !toolCard.monitor.planTier) return "";
         var labels = toolCard.monitor.availablePlans ? toolCard.monitor.availablePlans() : [];
         for (var i = 0; i < labels.length; i++) {

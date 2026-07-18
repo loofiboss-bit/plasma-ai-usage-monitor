@@ -125,6 +125,18 @@ target_link_libraries(test_subscription_tools
 
 add_test(NAME subscription_tools COMMAND test_subscription_tools)
 
+add_executable(test_antigravitymonitor
+    test_antigravitymonitor.cpp
+    ${TEST_CATALOG_SRC}
+    ${CMAKE_SOURCE_DIR}/plugin/subscriptiontoolbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/antigravitymonitor.cpp
+)
+target_include_directories(test_antigravitymonitor PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_antigravitymonitor
+    PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n antigravityprotocol
+)
+add_test(NAME antigravitymonitor COMMAND test_antigravitymonitor)
+
 # --- ProviderBackend unit test ---
 add_executable(test_providerbackend
     test_providerbackend.cpp
