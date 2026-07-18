@@ -33,7 +33,7 @@ Temporary browser database copies use owner-only permissions. Browser Sync is di
 
 ## Support reports
 
-The copied diagnostics report redacts endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values. Review any report before posting it publicly.
+Native Diagnostics builds the support report in the compiled plugin. It redacts endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values. The dependency-recovery screen has a smaller redacted bootstrap report that omits error details and paths. Review either report before posting it publicly.
 
 ## Removing local data
 

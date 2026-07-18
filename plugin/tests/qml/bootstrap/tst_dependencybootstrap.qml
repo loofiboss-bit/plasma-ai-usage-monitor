@@ -13,6 +13,21 @@ TestCase {
         AppUi.DependencyBootstrapController {}
     }
 
+    Component {
+        id: bootstrapFixture
+        Item { property string marker: "bootstrap" }
+    }
+
+    Component {
+        id: runtimeFixture
+        Item { property string marker: "runtime" }
+    }
+
+    Component {
+        id: representationLoaderComponent
+        AppUi.RuntimeRepresentationLoader {}
+    }
+
     function cleanup() {
         for (var i = 0; i < activeControllers.length; ++i)
             activeControllers[i].destroy();
@@ -75,5 +90,19 @@ TestCase {
         tryCompare(controller, "stateName", "runtime-unavailable");
         compare(controller.installedPluginVersion, "13.0.0");
         compare(controller.runtimeItem, null);
+    }
+
+    function test_representationSwapsWhenRuntimeBecomesReady() {
+        var loader = representationLoaderComponent.createObject(testCase, {
+            runtimeReady: false,
+            bootstrapRepresentation: bootstrapFixture,
+            runtimeRepresentation: runtimeFixture
+        });
+        verify(loader !== null);
+        activeControllers.push(loader);
+
+        tryCompare(loader.item, "marker", "bootstrap");
+        loader.runtimeReady = true;
+        tryCompare(loader.item, "marker", "runtime");
     }
 }

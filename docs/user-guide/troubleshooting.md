@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Check the installed versions and Diagnostics before deleting configuration or reinstalling.
+Check the recovery screen or native Diagnostics before deleting configuration or reinstalling.
 
 ## Widget is missing after installation
 
@@ -40,13 +40,21 @@ Log out and back in after changing install layers.
 
 ## QML plugin cannot be loaded
 
-The compiled plugin and Plasma package must have the same version. On Fedora, reinstall the COPR package:
+The compiled plugin and Plasma package must have the same version. A missing or mismatched plugin opens an in-widget recovery screen with the detected frontend and plugin versions.
+
+On Fedora, copy the command from that screen or reinstall the COPR package:
 
 ~~~bash
 sudo dnf reinstall plasma-ai-usage-monitor
 ~~~
 
-Open Diagnostics and inspect **Loaded plugin**. A missing library error in the journal usually means a partial source or Store-only install.
+Restart Plasma or log out and back in after repair. The QML engine can retain a failed import for the current session.
+
+Open Diagnostics and inspect **Version**, **Loaded plugin**, and **Install layers**. A missing library error in the journal usually means a partial source install or a Store frontend installed without the native plugin.
+
+## Frontend and native plugin versions differ
+
+Update the KDE Store frontend and the Fedora or source-installed plugin together. Diagnostics warns when a user-local frontend shadows the system package and offers a copyable repair command when it can identify one.
 
 ## KWallet does not open
 
@@ -99,11 +107,11 @@ Follow Plasma logs while reproducing the problem:
 journalctl --user -f | grep -i -E 'plasma|aiusage|qml'
 ~~~
 
-Also collect:
+Also collect or copy **Diagnostics → Copy version check**:
 
 ~~~bash
 plasmashell --version
 rpm -q plasma-ai-usage-monitor
 ~~~
 
-Attach the redacted support report from Diagnostics and the smallest relevant log excerpt to the GitHub issue.
+Attach the native **Copy support report** output and the smallest relevant log excerpt to the GitHub issue. The report includes install, database, and source-readiness state without credentials or identifying endpoint details.

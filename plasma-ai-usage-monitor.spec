@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        13.0.0
+Version:        14.0.0
 Release:        2%{?dist}
 Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
 License:        GPL-3.0-or-later
@@ -74,6 +74,9 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Sat Jul 18 2026 Loofi <loofi@github.com> - 14.0.0-1
+- Prepare v14.0.0 release
+
 * Fri Jul 17 2026 Loofi <loofi@github.com> - 13.0.0-2
 - Add git-core to the isolated buildroot for exact-tag policy tests
 

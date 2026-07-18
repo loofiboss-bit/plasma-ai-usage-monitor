@@ -1,19 +1,19 @@
 # Roadmap
 
-**Current release:** 13.0.0, Provider Intelligence
+**Current release:** 14.0.0, First Successful Use
 
-**Last updated:** 2026-07-17
+**Last updated:** 2026-07-18
 
-AI Usage Monitor will remain a desktop-native, local-first Plasma widget. The next work should make setup, data interpretation, diagnostics, and distribution more reliable before adding more providers.
+AI Usage Monitor remains a desktop-native, local-first Plasma widget. v14 makes one verified source the first-run goal and keeps provider-reported data, local estimates, balances, and connection checks separate.
 
 ## Current priorities
 
-### Setup that explains the result
+### Protect the first-success path
 
-- Guide users from installation to one verified data source.
-- Show the monitoring level before a provider is enabled.
+- Keep Guided first success focused on one useful source.
+- Keep the monitoring level visible before verification.
 - Keep authentication, permission, endpoint, and unsupported-metric errors distinct.
-- Link Diagnostics actions to the relevant user guide.
+- Test missing and mismatched native plugins without importing the plugin first.
 
 ### Trustworthy metrics
 
@@ -27,7 +27,7 @@ AI Usage Monitor will remain a desktop-native, local-first Plasma widget. The ne
 - Keep COPR as the supported Fedora package.
 - Test clean install, update, rollback, removal, and user-data preservation.
 - Detect mixed user-local and system versions before they cause QML plugin failures.
-- Keep KDE Store copy explicit about the required native plugin.
+- Keep the native-plugin requirement before every KDE Store install action.
 
 ### Useful local integrations
 
@@ -39,6 +39,7 @@ AI Usage Monitor will remain a desktop-native, local-first Plasma widget. The ne
 
 | Release | Result |
 | --- | --- |
+| 14.0.0 First Successful Use | Dependency-safe startup, Guided first success, source-focused Settings, outcome-first Overview, and native Diagnostics |
 | 13.0.0 Provider Intelligence | Read-only scheduled monitoring, nullable metric contract, SQLite schema v4, Catalog v5 adapters, LiteLLM, Cerebras, Fireworks, and Perplexity |
 | 12.0.x Reliability Core | Typed refresh lifecycle, source-aware history, catalog-driven models, KWallet caching, correct Fedora plugin packaging |
 | 11.0.0 Distribution and Catalog Truth | COPR-first installation, reviewed catalogs, release validation |

@@ -4,9 +4,9 @@
   <img src="assets/logo.png" alt="AI Usage Monitor logo" width="180">
 </p>
 
-AI Usage Monitor puts AI provider usage, spend, limits, and local coding-tool activity in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
+AI Usage Monitor puts provider-reported usage and spend, local coding-tool activity, and read-only connection checks in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-The current stable release is **13.0.0 (Provider Intelligence)**. Scheduled provider checks are read-only. A provider that cannot report usage or billing stays marked as unknown instead of showing a false zero.
+Version **14.0.0 (First Successful Use)** guides you from source choice to a safe verification. The result says whether the source returned usage or spend, a balance, a local estimate, or connectivity only. Scheduled provider checks are read-only, and missing values stay unknown instead of becoming false zeroes.
 
 ![AI Usage Monitor main window](assets/screenshots/main-window.png)
 
@@ -24,7 +24,7 @@ Log out and back in after the first install. Then:
 1. Right-click the panel or desktop and choose **Add Widgets**.
 2. Search for **AI Usage Monitor**.
 3. Add it to the panel or desktop.
-4. Right-click the widget and choose **Configure AI Usage Monitor**.
+4. Open the widget and complete **Guided first success** for one source.
 
 To update later:
 
@@ -49,13 +49,13 @@ The [GitHub wiki](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/wiki)
 
 ## What it monitors
 
-AI Usage Monitor supports 18 providers:
+OpenAI can report account usage and spend with an Admin API key. OpenRouter can report key usage, LiteLLM can report gateway spend, and DeepSeek can report a balance. Many other providers expose only model discovery or account connectivity. AI Usage Monitor labels those results as connection checks and does not turn them into invented usage data.
+
+Hosted-provider support includes:
 
 - OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter, and Google Veo
 - Mistral AI, Groq, xAI, Ollama Cloud, Together AI, and Cohere
 - Azure OpenAI, AWS Bedrock, LiteLLM Proxy, Cerebras, Fireworks AI, and Perplexity
-
-Providers expose different data. OpenAI can report account usage and spend with an Admin API key. OpenRouter can report key usage. LiteLLM can report gateway spend. Many other providers only expose model discovery or account connectivity. The widget labels those differences and does not turn connectivity into invented usage data.
 
 The generated [provider capability matrix](docs/provider-capabilities.md) lists the scheduled endpoint and monitoring level for every provider.
 
@@ -63,6 +63,9 @@ The widget also tracks Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf,
 
 ## Main features
 
+- Guided first success for one provider or detected local tool
+- Source-focused Settings with search, monitoring-level filters, and one detail pane
+- Overview sections for reporting providers, connection checks, local tools, and sources that need attention
 - Provider usage, spend, balances, limits, and connection state where the provider exposes them
 - Local history with single-provider and comparison views
 - Analyst view with spend trends, activity heatmap, anomalies, and top drivers
@@ -71,7 +74,7 @@ The widget also tracks Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf,
 - Scheduled JSON or CSV exports
 - A loopback-only Prometheus endpoint
 - Configuration export that excludes keys, tokens, cookies, and webhook URLs
-- Diagnostics for KWallet, provider health, catalogs, browser profiles, and the loaded plugin
+- Native Diagnostics for the loaded plugin, install layers, database, source readiness, KWallet, catalogs, and browser profiles
 - No telemetry or hosted backend
 
 ## Data boundaries
@@ -86,15 +89,20 @@ Read [Understanding the data](docs/user-guide/understanding-data.md) before sett
 
 | View | Screenshot |
 | --- | --- |
-| Provider intelligence | ![Provider intelligence](assets/screenshots/provider-intelligence.png) |
-| Analyst | ![Analyst view](assets/screenshots/analyst-view.png) |
-| Settings | ![Settings](assets/screenshots/settings-view.png) |
+| Guided first success | ![Guided first success source choice](assets/screenshots/guided-first-success.png) |
+| Verified result | ![Verified setup result with its monitoring level](assets/screenshots/verified-success.png) |
+| Overview | ![Overview with reporting providers and connection checks](assets/screenshots/main-window.png) |
+| Provider result | ![Provider result with source and quality labels](assets/screenshots/provider-intelligence.png) |
+| Provider settings | ![Provider settings](assets/screenshots/settings-view.png) |
+| History | ![History with compatible units and currency](assets/screenshots/history-view.png) |
+| Analyst | ![Analyst view with the current navigation](assets/screenshots/analyst-view.png) |
+| Panel | ![Compact panel state](assets/screenshots/panel-view.png) |
 
 ## Distribution notes
 
 - **Fedora COPR:** supported and recommended. Includes the widget and compiled plugin.
 - **Source build:** supported. Builds the same two parts.
-- **KDE Store plasmoid:** frontend-only. It needs a matching compiled plugin from COPR or a source build.
+- **KDE Store plasmoid:** frontend-only. Install the matching compiled plugin from COPR or a source build before installing the Store package. A missing or mismatched plugin opens an in-widget recovery screen; restart Plasma after repairing the installation.
 - **Flatpak:** not supported because the native QML plugin is not packaged by the old scaffold.
 
 ## Development

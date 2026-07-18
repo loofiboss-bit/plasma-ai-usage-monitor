@@ -2,6 +2,8 @@
 
 Provider cards answer different questions because provider APIs expose different information. Check the source and quality labels before comparing providers or setting a budget.
 
+Overview puts providers with useful reported metrics under **Reporting providers**. Providers that only prove endpoint access stay under the collapsed **Connection checks** section. Local tools appear separately. The header counts actual data, estimates, balances, connectivity, and sources that need attention without merging them into one success number.
+
 ## Monitoring levels
 
 | Level | What the widget can establish |

@@ -1,11 +1,11 @@
 # AI Usage Monitor wiki
 
-AI Usage Monitor is a KDE Plasma 6 widget for provider usage, spend, limits, and local coding-tool activity. Version 13.0.0 is the current stable release.
+AI Usage Monitor is a KDE Plasma 6 widget for provider-reported usage and spend, local coding-tool activity, and read-only connection checks. Version 14.0.0 is the current release.
 
 ## New user path
 
 1. [Install the complete package](Installation)
-2. [Complete the first setup](Getting-Started)
+2. [Verify one useful source](Getting-Started)
 3. [Learn what each value can prove](Understanding-the-Data)
 4. [Configure providers](Providers)
 5. [Add subscription tools](Subscription-Tools)
@@ -18,9 +18,9 @@ AI Usage Monitor is a KDE Plasma 6 widget for provider usage, spend, limits, and
 
 ## Important limits
 
-Provider APIs expose different information. Some report billing or key usage; many report only model access. The widget keeps missing values unknown and labels estimated data.
+Provider APIs expose different information. Some report billing or key usage; many report only model access. Guided first success names the result, and Overview keeps reporting providers separate from connection checks. Missing values stay unknown.
 
-The Fedora COPR and source build are complete installations. The KDE Store plasmoid needs the matching compiled plugin.
+The Fedora COPR and source build are complete installations. Install the matching compiled plugin before the frontend-only KDE Store plasmoid.
 
 The version-controlled [user guide](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/tree/main/docs/user-guide) contains the canonical commands and technical details.
 

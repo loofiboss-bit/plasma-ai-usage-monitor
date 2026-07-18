@@ -17,6 +17,18 @@ QQC2.ScrollView {
     readonly property var tools: root.allSubscriptionTools || []
     property bool connectionChecksExpanded: false
 
+    Component.onCompleted: {
+        if (root.smokeView === "provider-detail") {
+            Qt.callLater(function() {
+                if (overview.contentItem) {
+                    overview.contentItem.contentY = Math.min(
+                        overview.contentHeight - overview.availableHeight,
+                        Kirigami.Units.gridUnit * 20);
+                }
+            });
+        }
+    }
+
     Components.OverviewState {
         id: overviewState
         providers: overview.providers

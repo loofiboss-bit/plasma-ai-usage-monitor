@@ -16,7 +16,7 @@ PlasmaExtras.Representation {
                             : AppInfo.smokeView === "analyst" ? 2 : 0
 
     readonly property bool hasConfiguration: {
-        if (AppInfo.smokeView === "onboarding") return false;
+        if (AppInfo.smokeView.indexOf("onboarding") === 0) return false;
         var providers = root.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
             if (providers[i].enabled) return true;
@@ -71,6 +71,7 @@ PlasmaExtras.Representation {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
+        visible: AppInfo.smokeView !== "panel"
 
         RowLayout {
             Layout.fillWidth: true
@@ -103,6 +104,7 @@ PlasmaExtras.Representation {
             readinessModel: root.sourceReadiness
             secretStore: root.secretsManager
             configuration: plasmoid.configuration
+            previewState: AppInfo.smokeView
         }
 
         RowLayout {
@@ -146,6 +148,40 @@ PlasmaExtras.Representation {
                 var dbText = dbSize > 0 ? i18n(" · DB %1 KB", Math.round(dbSize / 1024)) : "";
                 return i18n("%1 providers connected", root.connectedCount || 0) + dbText;
             }
+        }
+    }
+
+    Rectangle {
+        anchors.fill: parent
+        visible: AppInfo.smokeView === "panel"
+        color: Kirigami.Theme.backgroundColor
+
+        Rectangle {
+            anchors.centerIn: parent
+            width: parent.width * 0.92
+            height: Kirigami.Units.gridUnit * 5
+            radius: height / 2
+            color: Qt.darker(Kirigami.Theme.backgroundColor, 1.35)
+            border.width: 1
+            border.color: Qt.alpha(Kirigami.Theme.textColor, 0.22)
+
+            Loader {
+                anchors.centerIn: parent
+                width: parent.width * 0.42
+                height: parent.height * 0.62
+                sourceComponent: root.compactRepresentationComponent
+            }
+        }
+    }
+
+    Component.onCompleted: {
+        if (AppInfo.smokeView === "settings") {
+            Qt.callLater(function() {
+                var configureAction = plasmoid.internalAction("configure");
+                if (configureAction) configureAction.trigger();
+            });
+        } else if (AppInfo.smokeView === "panel") {
+            plasmoid.configuration.compactDisplayMode = "cost";
         }
     }
 }

@@ -11,7 +11,7 @@ AI Usage Monitor has no telemetry, hosted account, cloud database, or cloud sync
 
 Webhooks send alert content to Slack or Discord by design. Treat the configured webhook destination as part of your data boundary.
 
-Review copied support reports before posting them publicly even though the widget redacts endpoint and account details.
+Native Diagnostics redacts endpoint and account details, credentials, and KWallet values from copied support reports. The dependency-recovery screen also omits error details and paths. Review either report before posting it publicly.
 
 Read the [full privacy guide](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/privacy-and-security.md).
 

@@ -15,6 +15,7 @@ QtObject {
     required property var secretStore
     required property var configuration
     required property var sourceApi
+    property string previewState: ""
 
     property int step: goalStep
     property string goal: ""
@@ -73,6 +74,21 @@ QtObject {
         refreshRecommendation();
         refreshCandidates();
         if (step === verificationStep) evaluateVerification();
+        Qt.callLater(applyPreviewState);
+    }
+
+    function applyPreviewState() {
+        if (previewState !== "onboarding-source"
+                && previewState !== "onboarding-result") return;
+
+        chooseGoal("provider");
+        if (candidates.length === 0) return;
+        selectSource(candidates[0].stableId, false);
+        if (previewState === "onboarding-result") {
+            resultQuality = qualityLabel(selectedSource);
+            resultSummary = qualitySummary(selectedSource);
+            goTo(resultStep);
+        }
     }
 
     function startAgain() {

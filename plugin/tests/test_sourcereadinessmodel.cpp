@@ -1,4 +1,5 @@
 #include <QtTest>
+#include <QScopeGuard>
 
 #include "providerbackend.h"
 #include "sourcereadinessmodel.h"
@@ -72,6 +73,7 @@ private Q_SLOTS:
     void credentialPropertyChangesInvalidateSource();
     void localToolStateTransitions();
     void explicitVerificationUsesSafeReadOnlyContract();
+    void demoModeUsesIsolatedEndpoint();
     void candidateRankingIsDeterministic();
 };
 
@@ -290,6 +292,30 @@ void SourceReadinessModelTest::explicitVerificationUsesSafeReadOnlyContract()
 
     const QVariantMap liteLlm = disabledModel.source(QStringLiteral("litellm"));
     QVERIFY(liteLlm.value(QStringLiteral("customEndpointRequired")).toBool());
+}
+
+void SourceReadinessModelTest::demoModeUsesIsolatedEndpoint()
+{
+    const bool wasSet = qEnvironmentVariableIsSet("PLASMA_AI_MONITOR_DEMO");
+    const QByteArray previous = qgetenv("PLASMA_AI_MONITOR_DEMO");
+    qputenv("PLASMA_AI_MONITOR_DEMO", QByteArrayLiteral("1"));
+    const auto restore = qScopeGuard([wasSet, previous]() {
+        if (wasSet) qputenv("PLASMA_AI_MONITOR_DEMO", previous);
+        else qunsetenv("PLASMA_AI_MONITOR_DEMO");
+    });
+
+    SourceReadinessModel model;
+    ReadinessProvider provider;
+    model.registerProviderBackend(QStringLiteral("litellm"), &provider);
+    model.setSourceEnabled(QStringLiteral("litellm"), true);
+
+    QCOMPARE(model.source(QStringLiteral("litellm"))
+                 .value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("ready_to_verify"));
+    QVERIFY(model.verifySource(QStringLiteral("litellm")));
+    QCOMPARE(model.source(QStringLiteral("litellm"))
+                 .value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("verifying"));
 }
 
 void SourceReadinessModelTest::candidateRankingIsDeterministic()

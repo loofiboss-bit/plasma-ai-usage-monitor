@@ -1,11 +1,11 @@
 # User guide
 
-Install the widget, connect one data source, and learn its labels before adding alerts or integrations.
+Install both required parts, verify one useful source in **Guided first success**, and learn what the result can prove before adding alerts or integrations.
 
 ## Set up the widget
 
 1. [Install or update](installation.md)
-2. [Complete the first setup](getting-started.md)
+2. [Reach your first successful source](getting-started.md)
 3. [Understand the data](understanding-data.md)
 
 ## Add data sources
@@ -21,4 +21,4 @@ Install the widget, connect one data source, and learn its labels before adding 
 
 ## Before asking for help
 
-Open **Settings → Diagnostics** and check the loaded plugin version, KWallet status, provider health, and catalog state. The **Copy support report** action omits endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values.
+Open **Settings → Diagnostics** and check the frontend and native-plugin versions, install layers, database, source readiness, KWallet, and catalogs. The native **Copy support report** action omits endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values.

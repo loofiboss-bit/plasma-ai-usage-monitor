@@ -1,6 +1,8 @@
 # Configure providers
 
-Open **Settings → Providers**, enable one provider at a time, and confirm its monitoring level in the setup overview.
+Open **Settings → Providers**, search or filter the source list, and select one source to configure. Usage and spend sources appear before connection checks. The detail pane shows one source at a time.
+
+Use the monitoring-level filter to find usage and spend, detected local tools, gateways, balances, or connectivity-only sources. Enable a source, enter its required fields, apply the changes, then choose **Verify**. Verification is disabled while Settings has pending changes.
 
 ## Common fields
 
@@ -8,6 +10,8 @@ Open **Settings → Providers**, enable one provider at a time, and confirm its 
 - **Model:** used for model-specific estimates or manual tests
 - **Custom base URL:** intended for a trusted proxy or gateway
 - **Refresh interval:** configured under General; catalog minimums still apply
+
+The default detail pane shows the monitoring level, required permission, scheduled read-only endpoint, and credential fields. Turn on **Advanced** only for model overrides, custom base URLs, or provider-specific fields.
 
 Use HTTPS for remote endpoints. Plain HTTP is accepted only for loopback development addresses such as 127.0.0.1, localhost, and ::1.
 
@@ -59,4 +63,4 @@ The runtime-generated [capability matrix](../provider-capabilities.md) lists eve
 - **429:** the provider rate-limited the request. The scheduler honors retry guidance and backs off.
 - **TLS or host error:** remove a custom base URL and retry the default endpoint.
 
-Open **Diagnostics** to confirm the loaded plugin, wallet state, provider status, and catalog contract before changing unrelated settings.
+Open **Diagnostics** to confirm the frontend and plugin match, inspect the typed source-readiness error, and select the affected provider before changing unrelated settings.

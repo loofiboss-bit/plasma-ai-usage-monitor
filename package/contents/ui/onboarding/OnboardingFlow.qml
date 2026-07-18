@@ -13,6 +13,8 @@ Item {
     required property var readinessModel
     required property var secretStore
     required property var configuration
+    property string previewState: ""
+    property alias guidedController: controller
 
     function startAgain() { controller.startAgain(); }
     function resume() { controller.resume(); }
@@ -23,6 +25,7 @@ Item {
         secretStore: flow.secretStore
         configuration: flow.configuration
         sourceApi: flow.runtime
+        previewState: flow.previewState
     }
 
     Rectangle {
@@ -80,23 +83,23 @@ Item {
 
     Component {
         id: goalComponent
-        SetupGoalStep { controller: controller }
+        SetupGoalStep { controller: flow.guidedController }
     }
     Component {
         id: sourceComponent
-        SetupSourceStep { controller: controller }
+        SetupSourceStep { controller: flow.guidedController }
     }
     Component {
         id: configureComponent
-        SetupConfigureStep { controller: controller }
+        SetupConfigureStep { controller: flow.guidedController }
     }
     Component {
         id: verificationComponent
-        SetupVerificationStep { controller: controller }
+        SetupVerificationStep { controller: flow.guidedController }
     }
     Component {
         id: resultComponent
-        SetupResultStep { controller: controller }
+        SetupResultStep { controller: flow.guidedController }
     }
     Component {
         id: pausedComponent

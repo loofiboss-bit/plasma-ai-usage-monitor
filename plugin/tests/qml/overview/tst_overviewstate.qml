@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import "../../../../package/contents/ui/components" as Components
+import "../../../../package/contents/ui" as Monitor
 import "../../../../package/contents/ui/Utils.js" as Utils
 import "fixtures/OverviewStateFixtures.js" as Fixtures
 
@@ -21,6 +22,11 @@ TestCase {
     Components.OverviewState {
         id: overviewState
         readinessModel: fakeReadiness
+    }
+
+    Component {
+        id: costCardComponent
+        Monitor.CostSummaryCard { width: 800 }
     }
 
     function loadFixture(fixture) {
@@ -111,5 +117,40 @@ TestCase {
         var formatted = Utils.formatNumber(1250, Qt.locale("sv_SE"));
         verify(formatted.indexOf("\u202fK") > 0);
         verify(formatted.indexOf(",") > 0);
+    }
+
+    function test_costCardFiltersNonPositiveRowsBeforeLayout() {
+        var card = createTemporaryObject(costCardComponent, testCase, {
+            providers: [
+                { name: "Actual", enabled: true, color: "red", backend: {
+                    connected: true, costSource: "actual_api", cost: 4.25,
+                    monthlyCost: 4.25, dailyCost: 0.5, currency: "USD",
+                    metrics: [{ kind: "cost", available: true, value: 4.25 }]
+                }},
+                { name: "Zero", enabled: true, color: "blue", backend: {
+                    connected: true, costSource: "actual_api", cost: 0,
+                    monthlyCost: 0, dailyCost: 0, currency: "USD",
+                    metrics: [{ kind: "cost", available: true, value: 0 }]
+                }},
+                { name: "Disabled", enabled: false, backend: { connected: true } }
+            ],
+            subscriptionTools: [
+                { name: "Paid", enabled: true, monitor: {
+                    hasSubscriptionCost: true, subscriptionCost: 20
+                }},
+                { name: "Free", enabled: true, monitor: {
+                    hasSubscriptionCost: true, subscriptionCost: 0
+                }}
+            ]
+        });
+        verify(card);
+        compare(card.providerRows.length, 1);
+        compare(card.providerRows[0].provider.name, "Actual");
+        compare(card.subscriptionRows.length, 1);
+        compare(card.subscriptionRows[0].tool.name, "Paid");
+
+        card.costViewMode = 1;
+        compare(card.providerRows.length, 1);
+        compare(card.subscriptionRows.length, 0);
     }
 }

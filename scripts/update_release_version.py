@@ -29,13 +29,19 @@ def render(version: str) -> dict[Path, str]:
     for relative in ("package/metadata.json", "package/contents/catalog/providers-v4.json",
                      "package/contents/catalog/subscriptions-v1.json"):
         path = ROOT / relative
-        payload = json.loads(path.read_text(encoding="utf-8"))
+        source = path.read_text(encoding="utf-8")
         if relative.endswith("metadata.json"):
+            payload = json.loads(source)
             payload["KPlugin"]["Version"] = version
             payload["X-AIUsageMonitor-RequiredPluginVersion"] = version
+            outputs[path] = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
         else:
-            payload["release"] = version
-        outputs[path] = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+            outputs[path] = replace_once(
+                source,
+                r'^(\s*"release":\s*")[^"]+("[,]?)$',
+                rf"\g<1>{version}\g<2>",
+                f"{relative} release",
+            )
 
     spec = (ROOT / "plasma-ai-usage-monitor.spec").read_text(encoding="utf-8")
     spec = replace_once(spec, r"^Version:\s*[^\n]+$", f"Version:        {version}", "RPM Version")
@@ -62,15 +68,20 @@ def render(version: str) -> dict[Path, str]:
     readme = readme_path.read_text(encoding="utf-8")
     readme = replace_once(
         readme,
-        r"(\*\*Current (?:development )?release:\*\* `v)[0-9]+\.[0-9]+\.[0-9]+",
-        rf"\g<1>{version}",
+        r"(Version \*\*)[0-9]+\.[0-9]+\.[0-9]+( \([^\n]+\)\*\*)",
+        rf"\g<1>{version}\g<2>",
         "README current release",
     )
     outputs[readme_path] = readme
 
     roadmap_path = ROOT / "ROADMAP.md"
     roadmap = roadmap_path.read_text(encoding="utf-8")
-    roadmap = replace_once(roadmap, r"(\*\*Current version:\*\* v)[0-9]+\.[0-9]+\.[0-9]+", rf"\g<1>{version}", "ROADMAP current version")
+    roadmap = replace_once(
+        roadmap,
+        r"(\*\*Current release:\*\* )[0-9]+\.[0-9]+\.[0-9]+",
+        rf"\g<1>{version}",
+        "ROADMAP current release",
+    )
     outputs[roadmap_path] = roadmap
     outputs[ROOT / "VERSION"] = version + "\n"
     return outputs

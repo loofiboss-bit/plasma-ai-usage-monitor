@@ -2,6 +2,8 @@
 
 The source label matters more than the size of the number.
 
+Overview places useful provider results under **Reporting providers** and keeps connectivity-only providers under the collapsed **Connection checks** section. Local tools appear separately. Its header counts actual data, estimates, balances, connection checks, and sources that need attention without treating them as the same outcome.
+
 | Label | Meaning |
 | --- | --- |
 | Actual usage or billing | The provider supplied account data |

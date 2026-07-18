@@ -210,7 +210,8 @@ bool SourceReadinessModel::verifySource(const QString &stableId)
     if (entry.kind == SourceKind::Provider) {
         auto *backend = qobject_cast<ProviderBackend *>(entry.backend.data());
         if (!backend || !providerCredentialsConfigured(entry, backend)
-            || (entry.customEndpointRequired && backend->customBaseUrl().isEmpty())) {
+            || (entry.customEndpointRequired && backend->customBaseUrl().isEmpty()
+                && !qEnvironmentVariableIsSet("PLASMA_AI_MONITOR_DEMO"))) {
             updateRow(row);
             return false;
         }
@@ -396,7 +397,8 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
         result.nextAction = NextAction::AddCredentials;
         return result;
     }
-    if (entry.customEndpointRequired && backend->customBaseUrl().isEmpty()) {
+    if (entry.customEndpointRequired && backend->customBaseUrl().isEmpty()
+        && !qEnvironmentVariableIsSet("PLASMA_AI_MONITOR_DEMO")) {
         result.state = SourceState::NeedsConfiguration;
         result.nextAction = NextAction::CompleteConfiguration;
         return result;

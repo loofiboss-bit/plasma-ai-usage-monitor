@@ -42,6 +42,7 @@ check:
     python3 scripts/check_provider_capability_docs.py
     python3 scripts/check_demo_contract.py
     python3 scripts/check_release_policy.py
+    python3 scripts/check_release_media.py
     bash scripts/test_verify_exact_tag.sh
 
 # Regenerate the provider capability matrix from Catalog v5
@@ -81,6 +82,7 @@ release-check: build-debug
     python3 scripts/check_provider_capability_docs.py
     python3 scripts/check_demo_contract.py
     python3 scripts/check_release_policy.py
+    python3 scripts/check_release_media.py
     bash scripts/test_verify_exact_tag.sh
     PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --strict --build-dir build/debug --expected-version "$(< VERSION)"
     @if command -v appstreamcli >/dev/null 2>&1; then appstreamcli validate com.github.loofi.aiusagemonitor.metainfo.xml; else echo "Warning: appstreamcli not found, skipping validation. Run 'sudo dnf install appstream' on Fedora."; exit 1; fi
@@ -197,9 +199,9 @@ copr-submit TAG PROJECT="loofitheboss/plasma-ai-usage-monitor":
     mkdir -p dist
     bash scripts/copr_submit_build.sh --project "{{PROJECT}}" --tag "{{TAG}}" --output-dir dist
 
-# Verify clean Fedora 44 install plus v12.0.3 upgrade, rollback, and removal
-rpm-lifecycle-check V12_RPM V13_RPM:
-    bash scripts/test_fedora44_rpm_lifecycle.sh "{{V12_RPM}}" "{{V13_RPM}}"
+# Verify clean Fedora 44 install plus v13 upgrade, rollback, re-upgrade, reinstall, and removal
+rpm-lifecycle-check V13_RPM V14_RPM:
+    bash scripts/test_fedora44_rpm_lifecycle.sh "{{V13_RPM}}" "{{V14_RPM}}"
 
 # Enable the COPR repository
 copr-enable:

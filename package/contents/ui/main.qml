@@ -19,12 +19,8 @@ PlasmoidItem {
                         ? root.nativeRoot.toolTipSubText
                         : i18n("Native plugin setup required")
 
-    compactRepresentation: root.runtimeReady && root.nativeRoot
-                           ? root.nativeRoot.compactRepresentationComponent
-                           : bootstrapCompactRepresentation
-    fullRepresentation: root.runtimeReady && root.nativeRoot
-                        ? root.nativeRoot.fullRepresentationComponent
-                        : bootstrapFullRepresentation
+    compactRepresentation: adaptiveCompactRepresentation
+    fullRepresentation: adaptiveFullRepresentation
 
     DependencyBootstrapController {
         id: dependencyController
@@ -60,6 +56,17 @@ PlasmoidItem {
     }
 
     Component {
+        id: adaptiveCompactRepresentation
+
+        RuntimeRepresentationLoader {
+            runtimeReady: root.runtimeReady && root.nativeRoot !== null
+            bootstrapRepresentation: bootstrapCompactRepresentation
+            runtimeRepresentation: root.nativeRoot
+                ? root.nativeRoot.compactRepresentationComponent : null
+        }
+    }
+
+    Component {
         id: bootstrapFullRepresentation
 
         DependencyBootstrap {
@@ -67,6 +74,17 @@ PlasmoidItem {
             installedPluginVersion: dependencyController.installedPluginVersion
             bootstrapState: dependencyController.stateName
             supportReport: dependencyController.supportReport()
+        }
+    }
+
+    Component {
+        id: adaptiveFullRepresentation
+
+        RuntimeRepresentationLoader {
+            runtimeReady: root.runtimeReady && root.nativeRoot !== null
+            bootstrapRepresentation: bootstrapFullRepresentation
+            runtimeRepresentation: root.nativeRoot
+                ? root.nativeRoot.fullRepresentationComponent : null
         }
     }
 }

@@ -1,6 +1,6 @@
 # Installation
 
-The Fedora COPR package includes the Plasma widget and compiled Qt plugin.
+AI Usage Monitor needs a Plasma frontend and matching compiled Qt plugin. The Fedora COPR package includes both.
 
 ~~~bash
 sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor
@@ -22,7 +22,9 @@ sudo dnf remove plasma-ai-usage-monitor
 sudo dnf copr remove loofitheboss/plasma-ai-usage-monitor
 ~~~
 
-The KDE Store plasmoid is frontend-only and needs a matching native plugin from COPR or a source build.
+Before installing the KDE Store plasmoid, install the matching native plugin from COPR or a source build. The Store package is frontend-only.
+
+A missing, older, or newer plugin opens an in-widget recovery screen. It shows both versions, a copyable COPR command, a source-install link, and a redacted report. Repair the installation, then restart Plasma or log out and back in.
 
 Source build instructions, version checks, and mixed-installation guidance live in the [canonical installation guide](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/installation.md).
 

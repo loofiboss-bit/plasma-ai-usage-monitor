@@ -1,6 +1,8 @@
 # Providers
 
-Open **Settings → Providers** and enable one provider at a time.
+Open **Settings → Providers**, search or filter the source list, and select one source. The detail pane shows its monitoring level, required permission, scheduled endpoint, enable control, credentials, and safe verification action.
+
+Apply pending changes before choosing **Verify**. Turn on **Advanced** only for model overrides, custom base URLs, or provider-specific fields. Cancelling Settings discards staged credential changes.
 
 OpenAI, OpenRouter, LiteLLM, and DeepSeek can expose account, key, gateway, or balance data. Most other supported providers currently confirm credentials or model access without returning account usage or billing.
 

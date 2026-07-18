@@ -11,6 +11,7 @@ Item {
     property string pendingSettingsVerificationSourceId: ""
     property bool diagnosticsSnapshotScheduled: false
     readonly property string pluginVersion: AppInfo.version
+    readonly property string smokeView: AppInfo.smokeView
     readonly property bool pluginVersionMismatch: {
         var required = plasmoid.metaData?.version || "";
         return required !== "" && required !== AppInfo.version;

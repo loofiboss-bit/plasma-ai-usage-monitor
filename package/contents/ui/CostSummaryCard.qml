@@ -76,6 +76,44 @@ ColumnLayout {
         return keys.length === 1 ? totals[keys[0]] : 0;
     }
 
+    function providerCostForMode(provider) {
+        if (!provider.enabled || !provider.backend || !provider.backend.connected) return 0;
+        if (!Utils.hasCompatibleCostData(provider.backend)) return 0;
+        var source = provider.backend.costSource || "unknown";
+        if (costViewMode === 3) return 0;
+        if (costViewMode === 4) {
+            if (source === "estimated_from_usage" || provider.backend.isEstimatedCost)
+                return provider.backend.estimatedMonthlyCost
+                    || provider.backend.monthlyCost || provider.backend.cost || 0;
+            return 0;
+        }
+        if (source !== "billing_api" && source !== "usage_api" && source !== "actual_api") return 0;
+        if (costViewMode === 1) return provider.backend.dailyCost ?? 0;
+        if (costViewMode === 2) return provider.backend.monthlyCost ?? 0;
+        return provider.backend.monthlyCost || provider.backend.cost || 0;
+    }
+
+    readonly property var providerRows: {
+        var rows = [];
+        for (var i = 0; i < providers.length; i++) {
+            var cost = providerCostForMode(providers[i]);
+            if (cost > 0) rows.push({ provider: providers[i], cost: cost });
+        }
+        return rows;
+    }
+
+    readonly property var subscriptionRows: {
+        if (costViewMode !== 0 && costViewMode !== 3) return [];
+        var rows = [];
+        for (var i = 0; i < subscriptionTools.length; i++) {
+            var tool = subscriptionTools[i];
+            var cost = tool.monitor && tool.monitor.hasSubscriptionCost
+                ? tool.monitor.subscriptionCost ?? 0 : 0;
+            if (tool.enabled && cost > 0) rows.push({ tool: tool, cost: cost });
+        }
+        return rows;
+    }
+
     readonly property var apiSpend: providerTotals("cost", false)
     readonly property var apiSpendToday: providerTotals("dailyCost", false)
     readonly property var apiSpendThisMonth: providerTotals("monthlyCost", false)
@@ -198,37 +236,22 @@ ColumnLayout {
             }
 
             Repeater {
-                model: costCard.providers
+                model: costCard.providerRows
                 RowLayout {
+                    required property var modelData
                     Layout.fillWidth: true
-                    readonly property double providerCost: {
-                        if (!modelData.backend) return 0;
-                        if (!Utils.hasCompatibleCostData(modelData.backend)) return 0;
-                        var source = modelData.backend.costSource || "unknown";
-                        if (costCard.costViewMode === 3) return 0;
-                        if (costCard.costViewMode === 4) {
-                            if (source === "estimated_from_usage" || modelData.backend.isEstimatedCost)
-                                return modelData.backend.estimatedMonthlyCost || modelData.backend.monthlyCost || modelData.backend.cost || 0;
-                            return 0;
-                        }
-                        if (source !== "billing_api" && source !== "usage_api" && source !== "actual_api") return 0;
-                        if (costCard.costViewMode === 1) return modelData.backend.dailyCost ?? 0;
-                        if (costCard.costViewMode === 2) return modelData.backend.monthlyCost ?? 0;
-                        return modelData.backend.monthlyCost || modelData.backend.cost || 0;
-                    }
-                    visible: modelData.enabled && modelData.backend && modelData.backend.connected && providerCost > 0
                     spacing: Kirigami.Units.smallSpacing
 
-                    Rectangle { width: 8; height: 8; radius: 4; color: modelData.color }
+                    Rectangle { width: 8; height: 8; radius: 4; color: modelData.provider.color }
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
                         elide: Text.ElideRight
-                        text: modelData.name
+                        text: modelData.provider.name
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.8
                     }
                     PlasmaComponents.Label {
-                        text: Utils.formatMoney(parent.providerCost, modelData.backend?.currency || "USD")
+                        text: Utils.formatMoney(modelData.cost, modelData.provider.backend?.currency || "USD")
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         font.bold: true
                     }
@@ -236,27 +259,22 @@ ColumnLayout {
             }
 
             Repeater {
-                model: costCard.subscriptionTools
+                model: costCard.subscriptionRows
                 RowLayout {
+                    required property var modelData
                     Layout.fillWidth: true
-                    readonly property double toolCost: {
-                        if (!modelData.monitor || !modelData.monitor.hasSubscriptionCost) return 0;
-                        return modelData.monitor.subscriptionCost ?? 0;
-                    }
-                    visible: (costCard.costViewMode === 0 || costCard.costViewMode === 3)
-                             && modelData.enabled && toolCost > 0
                     spacing: Kirigami.Units.smallSpacing
 
-                    Rectangle { width: 8; height: 8; radius: 4; color: modelData.monitor?.toolColor ?? Kirigami.Theme.highlightColor }
+                    Rectangle { width: 8; height: 8; radius: 4; color: modelData.tool.monitor?.toolColor ?? Kirigami.Theme.highlightColor }
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
                         elide: Text.ElideRight
-                        text: i18n("%1 (subscription fee)", modelData.name)
+                        text: i18n("%1 (subscription fee)", modelData.tool.name)
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.8
                     }
                     PlasmaComponents.Label {
-                        text: Utils.formatMoney(parent.toolCost, "USD")
+                        text: Utils.formatMoney(modelData.cost, "USD")
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         font.bold: true
                     }

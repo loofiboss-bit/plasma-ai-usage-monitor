@@ -51,7 +51,7 @@ TestCase {
         signal sourceChanged(string stableId)
 
         function source(stableId) { return sources[stableId] || ({}); }
-        function rankedSourceIds() { return ["codex-cli", "openai"]; }
+        function rankedSourceIds() { return ["codex-cli", "openai", "litellm"]; }
         function update(stableId, values) {
             var nextSources = Object.assign({}, sources);
             nextSources[stableId] = Object.assign({}, nextSources[stableId], values);
@@ -111,6 +111,11 @@ TestCase {
                 stableId: "openai", displayName: "OpenAI", sourceKindKey: "provider",
                 monitoringLevel: "actual_usage_spend", requiredCredentialSlots: ["openai"], installed: true,
                 safeVerification: true, customEndpointRequired: false, readinessStateKey: "disabled"
+            },
+            "litellm": {
+                stableId: "litellm", displayName: "LiteLLM Proxy", sourceKindKey: "provider",
+                monitoringLevel: "gateway_aggregate", requiredCredentialSlots: ["litellm"], installed: true,
+                safeVerification: true, customEndpointRequired: true, readinessStateKey: "disabled"
             }
         };
     }
@@ -138,6 +143,20 @@ TestCase {
         controller.initialize();
         controller.statusMessage = "";
         controller.statusError = false;
+        controller.previewState = "";
+    }
+
+    function test_mediaPreviewStatesDoNotRunVerification() {
+        controller.previewState = "onboarding-source";
+        controller.applyPreviewState();
+        compare(controller.step, controller.sourceStep);
+        compare(controller.selectedSourceId, "litellm");
+
+        controller.previewState = "onboarding-result";
+        controller.applyPreviewState();
+        compare(controller.step, controller.resultStep);
+        compare(controller.resultQuality, "Gateway-reported usage");
+        compare(fakeReadiness.verifyCalls, 0);
     }
 
     function test_localToolSuccess() {

@@ -7,11 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Documentation
-- Replace the monolithic README with a task-based documentation entry point.
-- Add end-user guides for installation, first setup, data semantics, providers, subscription tools, history, integrations, troubleshooting, privacy, and security.
-- Refresh the contributor, architecture, security, roadmap, provider setup, and distribution documents for the v13 runtime.
-- Add version-controlled sources for the GitHub wiki.
+## [14.0.0] — 2026-07-18
+
+### Added
+- Add a dependency-safe startup screen that can explain a missing, older, or newer native plugin before loading the native QML module.
+- Add one source-readiness contract for provider and detected local-tool configuration, verification state, result quality, and recovery actions.
+- Add Guided first success for choosing one goal, configuring only required fields, and running a read-only verification without inference.
+- Add direct QML behavior coverage for dependency bootstrap, guided setup, provider Settings transactions, and Overview state.
+
+### Changed
+- Replace the provider settings wall with a searchable source list, monitoring-level filters, and one selected detail pane.
+- Split Overview into reporting providers, collapsed connection checks, local tools, and actionable source problems.
+- Report actual provider data, gateway data, balances, local estimates, and connectivity as distinct outcomes across setup and daily use.
+- Move installed-system recovery into native Diagnostics with frontend/plugin identity, install layers, database health, source readiness, and redacted copy actions.
+- Refresh the README, user guide, wiki sources, AppStream copy, and screenshot brief around first successful use.
+
+### Fixed
+- Discard staged KWallet edits when Settings is cancelled or closed; write or remove secrets only when Apply succeeds.
+- Add complete settings and refresh bindings for every catalog provider.
 
 ## [13.0.0] — 2026-07-17
 
@@ -759,7 +772,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v13.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.0...HEAD
+[14.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v13.0.0...v14.0.0
 [13.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.3...v13.0.0
 [12.0.3]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.2...v12.0.3
 [12.0.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.1...v12.0.2

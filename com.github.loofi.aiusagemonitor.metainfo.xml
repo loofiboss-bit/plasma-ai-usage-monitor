@@ -4,19 +4,25 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0-or-later</project_license>
   <name>AI Usage Monitor</name>
+  <developer id="io.github.loofiboss-bit">
+    <name>Loofi</name>
+  </developer>
   <icon type="stock">utilities-system-monitor</icon>
-  <summary>KDE Plasma widget to monitor AI API usage, rate limits, and costs</summary>
+  <summary>Verify AI usage, spend, and local coding activity in Plasma</summary>
 
   <description>
     <p>
-      AI Usage Monitor is a Plasma 6 widget for tracking AI provider usage, estimated
-      cost, rate limits, budget thresholds, and subscription-tool limits directly from
-      the panel.
+      AI Usage Monitor is a Plasma 6 widget for provider-reported usage and spend,
+      local coding-tool activity, balances, rate limits, and read-only connection checks.
+      Guided setup verifies one useful source with a safe read-only request and states
+      what the result can prove.
     </p>
     <p>
-      It supports multiple hosted AI providers, local history, compare analytics,
-      export options, notification controls, and subscription-tool monitoring for
-      Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI.
+      The widget stores secrets in KWallet and history on the local computer. Overview
+      keeps reported data, estimates, balances, and connectivity separate. Native
+      diagnostics checks plugin versions, install layers, database health, and source
+      readiness. The KDE Store frontend requires the matching compiled plugin from the
+      Fedora COPR package or a source build.
     </p>
   </description>
 
@@ -26,22 +32,44 @@
   <url type="bugtracker">https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues</url>
 
   <screenshots>
+    <screenshot>
+      <caption>Guided first success source choice with monitoring levels</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/guided-first-success.png</image>
+    </screenshot>
     <screenshot type="default">
-      <caption>Live dashboard with connected provider cards and cost summaries</caption>
+      <caption>Overview with provider and local-tool status</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/main-window.png</image>
     </screenshot>
     <screenshot>
-      <caption>Compact panel representation with status badge</caption>
+      <caption>Compact panel value</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/panel-view.png</image>
     </screenshot>
     <screenshot>
-      <caption>Configuration-oriented view used for provider and budget setup</caption>
+      <caption>Provider settings in Plasma</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/settings-view.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>History with one compatible unit and currency</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/history-view.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Analyst view with current navigation and demo data</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-view.png</image>
     </screenshot>
   </screenshots>
 
   <releases>
 
+    <release version="14.0.0" date="2026-07-18">
+      <description>
+        <ul>
+          <li>Add Guided first success with safe source verification and truthful result labels.</li>
+          <li>Add recovery for a missing or mismatched native plugin.</li>
+          <li>Restructure provider Settings and separate reporting data from connection checks in Overview.</li>
+          <li>Add native install, database, and source-readiness diagnostics.</li>
+        </ul>
+      </description>
+    </release>
     <release version="13.0.0" date="2026-07-17"/>
     <release version="12.0.3" date="2026-07-13"/>
     <release version="12.0.2" date="2026-07-13"/>

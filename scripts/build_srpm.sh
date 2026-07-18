@@ -70,7 +70,11 @@ if [[ -n "$TAG" ]]; then
   git archive --format=tar --prefix="${PREFIX_DIR}" "$TAG" \
     | gzip -n > "$SOURCE_TARBALL"
 elif git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git -c core.quotepath=off ls-files -z | tar \
+  git -c core.quotepath=off ls-files -z --cached --others --exclude-standard \
+    | while IFS= read -r -d '' path; do
+        [[ -e "$path" ]] && printf '%s\0' "$path"
+      done \
+    | tar \
     --null \
     --no-recursion \
     --sort=name \
