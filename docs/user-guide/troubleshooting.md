@@ -99,6 +99,15 @@ Connectivity-only responses do not create fake usage rows.
 
 The service may have changed its undocumented endpoint. Local subscription tracking continues without Browser Sync.
 
+## Antigravity quota is unavailable
+
+- Update to a build that supports the Antigravity 2.x `resources/bin/language_server` layout.
+- Keep the Antigravity desktop app open and signed in, then use **Refresh / Test connection**.
+- Restart Antigravity after an app update so its localhost daemon and bundled certificate are current.
+- Check that Diagnostics reports the tool as installed and the source as **Antigravity local**.
+
+The Antigravity card reports Antigravity quota only. It does not include the separate usage limits shown by `gemini.google.com`.
+
 ## Collect logs
 
 Follow Plasma logs while reproducing the problem:

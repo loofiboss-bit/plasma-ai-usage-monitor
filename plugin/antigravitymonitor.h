@@ -3,6 +3,7 @@
 
 #include "subscriptiontoolbackend.h"
 
+#include <QByteArray>
 #include <QQueue>
 #include <QVariantMap>
 
@@ -80,8 +81,11 @@ class AntigravityMonitor : public SubscriptionToolBackend
     static QByteArray grpcFrame(const QByteArray &payload);
     static QByteArray firstGrpcMessage(const QByteArray &body, QString *error = nullptr);
     static QVariantMap parseUserStatusPayload(const QByteArray &payload);
+    static QVariantMap parseConnectUserStatusPayload(const QByteArray &payload);
+    static QVariantMap parseQuotaSummaryPayload(const QByteArray &payload);
     static QString normalizedPlanId(const QString &planName, const QString &tierId, bool enterprise);
     static bool isLoopbackHost(const QString &host);
+    static bool isSupportedLanguageServerPath(const QString &path);
     static bool validateDiscoveryFile(const QString &path, quint32 expectedOwner, QVariantMap *document = nullptr,
                                       QString *error = nullptr);
 
@@ -106,7 +110,7 @@ class AntigravityMonitor : public SubscriptionToolBackend
         QString host = QStringLiteral("127.0.0.1");
         quint16 port = 0;
         QString csrfToken;
-        QString certificatePath;
+        QByteArray certificateData;
         QString serverVersion;
     };
 
@@ -115,11 +119,12 @@ class AntigravityMonitor : public SubscriptionToolBackend
     QList<Endpoint> endpointsFromProcesses() const;
     static QString validatedLanguageServerExecutable(qint64 pid, quint32 expectedOwner);
     static QList<quint16> listeningLoopbackPorts(qint64 pid);
-    static QString certificateForExecutable(const QString &executable);
+    static QByteArray certificateForExecutable(const QString &executable);
     static QString argumentValue(const QList<QByteArray> &arguments, const QByteArray &name);
 
     void tryNextEndpoint();
     void requestEndpoint(const Endpoint &endpoint);
+    void requestQuotaSummary(const Endpoint &endpoint, const QVariantMap &userStatus);
     void finishSuccess(const QVariantMap &parsed);
     void updateAggregateWarning(double maximumPercentUsed);
     void setConnectionState(const QString &state, const QString &readinessCode);
