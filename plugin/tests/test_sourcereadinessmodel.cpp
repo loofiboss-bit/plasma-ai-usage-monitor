@@ -116,6 +116,8 @@ void SourceReadinessModelTest::providerStateTransitions()
     };
 
     QCOMPARE(state(), QStringLiteral("disabled"));
+    QVERIFY(!model.source(QStringLiteral("openai"))
+                 .value(QStringLiteral("lastVerifiedPresent")).toBool());
     model.setSourceEnabled(QStringLiteral("openai"), true);
     QCOMPARE(state(), QStringLiteral("needs_configuration"));
 
@@ -141,6 +143,8 @@ void SourceReadinessModelTest::providerStateTransitions()
     QCOMPARE(state(), QStringLiteral("reporting_actual"));
 
     provider.updateLastRefreshed();
+    QVERIFY(model.source(QStringLiteral("openai"))
+                .value(QStringLiteral("lastVerifiedPresent")).toBool());
     provider.setErrorDetails(QStringLiteral("offline"), ProviderBackend::ProviderErrorKind::Network);
     QCOMPARE(state(), QStringLiteral("degraded"));
 }

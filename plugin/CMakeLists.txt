@@ -119,6 +119,7 @@ target_link_libraries(aiusagemonitorplugin
     KF6::Wallet
     KF6::Notifications
     KF6::I18n
+    ${CMAKE_DL_LIBS}
 )
 
 install(TARGETS aiusagemonitorplugin DESTINATION ${KDE_INSTALL_QMLDIR}/com/github/loofi/aiusagemonitor)

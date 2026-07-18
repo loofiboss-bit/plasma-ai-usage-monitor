@@ -36,6 +36,9 @@ TestCase {
         tryCompare(controller, "stateName", "plugin-unavailable");
         compare(controller.installedPluginVersion, "");
         compare(controller.runtimeItem, null);
+        verify(controller.supportReport().indexOf("Native plugin: not_detected") >= 0);
+        verify(controller.supportReport().indexOf("Native status: plugin-unavailable") >= 0);
+        verify(controller.supportReport().indexOf(controller.errorDetail) < 0);
     }
 
     function test_matchingPluginLoadsRuntime() {
@@ -53,6 +56,9 @@ TestCase {
         tryCompare(controller, "stateName", "plugin-older");
         compare(controller.installedPluginVersion, "12.9.0");
         compare(controller.runtimeItem, null);
+        verify(controller.supportReport().indexOf("Frontend version: 13.0.0") >= 0);
+        verify(controller.supportReport().indexOf("Native plugin: 12.9.0") >= 0);
+        verify(controller.supportReport().indexOf("Native status: plugin-older") >= 0);
     }
 
     function test_newerPluginStopsBeforeRuntime() {

@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
@@ -11,6 +13,15 @@ KCM.SimpleKCM {
 
     readonly property string versionCheckCommand: "plasmashell --version; rpm -q plasma-ai-usage-monitor"
     readonly property string troubleshootingUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/troubleshooting.md"
+    readonly property string providerGuideUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/providers.md"
+    readonly property string providerCatalogUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/package/contents/catalog/providers-v4.json"
+    readonly property string subscriptionGuideUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/subscriptions.md"
+    readonly property string frontendVersion: (plasmoid.metaData && plasmoid.metaData.version)
+                                                ? plasmoid.metaData.version : "unknown"
+    readonly property var systemInfo: AppInfo.systemDiagnostics(frontendVersion)
+    readonly property var databaseInfo: AppInfo.databaseDiagnostics()
+    readonly property var sourceSnapshot: parseSourceSnapshot()
+    property string recoverySelectionMessage: ""
 
     SecretsManager { id: secrets }
     BrowserSyncService { id: syncDetector }
@@ -27,6 +38,7 @@ KCM.SimpleKCM {
         "setupWizardInProgress", "setupWizardStep", "setupWizardGoal", "setupWizardSourceId", "advancedSettingsMode",
         "settingsVerificationRequestId", "settingsVerificationCompletedRequestId", "settingsVerificationSourceId",
         "settingsVerificationState", "settingsVerificationMessage", "settingsVerificationTimestamp",
+        "diagnosticsSourceSnapshot",
         "dashboardMode", "showOnlyProblems", "openaiRefreshInterval", "anthropicRefreshInterval", "googleRefreshInterval",
         "mistralRefreshInterval", "deepseekRefreshInterval", "groqRefreshInterval", "xaiRefreshInterval", "ollamaRefreshInterval",
         "openrouterRefreshInterval", "togetherRefreshInterval", "cohereRefreshInterval", "googleveoRefreshInterval", "azureRefreshInterval",
@@ -169,15 +181,15 @@ KCM.SimpleKCM {
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
-                text: i18n("Open review checklist")
-                icon.name: "text-markdown"
-                onClicked: Qt.openUrlExternally(Qt.resolvedUrl("../../../docs/release/v" + AppInfo.version + "-checklist.md"))
+                text: i18n("Open provider guide")
+                icon.name: "help-contents"
+                onClicked: Qt.openUrlExternally(diagnosticsPage.providerGuideUrl)
             }
 
             QQC2.Button {
                 text: i18n("Review provider catalog")
                 icon.name: "document-open"
-                onClicked: Qt.openUrlExternally(Qt.resolvedUrl("../catalog/providers-v4.json"))
+                onClicked: Qt.openUrlExternally(diagnosticsPage.providerCatalogUrl)
             }
         }
 
@@ -393,14 +405,116 @@ KCM.SimpleKCM {
         
         QQC2.Label {
             Kirigami.FormData.label: i18n("Version:")
-            text: AppInfo.version
+            text: i18n("Frontend %1 · native plugin %2", diagnosticsPage.frontendVersion, AppInfo.version)
+            color: diagnosticsPage.systemInfo.nativeStatus === "ready"
+                   ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
         }
 
         QQC2.Label {
             Kirigami.FormData.label: i18n("Loaded plugin:")
-            text: AppInfo.pluginPath
+            text: diagnosticsPage.systemInfo.nativePluginPath
             wrapMode: Text.WrapAnywhere
             Layout.fillWidth: true
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Install layers:")
+            text: i18n("Frontend: %1 · plugin: %2", diagnosticsPage.systemInfo.frontendLayer,
+                       diagnosticsPage.systemInfo.pluginLayer)
+                  + (diagnosticsPage.systemInfo.shadowing ? i18n(" · user-local package shadows system package") : "")
+            color: diagnosticsPage.systemInfo.shadowing
+                   ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.textColor
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("System:")
+            text: diagnosticsPage.systemInfo.plasmaVersion + " · " + diagnosticsPage.systemInfo.distribution
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("History database:")
+            text: diagnosticsPage.databaseStatusText()
+            color: ["ok", "not_created"].indexOf(diagnosticsPage.databaseInfo.status) >= 0
+                   ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+        }
+
+        Kirigami.InlineMessage {
+            Kirigami.FormData.label: i18n("Recovery:")
+            Layout.fillWidth: true
+            visible: diagnosticsPage.systemInfo.nativeStatus !== "ready"
+                     || diagnosticsPage.systemInfo.shadowing
+            text: diagnosticsPage.systemInfo.nextStep
+            type: Kirigami.MessageType.Warning
+            actions: [
+                Kirigami.Action {
+                    text: i18n("Copy repair command")
+                    icon.name: "edit-copy"
+                    visible: diagnosticsPage.systemInfo.repairCommand.length > 0
+                    onTriggered: clipboard.setText(diagnosticsPage.systemInfo.repairCommand)
+                }
+            ]
+        }
+
+        ColumnLayout {
+            Kirigami.FormData.label: i18n("Source readiness:")
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+
+            Repeater {
+                model: diagnosticsPage.actionableSources()
+
+                delegate: RowLayout {
+                    id: sourceRow
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        text: diagnosticsPage.sourceSummary(sourceRow.modelData)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    QQC2.Button {
+                        text: sourceRow.modelData.sourceKindKey === "local_tool"
+                              ? i18n("Open tool guide") : i18n("Select in Providers")
+                        icon.name: "configure"
+                        visible: sourceRow.modelData.nextActionKey !== "none"
+                        onClicked: {
+                            if (sourceRow.modelData.sourceKindKey === "local_tool") {
+                                Qt.openUrlExternally(diagnosticsPage.subscriptionGuideUrl);
+                                return;
+                            }
+                            plasmoid.configuration.settingsVerificationSourceId = sourceRow.modelData.stableId;
+                            diagnosticsPage.recoverySelectionMessage = i18n("%1 is selected. Open Providers in the sidebar to continue.", diagnosticsPage.sourceDisplayName(sourceRow.modelData.stableId));
+                        }
+                    }
+                }
+            }
+
+            QQC2.Label {
+                Layout.fillWidth: true
+                visible: diagnosticsPage.actionableSources().length === 0
+                text: i18n("No enabled source currently needs recovery.")
+                color: Kirigami.Theme.positiveTextColor
+                wrapMode: Text.WordWrap
+            }
+
+            QQC2.Label {
+                Layout.fillWidth: true
+                visible: diagnosticsPage.recoverySelectionMessage.length > 0
+                text: diagnosticsPage.recoverySelectionMessage
+                color: Kirigami.Theme.linkColor
+                wrapMode: Text.WordWrap
+            }
         }
 
         RowLayout {
@@ -488,6 +602,95 @@ KCM.SimpleKCM {
         return count;
     }
 
+    function parseSourceSnapshot() {
+        var raw = plasmoid.configuration.diagnosticsSourceSnapshot || "[]";
+        try {
+            var parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function actionableSources() {
+        var result = [];
+        for (var i = 0; i < sourceSnapshot.length; i++) {
+            var source = sourceSnapshot[i];
+            if (!source.enabled) continue;
+            if (["reporting_actual", "reporting_estimate", "connected_connectivity_only"].indexOf(source.readinessStateKey) >= 0)
+                continue;
+            result.push(source);
+        }
+        return result;
+    }
+
+    function sourceDisplayName(stableId) {
+        var rows = providerCatalog.providers || [];
+        for (var i = 0; i < rows.length; i++) {
+            if (rows[i].configKey === stableId) return rows[i].name;
+        }
+        var localNames = {
+            "claude-code": "Claude Code", "codex-cli": "Codex CLI",
+            "github-copilot": "GitHub Copilot", "cursor": "Cursor",
+            "windsurf": "Windsurf", "jetbrains-ai": "JetBrains AI"
+        };
+        return localNames[stableId] || stableId;
+    }
+
+    function sourceSummary(source) {
+        var states = {
+            "disabled": i18n("Disabled"),
+            "unavailable_locally": i18n("Not installed locally"),
+            "needs_configuration": i18n("Needs configuration"),
+            "ready_to_verify": i18n("Ready to verify"),
+            "verifying": i18n("Verifying"),
+            "connected_connectivity_only": i18n("Connectivity confirmed"),
+            "reporting_estimate": i18n("Reporting an estimate"),
+            "reporting_actual": i18n("Reporting provider data"),
+            "degraded": i18n("Needs attention"),
+            "failed": i18n("Verification failed")
+        };
+        var errors = {
+            "backend_unavailable": i18n("native backend unavailable"),
+            "configuration": i18n("configuration incomplete"),
+            "authentication": i18n("authentication failed"),
+            "not_logged_in": i18n("not signed in"),
+            "permission": i18n("permission denied"),
+            "permission_denied": i18n("permission denied"),
+            "unsupported_metric": i18n("metric unsupported"),
+            "not_supported": i18n("metric unsupported"),
+            "schema": i18n("provider response changed"),
+            "stale": i18n("data is stale"),
+            "network": i18n("network error"),
+            "network_error": i18n("network error"),
+            "timeout": i18n("request timed out"),
+            "rate_limit": i18n("rate limited"),
+            "server": i18n("provider server error")
+        };
+        var error = source.errorCode
+            ? " · " + (errors[source.errorCode] || i18n("error: %1", source.errorCode)) : "";
+        return sourceDisplayName(source.stableId) + ": "
+            + (states[source.readinessStateKey] || i18n("Unknown")) + error;
+    }
+
+    function formatBytes(bytes) {
+        var value = Number(bytes || 0);
+        if (value < 1024) return i18n("%1 B", value);
+        if (value < 1024 * 1024) return i18n("%1 KiB", (value / 1024).toFixed(1));
+        return i18n("%1 MiB", (value / (1024 * 1024)).toFixed(1));
+    }
+
+    function databaseStatusText() {
+        var labels = {
+            "ok": i18n("Healthy"),
+            "not_created": i18n("Not created yet"),
+            "unreadable": i18n("Unreadable"),
+            "open_failed": i18n("Could not be opened read-only"),
+            "integrity_failed": i18n("Integrity check failed")
+        };
+        return (labels[databaseInfo.status] || i18n("Unknown")) + " · " + formatBytes(databaseInfo.sizeBytes);
+    }
+
     function insecureCustomUrlCount() {
         var keys = [
             "openaiCustomBaseUrl", "anthropicCustomBaseUrl", "googleCustomBaseUrl",
@@ -536,33 +739,11 @@ KCM.SimpleKCM {
     }
 
     function buildSupportReport() {
-        var readiness = syncDetector.readinessReport("");
-        var lines = [];
-        lines.push("Plasma AI Usage Monitor Support Report");
-        lines.push("Version: " + AppInfo.version);
-        lines.push("Plugin path: " + AppInfo.pluginPath);
-        lines.push("Enabled providers: " + enabledProviderCount());
-        lines.push("Wallet open: " + (secrets.walletOpen ? "yes" : "no"));
-        lines.push("Copilot token loaded: " + (secrets.walletOpen && secrets.hasKey("copilot_github") ? "yes" : "no"));
-        lines.push("Provider catalog: " + ProviderPricingCatalog.catalogVersion
-                   + " reviewed " + ProviderPricingCatalog.lastReviewed
-                   + " review_items=" + ProviderPricingCatalog.manualReviewCount
-                   + " conflicts=" + ProviderPricingCatalog.sourceConflictCount);
-        lines.push("Subscription catalog: " + SubscriptionPlanCatalog.catalogVersion
-                   + " reviewed " + SubscriptionPlanCatalog.lastReviewed
-                   + " review_items=" + SubscriptionPlanCatalog.manualReviewCount
-                   + " conflicts=" + SubscriptionPlanCatalog.sourceConflictCount);
-        lines.push("Browser sync enabled: " + (plasmoid.configuration.browserSyncEnabled ? "yes" : "no"));
-        lines.push("Browser profile found: " + (syncDetector.hasCurrentBrowserProfile ? "yes" : "no"));
-        lines.push("Cookie DB readable: " + (readiness.cookieDatabaseReadable ? "yes" : "no"));
-        lines.push("Safe storage access: " + (syncDetector.hasSafeStorageAccess ? "yes" : "no"));
-        lines.push("Insecure custom URLs: " + insecureCustomUrlCount());
-        lines.push("Local tools: Claude=" + (claudeDetector.installed ? "yes" : "no")
-                   + " Codex=" + (codexDetector.installed ? "yes" : "no")
-                   + " Copilot=" + (copilotDetector.installed ? "yes" : "no"));
-        lines.push("Alerts: warning=" + plasmoid.configuration.warningThreshold
-                   + "% critical=" + plasmoid.configuration.criticalThreshold
-                   + "% budget=" + plasmoid.configuration.budgetWarningPercent + "%");
-        return lines.join("\n");
+        return AppInfo.buildSupportReport(diagnosticsPage.frontendVersion, {
+            walletOpen: secrets.walletOpen,
+            providerCatalogVersion: ProviderPricingCatalog.catalogVersion,
+            subscriptionCatalogVersion: SubscriptionPlanCatalog.catalogVersion,
+            sources: diagnosticsPage.sourceSnapshot
+        });
     }
 }

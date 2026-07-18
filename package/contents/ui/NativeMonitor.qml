@@ -9,6 +9,7 @@ Item {
     property string modelMigrationNotice: ""
     property int pendingSettingsVerificationId: 0
     property string pendingSettingsVerificationSourceId: ""
+    property bool diagnosticsSnapshotScheduled: false
     readonly property string pluginVersion: AppInfo.version
     readonly property bool pluginVersionMismatch: {
         var required = plasmoid.metaData?.version || "";
@@ -250,6 +251,39 @@ Item {
         });
     }
 
+    function scheduleDiagnosticsSnapshot() {
+        if (diagnosticsSnapshotScheduled) return;
+        diagnosticsSnapshotScheduled = true;
+        Qt.callLater(function() {
+            diagnosticsSnapshotScheduled = false;
+            var rows = [];
+            var providers = providerRegistry.allProviders || [];
+            var tools = providerRegistry.allSubscriptionTools || [];
+            var ids = [];
+            for (var i = 0; i < providers.length; i++) ids.push(providers[i].configKey);
+            for (var j = 0; j < tools.length; j++) ids.push(tools[j].stableId);
+
+            for (var k = 0; k < ids.length; k++) {
+                var source = sourceReadinessModel.source(ids[k]);
+                if (!source || !source.stableId) continue;
+                rows.push({
+                    stableId: source.stableId,
+                    sourceKindKey: source.sourceKindKey,
+                    enabled: !!source.enabled,
+                    installed: !!source.installed,
+                    readinessStateKey: source.readinessStateKey || "failed",
+                    errorCode: source.errorCode || "",
+                    nextActionKey: source.nextActionKey || "none",
+                    lastVerifiedPresent: !!source.lastVerifiedPresent
+                });
+            }
+
+            var snapshot = JSON.stringify(rows);
+            if (plasmoid.configuration.diagnosticsSourceSnapshot !== snapshot)
+                plasmoid.configuration.diagnosticsSourceSnapshot = snapshot;
+        });
+    }
+
     function refreshAll() {
         refreshScheduler.refreshAll();
     }
@@ -449,6 +483,7 @@ Item {
         id: sourceReadinessModel
 
         onSourceChanged: function(stableId) {
+            root.scheduleDiagnosticsSnapshot();
             if (stableId === root.pendingSettingsVerificationSourceId)
                 root.finishSettingsVerification(sourceReadinessModel.source(stableId));
         }
@@ -686,6 +721,7 @@ Item {
 
     Component.onCompleted: {
         root.configureSourceReadiness();
+        root.scheduleDiagnosticsSnapshot();
         root.processSettingsVerificationRequest();
         var saved = plasmoid.configuration.deepseekModel || "";
         var effective = ProviderPricingCatalog.effectiveModelId("deepseek", saved);

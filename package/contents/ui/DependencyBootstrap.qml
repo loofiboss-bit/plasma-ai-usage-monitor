@@ -10,6 +10,7 @@ PlasmaExtras.Representation {
     required property string frontendVersion
     required property string installedPluginVersion
     required property string bootstrapState
+    required property string supportReport
 
     readonly property string installCommand: "sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor && sudo dnf install --refresh plasma-ai-usage-monitor"
     readonly property url sourceInstallUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/installation.md#guided-source-install"
@@ -138,6 +139,39 @@ PlasmaExtras.Representation {
                 icon.name: "help-contents"
                 onClicked: Qt.openUrlExternally(bootstrap.sourceInstallUrl)
             }
+
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                text: i18n("Support report")
+                font.bold: true
+            }
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: Kirigami.Units.smallSpacing
+
+                PlasmaComponents.TextArea {
+                    id: supportReportField
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 4
+                    readOnly: true
+                    selectByMouse: true
+                    wrapMode: TextEdit.Wrap
+                    text: bootstrap.supportReport
+                    Accessible.name: i18n("Bootstrap support report")
+                }
+
+                PlasmaComponents.Button {
+                    text: reportCopiedTimer.running ? i18n("Copied") : i18n("Copy report")
+                    icon.name: "edit-copy"
+                    onClicked: {
+                        supportReportField.selectAll();
+                        supportReportField.copy();
+                        supportReportField.deselect();
+                        reportCopiedTimer.restart();
+                    }
+                }
+            }
         }
 
         Kirigami.InlineMessage {
@@ -152,6 +186,11 @@ PlasmaExtras.Representation {
 
     Timer {
         id: copiedTimer
+        interval: 2000
+    }
+
+    Timer {
+        id: reportCopiedTimer
         interval: 2000
     }
 }

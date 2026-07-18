@@ -68,7 +68,8 @@ public:
         NextActionKeyRole,
         NextActionTextRole,
         ErrorCodeRole,
-        SetupRankRole
+        SetupRankRole,
+        LastVerifiedPresentRole
     };
     Q_ENUM(Role)
 

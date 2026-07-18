@@ -266,6 +266,15 @@ target_include_directories(test_sourcereadinessmodel PRIVATE ${CMAKE_SOURCE_DIR}
 target_link_libraries(test_sourcereadinessmodel PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
 add_test(NAME sourcereadinessmodel COMMAND test_sourcereadinessmodel)
 
+add_executable(test_appinfo
+    test_appinfo.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/appinfo.cpp
+)
+target_include_directories(test_appinfo PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_compile_definitions(test_appinfo PRIVATE AIUSAGE_MONITOR_VERSION="${PROJECT_VERSION}")
+target_link_libraries(test_appinfo PRIVATE Qt6::Core Qt6::Test Qt6::Sql KF6::I18n ${CMAKE_DL_LIBS})
+add_test(NAME appinfo COMMAND test_appinfo)
+
 add_executable(test_descriptorprovider_contract
     test_descriptorprovider_contract.cpp
     ${TEST_CATALOG_SRC}

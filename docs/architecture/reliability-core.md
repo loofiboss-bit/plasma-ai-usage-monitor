@@ -44,6 +44,20 @@ usage/spend and gateway sources, then balance/connectivity sources, and finally
 local tools that are not detected. Onboarding, Settings, Overview, and
 Diagnostics must consume this model instead of independently deriving status.
 
+## Diagnostics and recovery
+
+`AppInfo` owns native installation, version, Plasma, distribution, and read-only
+SQLite health inspection. It resolves the loaded plugin library, compares
+user-local and system plasmoid metadata, and reports one copyable repair command;
+it never removes an installation layer. The runtime persists only stable source
+IDs, readiness states, error kinds, actions, and a verified/not-verified flag for
+the Diagnostics KCM.
+
+Support reports are built from allowlisted fields. Endpoint details, account or
+project identifiers, credentials, cookies, webhook URLs, wallet contents, and
+free-form backend errors are excluded. The frontend-only bootstrap produces a
+separate minimal report for missing or mismatched native plugins.
+
 ## SQLite schema v4
 
 History stays local and uses WAL mode. Schema v4 stores normalized observations and permits null values. Migration from v3 is transactional, idempotent, and backed up before changes.

@@ -112,6 +112,7 @@ QVariant SourceReadinessModel::data(const QModelIndex &index, int role) const
     case NextActionTextRole: return nextActionText(snapshot.nextAction);
     case ErrorCodeRole: return snapshot.errorCode;
     case SetupRankRole: return snapshot.setupRank;
+    case LastVerifiedPresentRole: return snapshot.lastVerified.isValid();
     default: return {};
     }
 }
@@ -136,7 +137,8 @@ QHash<int, QByteArray> SourceReadinessModel::roleNames() const
         {NextActionKeyRole, "nextActionKey"},
         {NextActionTextRole, "nextActionText"},
         {ErrorCodeRole, "errorCode"},
-        {SetupRankRole, "setupRank"}
+        {SetupRankRole, "setupRank"},
+        {LastVerifiedPresentRole, "lastVerifiedPresent"}
     };
 }
 

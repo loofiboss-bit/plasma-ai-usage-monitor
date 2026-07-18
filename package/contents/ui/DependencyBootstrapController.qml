@@ -70,6 +70,24 @@ Item {
         return left === right ? 0 : (left < right ? -1 : 1);
     }
 
+    function safeVersion(value) {
+        var candidate = (value || "").toString().trim();
+        return /^\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$/.test(candidate)
+            ? candidate : "unknown";
+    }
+
+    function supportReport() {
+        var nativeVersion = installedPluginVersion !== ""
+            ? safeVersion(installedPluginVersion) : "not_detected";
+        return [
+            "Plasma AI Usage Monitor Bootstrap Support Report",
+            "Frontend version: " + safeVersion(frontendVersion),
+            "Native plugin: " + nativeVersion,
+            "Native status: " + stateName,
+            "Sensitive error details, paths, identifiers, and credentials are omitted."
+        ].join("\n");
+    }
+
     function startProbe() {
         if (loadState !== DependencyBootstrapController.Idle)
             return;

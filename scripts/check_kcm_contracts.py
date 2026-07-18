@@ -75,6 +75,26 @@ def validate_diagnostics() -> None:
         fail("Diagnostics does not expose the copyable version-check command")
     if not re.search(r'troubleshootingUrl:\s*"https://', text):
         fail("Diagnostics troubleshooting action must use HTTPS")
+    if "Qt.resolvedUrl" in text:
+        fail("Diagnostics actions must not depend on repository-relative files")
+    for token in (
+        "AppInfo.systemDiagnostics(frontendVersion)",
+        "AppInfo.databaseDiagnostics()",
+        "AppInfo.buildSupportReport",
+        "diagnosticsSourceSnapshot",
+        "providerGuideUrl",
+        "providerCatalogUrl",
+        "subscriptionGuideUrl",
+    ):
+        if token not in text:
+            fail(f"Diagnostics is missing the native recovery contract: {token}")
+
+    bootstrap = (UI / "DependencyBootstrap.qml").read_text(encoding="utf-8")
+    controller = (UI / "DependencyBootstrapController.qml").read_text(encoding="utf-8")
+    if "required property string supportReport" not in bootstrap or "Copy report" not in bootstrap:
+        fail("Missing-plugin recovery does not expose a copyable support report")
+    if "function supportReport()" not in controller or "Native status:" not in controller:
+        fail("Missing-plugin support report does not classify the bootstrap state")
 
 
 def validate_source_choice_settings() -> None:

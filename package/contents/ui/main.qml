@@ -66,6 +66,7 @@ PlasmoidItem {
             frontendVersion: root.frontendVersion
             installedPluginVersion: dependencyController.installedPluginVersion
             bootstrapState: dependencyController.stateName
+            supportReport: dependencyController.supportReport()
         }
     }
 }

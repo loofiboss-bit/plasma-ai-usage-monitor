@@ -66,6 +66,10 @@
             <default></default>
             <label>UTC timestamp for the last Settings verification result</label>
         </entry>
+        <entry name="diagnosticsSourceSnapshot" type="String">
+            <default>[]</default>
+            <label>Redacted source-readiness snapshot for Diagnostics</label>
+        </entry>
         <entry name="dashboardMode" type="String">
             <default>operator</default>
             <label>Popup mode: simple, operator, or analyst</label>
