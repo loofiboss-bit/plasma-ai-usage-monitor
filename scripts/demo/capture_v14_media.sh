@@ -241,6 +241,8 @@ capture_panel() {
 
   panel_script='var existing = panels(); for (var i = 0; i < existing.length; ++i) existing[i].remove(); var panel = new Panel; panel.location = "bottom"; panel.height = 58; panel.addWidget("org.kde.plasma.kickoff"); var monitor = panel.addWidget("com.github.loofi.aiusagemonitor"); monitor.currentConfigGroup = ["General"]; monitor.writeConfig("compactDisplayMode", "cost"); panel.addWidget("org.kde.plasma.panelspacer"); panel.addWidget("org.kde.plasma.digitalclock");'
 
+  # The quoted script expands its variables inside the isolated D-Bus session.
+  # shellcheck disable=SC2016
   setsid dbus-run-session -- env \
     XDG_DATA_HOME="$panel_data_home" \
     XDG_DATA_DIRS="$PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \
