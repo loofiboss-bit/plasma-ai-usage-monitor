@@ -36,6 +36,7 @@ ColumnLayout {
     ListView {
         id: providersList
         Accessible.name: i18n("Provider and detected local sources")
+        activeFocusOnTab: true
         Layout.fillWidth: true
         Layout.fillHeight: true
         clip: true
@@ -48,6 +49,21 @@ ColumnLayout {
         }
         section.property: "categoryLabel"
         section.delegate: Kirigami.ListSectionHeader { required property string section; text: section }
+
+        Keys.onUpPressed: function(event) {
+            if (currentIndex > 0) {
+                sourceList.controller.selectedSourceId = model[currentIndex - 1].configKey;
+            }
+            event.accepted = true;
+        }
+
+        Keys.onDownPressed: function(event) {
+            if (currentIndex >= 0 && currentIndex + 1 < model.length) {
+                sourceList.controller.selectedSourceId = model[currentIndex + 1].configKey;
+            }
+            event.accepted = true;
+        }
+
         delegate: QQC2.ItemDelegate {
             id: sourceDelegate
             required property var modelData

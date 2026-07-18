@@ -99,6 +99,7 @@ def validate_diagnostics() -> None:
 
 def validate_source_choice_settings() -> None:
     providers = (UI / "configProviders.qml").read_text(encoding="utf-8")
+    source_list = (UI / "ProviderSourceList.qml").read_text(encoding="utf-8")
     details = (UI / "ProviderSourceDetails.qml").read_text(encoding="utf-8")
     general = (UI / "configGeneral.qml").read_text(encoding="utf-8")
     onboarding = (UI / "onboarding" / "SetupConfigureStep.qml").read_text(encoding="utf-8")
@@ -107,6 +108,9 @@ def validate_source_choice_settings() -> None:
         fail("Providers Settings must render one catalog-driven master/detail surface")
     if "ProviderSettingsController" not in providers or "detectedLocalSources" not in providers:
         fail("Providers Settings must include deterministic selection and detected local sources")
+    for token in ("activeFocusOnTab: true", "Keys.onUpPressed", "Keys.onDownPressed"):
+        if token not in source_list:
+            fail(f"Provider source list is missing its keyboard contract: {token}")
     if "CredentialEditor" not in details or "CredentialEditor" not in onboarding:
         fail("Settings and onboarding must share the credential editor")
     if "Local-First" in general or "presetCombo" in general:
