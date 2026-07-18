@@ -27,6 +27,10 @@ KCM.SimpleKCM {
     property int cfg_googleveoRefreshInterval: plasmoid.configuration.googleveoRefreshInterval
     property int cfg_azureRefreshInterval: plasmoid.configuration.azureRefreshInterval
     property int cfg_bedrockRefreshInterval: plasmoid.configuration.bedrockRefreshInterval
+    property int cfg_litellmRefreshInterval: plasmoid.configuration.litellmRefreshInterval
+    property int cfg_cerebrasRefreshInterval: plasmoid.configuration.cerebrasRefreshInterval
+    property int cfg_fireworksRefreshInterval: plasmoid.configuration.fireworksRefreshInterval
+    property int cfg_perplexityRefreshInterval: plasmoid.configuration.perplexityRefreshInterval
 
     property ProviderCatalog providerCatalog: ProviderCatalog {}
 

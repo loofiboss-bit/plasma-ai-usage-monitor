@@ -1,7 +1,7 @@
 # AI Usage Monitor v14.0.0 — First Successful Use
 
 **Status:** Proposed  
-**Target baseline:** `main` at `07a9a7ddd2be66e937a13d7d93433dd98062236c`  
+**Target baseline:** `main` at `0c31caaf1087914950a950c86667594a47356c9c` (`07a9a7ddd2be66e937a13d7d93433dd98062236c` is its runtime-identical parent)
 **Current stable:** `13.0.0`  
 **Primary audience:** Plasma 6 users, with Fedora COPR as the supported complete package
 
@@ -26,7 +26,7 @@ The release should optimize for a first successful source, not for a larger prov
 
 1. **The first-run flow is informational, not operational.** `OnboardingFlow.qml` contains four static pages and then opens Settings. It does not select a source, save a credential, verify a connection, or confirm a useful result.
 2. **KDE Store installation can fail before guidance is visible.** `main.qml` imports the native QML module at parse time while the Store package is frontend-only. A missing plugin can therefore prevent the widget from rendering the recovery instructions it needs to show.
-3. **Secret cancellation semantics are unsafe and surprising.** `configProviders.qml` writes dirty KWallet fields from `Component.onDestruction`, so closing or cancelling the settings page can still persist a changed or cleared secret.
+3. **Secret cancellation semantics are unsafe and surprising.** `configProviders.qml`, `configSubscriptions.qml`, and `configAlerts.qml` write dirty KWallet fields from `Component.onDestruction`, so closing or cancelling the settings page can still persist changed or cleared credentials.
 4. **Provider setup is too dense.** `configProviders.qml` is 1,139 lines and presents the provider overview plus detailed forms for the complete catalog in one long page. Users must understand provider names and capabilities before choosing a useful source.
 5. **General settings expose implementation detail too early.** Per-provider refresh sliders are always shown for the complete catalog. The four v13 descriptor providers have refresh keys in `main.xml` but no matching `cfg_*RefreshInterval` properties in `configGeneral.qml`.
 6. **The “Local-First” preset is misleading.** It enables Ollama Cloud rather than a detected local coding tool, disables only three API providers, and does not guarantee a local-only result.
@@ -76,26 +76,32 @@ Remove correctness traps before restructuring the experience. Cancelling Setting
 ### Likely components
 
 - `package/contents/ui/configProviders.qml`
+- `package/contents/ui/configSubscriptions.qml`
+- `package/contents/ui/configAlerts.qml`
 - `package/contents/ui/configGeneral.qml`
-- `package/contents/config/main.xml`
+- `package/contents/ui/configBudget.qml`
+- new shared `package/contents/ui/SecretChangeSet.qml`
+- `plugin/secretsmanager.*`
+- `plugin/tests/`
 - `package/contents/ui/configDiagnostics.qml`
-- `scripts/check_config_portability.py`
-- new QML/KCM interaction tests or deterministic contract checks
+- new `scripts/check_kcm_contracts.py`
 
 ### Tasks
 
 1. Record the baseline SHA, current 29-test result, QML smoke result, and package payload result.
-2. Replace `Component.onDestruction: saveKeys()` with an explicit transaction that commits secret additions, replacements, and removals only on Apply/Save.
+2. Replace every destruction-time credential write on Providers, Subscriptions, and Alerts with a shared staged transaction that commits additions, replacements, and removals only from the Plasma page-level `saveConfig()` hook defined by the [Plasma configuration contract](https://develop.kde.org/docs/plasma/widget/configuration/).
 3. Ensure Cancel and window close discard pending secret edits without modifying KWallet.
-4. Add the missing LiteLLM, Cerebras, Fireworks, and Perplexity refresh bindings, or replace the manual property list with one descriptor-driven binding that covers every catalog entry.
-5. Remove or neutralize Diagnostics actions that attempt to launch shell commands as URLs. Until native replacements exist, expose a safe copyable command and a valid HTTPS help link.
-6. Add regression coverage for Apply, Cancel, clear-then-Cancel, and every catalog refresh key.
+4. Make synchronous [KWallet writes and removals](https://api.kde.org/kwallet-wallet.html) return success to QML, reject writes while the wallet is closed, retain failed staged entries for retry, and expose inline localized feedback.
+5. Add the missing LiteLLM, Cerebras, Fireworks, and Perplexity refresh and notification bindings plus LiteLLM daily/monthly budget bindings. Keep `main.xml` unchanged; it already contains the keys.
+6. Replace Diagnostics shell-as-URL actions with an HTTPS troubleshooting link and a clipboard-only version command.
+7. Add Qt Quick regression coverage for replacement, removal, multiple edits, failed writes, repeated Apply, Cancel/discard, and window destruction. Add a KCM/catalog contract check rather than changing the existing portability check.
 
 ### Acceptance criteria
 
 - Editing or clearing a key and pressing Cancel leaves the stored secret unchanged.
 - Apply writes exactly the intended secret change once and reports success or failure.
-- Every provider descriptor resolves an existing refresh configuration key and UI binding.
+- Failed mutations remain staged for retry; a second unchanged Apply performs no mutation.
+- Every provider descriptor resolves existing configuration keys and explicit static KCM bindings for its enabled/model, refresh, notification, and advertised cost-budget settings.
 - No Diagnostics button attempts to execute an arbitrary command through URL handling.
 - Existing configuration, history, and KWallet entries survive an upgrade from v13.
 
@@ -103,12 +109,13 @@ Remove correctness traps before restructuring the experience. Cancelling Setting
 
 ```bash
 just build-debug
-just test
+ctest --preset debug --output-on-failure
 just check
 just qml-lint
+PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --strict --build-dir build/debug --expected-version "$(< VERSION)"
+python3 scripts/check_package_payload.py
+QT_QPA_PLATFORM=offscreen dbus-run-session -- bash scripts/smoke_test_plasmoid.sh build/debug
 ```
-
-Add a focused automated command for the new KCM/secret transaction tests and run it repeatedly.
 
 ### Checkpoint
 
@@ -133,8 +140,8 @@ Make frontend-only Store installs, missing native plugins, and version mismatche
 
 1. Prototype a pure-QML bootstrap that does not import `com.github.loofi.aiusagemonitor` at parse time.
 2. Load the native monitor implementation only after the module is available.
-3. Show distinct states for missing plugin, incompatible plugin version, and ready runtime.
-4. Provide a Fedora COPR copy-command, a source-install documentation link, installed/frontend version details, and a retry action.
+3. Treat a failed module load as a missing or unusable plugin. Distinguish older/newer versions only after the plugin loads successfully.
+4. Provide a Fedora COPR copy-command, a source-install documentation link, installed/frontend version details when available, and an explicit instruction to restart Plasma or log out and in after installation.
 5. Keep the Store package honest: it remains a frontend package and never claims that the native dependency is bundled.
 6. Add smoke fixtures for no plugin, matching plugin, older plugin, and newer plugin.
 
@@ -142,8 +149,8 @@ Make frontend-only Store installs, missing native plugins, and version mismatche
 
 - A Store-only installation renders a recovery screen without QML import failure.
 - A matched COPR/source installation reaches the normal widget with no extra prompt.
-- A mismatched version names both versions and gives one safe next action.
-- Installing the required plugin and pressing Retry works without deleting user data.
+- A successfully loaded mismatched version names both versions and gives one safe next action.
+- Installing the required plugin and restarting Plasma or logging out and in reaches the normal widget without deleting user data; same-engine Retry is not required because failed imports remain cached by `QQmlEngine`.
 
 ### Verification
 
@@ -457,8 +464,8 @@ v14.0.0 is complete only when all of the following are true:
 
 ## Risks and open decisions
 
-1. **Missing-module bootstrap feasibility.** Validate delayed loading in Phase 1 before restructuring the native root. If Plasma still resolves the native import too early, stop and choose a small installer/launcher boundary; do not silently begin a D-Bus rewrite.
-2. **KCM secret transaction hooks.** Confirm the supported Plasma/KCM Apply and Cancel lifecycle with a fake wallet test before changing the production secret API.
+1. **Missing-module bootstrap lifecycle.** A dependency-free root plus URL-based [`Loader`](https://doc.qt.io/qt-6.8/qml-qtquick-loader.html) can render recovery UI, but a failed import remains in the current [`QQmlEngine` component cache](https://doc.qt.io/qt-6.8/qqmlengine.html). Recovery after installation therefore requires restarting Plasma or logging out and in. Do not silently begin a D-Bus rewrite.
+2. **KCM secret transaction hooks.** Plasma 6.7.3 calls a page-level `saveConfig()` and observes `unsavedChanges`; keep secret persistence on that lifecycle and cover it with a fake-store test.
 3. **Verification semantics.** Reuse the v13 read-only refresh contract. A provider without a safe read-only endpoint may be configured but must not be called an onboarding success for usage monitoring.
 4. **No telemetry.** v14 should not add analytics to measure the funnel. Use deterministic completion criteria, Store feedback, issues, and support-report quality as adoption proxies.
 5. **Distribution ceiling.** COPR remains the only complete prebuilt package. After v14 proves the product flow, evaluate OBS/AUR/deb packaging as a separate version based on maintainer capacity and user demand.

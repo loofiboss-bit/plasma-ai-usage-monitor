@@ -149,6 +149,17 @@ target_include_directories(test_secretsmanager PRIVATE ${CMAKE_SOURCE_DIR}/plugi
 target_link_libraries(test_secretsmanager PRIVATE Qt6::Core Qt6::Test KF6::Wallet)
 add_test(NAME secretsmanager COMMAND test_secretsmanager)
 
+add_executable(test_secretchangeset_qml
+    test_secretchangeset_qml.cpp
+)
+target_link_libraries(test_secretchangeset_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME secretchangeset_qml
+    COMMAND test_secretchangeset_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml"
+            -platform offscreen
+)
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp

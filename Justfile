@@ -36,6 +36,7 @@ check:
     python3 scripts/check_subscription_catalog.py
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
+    python3 scripts/check_kcm_contracts.py
     python3 scripts/check_qml_registered_types.py
     python3 scripts/check_non_invasive_monitoring.py
     python3 scripts/check_provider_capability_docs.py
@@ -74,6 +75,7 @@ release-check: build-debug
     python3 scripts/check_subscription_catalog.py
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
+    python3 scripts/check_kcm_contracts.py
     python3 scripts/check_qml_registered_types.py
     python3 scripts/check_non_invasive_monitoring.py
     python3 scripts/check_provider_capability_docs.py

@@ -9,6 +9,9 @@ import QtQuick.Dialogs as Dialogs
 KCM.SimpleKCM {
     id: diagnosticsPage
 
+    readonly property string versionCheckCommand: "plasmashell --version; rpm -q plasma-ai-usage-monitor"
+    readonly property string troubleshootingUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/troubleshooting.md"
+
     SecretsManager { id: secrets }
     BrowserSyncService { id: syncDetector }
     ProviderCatalog { id: providerCatalog }
@@ -402,18 +405,16 @@ KCM.SimpleKCM {
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
-                text: i18n("Run install doctor")
-                icon.name: "utilities-terminal"
-                onClicked: {
-                    Qt.openUrlExternally("konsole --hold -e sh -c 'cd " + AppInfo.pluginPath + "/../scripts && ./install_doctor.sh'");
-                }
+                text: i18n("Open troubleshooting")
+                icon.name: "help-contents"
+                onClicked: Qt.openUrlExternally(diagnosticsPage.troubleshootingUrl)
             }
 
             QQC2.Button {
-                text: i18n("Show installed versions")
-                icon.name: "view-list-details"
+                text: i18n("Copy version check")
+                icon.name: "edit-copy"
                 onClicked: {
-                    Qt.openUrlExternally("konsole --hold -e sh -c 'cd " + AppInfo.pluginPath + "/../scripts && ./show_installed_versions.sh'");
+                    clipboard.setText(diagnosticsPage.versionCheckCommand);
                 }
             }
 

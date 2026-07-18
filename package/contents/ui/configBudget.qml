@@ -39,6 +39,8 @@ KCM.SimpleKCM {
     property int cfg_bedrockMonthlyBudget
     property int cfg_googleveoDailyBudget
     property int cfg_googleveoMonthlyBudget
+    property int cfg_litellmDailyBudget
+    property int cfg_litellmMonthlyBudget
     property alias cfg_budgetWarningPercent: warningPercentSlider.value
 
     property ProviderCatalog providerCatalog: ProviderCatalog {}

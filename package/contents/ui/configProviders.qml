@@ -7,6 +7,8 @@ import com.github.loofi.aiusagemonitor 1.0
 
 KCM.SimpleKCM {
     id: providersPage
+    signal configurationChanged()
+
     ProviderCatalog { id: descriptorCatalog }
 
     property bool advancedMode: plasmoid.configuration.advancedSettingsMode
@@ -55,6 +57,20 @@ KCM.SimpleKCM {
             && !lower.startsWith("http://localhost")
             && !lower.startsWith("http://127.0.0.1")
             && !lower.startsWith("http://[::1]");
+    }
+
+    function stageSecret(key, value) {
+        if (value.length > 0) secretChanges.stageStore(key, value);
+        else secretChanges.stageRemove(key);
+        secretStatusMessage = "";
+        secretStatusError = false;
+    }
+
+    function clearSecret(key, field) {
+        field.text = "";
+        secretChanges.stageRemove(key);
+        secretStatusMessage = "";
+        secretStatusError = false;
     }
 
     // Keep every visible model picker aligned with Provider Catalog v5.
@@ -143,33 +159,17 @@ KCM.SimpleKCM {
     property string cfg_perplexityModel: plasmoid.configuration.perplexityModel
     property string cfg_perplexityCustomBaseUrl: plasmoid.configuration.perplexityCustomBaseUrl
 
-    // Track whether the user has actually edited each key field
-    property bool openaiKeyDirty: false
-    property bool anthropicKeyDirty: false
-    property bool googleKeyDirty: false
-    property bool mistralKeyDirty: false
-    property bool deepseekKeyDirty: false
-    property bool groqKeyDirty: false
-    property bool xaiKeyDirty: false
-    property bool ollamaKeyDirty: false
-    property bool openrouterKeyDirty: false
-    property bool togetherKeyDirty: false
-    property bool cohereKeyDirty: false
-    property bool googleveoKeyDirty: false
-    property bool azureKeyDirty: false
-    property bool bedrockAccessKeyDirty: false
-    property bool bedrockSecretKeyDirty: false
-    property bool bedrockSessionTokenDirty: false
-    property bool litellmKeyDirty: false
-    property bool cerebrasKeyDirty: false
-    property bool fireworksKeyDirty: false
+    readonly property bool unsavedChanges: secretChanges.dirty
+    readonly property bool walletOpen: secrets.walletOpen
+    property string secretStatusMessage: ""
+    property bool secretStatusError: false
 
     // ── KWallet Integration ──
     SecretsManager {
         id: secrets
 
         onWalletOpenChanged: {
-            if (walletOpen) {
+            if (walletOpen && !secretChanges.dirty) {
                 loadKeys();
             }
         }
@@ -183,70 +183,69 @@ KCM.SimpleKCM {
         }
     }
 
-    function loadKeys() {
-        var providers = [
-            { name: "openai", field: openaiKeyField, dirtyProp: "openaiKeyDirty" },
-            { name: "anthropic", field: anthropicKeyField, dirtyProp: "anthropicKeyDirty" },
-            { name: "google", field: googleKeyField, dirtyProp: "googleKeyDirty" },
-            { name: "mistral", field: mistralSection.keyField, dirtyProp: "mistralKeyDirty" },
-            { name: "deepseek", field: deepseekSection.keyField, dirtyProp: "deepseekKeyDirty" },
-            { name: "groq", field: groqSection.keyField, dirtyProp: "groqKeyDirty" },
-            { name: "xai", field: xaiSection.keyField, dirtyProp: "xaiKeyDirty" },
-            { name: "ollama", field: ollamaSection.keyField, dirtyProp: "ollamaKeyDirty" },
-            { name: "openrouter", field: openrouterSection.keyField, dirtyProp: "openrouterKeyDirty" },
-            { name: "together", field: togetherSection.keyField, dirtyProp: "togetherKeyDirty" },
-            { name: "cohere", field: cohereSection.keyField, dirtyProp: "cohereKeyDirty" },
-            { name: "googleveo", field: googleveoKeyField, dirtyProp: "googleveoKeyDirty" },
-            { name: "azure", field: azureKeyField, dirtyProp: "azureKeyDirty" },
-            { name: "bedrock_access_key_id", field: bedrockAccessKeyField, dirtyProp: "bedrockAccessKeyDirty" },
-            { name: "bedrock_secret_access_key", field: bedrockSecretKeyField, dirtyProp: "bedrockSecretKeyDirty" },
-            { name: "bedrock_session_token", field: bedrockSessionTokenField, dirtyProp: "bedrockSessionTokenDirty" }
-            ,{ name: "litellm", field: litellmSection.keyField, dirtyProp: "litellmKeyDirty" }
-            ,{ name: "cerebras", field: cerebrasSection.keyField, dirtyProp: "cerebrasKeyDirty" }
-            ,{ name: "fireworks", field: fireworksSection.keyField, dirtyProp: "fireworksKeyDirty" }
-        ];
+    SecretChangeSet {
+        id: secretChanges
+        store: secrets
+    }
 
+    function secretFields() {
+        return [
+            { name: "openai", field: openaiKeyField },
+            { name: "anthropic", field: anthropicKeyField },
+            { name: "google", field: googleKeyField },
+            { name: "mistral", field: mistralSection.keyField },
+            { name: "deepseek", field: deepseekSection.keyField },
+            { name: "groq", field: groqSection.keyField },
+            { name: "xai", field: xaiSection.keyField },
+            { name: "ollama", field: ollamaSection.keyField },
+            { name: "openrouter", field: openrouterSection.keyField },
+            { name: "together", field: togetherSection.keyField },
+            { name: "cohere", field: cohereSection.keyField },
+            { name: "googleveo", field: googleveoKeyField },
+            { name: "azure", field: azureKeyField },
+            { name: "bedrock_access_key_id", field: bedrockAccessKeyField },
+            { name: "bedrock_secret_access_key", field: bedrockSecretKeyField },
+            { name: "bedrock_session_token", field: bedrockSessionTokenField },
+            { name: "litellm", field: litellmSection.keyField },
+            { name: "cerebras", field: cerebrasSection.keyField },
+            { name: "fireworks", field: fireworksSection.keyField }
+        ];
+    }
+
+    function refreshSecretFields(keys) {
+        var providers = secretFields();
         for (var i = 0; i < providers.length; i++) {
             var p = providers[i];
+            if (keys && keys.indexOf(p.name) < 0) continue;
             if (secrets.hasKey(p.name)) {
                 p.field.text = "********";
-                providersPage[p.dirtyProp] = false;
             } else {
                 p.field.text = "";
             }
         }
     }
 
-    function saveKeys() {
-        var providers = [
-            { name: "openai", field: openaiKeyField, dirty: openaiKeyDirty },
-            { name: "anthropic", field: anthropicKeyField, dirty: anthropicKeyDirty },
-            { name: "google", field: googleKeyField, dirty: googleKeyDirty },
-            { name: "mistral", field: mistralSection.keyField, dirty: mistralSection.keyDirty },
-            { name: "deepseek", field: deepseekSection.keyField, dirty: deepseekSection.keyDirty },
-            { name: "groq", field: groqSection.keyField, dirty: groqSection.keyDirty },
-            { name: "xai", field: xaiSection.keyField, dirty: xaiSection.keyDirty },
-            { name: "ollama", field: ollamaSection.keyField, dirty: ollamaSection.keyDirty },
-            { name: "openrouter", field: openrouterSection.keyField, dirty: openrouterSection.keyDirty },
-            { name: "together", field: togetherSection.keyField, dirty: togetherSection.keyDirty },
-            { name: "cohere", field: cohereSection.keyField, dirty: cohereSection.keyDirty },
-            { name: "googleveo", field: googleveoKeyField, dirty: googleveoKeyDirty },
-            { name: "azure", field: azureKeyField, dirty: azureKeyDirty },
-            { name: "litellm", field: litellmSection.keyField, dirty: litellmSection.keyDirty },
-            { name: "cerebras", field: cerebrasSection.keyField, dirty: cerebrasSection.keyDirty },
-            { name: "fireworks", field: fireworksSection.keyField, dirty: fireworksSection.keyDirty },
-            { name: "bedrock_access_key_id", field: bedrockAccessKeyField, dirty: bedrockAccessKeyDirty },
-            { name: "bedrock_secret_access_key", field: bedrockSecretKeyField, dirty: bedrockSecretKeyDirty },
-            { name: "bedrock_session_token", field: bedrockSessionTokenField, dirty: bedrockSessionTokenDirty }
-        ];
+    function loadKeys() {
+        refreshSecretFields(null);
+    }
 
-        for (var i = 0; i < providers.length; i++) {
-            var p = providers[i];
-            if (p.dirty && p.field.text.length > 0 && p.field.text !== "********") {
-                secrets.storeKey(p.name, p.field.text);
-            } else if (p.dirty && p.field.text.length === 0) {
-                secrets.removeKey(p.name);
+    function saveConfig() {
+        var result = secretChanges.commit();
+        secretStatusError = !result.ok;
+        if (result.ok) {
+            secretStatusMessage = result.appliedKeys.length > 0
+                ? i18n("Credentials saved securely in KDE Wallet.") : "";
+            if (result.appliedKeys.length > 0) {
+                loadKeys();
             }
+        } else if (result.message === "wallet-not-open") {
+            secretStatusMessage = i18n("KDE Wallet is not open. Unlock it and retry Apply.");
+        } else {
+            secretStatusMessage = i18n("Some credentials could not be saved. Review the fields and retry Apply.");
+            if (result.appliedKeys.length > 0) refreshSecretFields(result.appliedKeys);
+        }
+        if (!result.ok) {
+            Qt.callLater(function() { providersPage.configurationChanged(); });
         }
     }
 
@@ -256,13 +255,15 @@ KCM.SimpleKCM {
         }
     }
 
-    Component.onDestruction: {
-        saveKeys();
-    }
-
-    
     Kirigami.FormLayout {
         anchors.fill: parent
+
+        Kirigami.InlineMessage {
+            visible: providersPage.secretStatusMessage.length > 0
+            text: providersPage.secretStatusMessage
+            type: providersPage.secretStatusError ? Kirigami.MessageType.Error : Kirigami.MessageType.Positive
+            Layout.fillWidth: true
+        }
         
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
@@ -359,11 +360,11 @@ KCM.SimpleKCM {
 
             QQC2.TextField {
                 id: openaiKeyField
-                enabled: openaiSwitch.checked
+                enabled: openaiSwitch.checked && secrets.walletOpen
                 echoMode: openaiKeyVisible.checked ? TextInput.Normal : TextInput.Password
                 placeholderText: i18n("sk-admin-...")
                 Layout.fillWidth: true
-                onTextEdited: providersPage.openaiKeyDirty = true
+                onTextEdited: providersPage.stageSecret("openai", text)
             }
 
             QQC2.ToolButton {
@@ -377,10 +378,10 @@ KCM.SimpleKCM {
 
             QQC2.ToolButton {
                 icon.name: "edit-clear"
-                enabled: openaiKeyField.text.length > 0
+                enabled: secrets.walletOpen && openaiKeyField.text.length > 0
                 display: QQC2.AbstractButton.IconOnly
                 QQC2.ToolTip.text: i18n("Clear key"); QQC2.ToolTip.visible: hovered
-                onClicked: { openaiKeyField.text = ""; providersPage.openaiKeyDirty = true; }
+                onClicked: providersPage.clearSecret("openai", openaiKeyField)
             }
         }
 
@@ -470,11 +471,11 @@ KCM.SimpleKCM {
 
             QQC2.TextField {
                 id: azureKeyField
-                enabled: azureSwitch.checked
+                enabled: azureSwitch.checked && secrets.walletOpen
                 echoMode: azureKeyVisible.checked ? TextInput.Normal : TextInput.Password
                 placeholderText: i18n("Enter Azure OpenAI API key...")
                 Layout.fillWidth: true
-                onTextEdited: providersPage.azureKeyDirty = true
+                onTextEdited: providersPage.stageSecret("azure", text)
             }
 
             QQC2.ToolButton {
@@ -488,10 +489,10 @@ KCM.SimpleKCM {
 
             QQC2.ToolButton {
                 icon.name: "edit-clear"
-                enabled: azureKeyField.text.length > 0
+                enabled: secrets.walletOpen && azureKeyField.text.length > 0
                 display: QQC2.AbstractButton.IconOnly
                 QQC2.ToolTip.text: i18n("Clear key"); QQC2.ToolTip.visible: hovered
-                onClicked: { azureKeyField.text = ""; providersPage.azureKeyDirty = true; }
+                onClicked: providersPage.clearSecret("azure", azureKeyField)
             }
         }
 
@@ -578,11 +579,11 @@ KCM.SimpleKCM {
 
             QQC2.TextField {
                 id: bedrockAccessKeyField
-                enabled: bedrockSwitch.checked
+                enabled: bedrockSwitch.checked && secrets.walletOpen
                 echoMode: bedrockAccessKeyVisible.checked ? TextInput.Normal : TextInput.Password
                 placeholderText: i18n("AKIA...")
                 Layout.fillWidth: true
-                onTextEdited: providersPage.bedrockAccessKeyDirty = true
+                onTextEdited: providersPage.stageSecret("bedrock_access_key_id", text)
             }
 
             QQC2.ToolButton {
@@ -600,11 +601,11 @@ KCM.SimpleKCM {
 
             QQC2.TextField {
                 id: bedrockSecretKeyField
-                enabled: bedrockSwitch.checked
+                enabled: bedrockSwitch.checked && secrets.walletOpen
                 echoMode: bedrockSecretKeyVisible.checked ? TextInput.Normal : TextInput.Password
                 placeholderText: i18n("AWS secret access key")
                 Layout.fillWidth: true
-                onTextEdited: providersPage.bedrockSecretKeyDirty = true
+                onTextEdited: providersPage.stageSecret("bedrock_secret_access_key", text)
             }
 
             QQC2.ToolButton {
@@ -618,11 +619,11 @@ KCM.SimpleKCM {
         QQC2.TextField {
             id: bedrockSessionTokenField
             Kirigami.FormData.label: i18n("Session token:")
-            enabled: bedrockSwitch.checked
+            enabled: bedrockSwitch.checked && secrets.walletOpen
             echoMode: TextInput.Password
             placeholderText: i18n("Optional for temporary credentials")
             Layout.fillWidth: true
-            onTextEdited: providersPage.bedrockSessionTokenDirty = true
+            onTextEdited: providersPage.stageSecret("bedrock_session_token", text)
         }
 
         QQC2.TextField {
@@ -688,11 +689,11 @@ KCM.SimpleKCM {
 
             QQC2.TextField {
                 id: anthropicKeyField
-                enabled: anthropicSwitch.checked
+                enabled: anthropicSwitch.checked && secrets.walletOpen
                 echoMode: anthropicKeyVisible.checked ? TextInput.Normal : TextInput.Password
                 placeholderText: i18n("sk-ant-...")
                 Layout.fillWidth: true
-                onTextEdited: providersPage.anthropicKeyDirty = true
+                onTextEdited: providersPage.stageSecret("anthropic", text)
             }
 
             QQC2.ToolButton {
@@ -706,10 +707,10 @@ KCM.SimpleKCM {
 
             QQC2.ToolButton {
                 icon.name: "edit-clear"
-                enabled: anthropicKeyField.text.length > 0
+                enabled: secrets.walletOpen && anthropicKeyField.text.length > 0
                 display: QQC2.AbstractButton.IconOnly
                 QQC2.ToolTip.text: i18n("Clear key"); QQC2.ToolTip.visible: hovered
-                onClicked: { anthropicKeyField.text = ""; providersPage.anthropicKeyDirty = true; }
+                onClicked: providersPage.clearSecret("anthropic", anthropicKeyField)
             }
         }
 
@@ -785,11 +786,11 @@ KCM.SimpleKCM {
 
             QQC2.TextField {
                 id: googleKeyField
-                enabled: googleSwitch.checked
+                enabled: googleSwitch.checked && secrets.walletOpen
                 echoMode: googleKeyVisible.checked ? TextInput.Normal : TextInput.Password
                 placeholderText: i18n("AIza...")
                 Layout.fillWidth: true
-                onTextEdited: providersPage.googleKeyDirty = true
+                onTextEdited: providersPage.stageSecret("google", text)
             }
 
             QQC2.ToolButton {
@@ -803,10 +804,10 @@ KCM.SimpleKCM {
 
             QQC2.ToolButton {
                 icon.name: "edit-clear"
-                enabled: googleKeyField.text.length > 0
+                enabled: secrets.walletOpen && googleKeyField.text.length > 0
                 display: QQC2.AbstractButton.IconOnly
                 QQC2.ToolTip.text: i18n("Clear key"); QQC2.ToolTip.visible: hovered
-                onClicked: { googleKeyField.text = ""; providersPage.googleKeyDirty = true; }
+                onClicked: providersPage.clearSecret("google", googleKeyField)
             }
         }
 
@@ -887,6 +888,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("Mistral AI")
             enabledProp: "cfg_mistralEnabled"
+            secretKey: "mistral"
             modelProp: "cfg_mistralModel"
             baseUrlProp: "cfg_mistralCustomBaseUrl"
             description: i18n("Read-only model discovery; inference tests are manual and may consume quota")
@@ -899,6 +901,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("DeepSeek")
             enabledProp: "cfg_deepseekEnabled"
+            secretKey: "deepseek"
             modelProp: "cfg_deepseekModel"
             baseUrlProp: "cfg_deepseekCustomBaseUrl"
             description: i18n("Tracks rate limits, token usage, and account balance")
@@ -911,6 +914,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("Groq")
             enabledProp: "cfg_groqEnabled"
+            secretKey: "groq"
             modelProp: "cfg_groqModel"
             baseUrlProp: "cfg_groqCustomBaseUrl"
             description: i18n("OpenAI-compatible API with rate limit headers")
@@ -923,6 +927,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("xAI / Grok")
             enabledProp: "cfg_xaiEnabled"
+            secretKey: "xai"
             modelProp: "cfg_xaiModel"
             baseUrlProp: "cfg_xaiCustomBaseUrl"
             description: i18n("OpenAI-compatible API for Grok models")
@@ -935,6 +940,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("Ollama Cloud")
             enabledProp: "cfg_ollamaEnabled"
+            secretKey: "ollama"
             modelProp: "cfg_ollamaModel"
             baseUrlProp: "cfg_ollamaCustomBaseUrl"
             description: i18n("Uses Ollama Cloud's OpenAI-compatible API at ollama.com/v1. Create an API key in your Ollama settings to monitor cloud usage from the widget.")
@@ -948,6 +954,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("OpenRouter")
             enabledProp: "cfg_openrouterEnabled"
+            secretKey: "openrouter"
             modelProp: "cfg_openrouterModel"
             baseUrlProp: "cfg_openrouterCustomBaseUrl"
             description: i18n("Unified gateway to 600+ models. Shows credits balance and usage.")
@@ -960,6 +967,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("Together AI")
             enabledProp: "cfg_togetherEnabled"
+            secretKey: "together"
             modelProp: "cfg_togetherModel"
             baseUrlProp: "cfg_togetherCustomBaseUrl"
             description: i18n("Fast inference for open-source models (Llama, Qwen, DeepSeek)")
@@ -972,6 +980,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("Cohere")
             enabledProp: "cfg_cohereEnabled"
+            secretKey: "cohere"
             modelProp: "cfg_cohereModel"
             baseUrlProp: "cfg_cohereCustomBaseUrl"
             description: i18n("Enterprise RAG and multilingual models via OpenAI-compatible API")
@@ -984,6 +993,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("LiteLLM Proxy")
             enabledProp: "cfg_litellmEnabled"; modelProp: "cfg_litellmModel"; baseUrlProp: "cfg_litellmCustomBaseUrl"
+            secretKey: "litellm"
             description: i18n("Read-only gateway spend and token aggregation. Custom HTTPS endpoint required; loopback HTTP may be enabled explicitly.")
             keyPlaceholder: i18n("LiteLLM master or viewer key")
             modelOptions: providersPage.catalogModelIds("litellm")
@@ -993,6 +1003,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("Cerebras Inference")
             enabledProp: "cfg_cerebrasEnabled"; modelProp: "cfg_cerebrasModel"; baseUrlProp: "cfg_cerebrasCustomBaseUrl"
+            secretKey: "cerebras"
             description: i18n("Read-only model discovery; dedicated metrics remain capability-dependent.")
             keyPlaceholder: i18n("Enter Cerebras API key")
             modelOptions: providersPage.catalogModelIds("cerebras")
@@ -1002,6 +1013,7 @@ KCM.SimpleKCM {
             configPage: providersPage
             providerTitle: i18n("Fireworks AI")
             enabledProp: "cfg_fireworksEnabled"; modelProp: "cfg_fireworksModel"; baseUrlProp: "cfg_fireworksCustomBaseUrl"
+            secretKey: "fireworks"
             description: i18n("Read-only model discovery. Scheduled billing is disabled until permissions are validated.")
             keyPlaceholder: i18n("Enter Fireworks API key; set account endpoint below")
             modelOptions: providersPage.catalogModelIds("fireworks")
@@ -1038,11 +1050,11 @@ KCM.SimpleKCM {
 
             QQC2.TextField {
                 id: googleveoKeyField
-                enabled: googleveoSwitch.checked
+                enabled: googleveoSwitch.checked && secrets.walletOpen
                 echoMode: googleveoKeyVisible.checked ? TextInput.Normal : TextInput.Password
                 placeholderText: i18n("AIza...")
                 Layout.fillWidth: true
-                onTextEdited: providersPage.googleveoKeyDirty = true
+                onTextEdited: providersPage.stageSecret("googleveo", text)
             }
 
             QQC2.ToolButton {
@@ -1056,10 +1068,10 @@ KCM.SimpleKCM {
 
             QQC2.ToolButton {
                 icon.name: "edit-clear"
-                enabled: googleveoKeyField.text.length > 0
+                enabled: secrets.walletOpen && googleveoKeyField.text.length > 0
                 display: QQC2.AbstractButton.IconOnly
                 QQC2.ToolTip.text: i18n("Clear key"); QQC2.ToolTip.visible: hovered
-                onClicked: { googleveoKeyField.text = ""; providersPage.googleveoKeyDirty = true; }
+                onClicked: providersPage.clearSecret("googleveo", googleveoKeyField)
             }
         }
 

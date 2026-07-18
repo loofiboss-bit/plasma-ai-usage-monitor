@@ -9,6 +9,7 @@ import com.github.loofi.aiusagemonitor 1.0
 
 KCM.SimpleKCM {
     id: alertsPage
+    signal configurationChanged()
 
     property alias cfg_alertsEnabled: alertsSwitch.checked
     property alias cfg_warningThreshold: warningSlider.value
@@ -35,12 +36,17 @@ KCM.SimpleKCM {
     property bool cfg_googleveoNotificationsEnabled: plasmoid.configuration.googleveoNotificationsEnabled
     property bool cfg_azureNotificationsEnabled: plasmoid.configuration.azureNotificationsEnabled
     property bool cfg_bedrockNotificationsEnabled: plasmoid.configuration.bedrockNotificationsEnabled
+    property bool cfg_litellmNotificationsEnabled: plasmoid.configuration.litellmNotificationsEnabled
+    property bool cfg_cerebrasNotificationsEnabled: plasmoid.configuration.cerebrasNotificationsEnabled
+    property bool cfg_fireworksNotificationsEnabled: plasmoid.configuration.fireworksNotificationsEnabled
+    property bool cfg_perplexityNotificationsEnabled: plasmoid.configuration.perplexityNotificationsEnabled
     property alias cfg_slackWebhookEnabled: slackWebhookSwitch.checked
     property alias cfg_discordWebhookEnabled: discordWebhookSwitch.checked
     property alias cfg_webhookCooldownMinutes: webhookCooldownSlider.value
 
-    property bool slackWebhookDirty: false
-    property bool discordWebhookDirty: false
+    readonly property bool unsavedChanges: secretChanges.dirty
+    property string secretStatusMessage: ""
+    property bool secretStatusError: false
 
     // DND hours: config stores -1 (disabled) or 0-23 (hour).
     // ComboBox index: 0 = "Disabled", 1-24 = hours 0-23.
@@ -53,37 +59,57 @@ KCM.SimpleKCM {
         id: alertSecrets
 
         onWalletOpenChanged: {
-            if (walletOpen) {
+            if (walletOpen && !secretChanges.dirty) {
                 alertsPage.loadWebhookSecrets();
             }
         }
     }
 
+    SecretChangeSet {
+        id: secretChanges
+        store: alertSecrets
+    }
+
     function loadWebhookSecrets() {
-        if (alertSecrets.hasKey("slack_webhook_url")) {
-            slackWebhookField.text = "********";
-            slackWebhookDirty = false;
-        }
-        if (alertSecrets.hasKey("discord_webhook_url")) {
-            discordWebhookField.text = "********";
-            discordWebhookDirty = false;
+        refreshWebhookSecret("slack_webhook_url", slackWebhookField);
+        refreshWebhookSecret("discord_webhook_url", discordWebhookField);
+    }
+
+    function refreshWebhookSecret(key, field) {
+        if (alertSecrets.hasKey(key)) {
+            field.text = "********";
+        } else {
+            field.text = "";
         }
     }
 
-    function saveWebhookSecrets() {
-        if (slackWebhookDirty) {
-            if (slackWebhookField.text.length > 0 && slackWebhookField.text !== "********") {
-                alertSecrets.storeKey("slack_webhook_url", slackWebhookField.text);
-            } else if (slackWebhookField.text.length === 0) {
-                alertSecrets.removeKey("slack_webhook_url");
+    function stageSecret(key, value) {
+        if (value.length > 0) secretChanges.stageStore(key, value);
+        else secretChanges.stageRemove(key);
+        secretStatusMessage = "";
+        secretStatusError = false;
+    }
+
+    function saveConfig() {
+        var result = secretChanges.commit();
+        secretStatusError = !result.ok;
+        if (result.ok) {
+            secretStatusMessage = result.appliedKeys.length > 0
+                ? i18n("Webhook credentials saved securely in KDE Wallet.") : "";
+            if (result.appliedKeys.length > 0) loadWebhookSecrets();
+        } else if (result.message === "wallet-not-open") {
+            secretStatusMessage = i18n("KDE Wallet is not open. Unlock it and retry Apply.");
+        } else {
+            secretStatusMessage = i18n("Some webhook credentials could not be saved. Retry Apply.");
+            if (result.appliedKeys.indexOf("slack_webhook_url") >= 0) {
+                refreshWebhookSecret("slack_webhook_url", slackWebhookField);
+            }
+            if (result.appliedKeys.indexOf("discord_webhook_url") >= 0) {
+                refreshWebhookSecret("discord_webhook_url", discordWebhookField);
             }
         }
-        if (discordWebhookDirty) {
-            if (discordWebhookField.text.length > 0 && discordWebhookField.text !== "********") {
-                alertSecrets.storeKey("discord_webhook_url", discordWebhookField.text);
-            } else if (discordWebhookField.text.length === 0) {
-                alertSecrets.removeKey("discord_webhook_url");
-            }
+        if (!result.ok) {
+            Qt.callLater(function() { alertsPage.configurationChanged(); });
         }
     }
 
@@ -109,10 +135,15 @@ KCM.SimpleKCM {
         }
     }
 
-    Component.onDestruction: saveWebhookSecrets()
-
     Kirigami.FormLayout {
         anchors.fill: parent
+
+        Kirigami.InlineMessage {
+            visible: alertsPage.secretStatusMessage.length > 0
+            text: alertsPage.secretStatusMessage
+            type: alertsPage.secretStatusError ? Kirigami.MessageType.Error : Kirigami.MessageType.Positive
+            Layout.fillWidth: true
+        }
 
         QQC2.Switch {
             id: alertsSwitch
@@ -307,11 +338,11 @@ KCM.SimpleKCM {
         QQC2.TextField {
             id: slackWebhookField
             Kirigami.FormData.label: i18n("Slack URL:")
-            enabled: alertsSwitch.checked && slackWebhookSwitch.checked
+            enabled: alertsSwitch.checked && slackWebhookSwitch.checked && alertSecrets.walletOpen
             echoMode: TextInput.Password
             placeholderText: i18n("Stored in KWallet")
             Layout.fillWidth: true
-            onTextEdited: alertsPage.slackWebhookDirty = true
+            onTextEdited: alertsPage.stageSecret("slack_webhook_url", text)
         }
 
         QQC2.Switch {
@@ -324,11 +355,11 @@ KCM.SimpleKCM {
         QQC2.TextField {
             id: discordWebhookField
             Kirigami.FormData.label: i18n("Discord URL:")
-            enabled: alertsSwitch.checked && discordWebhookSwitch.checked
+            enabled: alertsSwitch.checked && discordWebhookSwitch.checked && alertSecrets.walletOpen
             echoMode: TextInput.Password
             placeholderText: i18n("Stored in KWallet")
             Layout.fillWidth: true
-            onTextEdited: alertsPage.discordWebhookDirty = true
+            onTextEdited: alertsPage.stageSecret("discord_webhook_url", text)
         }
 
         ColumnLayout {

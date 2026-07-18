@@ -20,15 +20,16 @@ class SecretsManager : public QObject
 
 public:
     explicit SecretsManager(QObject *parent = nullptr);
+    SecretsManager(QObject *parent, bool openWalletOnConstruction);
     ~SecretsManager() override;
 
     bool isWalletOpen() const;
     int secretReadCount() const;
     bool isDemoIsolated() const;
 
-    Q_INVOKABLE void storeKey(const QString &provider, const QString &key);
+    Q_INVOKABLE bool storeKey(const QString &provider, const QString &key);
     Q_INVOKABLE QString getKey(const QString &provider);
-    Q_INVOKABLE void removeKey(const QString &provider);
+    Q_INVOKABLE bool removeKey(const QString &provider);
     Q_INVOKABLE bool hasKey(const QString &provider);
     Q_INVOKABLE void retryOpenWallet();
 
@@ -54,15 +55,6 @@ private:
     QString m_folderName = QStringLiteral("ai-usage-monitor");
     QHash<QString, QString> m_secretCache;
     int m_secretReadCount = 0;
-
-    // Pending operations queue
-    struct PendingOp {
-        enum Type { Store, Remove };
-        Type type;
-        QString provider;
-        QString key;
-    };
-    QList<PendingOp> m_pendingOps;
 };
 
 #endif // SECRETSMANAGER_H

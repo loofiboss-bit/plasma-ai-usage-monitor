@@ -7,6 +7,7 @@ import com.github.loofi.aiusagemonitor 1.0
 
 KCM.SimpleKCM {
     id: subscriptionsPage
+    signal configurationChanged()
 
     property bool advancedMode: plasmoid.configuration.advancedSettingsMode
 
@@ -65,8 +66,9 @@ KCM.SimpleKCM {
     property alias cfg_jetbrainsAiCustomLimit: jetbrainsAiLimitSpin.value
     property alias cfg_jetbrainsAiNotifications: jetbrainsAiNotifySwitch.checked
 
-    // Track key dirtiness for Copilot PAT
-    property bool copilotTokenDirty: false
+    readonly property bool unsavedChanges: secretChanges.dirty
+    property string secretStatusMessage: ""
+    property bool secretStatusError: false
 
     function normalizedSyncCode(code) {
         if (code === "not_found") return "cookies_not_found";
@@ -186,7 +188,7 @@ KCM.SimpleKCM {
         id: secrets
 
         onWalletOpenChanged: {
-            if (walletOpen) {
+            if (walletOpen && !secretChanges.dirty) {
                 loadCopilotToken();
             }
         }
@@ -200,20 +202,33 @@ KCM.SimpleKCM {
         }
     }
 
+    SecretChangeSet {
+        id: secretChanges
+        store: secrets
+    }
+
     function loadCopilotToken() {
         if (secrets.hasKey("copilot_github")) {
             copilotTokenField.text = "********";
-            copilotTokenDirty = false;
         } else {
             copilotTokenField.text = "";
         }
     }
 
-    function saveCopilotToken() {
-        if (copilotTokenDirty && copilotTokenField.text.length > 0 && copilotTokenField.text !== "********") {
-            secrets.storeKey("copilot_github", copilotTokenField.text);
-        } else if (copilotTokenDirty && copilotTokenField.text.length === 0) {
-            secrets.removeKey("copilot_github");
+    function saveConfig() {
+        var result = secretChanges.commit();
+        secretStatusError = !result.ok;
+        if (result.ok) {
+            secretStatusMessage = result.appliedKeys.length > 0
+                ? i18n("GitHub token saved securely in KDE Wallet.") : "";
+            if (result.appliedKeys.length > 0) loadCopilotToken();
+        } else if (result.message === "wallet-not-open") {
+            secretStatusMessage = i18n("KDE Wallet is not open. Unlock it and retry Apply.");
+        } else {
+            secretStatusMessage = i18n("The GitHub token could not be saved. Retry Apply.");
+        }
+        if (!result.ok) {
+            Qt.callLater(function() { subscriptionsPage.configurationChanged(); });
         }
     }
 
@@ -224,13 +239,15 @@ KCM.SimpleKCM {
         reloadBrowserProfiles();
     }
 
-    Component.onDestruction: {
-        saveCopilotToken();
-    }
-
-    
     Kirigami.FormLayout {
         anchors.fill: parent
+
+        Kirigami.InlineMessage {
+            visible: subscriptionsPage.secretStatusMessage.length > 0
+            text: subscriptionsPage.secretStatusMessage
+            type: subscriptionsPage.secretStatusError ? Kirigami.MessageType.Error : Kirigami.MessageType.Positive
+            Layout.fillWidth: true
+        }
         
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
@@ -622,11 +639,16 @@ KCM.SimpleKCM {
 
             QQC2.TextField {
                 id: copilotTokenField
-                enabled: copilotSwitch.checked
+                enabled: copilotSwitch.checked && secrets.walletOpen
                 echoMode: copilotTokenVisible.checked ? TextInput.Normal : TextInput.Password
                 placeholderText: i18n("ghp_...")
                 Layout.fillWidth: true
-                onTextEdited: subscriptionsPage.copilotTokenDirty = true
+                onTextEdited: {
+                    if (text.length > 0) secretChanges.stageStore("copilot_github", text);
+                    else secretChanges.stageRemove("copilot_github");
+                    subscriptionsPage.secretStatusMessage = "";
+                    subscriptionsPage.secretStatusError = false;
+                }
             }
 
             QQC2.ToolButton {
@@ -640,10 +662,15 @@ KCM.SimpleKCM {
 
             QQC2.ToolButton {
                 icon.name: "edit-clear"
-                enabled: copilotTokenField.text.length > 0
+                enabled: secrets.walletOpen && copilotTokenField.text.length > 0
                 display: QQC2.AbstractButton.IconOnly
                 QQC2.ToolTip.text: i18n("Clear token"); QQC2.ToolTip.visible: hovered
-                onClicked: { copilotTokenField.text = ""; subscriptionsPage.copilotTokenDirty = true; }
+                onClicked: {
+                    copilotTokenField.text = "";
+                    secretChanges.stageRemove("copilot_github");
+                    subscriptionsPage.secretStatusMessage = "";
+                    subscriptionsPage.secretStatusError = false;
+                }
             }
         }
 

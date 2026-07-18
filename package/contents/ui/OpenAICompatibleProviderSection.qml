@@ -20,7 +20,8 @@ Kirigami.FormLayout {
     property string baseUrlTooltip: i18n("Override the API endpoint for proxies or self-hosted gateways. Must start with https://")
     property string baseUrlPlaceholder: i18n("Leave empty for default")
     property bool requiresApiKey: true
-    property bool keyDirty: false
+    property string secretKey: ""
+    property bool walletOpen: configPage.walletOpen
     property alias keyField: providerKeyField
 
     Layout.fillWidth: true
@@ -45,11 +46,13 @@ Kirigami.FormLayout {
 
         QQC2.TextField {
             id: providerKeyField
-            enabled: enabledSwitch.checked
+            enabled: enabledSwitch.checked && section.walletOpen
             echoMode: keyVisibleButton.checked ? TextInput.Normal : TextInput.Password
             placeholderText: section.keyPlaceholder
             Layout.fillWidth: true
-            onTextEdited: section.keyDirty = true
+            onTextEdited: {
+                if (section.secretKey) section.configPage.stageSecret(section.secretKey, text);
+            }
         }
 
         QQC2.ToolButton {
@@ -64,13 +67,12 @@ Kirigami.FormLayout {
 
         QQC2.ToolButton {
             icon.name: "edit-clear"
-            enabled: providerKeyField.text.length > 0
+            enabled: section.walletOpen && providerKeyField.text.length > 0
             display: QQC2.AbstractButton.IconOnly
             QQC2.ToolTip.text: i18n("Clear key")
             QQC2.ToolTip.visible: hovered
             onClicked: {
-                providerKeyField.text = "";
-                section.keyDirty = true;
+                if (section.secretKey) section.configPage.clearSecret(section.secretKey, providerKeyField);
             }
         }
     }

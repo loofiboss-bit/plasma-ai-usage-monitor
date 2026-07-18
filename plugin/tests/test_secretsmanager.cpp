@@ -31,6 +31,7 @@ class SecretsManagerTest : public QObject
 
 private Q_SLOTS:
     void demoModeNeverOpensReadsOrWritesWallet();
+    void closedWalletRejectsWritesWithoutQueueing();
 };
 
 void SecretsManagerTest::demoModeNeverOpensReadsOrWritesWallet()
@@ -48,12 +49,32 @@ void SecretsManagerTest::demoModeNeverOpensReadsOrWritesWallet()
     QVERIFY(!manager.hasKey(QStringLiteral("openai")));
     QVERIFY(manager.getKey(QStringLiteral("openai")).isEmpty());
 
-    manager.storeKey(QStringLiteral("openai"), QStringLiteral("must-not-be-written"));
-    manager.removeKey(QStringLiteral("openai"));
+    QVERIFY(!manager.storeKey(QStringLiteral("openai"), QStringLiteral("must-not-be-written")));
+    QVERIFY(!manager.removeKey(QStringLiteral("openai")));
     manager.retryOpenWallet();
 
     QCOMPARE(manager.secretReadCount(), 0);
     QVERIFY(!manager.isWalletOpen());
+    QCOMPARE(storedSpy.count(), 0);
+    QCOMPARE(removedSpy.count(), 0);
+}
+
+void SecretsManagerTest::closedWalletRejectsWritesWithoutQueueing()
+{
+    EnvironmentGuard demoGuard("PLASMA_AI_MONITOR_DEMO");
+    qunsetenv("PLASMA_AI_MONITOR_DEMO");
+
+    SecretsManager manager(nullptr, false);
+    QSignalSpy errorSpy(&manager, &SecretsManager::error);
+    QSignalSpy storedSpy(&manager, &SecretsManager::keyStored);
+    QSignalSpy removedSpy(&manager, &SecretsManager::keyRemoved);
+
+    QVERIFY(!manager.isDemoIsolated());
+    QVERIFY(!manager.isWalletOpen());
+    QVERIFY(!manager.storeKey(QStringLiteral("openai"), QStringLiteral("must-not-be-queued")));
+    QVERIFY(!manager.removeKey(QStringLiteral("openai")));
+
+    QCOMPARE(errorSpy.count(), 2);
     QCOMPARE(storedSpy.count(), 0);
     QCOMPARE(removedSpy.count(), 0);
 }

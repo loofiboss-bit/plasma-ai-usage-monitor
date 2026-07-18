@@ -30,7 +30,7 @@ find_package(KF6I18n REQUIRED)
 
 include(CTest)
 if(BUILD_TESTING)
-    find_package(Qt6 REQUIRED COMPONENTS Test)
+    find_package(Qt6 REQUIRED COMPONENTS Test QuickTest)
     find_package(Python3 REQUIRED COMPONENTS Interpreter)
     add_test(
         NAME demo_contract
@@ -39,6 +39,10 @@ if(BUILD_TESTING)
     add_test(
         NAME release_policy
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_release_policy.py"
+    )
+    add_test(
+        NAME kcm_contracts
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_kcm_contracts.py"
     )
     add_test(
         NAME exact_tag_promotion

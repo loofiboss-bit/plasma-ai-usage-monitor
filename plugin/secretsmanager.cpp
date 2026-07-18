@@ -2,13 +2,18 @@
 #include <QDebug>
 
 SecretsManager::SecretsManager(QObject *parent)
+    : SecretsManager(parent, true)
+{
+}
+
+SecretsManager::SecretsManager(QObject *parent, bool openWalletOnConstruction)
     : QObject(parent),
       m_demoIsolated(qEnvironmentVariableIsSet("PLASMA_AI_MONITOR_DEMO"))
 {
     // Demo and screenshot sessions are deterministic fixtures. They must not
     // open KWallet, warm its cache, reveal which credentials exist, or mutate
     // a real user's secrets.
-    if (!m_demoIsolated) {
+    if (!m_demoIsolated && openWalletOnConstruction) {
         openWallet();
     }
 }
@@ -79,19 +84,6 @@ void SecretsManager::onWalletOpened(bool success)
 
     ensureFolder();
     warmCache();
-
-    // Process any pending operations
-    for (const auto &op : std::as_const(m_pendingOps)) {
-        switch (op.type) {
-        case PendingOp::Store:
-            storeKey(op.provider, op.key);
-            break;
-        case PendingOp::Remove:
-            removeKey(op.provider);
-            break;
-        }
-    }
-    m_pendingOps.clear();
 }
 
 void SecretsManager::warmCache()
@@ -126,26 +118,28 @@ bool SecretsManager::ensureFolder()
     return true;
 }
 
-void SecretsManager::storeKey(const QString &provider, const QString &key)
+bool SecretsManager::storeKey(const QString &provider, const QString &key)
 {
     if (m_demoIsolated) {
-        return;
+        return false;
     }
     if (!m_walletOpen) {
-        m_pendingOps.append({PendingOp::Store, provider, key});
-        return;
+        Q_EMIT error(QStringLiteral("KDE Wallet is not open"));
+        return false;
     }
 
-    if (!ensureFolder()) return;
+    if (!ensureFolder()) return false;
 
     int result = m_wallet->writePassword(provider, key);
     if (result == 0) {
         m_secretCache.insert(provider, key);
         Q_EMIT keyStored(provider);
         Q_EMIT secretAvailabilityChanged(provider, !key.isEmpty());
+        return true;
     } else {
         qWarning() << "AI Usage Monitor: Failed to store key for" << provider;
         Q_EMIT error(QStringLiteral("Failed to store key for %1").arg(provider));
+        return false;
     }
 }
 
@@ -176,26 +170,28 @@ QString SecretsManager::getKey(const QString &provider)
     return password;
 }
 
-void SecretsManager::removeKey(const QString &provider)
+bool SecretsManager::removeKey(const QString &provider)
 {
     if (m_demoIsolated) {
-        return;
+        return false;
     }
     if (!m_walletOpen) {
-        m_pendingOps.append({PendingOp::Remove, provider, QString()});
-        return;
+        Q_EMIT error(QStringLiteral("KDE Wallet is not open"));
+        return false;
     }
 
-    if (!ensureFolder()) return;
+    if (!ensureFolder()) return false;
 
     int result = m_wallet->removeEntry(provider);
     if (result == 0) {
         m_secretCache.remove(provider);
         Q_EMIT keyRemoved(provider);
         Q_EMIT secretAvailabilityChanged(provider, false);
+        return true;
     } else {
         qWarning() << "AI Usage Monitor: Failed to remove key for" << provider;
         Q_EMIT error(QStringLiteral("Failed to remove key for %1").arg(provider));
+        return false;
     }
 }
 
