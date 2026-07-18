@@ -1,6 +1,6 @@
 # AI Usage Monitor wiki
 
-AI Usage Monitor is a KDE Plasma 6 widget for provider-reported usage and spend, local coding-tool activity, and read-only connection checks. Version 14.0.0 is the current release.
+AI Usage Monitor is a KDE Plasma 6 widget for provider-reported usage and spend, local coding-tool activity, and read-only connection checks. Version 14.0.1 is the current release.
 
 ## New user path
 
