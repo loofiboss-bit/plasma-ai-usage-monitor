@@ -160,6 +160,17 @@ add_test(
             -platform offscreen
 )
 
+add_executable(test_dependencybootstrap_qml
+    test_dependencybootstrap_qml.cpp
+)
+target_link_libraries(test_dependencybootstrap_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME dependencybootstrap_qml
+    COMMAND test_dependencybootstrap_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/bootstrap"
+            -platform offscreen
+)
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp

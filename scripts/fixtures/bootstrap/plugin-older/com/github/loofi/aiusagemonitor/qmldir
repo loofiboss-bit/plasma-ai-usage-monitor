@@ -1,0 +1,2 @@
+module com.github.loofi.aiusagemonitor
+singleton AppInfo 1.0 AppInfo.qml

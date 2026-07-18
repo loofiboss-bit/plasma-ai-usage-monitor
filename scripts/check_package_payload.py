@@ -20,6 +20,10 @@ def main():
     expected_files_in_source = [
         "package/metadata.json",
         "package/contents/ui/main.qml",
+        "package/contents/ui/DependencyBootstrap.qml",
+        "package/contents/ui/DependencyBootstrapController.qml",
+        "package/contents/ui/NativeMonitor.qml",
+        "package/contents/ui/NativePluginProbe.qml",
         "package/contents/catalog/providers-v4.json",
         "package/contents/catalog/subscriptions-v1.json",
         "package/contents/icons/providers/openai.svg",
@@ -78,6 +82,10 @@ def main():
                 # Check for key files in the tarball
                 tar_expected = [
                     f"plasma-ai-usage-monitor-{expected_version}/package/metadata.json",
+                    f"plasma-ai-usage-monitor-{expected_version}/package/contents/ui/DependencyBootstrap.qml",
+                    f"plasma-ai-usage-monitor-{expected_version}/package/contents/ui/DependencyBootstrapController.qml",
+                    f"plasma-ai-usage-monitor-{expected_version}/package/contents/ui/NativeMonitor.qml",
+                    f"plasma-ai-usage-monitor-{expected_version}/package/contents/ui/NativePluginProbe.qml",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/catalog/providers-v4.json",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/catalog/subscriptions-v1.json",
                     f"plasma-ai-usage-monitor-{expected_version}/package/contents/icons/providers/openai.svg",
