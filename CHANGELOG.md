@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [14.0.1] — 2026-07-18
+
+### Fixed
+- Restore keyboard focus and arrow-key selection in the provider source list.
+
 ## [14.0.0] — 2026-07-18
 
 ### Added
@@ -772,7 +777,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.1...HEAD
+[14.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.0...v14.0.1
 [14.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v13.0.0...v14.0.0
 [13.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.3...v13.0.0
 [12.0.3]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.2...v12.0.3

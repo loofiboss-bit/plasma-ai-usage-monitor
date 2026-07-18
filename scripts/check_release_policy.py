@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import sys
 
 
@@ -16,17 +17,20 @@ def fail(message: str) -> None:
 
 
 version = (ROOT / "VERSION").read_text().strip()
-if version != "14.0.0":
-    fail(f"phase 7 requires VERSION 14.0.0, got {version}")
+if not re.fullmatch(r"14\.0\.\d+", version):
+    fail(f"phase 7 requires a stable v14 release, got {version}")
 
-checklist = (ROOT / "docs/release/v14.0.0-checklist.md").read_text()
+checklist_path = ROOT / f"docs/release/v{version}-checklist.md"
+if not checklist_path.is_file():
+    fail(f"missing current release checklist: {checklist_path.relative_to(ROOT)}")
+checklist = checklist_path.read_text()
 required_policy = (
     "Provider API keys and live provider accounts are optional release evidence "
     "and never block publication."
 )
 if required_policy not in checklist:
     fail("v14 checklist must declare provider credentials non-blocking")
-if "Publish `v14.0.0` directly from the verified `main` commit" not in checklist:
+if f"Publish `v{version}` directly from the verified `main` commit" not in checklist:
     fail("v14 checklist must require direct stable publication")
 
 release_surfaces = [

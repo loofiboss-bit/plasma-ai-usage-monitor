@@ -6,7 +6,7 @@
 
 AI Usage Monitor puts provider-reported usage and spend, local coding-tool activity, and read-only connection checks in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **14.0.0 (First Successful Use)** guides you from source choice to a safe verification. The result says whether the source returned usage or spend, a balance, a local estimate, or connectivity only. Scheduled provider checks are read-only, and missing values stay unknown instead of becoming false zeroes.
+Version **14.0.1 (First Successful Use)** guides you from source choice to a safe verification. The result says whether the source returned usage or spend, a balance, a local estimate, or connectivity only. Scheduled provider checks are read-only, and missing values stay unknown instead of becoming false zeroes.
 
 ![AI Usage Monitor main window](assets/screenshots/main-window.png)
 
