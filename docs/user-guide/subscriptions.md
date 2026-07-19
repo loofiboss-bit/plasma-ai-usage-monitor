@@ -16,11 +16,13 @@ Open **Settings → Subscriptions** and enable the tools you use. The detection 
 
 ## Google Antigravity
 
-Antigravity monitoring is opt-in and currently supports the Linux desktop app. Antigravity must be installed, running, and signed in. The widget detects the plan automatically and shows one row for every model variant returned for the account, including eligible Claude and GPT-OSS models. Models without quota progress remain visible as available, and temporarily disabled models keep their reported reason.
+Antigravity monitoring is opt-in and supports the current Antigravity 2.x Linux desktop app. Antigravity must be installed, running, and signed in. The widget detects the plan automatically, shows the shared five-hour and weekly quota buckets returned by Antigravity 2.x, and keeps the per-model rows returned for the account. Models without quota progress remain visible as available, and temporarily disabled models keep their reported reason.
 
-The monitor calls only the local, read-only `GetUserStatus` RPC over pinned TLS. It does not start Antigravity, sign in, read OAuth tokens, prompts, conversations, logs, or other cache data. The daemon CSRF value is kept in memory and sent only to the validated loopback process. It is never logged, persisted, diagnosed, or exported.
+The monitor calls only the local, read-only `GetUserStatus` and `RetrieveUserQuotaSummary` RPCs over pinned TLS. It accepts the Antigravity 2.x `resources/bin/language_server` layout and the older extension layout, but only when the process belongs to the current user, listens on loopback, and presents the certificate shipped with that executable. It does not start Antigravity, sign in, read OAuth tokens, prompts, conversations, logs, or other cache data. The daemon CSRF value is kept in memory and sent only to the validated loopback process. It is never logged, persisted, diagnosed, or exported.
 
 Model access and quotas are dynamic, so the catalog does not contain a fixed model matrix or numeric limits. If a temporary error occurs after a successful refresh, the last snapshot remains visible as **Stale**. Use **Refresh / Test connection** after restarting or updating Antigravity.
+
+`gemini.google.com` usage is not included in the Antigravity card. The Gemini web app uses a separate product quota and does not expose a stable, documented read-only quota interface that the widget can query safely.
 
 ## Local tracking
 

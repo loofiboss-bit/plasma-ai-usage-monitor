@@ -6,7 +6,7 @@
 
 AI Usage Monitor puts provider-reported usage and spend, local coding-tool activity, and read-only connection checks in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **14.1.0 (First Successful Use)** guides you from source choice to a safe verification. The result says whether the source returned usage or spend, a balance, a local estimate, or connectivity only. Scheduled provider checks are read-only, and missing values stay unknown instead of becoming false zeroes.
+Version **14.1.1 (First Successful Use)** guides you from source choice to a safe verification. The result says whether the source returned usage or spend, a balance, a local estimate, or connectivity only. Scheduled provider checks are read-only, and missing values stay unknown instead of becoming false zeroes.
 
 ![AI Usage Monitor main window](assets/screenshots/main-window.png)
 
@@ -59,7 +59,7 @@ Hosted-provider support includes:
 
 The generated [provider capability matrix](docs/provider-capabilities.md) lists the scheduled endpoint and monitoring level for every provider.
 
-The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI. Antigravity can report the signed-in plan and live per-model quota from its read-only localhost daemon; local activity and configured plan limits for other tools remain estimates unless a supported authenticated source provides a live quota window.
+The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI. Antigravity 2.x can report the signed-in plan, live per-model quota, and shared five-hour and weekly windows from its read-only localhost daemon; local activity and configured plan limits for other tools remain estimates unless a supported authenticated source provides a live quota window.
 
 ## Main features
 

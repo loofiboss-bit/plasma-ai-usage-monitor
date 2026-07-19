@@ -31,6 +31,12 @@ Browser Sync reads the selected local profile and uses the existing authenticate
 
 Temporary browser database copies use owner-only permissions. Browser Sync is disabled by default because it depends on undocumented service behavior.
 
+## Antigravity local monitoring
+
+Antigravity monitoring connects only to a language-server process owned by the current user and listening on loopback. The widget validates the executable layout and pins the localhost certificate shipped with the detected Antigravity installation. Its CSRF value remains in memory and is never logged, persisted, diagnosed, or exported.
+
+The monitor reads only account status and quota-summary RPCs. It does not read Antigravity prompts, conversations, OAuth tokens, logs, or the separate `gemini.google.com` session.
+
 ## Support reports
 
 Native Diagnostics builds the support report in the compiled plugin. It redacts endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values. The dependency-recovery screen has a smaller redacted bootstrap report that omits error details and paths. Review either report before posting it publicly.

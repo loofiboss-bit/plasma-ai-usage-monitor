@@ -8,8 +8,10 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QHostAddress>
+#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QNetworkRequest>
@@ -60,6 +62,25 @@ QString modelFamily(const QString &label, int provider)
     return QStringLiteral("antigravity");
 }
 
+QString normalizedPlanLabel(const QString &planId, const QString &planName, const QString &tierName)
+{
+    QString label = tierName.isEmpty() ? planName : tierName;
+    if (label.compare(QLatin1String("Pro"), Qt::CaseInsensitive) == 0)
+        label = QStringLiteral("Google AI Pro");
+    if (label.compare(QLatin1String("Ultra"), Qt::CaseInsensitive) == 0)
+        label = QStringLiteral("Google AI Ultra");
+    if (planId == QLatin1String("standard") && (label.compare(QLatin1String("Standard"), Qt::CaseInsensitive) == 0 ||
+                                                label.compare(QLatin1String("Free"), Qt::CaseInsensitive) == 0))
+    {
+        label = QStringLiteral("Google AI Standard");
+    }
+    if (planId == QLatin1String("ultra_5x"))
+        label = QStringLiteral("Google AI Ultra 5x");
+    if (planId == QLatin1String("ultra_20x"))
+        label = QStringLiteral("Google AI Ultra 20x");
+    return label.isEmpty() ? QStringLiteral("Unknown plan") : label;
+}
+
 int familyRank(const QString &family)
 {
     return family == QLatin1String("google") ? 0 : 1;
@@ -80,6 +101,72 @@ QString untilReset(const QDateTime &resetAt)
     if (hours > 0)
         return QStringLiteral("%1h %2m").arg(hours).arg(minutes);
     return QStringLiteral("%1m").arg(minutes);
+}
+
+QDateTime jsonResetTime(const QJsonValue &value)
+{
+    if (value.isString())
+    {
+        const QString text = value.toString();
+        QDateTime parsed = QDateTime::fromString(text, Qt::ISODate);
+        if (parsed.isValid())
+            return parsed.toUTC();
+        bool ok = false;
+        const qint64 seconds = text.toLongLong(&ok);
+        if (ok && seconds > 0)
+            return QDateTime::fromSecsSinceEpoch(seconds, QTimeZone::UTC);
+    }
+    if (value.isDouble() && value.toDouble() > 0)
+        return QDateTime::fromSecsSinceEpoch(static_cast<qint64>(value.toDouble()), QTimeZone::UTC);
+    if (value.isObject())
+    {
+        const QJsonValue secondsValue = value.toObject().value(QStringLiteral("seconds"));
+        bool ok = false;
+        const qint64 seconds = secondsValue.isString() ? secondsValue.toString().toLongLong(&ok)
+                                                       : static_cast<qint64>(secondsValue.toDouble());
+        if ((ok || secondsValue.isDouble()) && seconds > 0)
+            return QDateTime::fromSecsSinceEpoch(seconds, QTimeZone::UTC);
+    }
+    return {};
+}
+
+QString jsonIdentity(const QJsonObject &modelOrAlias, const QString &label)
+{
+    const auto scalar = [](const QJsonValue &value) {
+        if (value.isString())
+            return value.toString().trimmed();
+        if (value.isDouble())
+            return QString::number(static_cast<qint64>(value.toDouble()));
+        return QString();
+    };
+    const QString model = scalar(modelOrAlias.value(QStringLiteral("model")));
+    if (!model.isEmpty() && model != QLatin1String("0"))
+        return QStringLiteral("model:%1").arg(model);
+    const QString alias = scalar(modelOrAlias.value(QStringLiteral("alias")));
+    if (!alias.isEmpty() && alias != QLatin1String("0"))
+        return QStringLiteral("alias:%1").arg(alias);
+    return QStringLiteral("label:%1").arg(slug(label));
+}
+
+void addQuotaFields(QVariantMap &row, double remainingFraction, const QDateTime &resetAt)
+{
+    const bool hasExactFraction =
+        std::isfinite(remainingFraction) && remainingFraction >= 0.0 && remainingFraction <= 1.0;
+    if (hasExactFraction)
+    {
+        const double remaining = remainingFraction * 100.0;
+        row.insert(QStringLiteral("percentRemaining"), remaining);
+        row.insert(QStringLiteral("percentUsed"), 100.0 - remaining);
+    }
+    if (resetAt.isValid())
+    {
+        row.insert(QStringLiteral("resetAt"), resetAt.toString(Qt::ISODate));
+        row.insert(QStringLiteral("timeUntilReset"), untilReset(resetAt));
+    }
+    row.insert(QStringLiteral("precision"),
+               hasExactFraction ? QStringLiteral("local_daemon_actual") : QStringLiteral("availability_only"));
+    if (!row.contains(QStringLiteral("badge")))
+        row.insert(QStringLiteral("badge"), hasExactFraction ? QStringLiteral("Live") : QStringLiteral("Available"));
 }
 
 const ProtoPlanInfo *reportedPlan(const ProtoResponse &response)
@@ -145,10 +232,10 @@ bool AntigravityMonitor::isLimitReached() const
 
 void AntigravityMonitor::checkToolInstalled()
 {
-    const bool installed = !QStandardPaths::findExecutable(QStringLiteral("antigravity")).isEmpty() ||
-                           !QStandardPaths::findExecutable(QStringLiteral("agy")).isEmpty() ||
-                           QFileInfo::exists(QStringLiteral("/usr/share/antigravity/resources/app/extensions/"
-                                                            "antigravity/bin/language_server_linux_x64"));
+    bool installed = !QStandardPaths::findExecutable(QStringLiteral("antigravity")).isEmpty() ||
+                     !QStandardPaths::findExecutable(QStringLiteral("agy")).isEmpty();
+    for (const QString &candidate : installationCandidates(QDir::homePath()))
+        installed = installed || QFileInfo::exists(candidate);
     setInstalled(installed);
     if (!installed)
         setConnectionState(QStringLiteral("unavailable"), QStringLiteral("not_installed"));
@@ -255,21 +342,7 @@ QVariantMap AntigravityMonitor::parseUserStatusPayload(const QByteArray &payload
     const QString planName = plan ? fromProto(plan->plan_name()) : QString();
     const bool enterprise = plan && plan->is_enterprise();
     const QString planId = normalizedPlanId(planName, tierId, enterprise);
-    QString planLabel = tierName.isEmpty() ? planName : tierName;
-    if (planLabel.compare(QLatin1String("Pro"), Qt::CaseInsensitive) == 0)
-        planLabel = QStringLiteral("Google AI Pro");
-    if (planLabel.compare(QLatin1String("Ultra"), Qt::CaseInsensitive) == 0)
-        planLabel = QStringLiteral("Google AI Ultra");
-    if (planId == QLatin1String("standard") &&
-        (planLabel.compare(QLatin1String("Standard"), Qt::CaseInsensitive) == 0 ||
-         planLabel.compare(QLatin1String("Free"), Qt::CaseInsensitive) == 0))
-        planLabel = QStringLiteral("Google AI Standard");
-    if (planId == QLatin1String("ultra_5x"))
-        planLabel = QStringLiteral("Google AI Ultra 5x");
-    if (planId == QLatin1String("ultra_20x"))
-        planLabel = QStringLiteral("Google AI Ultra 20x");
-    if (planLabel.isEmpty())
-        planLabel = QStringLiteral("Unknown plan");
+    const QString planLabel = normalizedPlanLabel(planId, planName, tierName);
 
     QList<QVariantMap> normalizedRows;
     if (status.has_cascade_model_config_data())
@@ -382,6 +455,185 @@ QVariantMap AntigravityMonitor::parseUserStatusPayload(const QByteArray &payload
     return result;
 }
 
+QVariantMap AntigravityMonitor::parseConnectUserStatusPayload(const QByteArray &payload)
+{
+    QVariantMap result;
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject())
+    {
+        result.insert(QStringLiteral("error"), QStringLiteral("invalid_response"));
+        return result;
+    }
+
+    const QJsonObject status = document.object().value(QStringLiteral("userStatus")).toObject();
+    if (status.isEmpty())
+    {
+        result.insert(QStringLiteral("error"), QStringLiteral("not_signed_in"));
+        return result;
+    }
+
+    const QJsonObject planInfo =
+        status.value(QStringLiteral("planStatus")).toObject().value(QStringLiteral("planInfo")).toObject();
+    const QJsonObject tier = status.value(QStringLiteral("userTier")).toObject();
+    const QString planName = planInfo.value(QStringLiteral("planName")).toString();
+    const QString tierId = tier.value(QStringLiteral("id")).toString();
+    const QString tierName = tier.value(QStringLiteral("name")).toString();
+    const QString planId = normalizedPlanId(planName, tierId, planInfo.value(QStringLiteral("isEnterprise")).toBool());
+
+    QList<QVariantMap> normalizedRows;
+    QSet<QString> seen;
+    const QJsonArray configs = status.value(QStringLiteral("cascadeModelConfigData"))
+                                   .toObject()
+                                   .value(QStringLiteral("clientModelConfigs"))
+                                   .toArray();
+    normalizedRows.reserve(configs.size());
+    for (const QJsonValue &value : configs)
+    {
+        const QJsonObject config = value.toObject();
+        const QString label = config.value(QStringLiteral("label")).toString().trimmed();
+        if (label.isEmpty())
+            continue;
+
+        const QString identity = jsonIdentity(config.value(QStringLiteral("modelOrAlias")).toObject(), label);
+        const QString deduplicationKey = identity + QLatin1Char('|') + label;
+        if (seen.contains(deduplicationKey))
+            continue;
+        seen.insert(deduplicationKey);
+
+        QVariantMap row;
+        row.insert(QStringLiteral("kind"), QStringLiteral("model_quota"));
+        row.insert(QStringLiteral("label"), label);
+        row.insert(QStringLiteral("modelId"), identity);
+        row.insert(QStringLiteral("modelFamily"), modelFamily(label, config.value(QStringLiteral("provider")).toInt()));
+        row.insert(QStringLiteral("availability"), config.value(QStringLiteral("disabled")).toBool()
+                                                       ? QStringLiteral("disabled")
+                                                       : QStringLiteral("available"));
+        row.insert(QStringLiteral("unit"), QStringLiteral("percent_remaining"));
+        row.insert(QStringLiteral("source"), QStringLiteral("antigravity_local"));
+        row.insert(QStringLiteral("visibleByDefault"), true);
+        if (config.value(QStringLiteral("disabled")).toBool())
+        {
+            const QString description = config.value(QStringLiteral("description")).toString();
+            row.insert(QStringLiteral("availabilityReason"),
+                       description.isEmpty() ? config.value(QStringLiteral("tagDescription")).toString() : description);
+            row.insert(QStringLiteral("badge"), QStringLiteral("Unavailable"));
+        }
+
+        const QJsonObject quota = config.value(QStringLiteral("quotaInfo")).toObject();
+        const double remainingFraction = quota.contains(QStringLiteral("remainingFraction"))
+                                             ? quota.value(QStringLiteral("remainingFraction")).toDouble(-1.0)
+                                             : -1.0;
+        addQuotaFields(row, remainingFraction, jsonResetTime(quota.value(QStringLiteral("resetTime"))));
+        normalizedRows.append(row);
+    }
+
+    if (normalizedRows.isEmpty())
+    {
+        result.insert(QStringLiteral("error"), tierId.isEmpty() && planName.isEmpty()
+                                                   ? QStringLiteral("not_signed_in")
+                                                   : QStringLiteral("unsupported_version"));
+        return result;
+    }
+
+    std::stable_sort(normalizedRows.begin(), normalizedRows.end(),
+                     [](const QVariantMap &left, const QVariantMap &right) {
+                         const int leftRank = familyRank(left.value(QStringLiteral("modelFamily")).toString());
+                         const int rightRank = familyRank(right.value(QStringLiteral("modelFamily")).toString());
+                         if (leftRank != rightRank)
+                             return leftRank < rightRank;
+                         return QString::localeAwareCompare(left.value(QStringLiteral("label")).toString(),
+                                                            right.value(QStringLiteral("label")).toString()) < 0;
+                     });
+
+    QVariantList rows;
+    double maximumUsed = 0.0;
+    for (const QVariantMap &row : std::as_const(normalizedRows))
+    {
+        rows.append(row);
+        if (row.contains(QStringLiteral("percentUsed")))
+            maximumUsed = qMax(maximumUsed, row.value(QStringLiteral("percentUsed")).toDouble());
+    }
+    result.insert(QStringLiteral("ok"), true);
+    result.insert(QStringLiteral("planId"), planId);
+    result.insert(QStringLiteral("planLabel"), normalizedPlanLabel(planId, planName, tierName));
+    result.insert(QStringLiteral("rows"), rows);
+    result.insert(QStringLiteral("maximumPercentUsed"), maximumUsed);
+    return result;
+}
+
+QVariantMap AntigravityMonitor::parseQuotaSummaryPayload(const QByteArray &payload)
+{
+    QVariantMap result;
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(payload, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject())
+    {
+        result.insert(QStringLiteral("error"), QStringLiteral("invalid_response"));
+        return result;
+    }
+
+    const QJsonObject root = document.object();
+    QJsonArray groups = root.value(QStringLiteral("response")).toObject().value(QStringLiteral("groups")).toArray();
+    if (groups.isEmpty())
+        groups = root.value(QStringLiteral("quotaSummary")).toObject().value(QStringLiteral("groups")).toArray();
+    if (groups.isEmpty())
+        groups = root.value(QStringLiteral("groups")).toArray();
+
+    QVariantList rows;
+    QSet<QString> seen;
+    double maximumUsed = 0.0;
+    for (const QJsonValue &groupValue : groups)
+    {
+        const QJsonObject group = groupValue.toObject();
+        const QString groupLabel = group.value(QStringLiteral("displayName")).toString().trimmed();
+        for (const QJsonValue &bucketValue : group.value(QStringLiteral("buckets")).toArray())
+        {
+            const QJsonObject bucket = bucketValue.toObject();
+            if (bucket.value(QStringLiteral("disabled")).toBool())
+                continue;
+            const QString bucketLabel = bucket.value(QStringLiteral("displayName")).toString().trimmed();
+            const QString bucketId = bucket.value(QStringLiteral("bucketId")).toString().trimmed();
+            if (groupLabel.isEmpty() || bucketLabel.isEmpty())
+                continue;
+            const QString identity =
+                QStringLiteral("bucket:%1")
+                    .arg(bucketId.isEmpty() ? slug(groupLabel + QLatin1Char('-') + bucketLabel) : bucketId);
+            if (seen.contains(identity))
+                continue;
+            seen.insert(identity);
+
+            QVariantMap row;
+            row.insert(QStringLiteral("kind"), QStringLiteral("shared_quota"));
+            row.insert(QStringLiteral("label"), QStringLiteral("%1 — %2").arg(groupLabel, bucketLabel));
+            row.insert(QStringLiteral("modelId"), identity);
+            row.insert(QStringLiteral("modelFamily"), groupLabel.contains(QLatin1String("gemini"), Qt::CaseInsensitive)
+                                                          ? QStringLiteral("google")
+                                                          : QStringLiteral("antigravity"));
+            row.insert(QStringLiteral("availability"), QStringLiteral("available"));
+            row.insert(QStringLiteral("unit"), QStringLiteral("percent_remaining"));
+            row.insert(QStringLiteral("source"), QStringLiteral("antigravity_local"));
+            row.insert(QStringLiteral("visibleByDefault"), true);
+            row.insert(QStringLiteral("window"), bucket.value(QStringLiteral("window")).toString());
+            addQuotaFields(row, bucket.value(QStringLiteral("remainingFraction")).toDouble(-1.0),
+                           jsonResetTime(bucket.value(QStringLiteral("resetTime"))));
+            rows.append(row);
+            if (row.contains(QStringLiteral("percentUsed")))
+                maximumUsed = qMax(maximumUsed, row.value(QStringLiteral("percentUsed")).toDouble());
+        }
+    }
+
+    if (rows.isEmpty())
+    {
+        result.insert(QStringLiteral("error"), QStringLiteral("unsupported_version"));
+        return result;
+    }
+    result.insert(QStringLiteral("ok"), true);
+    result.insert(QStringLiteral("rows"), rows);
+    result.insert(QStringLiteral("maximumPercentUsed"), maximumUsed);
+    return result;
+}
+
 bool AntigravityMonitor::isLoopbackHost(const QString &host)
 {
     const QString normalized = host.trimmed().toLower();
@@ -457,25 +709,108 @@ QString AntigravityMonitor::argumentValue(const QList<QByteArray> &arguments, co
     return {};
 }
 
+bool AntigravityMonitor::isSupportedLanguageServerPath(const QString &path)
+{
+    const QString normalized = QDir::cleanPath(path);
+    return normalized.contains(QLatin1String("/extensions/antigravity/bin/language_server_")) ||
+           normalized.endsWith(QLatin1String("/resources/bin/language_server")) ||
+           normalized.endsWith(QLatin1String("/resources/bin/language_server_linux_x64"));
+}
+
+bool AntigravityMonitor::usesConnectProtocolForPath(const QString &path)
+{
+    return !QDir::cleanPath(path).contains(QLatin1String("/extensions/antigravity/bin/language_server_"));
+}
+
+QStringList AntigravityMonitor::installationCandidates(const QString &homePath)
+{
+    return {
+        QStringLiteral("/opt/Antigravity/resources/bin/language_server"),
+        QStringLiteral("/opt/antigravity/resources/bin/language_server"),
+        QStringLiteral("/usr/share/antigravity/resources/bin/language_server"),
+        QStringLiteral("/usr/share/antigravity/resources/app/extensions/antigravity/bin/"
+                       "language_server_linux_x64"),
+        QDir(homePath).filePath(QStringLiteral(".local/opt/antigravity/resources/bin/language_server")),
+    };
+}
+
 QString AntigravityMonitor::validatedLanguageServerExecutable(qint64 pid, quint32 expectedOwner)
 {
     const QFileInfo processInfo(QStringLiteral("/proc/%1").arg(pid));
     if (!processInfo.exists() || processInfo.ownerId() != expectedOwner || ::kill(static_cast<pid_t>(pid), 0) != 0)
         return {};
     const QString executable = QFileInfo(QStringLiteral("/proc/%1/exe").arg(pid)).symLinkTarget();
-    if (!executable.contains(QLatin1String("/extensions/antigravity/bin/language_server_")))
+    if (!isSupportedLanguageServerPath(executable))
         return {};
     return QFileInfo(executable).canonicalFilePath();
 }
 
-QString AntigravityMonitor::certificateForExecutable(const QString &executable)
+QByteArray AntigravityMonitor::certificateForExecutable(const QString &executable)
 {
     if (executable.isEmpty())
         return {};
     const QDir binDirectory = QFileInfo(executable).absoluteDir();
-    const QString certificate =
+    const QString certificatePath =
         QFileInfo(binDirectory.filePath(QStringLiteral("../dist/languageServer/cert.pem"))).canonicalFilePath();
-    return QFileInfo(certificate).isFile() ? certificate : QString();
+    QFile certificateFile(certificatePath);
+    if (!certificatePath.isEmpty() && certificateFile.open(QIODevice::ReadOnly) && certificateFile.size() <= 64 * 1024)
+        return certificateFile.readAll();
+
+    // Antigravity 2.x bundles its loopback-only TLS certificate in the Go
+    // language-server binary instead of installing a separate cert.pem.
+    QFile binary(executable);
+    if (!binary.open(QIODevice::ReadOnly) || binary.size() <= 0 || binary.size() > 512 * 1024 * 1024)
+        return {};
+    uchar *mapped = binary.map(0, binary.size());
+    if (!mapped)
+        return {};
+
+    const QByteArray bytes = QByteArray::fromRawData(reinterpret_cast<const char *>(mapped), binary.size());
+    const QByteArray beginMarker = QByteArrayLiteral("-----BEGIN CERTIFICATE-----");
+    const QByteArray endMarker = QByteArrayLiteral("-----END CERTIFICATE-----");
+    QByteArray certificateData;
+    qsizetype offset = 0;
+    while (offset < bytes.size())
+    {
+        const qsizetype begin = bytes.indexOf(beginMarker, offset);
+        if (begin < 0)
+            break;
+        const qsizetype end = bytes.indexOf(endMarker, begin + beginMarker.size());
+        if (end < 0)
+            break;
+        const qsizetype length = end + endMarker.size() - begin;
+        if (length > 32 * 1024)
+        {
+            // The Go binary contains certificate-related marker strings that are
+            // not PEM blocks. Resume after that marker so a real nested PEM
+            // certificate is still considered.
+            offset = begin + beginMarker.size();
+            continue;
+        }
+        if (length > 0)
+        {
+            const QByteArray pem = bytes.mid(begin, length);
+            const QList<QSslCertificate> certificates = QSslCertificate::fromData(pem, QSsl::Pem);
+            for (const QSslCertificate &certificate : certificates)
+            {
+                const bool localhost =
+                    certificate.subjectInfo(QSslCertificate::CommonName).contains(QStringLiteral("localhost"));
+                const bool loopback = certificate.subjectAlternativeNames()
+                                          .values(QSsl::IpAddressEntry)
+                                          .contains(QStringLiteral("127.0.0.1"));
+                if (certificate.isSelfSigned() && localhost && loopback)
+                {
+                    certificateData = pem;
+                    break;
+                }
+            }
+        }
+        if (!certificateData.isEmpty())
+            break;
+        offset = end + endMarker.size();
+    }
+    binary.unmap(mapped);
+    return certificateData;
 }
 
 QList<quint16> AntigravityMonitor::listeningLoopbackPorts(qint64 pid)
@@ -552,7 +887,7 @@ QList<AntigravityMonitor::Endpoint> AntigravityMonitor::endpointsFromDiscoveryFi
                 continue;
             const qint64 pid = object.value(QStringLiteral("pid")).toLongLong();
             const QString executable = validatedLanguageServerExecutable(pid, owner);
-            const QString certificate = certificateForExecutable(executable);
+            const QByteArray certificate = certificateForExecutable(executable);
             const quint16 port = static_cast<quint16>(object.value(QStringLiteral("httpsPort")).toUInt());
             if (certificate.isEmpty() || !listeningLoopbackPorts(pid).contains(port))
                 continue;
@@ -561,8 +896,9 @@ QList<AntigravityMonitor::Endpoint> AntigravityMonitor::endpointsFromDiscoveryFi
             endpoint.host = object.value(QStringLiteral("host"), QStringLiteral("127.0.0.1")).toString();
             endpoint.port = port;
             endpoint.csrfToken = object.value(QStringLiteral("csrfToken")).toString();
-            endpoint.certificatePath = certificate;
+            endpoint.certificateData = certificate;
             endpoint.serverVersion = object.value(QStringLiteral("lsVersion")).toString();
+            endpoint.useConnectProtocol = usesConnectProtocolForPath(executable);
             endpoints.append(endpoint);
         }
     }
@@ -590,7 +926,7 @@ QList<AntigravityMonitor::Endpoint> AntigravityMonitor::endpointsFromProcesses()
             continue;
         const QList<QByteArray> arguments = cmdline.readAll().split('\0');
         const QString csrfToken = argumentValue(arguments, QByteArrayLiteral("--csrf_token"));
-        const QString certificate = certificateForExecutable(executable);
+        const QByteArray certificate = certificateForExecutable(executable);
         if (csrfToken.isEmpty() || certificate.isEmpty())
             continue;
         for (quint16 port : listeningLoopbackPorts(pid))
@@ -599,7 +935,8 @@ QList<AntigravityMonitor::Endpoint> AntigravityMonitor::endpointsFromProcesses()
             endpoint.pid = pid;
             endpoint.port = port;
             endpoint.csrfToken = csrfToken;
-            endpoint.certificatePath = certificate;
+            endpoint.certificateData = certificate;
+            endpoint.useConnectProtocol = usesConnectProtocolForPath(executable);
             endpoints.append(endpoint);
         }
     }
@@ -671,15 +1008,99 @@ void AntigravityMonitor::tryNextEndpoint()
 
 void AntigravityMonitor::requestEndpoint(const Endpoint &endpoint)
 {
-    QFile certificateFile(endpoint.certificatePath);
-    if (!certificateFile.open(QIODevice::ReadOnly))
+    if (!endpoint.useConnectProtocol)
+    {
+        requestLegacyEndpoint(endpoint);
+        return;
+    }
+
+    const QSslCertificate certificate(endpoint.certificateData, QSsl::Pem);
+    if (certificate.isNull())
     {
         m_lastAttemptCode = QStringLiteral("tls_error");
-        m_lastAttemptMessage = i18n("Antigravity's local certificate could not be read.");
+        m_lastAttemptMessage = i18n("Antigravity's local certificate is invalid.");
         tryNextEndpoint();
         return;
     }
-    const QSslCertificate certificate(certificateFile.readAll(), QSsl::Pem);
+
+    QSslConfiguration ssl = QSslConfiguration::defaultConfiguration();
+    ssl.setCaCertificates({certificate});
+    ssl.setPeerVerifyMode(QSslSocket::VerifyPeer);
+    ssl.setProtocol(QSsl::TlsV1_2OrLater);
+
+    QUrl url;
+    url.setScheme(QStringLiteral("https"));
+    url.setHost(endpoint.host);
+    url.setPort(endpoint.port);
+    url.setPath(QStringLiteral("/exa.language_server_pb.LanguageServerService/GetUserStatus"));
+    QNetworkRequest request(url);
+    request.setSslConfiguration(ssl);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setRawHeader("Accept", "application/json");
+    request.setRawHeader("Connect-Protocol-Version", "1");
+    request.setRawHeader("x-codeium-csrf-token", endpoint.csrfToken.toUtf8());
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, true);
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
+    request.setAttribute(QNetworkRequest::CacheSaveControlAttribute, false);
+    request.setTransferTimeout(5000);
+
+    const QJsonObject metadata{{QStringLiteral("ideName"), QStringLiteral("antigravity")},
+                               {QStringLiteral("extensionName"), QStringLiteral("ai-usage-monitor")},
+                               {QStringLiteral("locale"), QStringLiteral("en")}};
+    const QByteArray body =
+        QJsonDocument(QJsonObject{{QStringLiteral("metadata"), metadata}}).toJson(QJsonDocument::Compact);
+    QNetworkReply *reply = networkManager()->post(request, body);
+    connect(reply, &QNetworkReply::sslErrors, this, [reply](const QList<QSslError> &) {
+        // Never ignore certificate failures; remember only the error class.
+        reply->setProperty("antigravityTlsError", true);
+    });
+    connect(reply, &QNetworkReply::finished, this, [this, endpoint, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError)
+        {
+            const bool tlsError = reply->property("antigravityTlsError").toBool() ||
+                                  reply->error() == QNetworkReply::SslHandshakeFailedError;
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const bool unsupportedProtocol =
+                status == 400 || status == 404 || status == 405 || status == 415 || status == 501;
+            if (!tlsError && unsupportedProtocol)
+            {
+                requestLegacyEndpoint(endpoint);
+                return;
+            }
+            m_lastAttemptCode = tlsError                                        ? QStringLiteral("tls_error")
+                                : reply->error() == QNetworkReply::TimeoutError ? QStringLiteral("timeout")
+                                                                                : QStringLiteral("daemon_not_running");
+            m_lastAttemptMessage = safeNetworkMessage(reply->error());
+            tryNextEndpoint();
+            return;
+        }
+
+        const QVariantMap parsed = parseConnectUserStatusPayload(reply->readAll());
+        if (!parsed.value(QStringLiteral("ok")).toBool())
+        {
+            if (parsed.value(QStringLiteral("error")).toString() == QLatin1String("invalid_response"))
+            {
+                requestLegacyEndpoint(endpoint);
+                return;
+            }
+            m_lastAttemptCode = parsed.value(QStringLiteral("error"), QStringLiteral("invalid_response")).toString();
+            m_lastAttemptMessage = m_lastAttemptCode == QLatin1String("not_signed_in")
+                                       ? i18n("Sign in to Antigravity, then retry.")
+                                   : m_lastAttemptCode == QLatin1String("unsupported_version")
+                                       ? i18n("This Antigravity version does not expose compatible "
+                                              "model quota data.")
+                                       : i18n("Antigravity returned invalid quota data.");
+            tryNextEndpoint();
+            return;
+        }
+        requestQuotaSummary(endpoint, parsed);
+    });
+}
+
+void AntigravityMonitor::requestLegacyEndpoint(const Endpoint &endpoint)
+{
+    const QSslCertificate certificate(endpoint.certificateData, QSsl::Pem);
     if (certificate.isNull())
     {
         m_lastAttemptCode = QStringLiteral("tls_error");
@@ -711,10 +1132,8 @@ void AntigravityMonitor::requestEndpoint(const Endpoint &endpoint)
     request.setTransferTimeout(5000);
 
     QNetworkReply *reply = networkManager()->post(request, grpcFrame({}));
-    connect(reply, &QNetworkReply::sslErrors, this, [reply](const QList<QSslError> &) {
-        // Never ignore certificate failures; remember only the error class.
-        reply->setProperty("antigravityTlsError", true);
-    });
+    connect(reply, &QNetworkReply::sslErrors, this,
+            [reply](const QList<QSslError> &) { reply->setProperty("antigravityTlsError", true); });
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError)
@@ -755,6 +1174,75 @@ void AntigravityMonitor::requestEndpoint(const Endpoint &endpoint)
     });
 }
 
+void AntigravityMonitor::requestQuotaSummary(const Endpoint &endpoint, const QVariantMap &userStatus)
+{
+    const QSslCertificate certificate(endpoint.certificateData, QSsl::Pem);
+    QSslConfiguration ssl = QSslConfiguration::defaultConfiguration();
+    ssl.setCaCertificates({certificate});
+    ssl.setPeerVerifyMode(QSslSocket::VerifyPeer);
+    ssl.setProtocol(QSsl::TlsV1_2OrLater);
+
+    QUrl url;
+    url.setScheme(QStringLiteral("https"));
+    url.setHost(endpoint.host);
+    url.setPort(endpoint.port);
+    url.setPath(QStringLiteral("/exa.language_server_pb.LanguageServerService/"
+                               "RetrieveUserQuotaSummary"));
+    QNetworkRequest request(url);
+    request.setSslConfiguration(ssl);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/json"));
+    request.setRawHeader("Accept", "application/json");
+    request.setRawHeader("Connect-Protocol-Version", "1");
+    request.setRawHeader("x-codeium-csrf-token", endpoint.csrfToken.toUtf8());
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, true);
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
+    request.setAttribute(QNetworkRequest::CacheSaveControlAttribute, false);
+    request.setTransferTimeout(5000);
+
+    const QJsonObject metadata{{QStringLiteral("ideName"), QStringLiteral("antigravity")},
+                               {QStringLiteral("extensionName"), QStringLiteral("ai-usage-monitor")},
+                               {QStringLiteral("locale"), QStringLiteral("en")}};
+    const QByteArray body =
+        QJsonDocument(QJsonObject{{QStringLiteral("metadata"), metadata}}).toJson(QJsonDocument::Compact);
+    QNetworkReply *reply = networkManager()->post(request, body);
+    connect(reply, &QNetworkReply::sslErrors, this,
+            [reply](const QList<QSslError> &) { reply->setProperty("antigravityTlsError", true); });
+    connect(reply, &QNetworkReply::finished, this, [this, reply, userStatus]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError || reply->property("antigravityTlsError").toBool())
+        {
+            // The summary RPC is additive. Model quotas from GetUserStatus
+            // remain usable when an older daemon does not expose it.
+            finishSuccess(userStatus);
+            return;
+        }
+
+        const QVariantMap summary = parseQuotaSummaryPayload(reply->readAll());
+        if (!summary.value(QStringLiteral("ok")).toBool())
+        {
+            finishSuccess(userStatus);
+            return;
+        }
+
+        QVariantMap combined = userStatus;
+        QVariantList rows = summary.value(QStringLiteral("rows")).toList();
+        QSet<QString> identities;
+        for (const QVariant &value : std::as_const(rows))
+            identities.insert(value.toMap().value(QStringLiteral("modelId")).toString());
+        for (const QVariant &value : userStatus.value(QStringLiteral("rows")).toList())
+        {
+            const QString identity = value.toMap().value(QStringLiteral("modelId")).toString();
+            if (!identities.contains(identity))
+                rows.append(value);
+        }
+        combined.insert(QStringLiteral("rows"), rows);
+        combined.insert(QStringLiteral("maximumPercentUsed"),
+                        qMax(userStatus.value(QStringLiteral("maximumPercentUsed")).toDouble(),
+                             summary.value(QStringLiteral("maximumPercentUsed")).toDouble()));
+        finishSuccess(combined);
+    });
+}
+
 void AntigravityMonitor::finishSuccess(const QVariantMap &parsed)
 {
     const QVariantList rows = parsed.value(QStringLiteral("rows")).toList();
@@ -765,7 +1253,7 @@ void AntigravityMonitor::finishSuccess(const QVariantMap &parsed)
     setLastSyncTime(QDateTime::currentDateTimeUtc());
     setLastActivity(lastSyncTime());
     setSyncing(false);
-    setSyncStatus(i18n("Synced %1 models", rows.size()));
+    setSyncStatus(i18n("Synced %1 quota rows", rows.size()));
     setConnectionState(QStringLiteral("connected"), QString());
     updateAggregateWarning(m_maximumPercentUsed);
     Q_EMIT antigravityStatusChanged();

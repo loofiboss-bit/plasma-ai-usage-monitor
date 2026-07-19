@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [14.1.1] — 2026-07-19
+
+### Changed
+- Support the Antigravity 2.x desktop language server, including its new executable layout and Connect/JSON status contract.
+- Show Antigravity 2.x shared five-hour and weekly quota buckets alongside the daemon-reported per-model quota rows.
+
+### Fixed
+- Discover the Antigravity 2.x `resources/bin/language_server` process and validate its bundled localhost TLS certificate instead of accepting only the legacy IDE extension layout.
+
 ## [14.1.0] — 2026-07-18
 
 ### Added
@@ -793,7 +802,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.1...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...HEAD
+[14.1.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.0...v14.1.1
+[14.1.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.1...v14.1.0
 [14.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.0...v14.0.1
 [14.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v13.0.0...v14.0.0
 [13.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v12.0.3...v13.0.0

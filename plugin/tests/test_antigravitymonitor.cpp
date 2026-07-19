@@ -31,6 +31,9 @@ class AntigravityMonitorTest : public QObject
     void payloadPlanLabels_data();
     void payloadPlanLabels();
     void payloadModelsAndQuota();
+    void connectPayloadModelsAndQuota();
+    void quotaSummaryPayload();
+    void installationAndProtocolCompatibility();
     void discoverySecurity();
     void staleSnapshotIsPreserved();
     void liveSync();
@@ -202,6 +205,98 @@ void AntigravityMonitorTest::payloadModelsAndQuota()
              QStringLiteral("not_signed_in"));
 }
 
+void AntigravityMonitorTest::connectPayloadModelsAndQuota()
+{
+    const QByteArray payload = R"JSON({
+      "userStatus": {
+        "planStatus": {"planInfo": {"planName": "Pro"}},
+        "userTier": {"id": "g1-pro-tier", "name": "Google AI Pro"},
+        "cascadeModelConfigData": {
+          "clientModelConfigs": [
+            {
+              "label": "Gemini 3.5 Flash (High)",
+              "modelOrAlias": {"model": "MODEL_GEMINI_3_5_FLASH_HIGH"},
+              "quotaInfo": {"remainingFraction": 0.4, "resetTime": "2100-01-01T00:00:00Z"}
+            },
+            {
+              "label": "Claude Sonnet 4.6",
+              "modelOrAlias": {"model": "MODEL_CLAUDE_4_6_SONNET"},
+              "quotaInfo": {"remainingFraction": 0.9, "resetTime": {"seconds": "4102444800"}}
+            }
+          ]
+        }
+      }
+    })JSON";
+
+    const QVariantMap parsed = AntigravityMonitor::parseConnectUserStatusPayload(payload);
+    QVERIFY(parsed.value(QStringLiteral("ok")).toBool());
+    QCOMPARE(parsed.value(QStringLiteral("planId")).toString(), QStringLiteral("pro"));
+    QCOMPARE(parsed.value(QStringLiteral("planLabel")).toString(), QStringLiteral("Google AI Pro"));
+    QCOMPARE(parsed.value(QStringLiteral("maximumPercentUsed")).toDouble(), 60.0);
+
+    const QVariantList rows = parsed.value(QStringLiteral("rows")).toList();
+    QCOMPARE(rows.size(), 2);
+    const QVariantMap gemini = rows.at(0).toMap();
+    QCOMPARE(gemini.value(QStringLiteral("modelId")).toString(), QStringLiteral("model:MODEL_GEMINI_3_5_FLASH_HIGH"));
+    QCOMPARE(gemini.value(QStringLiteral("modelFamily")).toString(), QStringLiteral("google"));
+    QCOMPARE(gemini.value(QStringLiteral("percentRemaining")).toDouble(), 40.0);
+    QCOMPARE(gemini.value(QStringLiteral("precision")).toString(), QStringLiteral("local_daemon_actual"));
+    QVERIFY(gemini.value(QStringLiteral("resetAt")).toString().endsWith(QLatin1Char('Z')));
+
+    QCOMPARE(AntigravityMonitor::parseConnectUserStatusPayload(QByteArray("broken"))
+                 .value(QStringLiteral("error"))
+                 .toString(),
+             QStringLiteral("invalid_response"));
+}
+
+void AntigravityMonitorTest::quotaSummaryPayload()
+{
+    const QByteArray payload = R"JSON({
+      "response": {
+        "groups": [
+          {
+            "displayName": "Gemini Models",
+            "buckets": [
+              {"bucketId": "gemini-weekly", "displayName": "Weekly Limit", "window": "weekly", "remainingFraction": 0.7, "resetTime": "2100-01-07T00:00:00Z"},
+              {"bucketId": "gemini-5h", "displayName": "Five Hour Limit", "window": "5h", "remainingFraction": 0.25, "resetTime": "2100-01-01T05:00:00Z"}
+            ]
+          },
+          {
+            "displayName": "Claude and GPT models",
+            "buckets": [
+              {"bucketId": "3p-weekly", "displayName": "Weekly Limit", "window": "weekly", "remainingFraction": 1.0, "resetTime": "2100-01-07T00:00:00Z"},
+              {"bucketId": "3p-5h", "displayName": "Five Hour Limit", "window": "5h", "remainingFraction": 0.5, "resetTime": "2100-01-01T05:00:00Z"}
+            ]
+          }
+        ]
+      }
+    })JSON";
+
+    const QVariantMap parsed = AntigravityMonitor::parseQuotaSummaryPayload(payload);
+    QVERIFY(parsed.value(QStringLiteral("ok")).toBool());
+    QCOMPARE(parsed.value(QStringLiteral("maximumPercentUsed")).toDouble(), 75.0);
+    const QVariantList rows = parsed.value(QStringLiteral("rows")).toList();
+    QCOMPARE(rows.size(), 4);
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("label")).toString(),
+             QStringLiteral("Gemini Models — Weekly Limit"));
+    QCOMPARE(rows.at(0).toMap().value(QStringLiteral("modelId")).toString(), QStringLiteral("bucket:gemini-weekly"));
+    QCOMPARE(rows.at(1).toMap().value(QStringLiteral("window")).toString(), QStringLiteral("5h"));
+    QCOMPARE(rows.at(2).toMap().value(QStringLiteral("modelFamily")).toString(), QStringLiteral("antigravity"));
+}
+
+void AntigravityMonitorTest::installationAndProtocolCompatibility()
+{
+    const QStringList candidates = AntigravityMonitor::installationCandidates(QStringLiteral("/home/test"));
+    QVERIFY(candidates.contains(QStringLiteral("/opt/Antigravity/resources/bin/language_server")));
+    QVERIFY(candidates.contains(QStringLiteral("/home/test/.local/opt/antigravity/resources/bin/language_server")));
+
+    QVERIFY(AntigravityMonitor::usesConnectProtocolForPath(
+        QStringLiteral("/opt/Antigravity/resources/bin/language_server")));
+    QVERIFY(!AntigravityMonitor::usesConnectProtocolForPath(
+        QStringLiteral("/usr/share/antigravity/resources/app/extensions/"
+                       "antigravity/bin/language_server_linux_x64")));
+}
+
 void AntigravityMonitorTest::discoverySecurity()
 {
     QTemporaryDir directory;
@@ -219,6 +314,12 @@ void AntigravityMonitorTest::discoverySecurity()
     QCOMPARE(document.value(QStringLiteral("httpsPort")).toInt(), 443);
     QVERIFY(AntigravityMonitor::isLoopbackHost(QStringLiteral("::1")));
     QVERIFY(!AntigravityMonitor::isLoopbackHost(QStringLiteral("192.168.1.10")));
+    QVERIFY(AntigravityMonitor::isSupportedLanguageServerPath(
+        QStringLiteral("/opt/Antigravity/resources/bin/language_server")));
+    QVERIFY(AntigravityMonitor::isSupportedLanguageServerPath(
+        QStringLiteral("/usr/share/antigravity/resources/app/extensions/"
+                       "antigravity/bin/language_server_linux_x64")));
+    QVERIFY(!AntigravityMonitor::isSupportedLanguageServerPath(QStringLiteral("/tmp/language_server")));
     QVERIFY(
         !AntigravityMonitor::validateDiscoveryFile(validPath, static_cast<quint32>(::getuid() + 1), nullptr, &error));
     QCOMPARE(error, QStringLiteral("wrong_owner"));
