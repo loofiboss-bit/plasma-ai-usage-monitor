@@ -232,13 +232,10 @@ bool AntigravityMonitor::isLimitReached() const
 
 void AntigravityMonitor::checkToolInstalled()
 {
-    const bool installed = !QStandardPaths::findExecutable(QStringLiteral("antigravity")).isEmpty() ||
-                           !QStandardPaths::findExecutable(QStringLiteral("agy")).isEmpty() ||
-                           QFileInfo::exists(QStringLiteral("/usr/share/antigravity/resources/app/extensions/"
-                                                            "antigravity/bin/language_server_linux_x64")) ||
-                           QFileInfo::exists(QDir::home().filePath(
-                               QStringLiteral(".local/opt/antigravity/resources/bin/language_server"))) ||
-                           QFileInfo::exists(QStringLiteral("/usr/share/antigravity/resources/bin/language_server"));
+    bool installed = !QStandardPaths::findExecutable(QStringLiteral("antigravity")).isEmpty() ||
+                     !QStandardPaths::findExecutable(QStringLiteral("agy")).isEmpty();
+    for (const QString &candidate : installationCandidates(QDir::homePath()))
+        installed = installed || QFileInfo::exists(candidate);
     setInstalled(installed);
     if (!installed)
         setConnectionState(QStringLiteral("unavailable"), QStringLiteral("not_installed"));
@@ -720,6 +717,23 @@ bool AntigravityMonitor::isSupportedLanguageServerPath(const QString &path)
            normalized.endsWith(QLatin1String("/resources/bin/language_server_linux_x64"));
 }
 
+bool AntigravityMonitor::usesConnectProtocolForPath(const QString &path)
+{
+    return !QDir::cleanPath(path).contains(QLatin1String("/extensions/antigravity/bin/language_server_"));
+}
+
+QStringList AntigravityMonitor::installationCandidates(const QString &homePath)
+{
+    return {
+        QStringLiteral("/opt/Antigravity/resources/bin/language_server"),
+        QStringLiteral("/opt/antigravity/resources/bin/language_server"),
+        QStringLiteral("/usr/share/antigravity/resources/bin/language_server"),
+        QStringLiteral("/usr/share/antigravity/resources/app/extensions/antigravity/bin/"
+                       "language_server_linux_x64"),
+        QDir(homePath).filePath(QStringLiteral(".local/opt/antigravity/resources/bin/language_server")),
+    };
+}
+
 QString AntigravityMonitor::validatedLanguageServerExecutable(qint64 pid, quint32 expectedOwner)
 {
     const QFileInfo processInfo(QStringLiteral("/proc/%1").arg(pid));
@@ -884,6 +898,7 @@ QList<AntigravityMonitor::Endpoint> AntigravityMonitor::endpointsFromDiscoveryFi
             endpoint.csrfToken = object.value(QStringLiteral("csrfToken")).toString();
             endpoint.certificateData = certificate;
             endpoint.serverVersion = object.value(QStringLiteral("lsVersion")).toString();
+            endpoint.useConnectProtocol = usesConnectProtocolForPath(executable);
             endpoints.append(endpoint);
         }
     }
@@ -921,6 +936,7 @@ QList<AntigravityMonitor::Endpoint> AntigravityMonitor::endpointsFromProcesses()
             endpoint.port = port;
             endpoint.csrfToken = csrfToken;
             endpoint.certificateData = certificate;
+            endpoint.useConnectProtocol = usesConnectProtocolForPath(executable);
             endpoints.append(endpoint);
         }
     }
@@ -992,6 +1008,12 @@ void AntigravityMonitor::tryNextEndpoint()
 
 void AntigravityMonitor::requestEndpoint(const Endpoint &endpoint)
 {
+    if (!endpoint.useConnectProtocol)
+    {
+        requestLegacyEndpoint(endpoint);
+        return;
+    }
+
     const QSslCertificate certificate(endpoint.certificateData, QSsl::Pem);
     if (certificate.isNull())
     {
@@ -1038,6 +1060,14 @@ void AntigravityMonitor::requestEndpoint(const Endpoint &endpoint)
         {
             const bool tlsError = reply->property("antigravityTlsError").toBool() ||
                                   reply->error() == QNetworkReply::SslHandshakeFailedError;
+            const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+            const bool unsupportedProtocol =
+                status == 400 || status == 404 || status == 405 || status == 415 || status == 501;
+            if (!tlsError && unsupportedProtocol)
+            {
+                requestLegacyEndpoint(endpoint);
+                return;
+            }
             m_lastAttemptCode = tlsError                                        ? QStringLiteral("tls_error")
                                 : reply->error() == QNetworkReply::TimeoutError ? QStringLiteral("timeout")
                                                                                 : QStringLiteral("daemon_not_running");
@@ -1047,6 +1077,87 @@ void AntigravityMonitor::requestEndpoint(const Endpoint &endpoint)
         }
 
         const QVariantMap parsed = parseConnectUserStatusPayload(reply->readAll());
+        if (!parsed.value(QStringLiteral("ok")).toBool())
+        {
+            if (parsed.value(QStringLiteral("error")).toString() == QLatin1String("invalid_response"))
+            {
+                requestLegacyEndpoint(endpoint);
+                return;
+            }
+            m_lastAttemptCode = parsed.value(QStringLiteral("error"), QStringLiteral("invalid_response")).toString();
+            m_lastAttemptMessage = m_lastAttemptCode == QLatin1String("not_signed_in")
+                                       ? i18n("Sign in to Antigravity, then retry.")
+                                   : m_lastAttemptCode == QLatin1String("unsupported_version")
+                                       ? i18n("This Antigravity version does not expose compatible "
+                                              "model quota data.")
+                                       : i18n("Antigravity returned invalid quota data.");
+            tryNextEndpoint();
+            return;
+        }
+        requestQuotaSummary(endpoint, parsed);
+    });
+}
+
+void AntigravityMonitor::requestLegacyEndpoint(const Endpoint &endpoint)
+{
+    const QSslCertificate certificate(endpoint.certificateData, QSsl::Pem);
+    if (certificate.isNull())
+    {
+        m_lastAttemptCode = QStringLiteral("tls_error");
+        m_lastAttemptMessage = i18n("Antigravity's local certificate is invalid.");
+        tryNextEndpoint();
+        return;
+    }
+
+    QSslConfiguration ssl = QSslConfiguration::defaultConfiguration();
+    ssl.setCaCertificates({certificate});
+    ssl.setPeerVerifyMode(QSslSocket::VerifyPeer);
+    ssl.setProtocol(QSsl::TlsV1_2OrLater);
+
+    QUrl url;
+    url.setScheme(QStringLiteral("https"));
+    url.setHost(endpoint.host);
+    url.setPort(endpoint.port);
+    url.setPath(QStringLiteral("/exa.language_server_pb.LanguageServerService/GetUserStatus"));
+    QNetworkRequest request(url);
+    request.setSslConfiguration(ssl);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, QStringLiteral("application/grpc+proto"));
+    request.setRawHeader("Accept", "application/grpc+proto");
+    request.setRawHeader("TE", "trailers");
+    request.setRawHeader("grpc-accept-encoding", "identity");
+    request.setRawHeader("x-codeium-csrf-token", endpoint.csrfToken.toUtf8());
+    request.setAttribute(QNetworkRequest::Http2AllowedAttribute, true);
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute, QNetworkRequest::AlwaysNetwork);
+    request.setAttribute(QNetworkRequest::CacheSaveControlAttribute, false);
+    request.setTransferTimeout(5000);
+
+    QNetworkReply *reply = networkManager()->post(request, grpcFrame({}));
+    connect(reply, &QNetworkReply::sslErrors, this,
+            [reply](const QList<QSslError> &) { reply->setProperty("antigravityTlsError", true); });
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        reply->deleteLater();
+        if (reply->error() != QNetworkReply::NoError)
+        {
+            const bool tlsError = reply->property("antigravityTlsError").toBool() ||
+                                  reply->error() == QNetworkReply::SslHandshakeFailedError;
+            m_lastAttemptCode = tlsError                                        ? QStringLiteral("tls_error")
+                                : reply->error() == QNetworkReply::TimeoutError ? QStringLiteral("timeout")
+                                                                                : QStringLiteral("daemon_not_running");
+            m_lastAttemptMessage = safeNetworkMessage(reply->error());
+            tryNextEndpoint();
+            return;
+        }
+
+        QString frameError;
+        const QByteArray payload = firstGrpcMessage(reply->readAll(), &frameError);
+        if (!frameError.isEmpty())
+        {
+            m_lastAttemptCode = QStringLiteral("invalid_response");
+            m_lastAttemptMessage = i18n("Antigravity returned an unsupported local protocol response.");
+            tryNextEndpoint();
+            return;
+        }
+        const QVariantMap parsed = parseUserStatusPayload(payload);
         if (!parsed.value(QStringLiteral("ok")).toBool())
         {
             m_lastAttemptCode = parsed.value(QStringLiteral("error"), QStringLiteral("invalid_response")).toString();
@@ -1059,7 +1170,7 @@ void AntigravityMonitor::requestEndpoint(const Endpoint &endpoint)
             tryNextEndpoint();
             return;
         }
-        requestQuotaSummary(endpoint, parsed);
+        finishSuccess(parsed);
     });
 }
 

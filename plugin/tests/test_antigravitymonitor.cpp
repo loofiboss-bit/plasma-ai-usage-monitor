@@ -33,6 +33,7 @@ class AntigravityMonitorTest : public QObject
     void payloadModelsAndQuota();
     void connectPayloadModelsAndQuota();
     void quotaSummaryPayload();
+    void installationAndProtocolCompatibility();
     void discoverySecurity();
     void staleSnapshotIsPreserved();
     void liveSync();
@@ -281,6 +282,19 @@ void AntigravityMonitorTest::quotaSummaryPayload()
     QCOMPARE(rows.at(0).toMap().value(QStringLiteral("modelId")).toString(), QStringLiteral("bucket:gemini-weekly"));
     QCOMPARE(rows.at(1).toMap().value(QStringLiteral("window")).toString(), QStringLiteral("5h"));
     QCOMPARE(rows.at(2).toMap().value(QStringLiteral("modelFamily")).toString(), QStringLiteral("antigravity"));
+}
+
+void AntigravityMonitorTest::installationAndProtocolCompatibility()
+{
+    const QStringList candidates = AntigravityMonitor::installationCandidates(QStringLiteral("/home/test"));
+    QVERIFY(candidates.contains(QStringLiteral("/opt/Antigravity/resources/bin/language_server")));
+    QVERIFY(candidates.contains(QStringLiteral("/home/test/.local/opt/antigravity/resources/bin/language_server")));
+
+    QVERIFY(AntigravityMonitor::usesConnectProtocolForPath(
+        QStringLiteral("/opt/Antigravity/resources/bin/language_server")));
+    QVERIFY(!AntigravityMonitor::usesConnectProtocolForPath(
+        QStringLiteral("/usr/share/antigravity/resources/app/extensions/"
+                       "antigravity/bin/language_server_linux_x64")));
 }
 
 void AntigravityMonitorTest::discoverySecurity()

@@ -86,6 +86,8 @@ class AntigravityMonitor : public SubscriptionToolBackend
     static QString normalizedPlanId(const QString &planName, const QString &tierId, bool enterprise);
     static bool isLoopbackHost(const QString &host);
     static bool isSupportedLanguageServerPath(const QString &path);
+    static bool usesConnectProtocolForPath(const QString &path);
+    static QStringList installationCandidates(const QString &homePath);
     static bool validateDiscoveryFile(const QString &path, quint32 expectedOwner, QVariantMap *document = nullptr,
                                       QString *error = nullptr);
 
@@ -112,6 +114,7 @@ class AntigravityMonitor : public SubscriptionToolBackend
         QString csrfToken;
         QByteArray certificateData;
         QString serverVersion;
+        bool useConnectProtocol = true;
     };
 
     QList<Endpoint> discoverEndpoints(QString *errorCode) const;
@@ -124,6 +127,7 @@ class AntigravityMonitor : public SubscriptionToolBackend
 
     void tryNextEndpoint();
     void requestEndpoint(const Endpoint &endpoint);
+    void requestLegacyEndpoint(const Endpoint &endpoint);
     void requestQuotaSummary(const Endpoint &endpoint, const QVariantMap &userStatus);
     void finishSuccess(const QVariantMap &parsed);
     void updateAggregateWarning(double maximumPercentUsed);
