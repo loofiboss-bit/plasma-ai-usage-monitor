@@ -11,7 +11,7 @@ jobs:
     container: fedora:44
     steps:
       - run: dnf install -y git cmake ninja-build gcc-c++ extra-cmake-modules qt6-qtbase-devel qt6-qtdeclarative-devel libplasma-devel kf6-kcoreaddons-devel kf6-kpackage-devel kf6-kwallet-devel kf6-ki18n-devel kf6-knotifications-devel openssl-devel protobuf-compiler protobuf-devel
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: cmake --preset ci
       - run: cmake --build --preset ci

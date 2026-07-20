@@ -11,7 +11,7 @@ jobs:
     container: fedora:44
     steps:
       - run: dnf install -y git python3 tar gzip
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: mkdir -p dist && SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_source_tarball.sh --output-dir dist
       - run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_plasmoid.sh --output-dir dist
       - run: python3 scripts/check_package_payload.py
