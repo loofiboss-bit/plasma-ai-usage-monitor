@@ -13,7 +13,7 @@ Kirigami.ScrollablePage {
     property var activityData: []
     property double maxIntensity: 1.0
     property double avgEfficiency: 0.0
-    property string efficiencyTrend: "neutral"
+    property bool hasEfficiencyData: false
     property var overview: ({})
 
     readonly property var db: plasmoid.configuration.historyEnabled ? root.usageDb : null
@@ -51,7 +51,7 @@ Kirigami.ScrollablePage {
             activityData = [];
             overview = ({});
             avgEfficiency = 0.0;
-            efficiencyTrend = "neutral";
+            hasEfficiencyData = false;
             return;
         }
 
@@ -61,29 +61,13 @@ Kirigami.ScrollablePage {
 
         var efficiency = db.getEfficiencySeries(30);
         avgEfficiency = 0.0;
-        efficiencyTrend = "neutral";
+        hasEfficiencyData = efficiency.length > 0;
         if (efficiency.length > 0) {
             var sum = 0;
             for (var i = 0; i < efficiency.length; ++i) {
-                sum += efficiency[i].value || 0;
+                sum += Number(efficiency[i].value);
             }
             avgEfficiency = sum / efficiency.length;
-
-            if (efficiency.length >= 14) {
-                var recentSum = 0;
-                var olderSum = 0;
-                for (var j = 0; j < 7; ++j) {
-                    recentSum += efficiency[efficiency.length - 1 - j].value || 0;
-                    olderSum += efficiency[efficiency.length - 8 - j].value || 0;
-                }
-                var recentAvg = recentSum / 7;
-                var olderAvg = olderSum / 7;
-                if (recentAvg > olderAvg * 1.05) {
-                    efficiencyTrend = "up";
-                } else if (recentAvg < olderAvg * 0.95) {
-                    efficiencyTrend = "down";
-                }
-            }
         }
 
         overview = db.getAnalystOverview(30) || ({});
@@ -175,9 +159,9 @@ Kirigami.ScrollablePage {
         if (reportEfficiency.length > 0) {
             var total = 0;
             for (var i = 0; i < reportEfficiency.length; ++i) {
-                total += reportEfficiency[i].value || 0;
+                total += Number(reportEfficiency[i].value);
             }
-            lines.push(i18n("Average prompt efficiency: %1x", (total / reportEfficiency.length).toFixed(2)));
+            lines.push(i18n("Average output / input ratio: %1x", (total / reportEfficiency.length).toFixed(2)));
         }
 
         lines.push("");
@@ -258,8 +242,8 @@ Kirigami.ScrollablePage {
 
             EfficiencyMetricCard {
                 Layout.fillWidth: true
+                visible: analystPage.hasEfficiencyData
                 efficiencyRatio: avgEfficiency
-                trend: efficiencyTrend
             }
 
             Kirigami.Card {
@@ -364,12 +348,13 @@ Kirigami.ScrollablePage {
                         maxIntensity: analystPage.maxIntensity
                         baseColor: Kirigami.Theme.highlightColor
 
-                        onHovered: function(date, value) {
-                            hoverLabel.text = i18n("%1: %2",
-                                                   date,
-                                                   plasmoid.configuration.analystIntensityMode === 0
-                                                       ? formatCurrency(value)
-                                                       : Utils.formatNumber(value) + i18n(" tokens"));
+                        onHovered: function(date, value, recorded) {
+                            hoverLabel.text = recorded
+                                ? i18n("%1: %2", date,
+                                       plasmoid.configuration.analystIntensityMode === 0
+                                           ? formatCurrency(value)
+                                           : Utils.formatNumber(value) + i18n(" tokens"))
+                                : i18n("%1: No recorded data", date);
                         }
                     }
                 }

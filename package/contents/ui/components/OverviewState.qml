@@ -45,6 +45,19 @@ QtObject {
         ]);
     }
 
+    function toolHasQuotaData(tool) {
+        var monitor = tool?.monitor;
+        if (!monitor) return false;
+        var rows = monitor.quotaWindows || [];
+        for (var i = 0; i < rows.length; i++) {
+            var row = rows[i] || {};
+            if (row.availability === "disabled" || row.availability === "unavailable"
+                    || row.precision === "availability_only") continue;
+            if (Number.isFinite(Number(row.percentUsed))) return true;
+        }
+        return Number(monitor.usageLimit) > 0;
+    }
+
     function fallbackSnapshot(item, sourceKindKey) {
         var backend = sourceKindKey === "provider" ? item?.backend : item?.monitor;
         var result = {
@@ -64,17 +77,28 @@ QtObject {
             result.nextActionKey = "complete_configuration";
             result.nextActionText = i18n("Review this source configuration");
         } else if (sourceKindKey === "local_tool") {
-            result.readinessStateKey = backend.installed ? "reporting_estimate" : "unavailable_locally";
-            result.nextActionKey = backend.installed ? "none" : "install_local_source";
-            result.nextActionText = backend.installed ? i18n("No action required")
-                                                       : i18n("Install the local tool, then check again");
+            if (!backend.installed) {
+                result.readinessStateKey = "unavailable_locally";
+                result.nextActionKey = "install_local_source";
+                result.nextActionText = i18n("Install the local tool, then check again");
+            } else if (toolHasQuotaData(item)) {
+                result.readinessStateKey = "reporting_estimate";
+                result.nextActionKey = "none";
+                result.nextActionText = i18n("No action required");
+            }
         } else if (backend.connected) {
             var source = backend.usageSource || backend.costSource || "";
-            result.readinessStateKey = source === "connectivity_probe"
-                || source === "connectivity_read_only" || source === "model_discovery_api"
-                ? "connected_connectivity_only" : "reporting_actual";
-            result.nextActionKey = "none";
-            result.nextActionText = i18n("No action required");
+            if (source === "connectivity_probe" || source === "connectivity_read_only"
+                    || source === "model_discovery_api") {
+                result.readinessStateKey = "connected_connectivity_only";
+                result.nextActionKey = "none";
+                result.nextActionText = i18n("No action required");
+            } else if (providerHasUsefulMetrics(item)) {
+                result.readinessStateKey = source === "estimated_from_usage"
+                    ? "reporting_estimate" : "reporting_actual";
+                result.nextActionKey = "none";
+                result.nextActionText = i18n("No action required");
+            }
         }
         return result;
     }
@@ -140,7 +164,8 @@ QtObject {
             connectivity: 0,
             attention: 0,
             verifying: 0,
-            useful: 0
+            useful: 0,
+            verified: 0
         };
         for (var i = 0; i < rows.length; i++) {
             var row = rows[i];
@@ -152,7 +177,17 @@ QtObject {
             if (row.needsAttention) result.attention++;
         }
         result.useful = result.actual + result.estimate + result.balance;
+        result.verified = result.useful + result.connectivity;
         return result;
+    }
+
+    function summaryText() {
+        var parts = [i18n("%1 of %2 active sources", summary.useful, summary.enabled)];
+        if (summary.connectivity > 0)
+            parts.push(i18np("%1 connectivity only", "%1 connectivity only", summary.connectivity));
+        if (summary.attention > 0)
+            parts.push(i18np("%1 needs attention", "%1 need attention", summary.attention));
+        return parts.join(i18n(" · "));
     }
 
     function filterProviders(qualityClasses) {

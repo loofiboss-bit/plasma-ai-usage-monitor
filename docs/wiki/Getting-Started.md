@@ -1,22 +1,60 @@
-# Getting started
+<!-- Generated from docs/user-guide/getting-started.md by scripts/generate_wiki_docs.py; do not edit. -->
+# First successful source
 
-Use **Guided first success** to configure and verify one provider or detected local tool before adding budgets or integrations.
+Use **Guided first success** to configure and verify one provider or detected local tool. The final screen tells you whether the result is provider-reported usage or spend, gateway data, a balance, a local estimate, or connectivity only.
 
-1. Add **AI Usage Monitor** from Plasma's widget picker.
-2. Open the widget and choose what you want to track first.
-3. Choose one recommended source and review its monitoring level.
-4. Enter only its required fields.
-5. Choose **Save and verify** or **Enable and verify**.
-6. Read whether the result is provider usage or spend, gateway data, a balance, a local estimate, or connectivity only.
+## Add the widget
 
-Keys are stored in KWallet. Plasma may ask you to unlock the wallet.
+1. Right-click the panel or desktop.
+2. Choose **Add Widgets**.
+3. Search for **AI Usage Monitor**.
+4. Add it to the panel or desktop.
+5. Open the widget. The guided setup starts on a new installation.
 
-Guided setup uses the safe scheduled read-only request and does not run inference. A connectivity-only result confirms access but does not prove usage or spend.
+If setup was skipped earlier, reopen the widget and choose **Resume setup**. Full controls remain available in Settings.
 
-To add another source, open **Settings → Providers**. Search or filter the list, select one source, apply its settings, then choose **Verify**. Cancelling Settings discards staged KWallet changes.
+## Complete Guided first success
 
-Overview keeps reporting providers separate from collapsed connection checks. Native Diagnostics shows matching frontend and plugin versions, install layers, database health, source readiness, KWallet, and catalogs.
+1. Choose what you want to track first: a local coding tool, provider usage or spend, or a gateway or provider connection.
+2. Choose one source. Sources that can return useful reporting data appear before connectivity-only checks.
+3. Review the monitoring level and expected result.
+4. Enter only the required credential and endpoint fields. Provider credentials are saved in KWallet when you choose **Save and verify**.
+5. Run the verification. Provider verification uses the scheduled read-only request and never sends inference. Local-tool verification checks the detected activity path.
+6. Read the result quality before opening the dashboard.
 
-Read [Understanding the data](Understanding-the-Data) before configuring budgets.
+Connectivity-only verification is a successful connection test, not proof of token usage or spend. A local-tool result remains an estimate unless an authenticated source reports a live quota window.
 
-The full flow is in the [first successful source guide](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/getting-started.md).
+## Add another source in Settings
+
+Open **Settings → Providers**. Search or filter the source list, then select one source to open its detail pane. The pane shows its monitoring level, required permission, scheduled endpoint, enable control, credential fields, and safe verification action.
+
+Apply pending changes before choosing **Verify**. Cancelling Settings discards staged credential changes. Applying writes or removes the staged KWallet values.
+
+The **Advanced** switch shows model overrides, custom base URLs, and provider-specific fields. Leave it off for a first setup unless your provider needs a custom endpoint.
+
+## Read Overview
+
+Overview groups useful provider results under **Reporting providers**. Connectivity-only providers stay under the collapsed **Connection checks** section. Local coding tools have their own section, and sources that need configuration or recovery appear as actions near the top.
+
+The header counts actual data, estimates, balances, connection checks, and sources that need attention separately. It does not count a connection check as reported usage.
+
+## Check Diagnostics
+
+Open **Settings → Diagnostics** after the first setup. Confirm:
+
+- the frontend and native-plugin versions match
+- the frontend and plugin come from the expected install layers
+- the history database is healthy or not created yet
+- no enabled source unexpectedly needs recovery
+- KWallet and both catalogs are available
+
+Diagnostics can copy the relevant repair command, version check, capability report, or redacted support report. Use the source-readiness action to select a provider that needs repair.
+
+## Add safeguards later
+
+After the first source works:
+
+- set provider budgets only for compatible USD spend data
+- enable notifications with a cooldown
+- turn on history if you want trends
+- enable exports, Prometheus, or webhooks only if you use them

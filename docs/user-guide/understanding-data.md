@@ -4,6 +4,11 @@ Provider cards answer different questions because provider APIs expose different
 
 Overview puts providers with useful reported metrics under **Reporting providers**. Providers that only prove endpoint access stay under the collapsed **Connection checks** section. Local tools appear separately. The header counts actual data, estimates, balances, connectivity, and sources that need attention without merging them into one success number.
 
+The panel and popup footer use the same source summary. **Active sources** means
+sources with verified actual data, an estimate, or a balance; connectivity-only
+and needs-attention sources are called out separately. A verified local tool can
+therefore be active even when no API provider is configured.
+
 ## Monitoring levels
 
 | Level | What the widget can establish |
@@ -31,6 +36,16 @@ An estimate is useful for trends but is not an invoice. A connectivity check pro
 ## Unknown and zero
 
 **Unknown** means the source did not provide a compatible value. Zero means the source explicitly reported zero. The widget preserves that distinction in the UI, database, exports, alerts, and Prometheus output.
+
+Compact cost modes include only available provider-reported spend and keep each
+currency separate. Remaining requests show an em dash when no compatible metric
+exists and `0 req` only when a source explicitly reports zero.
+
+The Analyst activity heatmap uses a neutral cell for both missing days and
+explicit zero activity. Hover text distinguishes them: only a missing day says
+**No recorded data**. The **Output / Input Ratio** is descriptive, not a score of
+prompt quality. It appears only when compatible snapshots contain positive input
+tokens; a reported zero output remains a valid ratio of zero.
 
 ## Currency handling
 

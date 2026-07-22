@@ -5,6 +5,7 @@ import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import "Utils.js" as Utils
+import "components" as Components
 
 MouseArea {
     id: compactRoot
@@ -15,18 +16,14 @@ MouseArea {
     readonly property int warningThreshold: plasmoid.configuration.warningThreshold || 80
     readonly property int criticalThreshold: plasmoid.configuration.criticalThreshold || 95
 
-    readonly property var compactApiSpend: {
-        var totals = {};
-        for (var i = 0; i < providers.length; i++) {
-            var provider = providers[i];
-            if (provider && provider.enabled && provider.backend && provider.backend.connected
-                && (provider.backend.costSource === "billing_api"
-                    || provider.backend.costSource === "usage_api"
-                    || provider.backend.costSource === "actual_api"))
-                Utils.addCurrencyTotal(totals, provider.backend.currency, provider.backend.cost ?? 0);
-        }
-        return totals;
+    Components.OverviewState {
+        id: compactOverviewState
+        providers: compactRoot.providers
+        tools: compactRoot.subscriptionTools
+        readinessModel: root.sourceReadiness
     }
+
+    readonly property var compactApiSpend: Utils.actualCostTotals(providers, "current")
 
     readonly property double compactSubscriptionFees: {
         var total = 0;
@@ -39,51 +36,24 @@ MouseArea {
     }
 
     Accessible.role: Accessible.Button
-    Accessible.name: i18n("AI Usage Monitor: %1 providers connected", root.connectedCount ?? 0)
+    Accessible.name: i18n("AI Usage Monitor: %1", compactOverviewState.summaryText())
 
-    readonly property bool hasWarning: {
-        for (var i = 0; i < providers.length; i++) {
-            var p = providers[i];
-            if (p && p.enabled && p.backend && p.backend.connected && p.backend.rateLimitRequests > 0) {
-                var usedPercent = ((p.backend.rateLimitRequests - p.backend.rateLimitRequestsRemaining) / p.backend.rateLimitRequests) * 100;
-                if (usedPercent >= compactRoot.warningThreshold) return true;
-            }
-        }
-        // Also check subscription tools
-        var tools = root.allSubscriptionTools ?? [];
-        for (var j = 0; j < tools.length; j++) {
-            var t = tools[j];
-            if (t && t.enabled && t.monitor && t.monitor.percentUsed >= compactRoot.warningThreshold) return true;
-        }
-        return false;
-    }
-    readonly property bool hasCritical: {
-        for (var i = 0; i < providers.length; i++) {
-            var p = providers[i];
-            if (p && p.enabled && p.backend && p.backend.connected && p.backend.rateLimitRequests > 0) {
-                var usedPercent = ((p.backend.rateLimitRequests - p.backend.rateLimitRequestsRemaining) / p.backend.rateLimitRequests) * 100;
-                if (usedPercent >= compactRoot.criticalThreshold) return true;
-            }
-        }
-        // Also check subscription tools
-        var tools = root.allSubscriptionTools ?? [];
-        for (var j = 0; j < tools.length; j++) {
-            var t = tools[j];
-            if (t && t.enabled && t.monitor && (t.monitor.limitReached || t.monitor.percentUsed >= compactRoot.criticalThreshold)) return true;
-        }
-        return false;
-    }
-    readonly property bool anyConnected: {
-        for (var i = 0; i < providers.length; i++) {
-            if (providers[i] && providers[i].enabled && providers[i].backend && providers[i].backend.connected)
-                return true;
-        }
-        return false;
-    }
+    readonly property string statusKey: Utils.compactStatus(
+        compactOverviewState.summary, providers, subscriptionTools,
+        compactRoot.warningThreshold, compactRoot.criticalThreshold)
+    readonly property bool hasWarning: statusKey === "warning"
+    readonly property bool hasCritical: statusKey === "critical"
+    readonly property bool hasVerifiedSource: compactOverviewState.summary.verified > 0
     readonly property bool anyLoading: {
+        if (compactOverviewState.summary.verifying > 0) return true;
         for (var i = 0; i < providers.length; i++) {
             if (providers[i] && providers[i].enabled && providers[i].backend && providers[i].backend.loading)
                 return true;
+        }
+        for (var j = 0; j < subscriptionTools.length; j++) {
+            var tool = subscriptionTools[j];
+            if (tool && tool.enabled && tool.monitor
+                    && (tool.monitor.syncing || tool.monitor.syncInProgress)) return true;
         }
         return false;
     }
@@ -107,16 +77,17 @@ MouseArea {
         // Overlay badge for status indication
         Rectangle {
             id: statusBadge
-            visible: compactRoot.anyConnected
+            visible: compactRoot.statusKey !== "hidden"
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             width: Kirigami.Units.smallSpacing * 3
             height: width
             radius: width / 2
             color: {
-                if (compactRoot.hasCritical) return Kirigami.Theme.negativeTextColor;
-                if (compactRoot.hasWarning) return Kirigami.Theme.neutralTextColor;
-                return Kirigami.Theme.positiveTextColor;
+                if (compactRoot.statusKey === "critical") return Kirigami.Theme.negativeTextColor;
+                if (compactRoot.statusKey === "warning") return Kirigami.Theme.neutralTextColor;
+                if (compactRoot.statusKey === "healthy") return Kirigami.Theme.positiveTextColor;
+                return Kirigami.Theme.disabledTextColor;
             }
             border.width: 1
             border.color: Kirigami.Theme.backgroundColor
@@ -161,46 +132,23 @@ MouseArea {
         }
 
         PlasmaComponents.Label {
-            text: (root.connectedCount ?? 0).toString()
+            text: compactOverviewState.summary.useful.toString()
             font.bold: true
             Layout.alignment: Qt.AlignVCenter
         }
     }
 
-    readonly property var compactDailyCost: {
-        var totals = {};
-        for (var i = 0; i < providers.length; i++) {
-            var provider = providers[i];
-            if (provider && provider.enabled && provider.backend && provider.backend.connected)
-                Utils.addCurrencyTotal(totals, provider.backend.currency, provider.backend.dailyCost ?? 0);
-        }
-        return totals;
-    }
+    readonly property var compactDailyCost: Utils.actualCostTotals(providers, "day")
 
-    readonly property int totalRequestsRemaining: {
-        var req = 0;
-        for (var i = 0; i < providers.length; i++) {
-            var p = providers[i];
-            if (p && p.enabled && p.backend && p.backend.connected && p.backend.rateLimitRequestsRemaining > 0)
-                req += p.backend.rateLimitRequestsRemaining;
-        }
-        return req;
-    }
+    readonly property var requestAvailability: Utils.requestsRemaining(providers)
 
-    readonly property string criticalProviderText: {
-        var worst = "";
-        var worstPercent = 0;
-        for (var i = 0; i < providers.length; i++) {
-            var p = providers[i];
-            if (p && p.enabled && p.backend && p.backend.connected && p.backend.rateLimitRequests > 0) {
-                var pct = ((p.backend.rateLimitRequests - p.backend.rateLimitRequestsRemaining) / p.backend.rateLimitRequests) * 100;
-                if (pct > worstPercent) {
-                    worstPercent = pct;
-                    worst = p.name;
-                }
-            }
-        }
-        return worst !== "" ? worst + " (" + Math.round(worstPercent) + "%)" : i18n("All healthy");
+    readonly property string criticalSourceText: {
+        var worst = Utils.worstQuotaSource(providers, subscriptionTools);
+        if (worst.available)
+            return worst.name + " (" + Math.round(worst.percent) + "%)";
+        if (compactRoot.hasVerifiedSource && compactOverviewState.summary.attention === 0)
+            return i18n("All healthy");
+        return "\u2014";
     }
 
     // Daily cost mode
@@ -219,7 +167,8 @@ MouseArea {
     PlasmaComponents.Label {
         anchors.fill: parent
         visible: compactRoot.displayMode === "requests"
-        text: compactRoot.totalRequestsRemaining + " req"
+        text: compactRoot.requestAvailability.available
+            ? i18n("%1 req", compactRoot.requestAvailability.value) : "\u2014"
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         font.bold: true
@@ -231,7 +180,7 @@ MouseArea {
     PlasmaComponents.Label {
         anchors.fill: parent
         visible: compactRoot.displayMode === "critical"
-        text: compactRoot.criticalProviderText
+        text: compactRoot.criticalSourceText
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment: Text.AlignVCenter
         font.bold: true

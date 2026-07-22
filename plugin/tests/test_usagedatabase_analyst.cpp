@@ -59,6 +59,7 @@ class UsageDatabaseAnalystTest : public QObject
 private Q_SLOTS:
     void testYearlyActivity();
     void testEfficiencySeries();
+    void testEmptyEfficiencySeries();
     void testAnalystOverview();
 };
 
@@ -139,12 +140,16 @@ void UsageDatabaseAnalystTest::testEfficiencySeries()
     db.recordSnapshot("p1", 100, 50, 1, 0.2, 0, 0, 0, 0, 0, 0);
     QVERIFY(updateSnapshotData("p1", 0, 100, 50, now.addDays(-1).toString("yyyy-MM-dd HH:mm:ss")));
 
-    // Day 2: 0 in, 0 out -> handle division by zero (should be 0 or skipped, let's say 0)
-    db.recordSnapshot("p1", 0, 0, 1, 0.3, 0, 0, 0, 0, 0, 0);
-    QVERIFY(updateSnapshotData("p1", 0, 0, 0, now.addDays(-2).toString("yyyy-MM-dd HH:mm:ss")));
+    // Day 2: output without input is incompatible and must be omitted.
+    db.recordSnapshot("p1", 0, 50, 1, 0.3, 0, 0, 0, 0, 0, 0);
+    QVERIFY(updateSnapshotData("p1", 0, 0, 50, now.addDays(-2).toString("yyyy-MM-dd HH:mm:ss")));
+
+    // Day 3: explicit zero output with positive input is a real ratio of zero.
+    db.recordSnapshot("p1", 50, 0, 1, 0.4, 0, 0, 0, 0, 0, 0);
+    QVERIFY(updateSnapshotData("p1", 0, 50, 0, now.addDays(-3).toString("yyyy-MM-dd HH:mm:ss")));
 
     QVariantList series = db.getEfficiencySeries(7);
-    QCOMPARE(series.size(), 3); // 3 days with data
+    QCOMPARE(series.size(), 3);
 
     // Check values (order might depend on implementation, usually ASC date or DESC date)
     // Let's assume we sort by date.
@@ -157,7 +162,20 @@ void UsageDatabaseAnalystTest::testEfficiencySeries()
 
     QCOMPARE(values[now.toString("yyyy-MM-dd")], 2.0);
     QCOMPARE(values[now.addDays(-1).toString("yyyy-MM-dd")], 0.5);
-    QCOMPARE(values[now.addDays(-2).toString("yyyy-MM-dd")], 0.0);
+    QVERIFY(!values.contains(now.addDays(-2).toString("yyyy-MM-dd")));
+    QCOMPARE(values[now.addDays(-3).toString("yyyy-MM-dd")], 0.0);
+}
+
+void UsageDatabaseAnalystTest::testEmptyEfficiencySeries()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+
+    QVERIFY(db.getEfficiencySeries(30).isEmpty());
 }
 
 void UsageDatabaseAnalystTest::testAnalystOverview()

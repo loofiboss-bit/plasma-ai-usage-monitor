@@ -15,6 +15,11 @@ The popup provides:
 
 Only compatible units and currencies should be compared. Unknown values remain absent rather than becoming zero.
 
+Analyst's **Output / Input Ratio** is available only for days with compatible
+snapshots and positive input tokens. It is a neutral relationship between two
+reported quantities, not a prompt-quality or efficiency recommendation. Missing
+heatmap days are also kept distinct from explicit zero activity.
+
 The database is stored at:
 
 ~~~text

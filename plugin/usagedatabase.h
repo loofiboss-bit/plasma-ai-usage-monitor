@@ -83,8 +83,8 @@ public:
     Q_INVOKABLE QVariantMap getYearlyActivity(int mode) const;
 
     /**
-     * Query average token efficiency (output_tokens / input_tokens) per day
-     * for the last N days across all providers.
+     * Query the neutral output_tokens / input_tokens ratio per day for the
+     * last N days across compatible snapshots with positive total input.
      * Returns a list of maps with: { "date": "YYYY-MM-DD", "value": ... }
      */
     Q_INVOKABLE QVariantList getEfficiencySeries(int days) const;

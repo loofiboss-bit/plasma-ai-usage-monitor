@@ -25,7 +25,7 @@ The generated [provider capability matrix](../provider-capabilities.md) is check
 ## Source readiness contract
 
 `SourceReadinessModel` is the single QML-facing readiness authority for all 18
-providers and 6 local tools. Each source appears once with a stable ID, source
+providers and 7 local tools. Each source appears once with a stable ID, source
 kind, monitoring level, required credential slots, local installation state,
 enabled state, last verified time, safe verification capability, and a redacted
 next action.
@@ -44,6 +44,12 @@ usage/spend and gateway sources, then balance/connectivity sources, and finally
 local tools that are not detected. Onboarding, Settings, Overview, and
 Diagnostics must consume this model instead of independently deriving status.
 
+`OverviewState` is the shared QML projection for Overview, the panel, and the
+popup footer. Its summary keeps useful data, connectivity-only results, and
+attention states separate. Compact quota and cost modes consume only available
+typed metrics; unavailable scalar defaults cannot create healthy status or zero
+usage.
+
 ## Diagnostics and recovery
 
 `AppInfo` owns native installation, version, Plasma, distribution, and read-only
@@ -61,6 +67,10 @@ separate minimal report for missing or mismatched native plugins.
 ## SQLite schema v4
 
 History stays local and uses WAL mode. Schema v4 stores normalized observations and permits null values. Migration from v3 is transactional, idempotent, and backed up before changes.
+
+The Analyst output/input query retains the schema-v4 compatibility projection
+and returns only days with positive total input. It does not synthesize ratios
+for missing input and does not interpret the ratio as prompt quality.
 
 Calendar totals include only compatible interval-total observations. Gauges, cumulative counters, and rolling windows are not relabeled as calendar totals. Queries preserve ISO currency and source quality.
 

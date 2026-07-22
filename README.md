@@ -6,7 +6,7 @@
 
 AI Usage Monitor puts provider-reported usage and spend, local coding-tool activity, and read-only connection checks in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **14.1.1 (First Successful Use)** guides you from source choice to a safe verification. The result says whether the source returned usage or spend, a balance, a local estimate, or connectivity only. Scheduled provider checks are read-only, and missing values stay unknown instead of becoming false zeroes.
+Version **14.1.2 (First Successful Use)** guides you from source choice to a safe verification. The result says whether the source returned usage or spend, a balance, a local estimate, or connectivity only. Scheduled provider checks are read-only, and missing values stay unknown instead of becoming false zeroes.
 
 ![AI Usage Monitor main window](assets/screenshots/main-window.png)
 
@@ -46,6 +46,10 @@ For source builds and other installation details, read the [installation guide](
 - [Review privacy and security behavior](docs/user-guide/privacy-and-security.md)
 
 The [GitHub wiki](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/wiki) provides the same task-based entry points for people who prefer GitHub's wiki navigation.
+
+`docs/user-guide/` is the only editable source for end-user documentation. The
+versioned `docs/wiki/` mirror is generated; update it with
+`python3 scripts/generate_wiki_docs.py` and never edit it by hand.
 
 ## What it monitors
 

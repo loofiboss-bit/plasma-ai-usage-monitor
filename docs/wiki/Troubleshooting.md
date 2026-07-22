@@ -1,21 +1,127 @@
+<!-- Generated from docs/user-guide/troubleshooting.md by scripts/generate_wiki_docs.py; do not edit. -->
 # Troubleshooting
 
-If the widget shows a native-plugin recovery screen, use its copyable COPR command or source-install link first. Restart Plasma after repairing the installation.
+Check the recovery screen or native Diagnostics before deleting configuration or reinstalling.
 
-Otherwise open **Settings → Diagnostics**. Check the frontend and plugin versions, loaded plugin path, install layers, database, source readiness, KWallet, catalogs, and Browser Sync readiness.
+## Widget is missing after installation
 
-Common fixes:
+Log out and back in. If you need to reload the current session:
 
-- log out and back in after the first install
-- install the native plugin before using the frontend-only KDE Store package
-- update the frontend and native plugin together when their versions differ
-- check for a user-local package that overrides the system package
-- unlock KWallet before re-entering provider keys
-- remove a custom base URL before debugging authentication
-- remember that connected providers can legitimately have unknown usage
+~~~bash
+./scripts/reload_plasma.sh
+~~~
 
-For a bug report, include the Plasma version, distribution, installed package version, reproduction steps, native redacted support report, and a short relevant journal excerpt.
+Confirm that Plasma sees the package:
 
-Do not post provider keys, cookies, tokens, or unredacted URLs.
+~~~bash
+kpackagetool6 --type Plasma/Applet --show com.github.loofi.aiusagemonitor
+~~~
 
-Commands and symptom-specific steps are in the [troubleshooting guide](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/troubleshooting.md).
+## Widget shows an old version
+
+A user-local package can override the system package:
+
+~~~bash
+./scripts/show_installed_versions.sh
+~~~
+
+Run the smoke check from a repository checkout:
+
+~~~bash
+./scripts/smoke_test_plasmoid.sh
+~~~
+
+Remove only the stale user-local package if Diagnostics confirms that it shadows the current RPM:
+
+~~~bash
+kpackagetool6 --type Plasma/Applet --remove com.github.loofi.aiusagemonitor
+~~~
+
+Log out and back in after changing install layers.
+
+## QML plugin cannot be loaded
+
+The compiled plugin and Plasma package must have the same version. A missing or mismatched plugin opens an in-widget recovery screen with the detected frontend and plugin versions.
+
+On Fedora, copy the command from that screen or reinstall the COPR package:
+
+~~~bash
+sudo dnf reinstall plasma-ai-usage-monitor
+~~~
+
+Restart Plasma or log out and back in after repair. The QML engine can retain a failed import for the current session.
+
+Open Diagnostics and inspect **Version**, **Loaded plugin**, and **Install layers**. A missing library error in the journal usually means a partial source install or a Store frontend installed without the native plugin.
+
+## Frontend and native plugin versions differ
+
+Update the KDE Store frontend and the Fedora or source-installed plugin together. Diagnostics warns when a user-local frontend shadows the system package and offers a copyable repair command when it can identify one.
+
+## KWallet does not open
+
+1. Open **System Settings → KDE Wallet** and confirm that the wallet subsystem is enabled.
+2. Unlock the wallet.
+3. Reopen widget settings.
+4. Check **Diagnostics → Wallet & Secrets**.
+
+There is no plaintext fallback for provider keys.
+
+## Provider returns 401 or 403
+
+- Re-enter the key and apply settings.
+- Remove a custom base URL and retry.
+- Confirm the key belongs to the selected provider.
+- For OpenAI account usage, use an Admin API key.
+- For Azure or AWS, verify the resource, region, deployment, API version, and account permission.
+
+Do not post keys or unredacted request URLs in an issue.
+
+## Provider is connected but usage is unknown
+
+This can be correct. Many provider APIs expose model discovery but no account usage or spend. Check the monitoring level and source labels on the card or in the [capability matrix](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/provider-capabilities.md).
+
+## History is empty
+
+- Enable history in Settings.
+- Wait for an enabled source to complete a successful refresh.
+- Confirm the source returned a compatible metric.
+- Check the configured retention period.
+- Inspect database size in History settings.
+
+Connectivity-only responses do not create fake usage rows.
+
+## Browser Sync Labs fails
+
+- Sign in again in the selected browser.
+- Choose the exact browser profile.
+- Open the service once so its cookie database exists.
+- Confirm KWallet or libsecret is available for Chromium-family browsers.
+- Check Browser Sync readiness in Diagnostics.
+
+The service may have changed its undocumented endpoint. Local subscription tracking continues without Browser Sync.
+
+## Antigravity quota is unavailable
+
+- Update to a build that supports the Antigravity 2.x `resources/bin/language_server` layout.
+- Keep the Antigravity desktop app open and signed in, then use **Refresh / Test connection**.
+- Restart Antigravity after an app update so its localhost daemon and bundled certificate are current.
+- Check that Diagnostics reports the tool as installed and the source as **Antigravity local**.
+
+The Antigravity card reports Antigravity quota only. It does not include the separate usage limits shown by `gemini.google.com`.
+
+## Collect logs
+
+Follow Plasma logs while reproducing the problem:
+
+~~~bash
+journalctl --user -f | grep -i -E 'plasma|aiusage|qml'
+~~~
+
+Also collect or copy **Diagnostics → Copy version check**:
+
+~~~bash
+plasmashell --version
+rpm -q plasma-ai-usage-monitor
+~~~
+
+Attach the native **Copy support report** output and the smallest relevant log excerpt to the GitHub issue. The report includes install, database, and source-readiness state without credentials or identifying endpoint details.

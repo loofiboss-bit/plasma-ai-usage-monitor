@@ -1,6 +1,6 @@
 # Roadmap
 
-**Current release:** 14.1.1, First Successful Use
+**Current release:** 14.1.2, First Successful Use
 
 **Last updated:** 2026-07-18
 

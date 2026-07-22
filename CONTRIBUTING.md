@@ -8,7 +8,8 @@ AI Usage Monitor is a C++20 and QML Plasma 6 widget. Keep changes local-first, p
 sudo dnf install cmake extra-cmake-modules gcc-c++ git python3 just ninja-build \
     qt6-qtbase qt6-qtbase-devel qt6-qtdeclarative-devel \
     libplasma-devel kf6-kwallet-devel kf6-ki18n-devel \
-    kf6-knotifications-devel kf6-kcoreaddons-devel openssl-devel
+    kf6-knotifications-devel kf6-kcoreaddons-devel openssl-devel \
+    protobuf-devel protobuf-compiler xorg-x11-server-Xvfb
 
 git clone https://github.com/loofiboss-bit/plasma-ai-usage-monitor.git
 cd plasma-ai-usage-monitor
@@ -53,7 +54,8 @@ The deterministic demo environment is documented in [docs/demo/fedora-kde-vm.md]
 | plugin/ | Native QML plugin, providers, history, secrets, local monitors |
 | plugin/tests/ | CTest and Qt Test coverage |
 | scripts/ | Validation, packaging, install, smoke, demo, and release tools |
-| docs/user-guide/ | End-user documentation |
+| docs/user-guide/ | Canonical, editable end-user documentation |
+| docs/wiki/ | Generated GitHub wiki mirror; never edit directly |
 | docs/architecture/ | Current technical contracts |
 | docs/release/ | Version-specific release evidence |
 
@@ -99,6 +101,14 @@ Run the QML checks before submitting:
 ~~~bash
 just qml-lint
 just smoke
+~~~
+
+After changing end-user documentation, regenerate the wiki mirror and verify
+that no manually maintained copy has drifted:
+
+~~~bash
+python3 scripts/generate_wiki_docs.py
+python3 scripts/generate_wiki_docs.py --check
 ~~~
 
 ## Add or change a provider

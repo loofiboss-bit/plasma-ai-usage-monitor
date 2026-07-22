@@ -6,6 +6,7 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import com.github.loofi.aiusagemonitor 1.0
 import "onboarding" as Onboarding
+import "components" as Components
 
 PlasmaExtras.Representation {
     id: fullRoot
@@ -32,6 +33,13 @@ PlasmaExtras.Representation {
             && !plasmoid.configuration.setupWizardCompleted
             && !plasmoid.configuration.setupWizardDismissed)
 
+    Components.OverviewState {
+        id: fullOverviewState
+        providers: root.allProviders || []
+        tools: root.allSubscriptionTools || []
+        readinessModel: root.sourceReadiness
+    }
+
     header: PlasmaExtras.PlasmoidHeading {
         RowLayout {
             anchors.fill: parent
@@ -51,7 +59,7 @@ PlasmaExtras.Representation {
                 activeFocusOnTab: true
                 icon.name: "view-refresh"
                 onClicked: root.refreshAll()
-                PlasmaComponents.ToolTip { text: i18n("Refresh all configured providers") }
+                PlasmaComponents.ToolTip { text: i18n("Refresh all configured sources") }
             }
             PlasmaComponents.ToolButton {
                 activeFocusOnTab: true
@@ -144,7 +152,7 @@ PlasmaExtras.Representation {
             text: {
                 var dbSize = root.usageDb ? root.usageDb.databaseSize() : 0;
                 var dbText = dbSize > 0 ? i18n(" · DB %1 KB", Math.round(dbSize / 1024)) : "";
-                return i18n("%1 providers connected", root.connectedCount || 0) + dbText;
+                return fullOverviewState.summaryText() + dbText;
             }
         }
     }

@@ -91,10 +91,10 @@ KCM.SimpleKCM {
             model: [
                 i18n("Icon only"),
                 i18n("Total cost"),
-                i18n("Active providers count"),
+                i18n("Active sources count"),
                 i18n("Daily cost"),
                 i18n("Remaining requests"),
-                i18n("Most critical provider")
+                i18n("Most critical source")
             ]
             QQC2.ToolTip.text: i18n("Choose what to display next to the icon in the system panel")
             QQC2.ToolTip.visible: hovered

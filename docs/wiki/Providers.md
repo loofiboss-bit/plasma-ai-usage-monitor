@@ -1,29 +1,67 @@
-# Providers
+<!-- Generated from docs/user-guide/providers.md by scripts/generate_wiki_docs.py; do not edit. -->
+# Configure providers
 
-Open **Settings → Providers**, search or filter the source list, and select one source. The detail pane shows its monitoring level, required permission, scheduled endpoint, enable control, credentials, and safe verification action.
+Open **Settings → Providers**, search or filter the source list, and select one source to configure. Usage and spend sources appear before connection checks. The detail pane shows one source at a time.
 
-Apply pending changes before choosing **Verify**. Turn on **Advanced** only for model overrides, custom base URLs, or provider-specific fields. Cancelling Settings discards staged credential changes.
+Use the monitoring-level filter to find usage and spend, detected local tools, gateways, balances, or connectivity-only sources. Enable a source, enter its required fields, apply the changes, then choose **Verify**. Verification is disabled while Settings has pending changes.
 
-OpenAI, OpenRouter, LiteLLM, and DeepSeek can expose account, key, gateway, or balance data. Most other supported providers currently confirm credentials or model access without returning account usage or billing.
+## Common fields
 
-Common requirements:
+- **API key:** stored in KWallet, not in Plasma configuration files
+- **Model:** used for model-specific estimates or manual tests
+- **Custom base URL:** intended for a trusted proxy or gateway
+- **Refresh interval:** configured under General; catalog minimums still apply
 
-- provider key stored in KWallet when the API requires one
-- model from the reviewed catalog when the provider uses a model field
-- default HTTPS endpoint or a provider-specific custom endpoint
-- additional deployment, region, or project fields for Azure, AWS, or OpenAI
+The default detail pane shows the monitoring level, required permission, scheduled read-only endpoint, and credential fields. Turn on **Advanced** only for model overrides, custom base URLs, or provider-specific fields.
 
-LiteLLM requires the URL of your proxy. Fireworks requires an account-scoped base URL such as `https://api.fireworks.ai/v1/accounts/{account_id}`. Neither integration has a default endpoint in the widget.
+Use HTTPS for remote endpoints. Plain HTTP is accepted only for loopback development addresses such as 127.0.0.1, localhost, and ::1.
 
-OpenAI account usage needs an Admin API key. A normal inference key can return 403.
+## Providers with account data
 
-Custom remote endpoints must use HTTPS. Use plain HTTP only for loopback development.
+### OpenAI
 
-Common response codes:
+OpenAI usage and cost endpoints require an Admin API key. A normal project key can return a permission error even when it works for inference. The optional project ID narrows usage to one project.
 
-- 401: invalid or missing credential
-- 403: insufficient permission
-- 404: wrong base URL, deployment, API version, or model
-- 429: provider rate limit
+### OpenRouter
 
-Provider-specific notes and the exact monitoring contract live in the [provider guide](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/providers.md).
+OpenRouter reads key usage and remaining-limit fields from its key endpoint. The values belong to the configured key and may not represent every key in the account.
+
+### LiteLLM Proxy
+
+LiteLLM reads gateway spend logs. Enter the proxy base URL and a key that can access the spend endpoint. Keep each returned currency separate.
+
+### DeepSeek
+
+DeepSeek combines model discovery with the account balance endpoint. Balance is not the same as historical spend.
+
+## Connectivity-only providers
+
+Anthropic, Gemini, Mistral, Groq, xAI, Ollama Cloud, Together, Cohere, Google Veo, Azure OpenAI, AWS Bedrock, Cerebras, Fireworks, and Perplexity may confirm credentials or model access without returning account usage or billing.
+
+Perplexity's current model discovery is public, so the card can prove endpoint availability without a key. It still cannot infer account usage from that response.
+
+Additional field notes:
+
+- **Azure OpenAI:** provide the resource endpoint, deployment, API key, and compatible API version.
+- **AWS Bedrock:** provide access key ID, secret access key, optional session token, region, and model.
+- **Google Veo:** published limits stay separate from live remaining quota.
+
+## Detailed setup notes
+
+- [Gemini](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/provider-setup/gemini.md)
+- [LiteLLM Proxy](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/provider-setup/litellm.md)
+- [Cerebras](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/provider-setup/cerebras.md)
+- [Fireworks AI](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/provider-setup/fireworks.md)
+- [Perplexity](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/provider-setup/perplexity.md)
+
+The runtime-generated [capability matrix](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/provider-capabilities.md) lists every scheduled call and monitoring level.
+
+## Connection errors
+
+- **401:** the key is missing, expired, revoked, or sent to the wrong endpoint.
+- **403:** the key lacks the required role or account permission. OpenAI account usage commonly fails here when the key is not an Admin key.
+- **404:** the base URL, API version, deployment, or model is wrong.
+- **429:** the provider rate-limited the request. The scheduler honors retry guidance and backs off.
+- **TLS or host error:** remove a custom base URL and retry the default endpoint.
+
+Open **Diagnostics** to confirm the frontend and plugin match, inspect the typed source-readiness error, and select the affected provider before changing unrelated settings.

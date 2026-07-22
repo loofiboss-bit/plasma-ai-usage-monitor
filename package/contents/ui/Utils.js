@@ -45,6 +45,119 @@ function formatCurrencyTotals(totals) {
     return parts.join(" + ");
 }
 
+function availableMetric(backend, kind, window) {
+    if (!backend) return null;
+    var metrics = backend.metrics || [];
+    for (var i = 0; i < metrics.length; i++) {
+        var metric = metrics[i] || {};
+        if (metric.kind !== kind || metric.available !== true) continue;
+        if (window !== undefined && window !== null && (metric.window || "") !== window) continue;
+        if (!Number.isFinite(Number(metric.value))) continue;
+        return metric;
+    }
+    return null;
+}
+
+function isActualCostSource(source) {
+    return ["billing_api", "usage_api", "actual_api"].indexOf(source || "unknown") >= 0;
+}
+
+function actualCostTotals(providers, window) {
+    var totals = {};
+    var rows = providers || [];
+    for (var i = 0; i < rows.length; i++) {
+        var provider = rows[i];
+        var backend = provider?.backend;
+        if (!provider?.enabled || !backend?.connected) continue;
+        var metric = availableMetric(backend, "cost", window);
+        if (!metric || !isActualCostSource(metric.source || backend.costSource)) continue;
+        addCurrencyTotal(totals, metric.currency || backend.currency, metric.value);
+    }
+    return totals;
+}
+
+function requestsRemaining(providers) {
+    var result = { available: false, value: 0 };
+    var rows = providers || [];
+    for (var i = 0; i < rows.length; i++) {
+        var provider = rows[i];
+        var backend = provider?.backend;
+        if (!provider?.enabled || !backend?.connected) continue;
+        var metric = availableMetric(backend, "request_remaining");
+        if (!metric) continue;
+        result.available = true;
+        result.value += Number(metric.value);
+    }
+    return result;
+}
+
+function providerQuotaPercent(backend) {
+    if (!backend) return -1;
+    var result = -1;
+    var pairs = [
+        ["request_limit", "request_remaining"],
+        ["token_limit", "token_remaining"]
+    ];
+    for (var i = 0; i < pairs.length; i++) {
+        var limit = availableMetric(backend, pairs[i][0]);
+        var remaining = availableMetric(backend, pairs[i][1]);
+        if (!limit || !remaining || Number(limit.value) <= 0) continue;
+        result = Math.max(result, 100 - (Number(remaining.value) * 100 / Number(limit.value)));
+    }
+    return result;
+}
+
+function toolQuotaPercent(monitor) {
+    if (!monitor) return -1;
+    var result = -1;
+    var rows = monitor.quotaWindows || [];
+    for (var i = 0; i < rows.length; i++) {
+        var row = rows[i] || {};
+        if (row.availability === "disabled" || row.availability === "unavailable"
+                || row.precision === "availability_only") continue;
+        if (row.limit !== undefined && Number(row.limit) <= 0) continue;
+        if (Number.isFinite(Number(row.percentUsed)))
+            result = Math.max(result, Number(row.percentUsed));
+    }
+    if (result >= 0) return result;
+    if (Number(monitor.usageLimit) > 0 && Number.isFinite(Number(monitor.percentUsed)))
+        return Number(monitor.percentUsed);
+    return -1;
+}
+
+function worstQuotaSource(providers, tools) {
+    var result = { available: false, name: "", percent: -1 };
+    var providerRows = providers || [];
+    for (var i = 0; i < providerRows.length; i++) {
+        var provider = providerRows[i];
+        if (!provider?.enabled || !provider?.backend?.connected) continue;
+        var providerPercent = providerQuotaPercent(provider.backend);
+        if (providerPercent > result.percent) {
+            result = { available: true, name: provider.name || provider.configKey || "", percent: providerPercent };
+        }
+    }
+    var toolRows = tools || [];
+    for (var j = 0; j < toolRows.length; j++) {
+        var tool = toolRows[j];
+        if (!tool?.enabled || !tool?.monitor) continue;
+        var toolPercent = toolQuotaPercent(tool.monitor);
+        if (toolPercent > result.percent) {
+            result = { available: true, name: tool.name || tool.stableId || "", percent: toolPercent };
+        }
+    }
+    return result;
+}
+
+function compactStatus(summary, providers, tools, warningThreshold, criticalThreshold) {
+    if (!summary || Number(summary.enabled) <= 0) return "hidden";
+    var worst = worstQuotaSource(providers, tools);
+    if (worst.available && worst.percent >= criticalThreshold) return "critical";
+    if ((worst.available && worst.percent >= warningThreshold) || Number(summary.attention) > 0)
+        return "warning";
+    if (Number(summary.verified) > 0) return "healthy";
+    return "unverified";
+}
+
 function providerOutcomeBadgeKeys(usageSource, costSource, monitoringLevel, qualityClass) {
     var keys = [];
     function appendUnique(key) {

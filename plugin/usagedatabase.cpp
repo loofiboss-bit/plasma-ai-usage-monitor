@@ -1622,6 +1622,7 @@ QVariantList UsageDatabase::getEfficiencySeries(int daysCount) const
         "  GROUP BY day, provider"
         ") "
         "GROUP BY day "
+        "HAVING SUM(provider_input) > 0 "
         "ORDER BY day ASC"
     ).arg(daysCount));
 
@@ -1637,16 +1638,7 @@ QVariantList UsageDatabase::getEfficiencySeries(int daysCount) const
         double input = query.value(1).toDouble();
         double output = query.value(2).toDouble();
         
-        double ratio = 0.0;
-        if (input > 0) {
-            ratio = output / input;
-        } else if (output > 0) {
-            // If we have output but no input (unlikely but possible in some APIs),
-            // we could cap it or return a high value. Let's cap at 10x for safety.
-            ratio = 10.0;
-        }
-
-        entry[QStringLiteral("value")] = ratio;
+        entry[QStringLiteral("value")] = output / input;
         series.append(entry);
     }
 

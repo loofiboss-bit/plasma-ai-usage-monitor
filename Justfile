@@ -40,6 +40,7 @@ check:
     python3 scripts/check_qml_registered_types.py
     python3 scripts/check_non_invasive_monitoring.py
     python3 scripts/check_provider_capability_docs.py
+    python3 scripts/generate_wiki_docs.py --check
     python3 scripts/check_demo_contract.py
     python3 scripts/check_release_policy.py
     python3 scripts/check_release_media.py
@@ -48,6 +49,10 @@ check:
 # Regenerate the provider capability matrix from Catalog v5
 generate-provider-docs:
     python3 scripts/generate_provider_capabilities.py
+
+# Regenerate the versioned GitHub wiki mirror from docs/user-guide
+generate-wiki-docs:
+    python3 scripts/generate_wiki_docs.py
 
 # Validate install prerequisites (dependencies + runtime commands)
 doctor:
@@ -80,6 +85,7 @@ release-check: build-debug
     python3 scripts/check_qml_registered_types.py
     python3 scripts/check_non_invasive_monitoring.py
     python3 scripts/check_provider_capability_docs.py
+    python3 scripts/generate_wiki_docs.py --check
     python3 scripts/check_demo_contract.py
     python3 scripts/check_release_policy.py
     python3 scripts/check_release_media.py
@@ -199,9 +205,9 @@ copr-submit TAG PROJECT="loofitheboss/plasma-ai-usage-monitor":
     mkdir -p dist
     bash scripts/copr_submit_build.sh --project "{{PROJECT}}" --tag "{{TAG}}" --output-dir dist
 
-# Verify clean Fedora 44 install plus v13 upgrade, rollback, re-upgrade, reinstall, and removal
-rpm-lifecycle-check V13_RPM V14_RPM:
-    bash scripts/test_fedora44_rpm_lifecycle.sh "{{V13_RPM}}" "{{V14_RPM}}"
+# Verify clean Fedora 44 install plus base upgrade, rollback, re-upgrade, reinstall, and removal
+rpm-lifecycle-check BASE_RPM CANDIDATE_RPM:
+    bash scripts/test_fedora44_rpm_lifecycle.sh "{{BASE_RPM}}" "{{CANDIDATE_RPM}}"
 
 # Enable the COPR repository
 copr-enable:

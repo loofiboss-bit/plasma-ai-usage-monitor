@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [14.1.2] — 2026-07-22
+
+### Changed
+- Use one source-readiness summary for the panel accessibility label, compact count, and popup footer, including verified local tools and connectivity-only results.
+- Present Analyst output/input ratio as a neutral measurement only when compatible history exists, and render missing or zero-activity heatmap days outside the activity gradient.
+- Make `docs/user-guide/` the sole editable user-documentation source and gate its generated `docs/wiki/` mirror against drift.
+- Generalize the Fedora 44 RPM lifecycle gate around explicit base and candidate packages, with v14.1.1 as the required maintenance-release base.
+
+### Fixed
+- Stop unavailable provider cost, remaining-request, and quota defaults from appearing as real zero values or healthy status in compact panel modes.
+- Include verified tool-only configurations in panel health and include provider and tool quota windows in the most constrained source display.
+- Remove the synthetic output/input `10x` fallback, prompt-quality labels, recommendation text, and trend coloring from Analyst.
+- Distinguish a missing heatmap observation from an explicitly recorded zero in hover details.
+
 ## [14.1.1] — 2026-07-19
 
 ### Changed

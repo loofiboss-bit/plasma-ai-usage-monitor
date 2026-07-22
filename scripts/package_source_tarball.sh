@@ -63,7 +63,9 @@ if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   # excluding ignored artifacts and paths deleted from the working tree.
   git -c core.quotepath=off ls-files -z --cached --others --exclude-standard \
     | while IFS= read -r -d '' path; do
-        [[ -e "$path" ]] && printf '%s\0' "$path"
+        if [[ -e "$path" ]]; then
+          printf '%s\0' "$path"
+        fi
       done \
     | tar \
     --null \

@@ -216,6 +216,17 @@ add_test(
             -platform offscreen
 )
 
+add_executable(test_dailytruth_qml
+    test_dailytruth_qml.cpp
+)
+target_link_libraries(test_dailytruth_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME dailytruth_qml
+    COMMAND test_dailytruth_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/dailytruth"
+            -platform offscreen
+)
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp
