@@ -53,6 +53,7 @@ for view in overview history analyst; do
 done
 
 for scale_factor in 1 1.25 1.5 2; do
+  run_smoke "overview-scale-${scale_factor//./-}" "overview" "$qml_path" "$scale_factor"
   run_smoke "onboarding-scale-${scale_factor//./-}" "onboarding" "$qml_path" "$scale_factor"
 done
 
@@ -60,4 +61,4 @@ run_smoke "plugin-unavailable" "overview" "${FIXTURE_DIR}/plugin-unavailable:${q
 run_smoke "plugin-older" "overview" "${FIXTURE_DIR}/plugin-older:${qml_path}"
 run_smoke "plugin-newer" "overview" "${FIXTURE_DIR}/plugin-newer:${qml_path}"
 
-echo "Full plasmoid smoke passed: main views, Guided First Success at 100/125/150/200%, and plugin recovery modes"
+echo "Full plasmoid smoke passed: main views, Overview and Guided First Success at 100/125/150/200%, and plugin recovery modes"

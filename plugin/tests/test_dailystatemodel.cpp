@@ -99,6 +99,8 @@ private Q_SLOTS:
   void priorityRules();
   void budgetPriorityRequiresTypedCost();
   void priorityTiesAreDeterministic();
+  void panelAggregatesUseTypedDailyMetrics();
+  void documentedAndLocalLimitsAreNotLiveQuota();
 };
 
 void DailyStateModelTest::enabledSourcesAppearExactlyOnce() {
@@ -401,6 +403,85 @@ void DailyStateModelTest::priorityTiesAreDeterministic() {
   QCOMPARE(
       daily.summary().value(QStringLiteral("mostUrgentSourceId")).toString(),
       QStringLiteral("anthropic"));
+}
+
+void DailyStateModelTest::panelAggregatesUseTypedDailyMetrics() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  provider.makeReady();
+  provider.addMetric(ProviderBackend::MetricKind::Cost, 0.0,
+                     QStringLiteral("USD"), QStringLiteral("USD"),
+                     QStringLiteral("current"),
+                     ProviderBackend::MetricSource::BillingApi);
+  provider.addMetric(ProviderBackend::MetricKind::Cost, 1.5,
+                     QStringLiteral("USD"), QStringLiteral("USD"),
+                     QStringLiteral("day"),
+                     ProviderBackend::MetricSource::BillingApi);
+  provider.addQuota(0.0, QDateTime::currentDateTimeUtc().addSecs(3600));
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+
+  const QVariantMap summary = daily.summary();
+  QCOMPARE(summary.value(QStringLiteral("providerActualSpendTotals"))
+               .toMap()
+               .value(QStringLiteral("USD"))
+               .toDouble(),
+           0.0);
+  QCOMPARE(summary.value(QStringLiteral("providerDailyActualSpendTotals"))
+               .toMap()
+               .value(QStringLiteral("USD"))
+               .toDouble(),
+           1.5);
+  const QVariantMap requests =
+      summary.value(QStringLiteral("remainingRequests")).toMap();
+  QCOMPARE(requests.value(QStringLiteral("stableId")).toString(),
+           QStringLiteral("openai"));
+  QCOMPARE(requests.value(QStringLiteral("value")).toDouble(), 0.0);
+  QCOMPARE(summary.value(QStringLiteral("lowestActualRemainingQuota"))
+               .toMap()
+               .value(QStringLiteral("stableId"))
+               .toString(),
+           QStringLiteral("openai"));
+}
+
+void DailyStateModelTest::documentedAndLocalLimitsAreNotLiveQuota() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  DailyTool tool;
+  provider.makeReady();
+  provider.addMetric(ProviderBackend::MetricKind::RequestLimit, 100.0,
+                     QStringLiteral("request"), QString(),
+                     QStringLiteral("rolling"),
+                     ProviderBackend::MetricSource::PublishedDocumentation);
+  provider.addMetric(ProviderBackend::MetricKind::RequestRemaining, 10.0,
+                     QStringLiteral("request"), QString(),
+                     QStringLiteral("rolling"),
+                     ProviderBackend::MetricSource::ResponseHeaders,
+                     QDateTime::currentDateTimeUtc().addSecs(3600));
+  tool.setEnabled(true);
+  tool.install();
+  tool.setUsageLimit(100);
+  tool.recordActivity();
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  readiness.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+  daily.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+
+  const QVariantMap summary = daily.summary();
+  QVERIFY(summary.value(QStringLiteral("lowestActualRemainingQuota"))
+              .toMap()
+              .isEmpty());
+  QVERIFY(
+      summary.value(QStringLiteral("nearestActualReset")).toMap().isEmpty());
+  QVERIFY(summary.value(QStringLiteral("remainingRequests")).toMap().isEmpty());
+  QVERIFY(
+      !summary.value(QStringLiteral("lowestRemainingQuota")).toMap().isEmpty());
 }
 
 QTEST_MAIN(DailyStateModelTest)

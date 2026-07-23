@@ -151,7 +151,8 @@ bool betterQuota(const QVariantMap &candidate, const QVariantMap &current) {
   return leftReset.isValid() && leftReset < rightReset;
 }
 
-QVariantMap providerQuota(const QVariantList &metrics) {
+QVariantMap providerQuota(const QVariantList &metrics,
+                          bool actualOnly = false) {
   QVariantMap best;
   for (const QVariant &entry : metrics) {
     const QVariantMap remainingMetric = entry.toMap();
@@ -160,6 +161,10 @@ QVariantMap providerQuota(const QVariantList &metrics) {
     if (!metricAvailable(remainingMetric) ||
         (kind != QLatin1String("request_remaining") &&
          kind != QLatin1String("token_remaining")))
+      continue;
+    if (actualOnly &&
+        !actualSource(
+            remainingMetric.value(QStringLiteral("source")).toString()))
       continue;
     const QString limitKind = kind == QLatin1String("request_remaining")
                                   ? QStringLiteral("request_limit")
@@ -173,6 +178,9 @@ QVariantMap providerQuota(const QVariantList &metrics) {
           possible.value(QStringLiteral("window")) ==
               remainingMetric.value(QStringLiteral("window")) &&
           metricAvailable(possible)) {
+        if (actualOnly &&
+            !actualSource(possible.value(QStringLiteral("source")).toString()))
+          continue;
         limitMetric = possible;
         break;
       }
@@ -193,12 +201,53 @@ QVariantMap providerQuota(const QVariantList &metrics) {
   return best;
 }
 
-QVariantMap toolQuota(SubscriptionToolBackend *tool) {
+QVariantMap providerRemainingRequests(const QVariantList &metrics) {
+  QVariantMap best;
+  for (const QVariant &entry : metrics) {
+    const QVariantMap remaining = entry.toMap();
+    if (remaining.value(QStringLiteral("kind")) !=
+            QLatin1String("request_remaining") ||
+        !metricAvailable(remaining) ||
+        !actualSource(remaining.value(QStringLiteral("source")).toString()))
+      continue;
+    bool hasCompatibleLimit = false;
+    for (const QVariant &possibleEntry : metrics) {
+      const QVariantMap possible = possibleEntry.toMap();
+      if (possible.value(QStringLiteral("kind")) ==
+              QLatin1String("request_limit") &&
+          possible.value(QStringLiteral("scope")) ==
+              remaining.value(QStringLiteral("scope")) &&
+          possible.value(QStringLiteral("window")) ==
+              remaining.value(QStringLiteral("window")) &&
+          metricAvailable(possible) &&
+          actualSource(possible.value(QStringLiteral("source")).toString()) &&
+          possible.value(QStringLiteral("value")).toDouble() > 0.0) {
+        hasCompatibleLimit = true;
+        break;
+      }
+    }
+    if (!hasCompatibleLimit)
+      continue;
+    const double value = remaining.value(QStringLiteral("value")).toDouble();
+    if (best.isEmpty() ||
+        value < best.value(QStringLiteral("value")).toDouble()) {
+      best = {
+          {QStringLiteral("value"), value},
+          {QStringLiteral("unit"), remaining.value(QStringLiteral("unit"))}};
+    }
+  }
+  return best;
+}
+
+QVariantMap toolQuota(SubscriptionToolBackend *tool, bool actualOnly = false) {
   QVariantMap best;
   for (const QVariant &entry : tool->quotaWindows()) {
     const QVariantMap window = entry.toMap();
     if (window.value(QStringLiteral("precision")) ==
         QLatin1String("availability_only"))
+      continue;
+    if (actualOnly &&
+        !actualSource(window.value(QStringLiteral("source")).toString()))
       continue;
     const bool hasUsed =
         finiteNumber(window.value(QStringLiteral("percentUsed")));
@@ -236,12 +285,14 @@ QVariantMap toolQuota(SubscriptionToolBackend *tool) {
     if (betterQuota(candidate, best))
       best = candidate;
   };
-  consider(QStringLiteral("primary_quota"), tool->periodLabel(),
-           tool->usageCount(), tool->usageLimit(), tool->periodEnd());
-  if (tool->hasSecondaryLimit())
-    consider(QStringLiteral("secondary_quota"), tool->secondaryPeriodLabel(),
-             tool->secondaryUsageCount(), tool->secondaryUsageLimit(),
-             tool->secondaryPeriodEnd());
+  if (!actualOnly) {
+    consider(QStringLiteral("primary_quota"), tool->periodLabel(),
+             tool->usageCount(), tool->usageLimit(), tool->periodEnd());
+    if (tool->hasSecondaryLimit())
+      consider(QStringLiteral("secondary_quota"), tool->secondaryPeriodLabel(),
+               tool->secondaryUsageCount(), tool->secondaryUsageLimit(),
+               tool->secondaryPeriodEnd());
+  }
   return best;
 }
 
@@ -274,6 +325,21 @@ QVariantList preferredCosts(const QVariantList &metrics) {
       selected.append(entry);
   }
   return selected;
+}
+
+QVariantMap costTotals(const QVariantList &metrics, const QString &window) {
+  QVariantMap totals;
+  for (const QVariant &entry : metrics) {
+    const QVariantMap metric = entry.toMap();
+    if (metric.value(QStringLiteral("kind")) != QLatin1String("cost") ||
+        metric.value(QStringLiteral("window")) != window ||
+        !metricAvailable(metric) ||
+        !actualSource(metric.value(QStringLiteral("source")).toString()))
+      continue;
+    addCurrency(totals, metric.value(QStringLiteral("currency")).toString(),
+                metric.value(QStringLiteral("value")).toDouble());
+  }
+  return totals;
 }
 
 int severityRank(const QString &severity) {
@@ -440,7 +506,10 @@ QVariantMap DailyStateModel::buildRow(const QVariantMap &readiness,
       {QStringLiteral("budgetPercentUsed"), QVariant()},
       {QStringLiteral("_actualCosts"), QVariantMap()},
       {QStringLiteral("_estimatedCosts"), QVariantMap()},
-      {QStringLiteral("_fixedFees"), QVariantMap()}};
+      {QStringLiteral("_fixedFees"), QVariantMap()},
+      {QStringLiteral("_dailyActualCosts"), QVariantMap()},
+      {QStringLiteral("_remainingRequests"), QVariantMap()},
+      {QStringLiteral("_actualQuota"), QVariantMap()}};
   const QString id = row.value(QStringLiteral("stableId")).toString();
   row = row.value(QStringLiteral("sourceKind")) == QLatin1String("provider")
             ? buildProviderRow(row, m_providerBackends.value(id))
@@ -456,6 +525,10 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
   row.insert(QStringLiteral("lastAttempt"), backend->lastAttempt());
   row.insert(QStringLiteral("freshnessState"),
              freshnessKey(backend->freshness()));
+  row.insert(QStringLiteral("_remainingRequests"),
+             providerRemainingRequests(backend->metrics()));
+  row.insert(QStringLiteral("_actualQuota"),
+             providerQuota(backend->metrics(), true));
 
   bool actual = false;
   bool estimated = false;
@@ -540,6 +613,8 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
   }
   row.insert(QStringLiteral("_actualCosts"), actualCosts);
   row.insert(QStringLiteral("_estimatedCosts"), estimatedCosts);
+  row.insert(QStringLiteral("_dailyActualCosts"),
+             costTotals(backend->metrics(), QStringLiteral("day")));
   QVariantMap combined = actualCosts;
   mergeCurrencies(combined, estimatedCosts);
   if (combined.size() == 1) {
@@ -585,6 +660,7 @@ QVariantMap DailyStateModel::buildToolRow(QVariantMap row,
                                           SubscriptionToolBackend *tool) const {
   if (tool == nullptr)
     return row;
+  row.insert(QStringLiteral("_actualQuota"), toolQuota(tool, true));
   QDateTime lastSuccess = tool->lastSyncTime();
   if (!lastSuccess.isValid() ||
       (tool->lastActivity().isValid() && tool->lastActivity() > lastSuccess))
@@ -760,15 +836,25 @@ DailyStateModel::buildSummary(const QList<QVariantMap> &rows) const {
       {QStringLiteral("mostUrgentSource"), QVariantMap()},
       {QStringLiteral("lowestRemainingQuota"), QVariantMap()},
       {QStringLiteral("nearestReset"), QVariantMap()},
+      {QStringLiteral("lowestActualRemainingQuota"), QVariantMap()},
+      {QStringLiteral("nearestActualReset"), QVariantMap()},
       {QStringLiteral("actualSpendTotals"), QVariantMap()},
       {QStringLiteral("estimatedSpendTotals"), QVariantMap()},
       {QStringLiteral("fixedSubscriptionFees"), QVariantMap()},
+      {QStringLiteral("providerActualSpendTotals"), QVariantMap()},
+      {QStringLiteral("providerDailyActualSpendTotals"), QVariantMap()},
+      {QStringLiteral("remainingRequests"), QVariantMap()},
       {QStringLiteral("lastAggregateRefreshCompletion"), QDateTime()}};
   QVariantMap actualCosts;
   QVariantMap estimatedCosts;
   QVariantMap fixedFees;
   QVariantMap lowestQuota;
   QVariantMap nearestReset;
+  QVariantMap lowestActualQuota;
+  QVariantMap nearestActualReset;
+  QVariantMap providerActualCosts;
+  QVariantMap providerDailyActualCosts;
+  QVariantMap remainingRequests;
   QDateTime lastCompletion;
   int highestSeverity = 0;
   for (const QVariantMap &row : rows) {
@@ -801,6 +887,24 @@ DailyStateModel::buildSummary(const QList<QVariantMap> &rows) const {
     mergeCurrencies(estimatedCosts,
                     row.value(QStringLiteral("_estimatedCosts")).toMap());
     mergeCurrencies(fixedFees, row.value(QStringLiteral("_fixedFees")).toMap());
+    if (row.value(QStringLiteral("sourceKind")) == QLatin1String("provider")) {
+      mergeCurrencies(providerActualCosts,
+                      row.value(QStringLiteral("_actualCosts")).toMap());
+      mergeCurrencies(providerDailyActualCosts,
+                      row.value(QStringLiteral("_dailyActualCosts")).toMap());
+      const QVariantMap candidate =
+          row.value(QStringLiteral("_remainingRequests")).toMap();
+      if (!candidate.isEmpty() &&
+          (remainingRequests.isEmpty() ||
+           candidate.value(QStringLiteral("value")).toDouble() <
+               remainingRequests.value(QStringLiteral("value")).toDouble())) {
+        remainingRequests = candidate;
+        remainingRequests.insert(QStringLiteral("stableId"),
+                                 row.value(QStringLiteral("stableId")));
+        remainingRequests.insert(QStringLiteral("displayName"),
+                                 row.value(QStringLiteral("displayName")));
+      }
+    }
     if (row.value(QStringLiteral("percentRemainingAvailable")).toBool()) {
       QVariantMap candidate{
           {QStringLiteral("stableId"), row.value(QStringLiteral("stableId"))},
@@ -812,6 +916,23 @@ DailyStateModel::buildSummary(const QList<QVariantMap> &rows) const {
           {QStringLiteral("resetAt"), row.value(QStringLiteral("resetAt"))}};
       if (betterQuota(candidate, lowestQuota))
         lowestQuota = candidate;
+    }
+    QVariantMap actualQuota = row.value(QStringLiteral("_actualQuota")).toMap();
+    if (!actualQuota.isEmpty()) {
+      actualQuota.insert(QStringLiteral("stableId"),
+                         row.value(QStringLiteral("stableId")));
+      actualQuota.insert(QStringLiteral("displayName"),
+                         row.value(QStringLiteral("displayName")));
+      if (betterQuota(actualQuota, lowestActualQuota))
+        lowestActualQuota = actualQuota;
+      const QDateTime actualReset =
+          asDateTime(actualQuota.value(QStringLiteral("resetAt")));
+      if (actualReset.isValid() &&
+          (!asDateTime(nearestActualReset.value(QStringLiteral("resetAt")))
+                .isValid() ||
+           actualReset <
+               asDateTime(nearestActualReset.value(QStringLiteral("resetAt")))))
+        nearestActualReset = actualQuota;
     }
     const QDateTime resetAt = asDateTime(row.value(QStringLiteral("resetAt")));
     if (row.value(QStringLiteral("resetAtAvailable")).toBool() &&
@@ -838,9 +959,17 @@ DailyStateModel::buildSummary(const QList<QVariantMap> &rows) const {
   }
   summary.insert(QStringLiteral("lowestRemainingQuota"), lowestQuota);
   summary.insert(QStringLiteral("nearestReset"), nearestReset);
+  summary.insert(QStringLiteral("lowestActualRemainingQuota"),
+                 lowestActualQuota);
+  summary.insert(QStringLiteral("nearestActualReset"), nearestActualReset);
   summary.insert(QStringLiteral("actualSpendTotals"), actualCosts);
   summary.insert(QStringLiteral("estimatedSpendTotals"), estimatedCosts);
   summary.insert(QStringLiteral("fixedSubscriptionFees"), fixedFees);
+  summary.insert(QStringLiteral("providerActualSpendTotals"),
+                 providerActualCosts);
+  summary.insert(QStringLiteral("providerDailyActualSpendTotals"),
+                 providerDailyActualCosts);
+  summary.insert(QStringLiteral("remainingRequests"), remainingRequests);
   summary.insert(QStringLiteral("lastAggregateRefreshCompletion"),
                  lastCompletion);
   return summary;

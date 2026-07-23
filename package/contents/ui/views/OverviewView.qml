@@ -13,27 +13,17 @@ import "../components" as Components
 QQC2.ScrollView {
     id: overview
 
-    readonly property var providers: root.allProviders || []
-    readonly property var tools: root.allSubscriptionTools || []
     property bool connectionChecksExpanded: false
+    readonly property var sourceSections: [
+        { label: i18n("Provider-reported data"), rows: overviewState.actualRows },
+        { label: i18n("Local estimates"), rows: overviewState.estimatedRows },
+        { label: i18n("Balances"), rows: overviewState.balanceRows },
+        { label: i18n("Unavailable"), rows: overviewState.unavailableRows }
+    ]
 
-    Component.onCompleted: {
-        if (root.smokeView === "provider-detail") {
-            Qt.callLater(function() {
-                if (overview.contentItem) {
-                    overview.contentItem.contentY = Math.min(
-                        overview.contentHeight - overview.availableHeight,
-                        Kirigami.Units.gridUnit * 9);
-                }
-            });
-        }
-    }
-
-    Components.OverviewState {
+    Components.DailyOverviewState {
         id: overviewState
-        providers: overview.providers
-        tools: overview.tools
-        readinessModel: root.sourceReadiness
+        dailyState: root.dailyState
     }
 
     ColumnLayout {
@@ -43,16 +33,16 @@ QQC2.ScrollView {
         Components.StatusHeader {
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
-            summary: overviewState.summary
+            presentation: overviewState
         }
 
         Components.AttentionList {
             Layout.fillWidth: true
-            Layout.leftMargin: Kirigami.Units.largeSpacing
-            Layout.rightMargin: Kirigami.Units.largeSpacing
-            rows: overviewState.attentionRows
-            onFixRequested: function(stableId, actionKey, sourceKindKey) {
-                root.fixOverviewSource(stableId, actionKey, sourceKindKey);
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            presentation: overviewState
+            onFixRequested: function(stableId, actionKey, sourceKind) {
+                root.fixOverviewSource(stableId, actionKey, sourceKind);
             }
         }
 
@@ -66,46 +56,64 @@ QQC2.ScrollView {
             wrapMode: Text.WordWrap
         }
 
-        Monitor.CostSummaryCard {
-            Layout.fillWidth: true
-            Layout.margins: Kirigami.Units.smallSpacing
-            providers: overview.providers
-            subscriptionTools: overview.tools
-        }
-
-        RowLayout {
+        Monitor.QuotaResetCard {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
-            visible: overviewState.reportingProviders.length > 0
+            presentation: overviewState
+        }
 
-            PlasmaExtras.Heading {
-                level: 4
-                text: i18n("Reporting providers")
-                Layout.fillWidth: true
-            }
-            PlasmaComponents.Label {
-                text: overviewState.reportingProviders.length
-                opacity: 0.7
-            }
+        Monitor.CostSummaryCard {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            summary: overviewState.summary
+        }
+
+        PlasmaExtras.Heading {
+            level: 4
+            text: i18n("Sources")
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            visible: Number(overviewState.summary.enabledSourceCount || 0) > 0
         }
 
         Repeater {
-            model: overviewState.reportingProviders
+            model: overview.sourceSections
 
-            Monitor.ProviderCard {
+            ColumnLayout {
+                required property var modelData
                 Layout.fillWidth: true
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
-                providerName: modelData.name
-                providerIcon: modelData.iconSource || modelData.backend?.iconName || "globe"
-                providerColor: modelData.color
-                backend: modelData.backend || null
-                readiness: overviewState.rowForProvider(modelData)
-                scheduler: root.refreshScheduler
-                showCost: true
-                showUsage: true
-                collapsed: false
+                visible: modelData.rows.length > 0
+                spacing: Kirigami.Units.smallSpacing
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        text: modelData.label
+                        font.bold: true
+                    }
+                    PlasmaComponents.Label {
+                        text: modelData.rows.length
+                        color: Kirigami.Theme.disabledTextColor
+                    }
+                }
+
+                Repeater {
+                    model: modelData.rows
+                    Monitor.DailySourceCard {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        row: modelData
+                        onActionRequested: function(stableId, actionKey, sourceKind) {
+                            root.fixOverviewSource(stableId, actionKey, sourceKind);
+                        }
+                    }
+                }
             }
         }
 
@@ -113,24 +121,25 @@ QQC2.ScrollView {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
-            visible: overviewState.connectivityProviders.length > 0
+            visible: overviewState.connectivityRows.length > 0
 
-            PlasmaExtras.Heading {
-                level: 4
-                text: i18n("Connection checks")
+            PlasmaComponents.Label {
                 Layout.fillWidth: true
+                text: i18n("Connectivity only")
+                font.bold: true
+                color: Kirigami.Theme.disabledTextColor
             }
             PlasmaComponents.Button {
                 text: overview.connectionChecksExpanded ? i18n("Hide")
-                                                        : i18np("Show %1 source", "Show %1 sources",
-                                                                 overviewState.connectivityProviders.length)
+                    : i18np("Show %1 source", "Show %1 sources",
+                             overviewState.connectivityRows.length)
                 icon.name: overview.connectionChecksExpanded ? "arrow-up" : "arrow-down"
                 checkable: true
                 checked: overview.connectionChecksExpanded
                 activeFocusOnTab: true
                 Accessible.name: overview.connectionChecksExpanded
-                    ? i18n("Hide connectivity-only providers")
-                    : i18n("Show connectivity-only providers")
+                    ? i18n("Hide connectivity-only sources")
+                    : i18n("Show connectivity-only sources")
                 onClicked: overview.connectionChecksExpanded = !overview.connectionChecksExpanded
             }
         }
@@ -139,66 +148,21 @@ QQC2.ScrollView {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.largeSpacing
             Layout.rightMargin: Kirigami.Units.largeSpacing
-            visible: overviewState.connectivityProviders.length > 0 && !overview.connectionChecksExpanded
-            text: i18n("These sources confirm access to an endpoint but do not report token usage or spend.")
+            visible: overviewState.connectivityRows.length > 0
+                  && !overview.connectionChecksExpanded
+            text: i18n("These sources confirm endpoint access but do not report usage, spend, or live quota.")
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
         }
 
         Repeater {
-            model: overview.connectionChecksExpanded ? overviewState.connectivityProviders : []
-
-            Monitor.ProviderCard {
+            model: overview.connectionChecksExpanded ? overviewState.connectivityRows : []
+            Monitor.DailySourceCard {
+                required property var modelData
                 Layout.fillWidth: true
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
-                providerName: modelData.name
-                providerIcon: modelData.iconSource || modelData.backend?.iconName || "globe"
-                providerColor: modelData.color
-                backend: modelData.backend || null
-                readiness: overviewState.rowForProvider(modelData)
-                scheduler: root.refreshScheduler
-                showCost: false
-                showUsage: false
-                collapsed: true
-            }
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.leftMargin: Kirigami.Units.smallSpacing
-            Layout.rightMargin: Kirigami.Units.smallSpacing
-            visible: root.enabledToolCount > 0
-
-            PlasmaExtras.Heading {
-                level: 4
-                text: i18n("Subscription tools")
-                Layout.fillWidth: true
-            }
-            PlasmaComponents.ToolButton {
-                visible: plasmoid.configuration.browserSyncEnabled || plasmoid.configuration.antigravityEnabled
-                icon.name: "view-refresh"
-                activeFocusOnTab: true
-                Accessible.name: i18n("Refresh subscription quotas")
-                onClicked: root.refreshSubscriptionTools()
-                PlasmaComponents.ToolTip { text: i18n("Refresh subscription quotas") }
-            }
-        }
-
-        Repeater {
-            model: overview.tools
-
-            Monitor.SubscriptionToolCard {
-                Layout.fillWidth: true
-                Layout.leftMargin: Kirigami.Units.smallSpacing
-                Layout.rightMargin: Kirigami.Units.smallSpacing
-                visible: modelData.enabled
-                toolName: modelData.name
-                toolIcon: modelData.iconSource || modelData.monitor?.iconName || "utilities-terminal"
-                toolColor: modelData.monitor?.toolColor || Kirigami.Theme.textColor
-                monitor: modelData.monitor || null
-                collapsed: false
-                onSyncRequested: root.refreshSubscriptionTool(modelData)
+                row: modelData
             }
         }
 

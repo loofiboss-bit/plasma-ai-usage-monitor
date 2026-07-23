@@ -6,7 +6,6 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import com.github.loofi.aiusagemonitor 1.0
 import "onboarding" as Onboarding
-import "components" as Components
 
 PlasmaExtras.Representation {
     id: fullRoot
@@ -32,13 +31,6 @@ PlasmaExtras.Representation {
         || (!fullRoot.hasConfiguration
             && !plasmoid.configuration.setupWizardCompleted
             && !plasmoid.configuration.setupWizardDismissed)
-
-    Components.OverviewState {
-        id: fullOverviewState
-        providers: root.allProviders || []
-        tools: root.allSubscriptionTools || []
-        readinessModel: root.sourceReadiness
-    }
 
     header: PlasmaExtras.PlasmoidHeading {
         RowLayout {
@@ -142,19 +134,6 @@ PlasmaExtras.Representation {
                   : "views/AnalystView.qml"
         }
 
-        PlasmaComponents.Label {
-            Layout.fillWidth: true
-            Layout.margins: Kirigami.Units.smallSpacing
-            visible: !fullRoot.showGuidedSetup
-            horizontalAlignment: Text.AlignHCenter
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            opacity: 0.6
-            text: {
-                var dbSize = root.usageDb ? root.usageDb.databaseSize() : 0;
-                var dbText = dbSize > 0 ? i18n(" · DB %1 KB", Math.round(dbSize / 1024)) : "";
-                return fullOverviewState.summaryText() + dbText;
-            }
-        }
     }
 
     Component.onCompleted: {

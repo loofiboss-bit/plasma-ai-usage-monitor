@@ -44,12 +44,6 @@ usage/spend and gateway sources, then balance/connectivity sources, and finally
 local tools that are not detected. Onboarding, Settings, Overview, and
 Diagnostics must consume this model instead of independently deriving status.
 
-`OverviewState` is the shared QML projection for Overview, the panel, and the
-popup footer. Its summary keeps useful data, connectivity-only results, and
-attention states separate. Compact quota and cost modes consume only available
-typed metrics; unavailable scalar defaults cannot create healthy status or zero
-usage.
-
 ## Daily state contract
 
 `DailyStateModel` is the typed Phase 1 projection for daily surfaces. It observes
@@ -89,6 +83,21 @@ verify, healthy connectivity-only, then normal reporting. Ties use lower
 remaining quota, earlier reset, and finally immutable catalog order. Severity
 keys are `critical`, `warning`, `info`, and `none`; reason keys remain stable and
 non-localized.
+
+Phase 2 daily surfaces consume this model through `DailyOverviewState`. The
+normal Overview and compact representation do not maintain independent provider
+or tool summary loops. Overview renders one top recovery action, then actual
+quota/reset facts, separated spend categories, and compact source groups.
+Connectivity-only sources stay collapsed by default.
+
+The live-quota aggregates accept only provider-reported or synchronized quota
+windows. A published documentation limit and a locally configured activity
+limit remain available on their source card as estimates, but they cannot drive
+the Overview live-quota section or the `lowest-quota` and `next-reset` panel
+modes. Compact-mode compatibility maps `count` to `active-sources`, `critical`
+to `attention`, and `cost` to `actual-spend`; legacy `dailycost` and `requests`
+remain readable only when the Daily State Model exposes a compatible available
+metric.
 
 ## Diagnostics and recovery
 
