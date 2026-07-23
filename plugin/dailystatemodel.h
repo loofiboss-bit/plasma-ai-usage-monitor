@@ -53,7 +53,8 @@ public:
     CostValueRole,
     CostSourceRole,
     BudgetAvailableRole,
-    BudgetPercentUsedRole
+    BudgetPercentUsedRole,
+    QuotaWindowsRole
   };
   Q_ENUM(Role)
 

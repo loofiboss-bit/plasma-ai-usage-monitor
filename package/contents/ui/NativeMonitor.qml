@@ -721,6 +721,7 @@ Item {
         id: notificationController
         configuration: plasmoid.configuration
         registry: providerRegistry
+        dailyState: dailyStateModel
         usageDatabase: usageDatabase
         webhookNotifier: webhookNotifier
     }
@@ -744,7 +745,6 @@ Item {
         registry: providerRegistry
         secrets: secrets
         usageDatabase: usageDatabase
-        notificationController: notificationController
         scheduler: refreshScheduler
         metricsServer: metricsServer
         webhookNotifier: webhookNotifier

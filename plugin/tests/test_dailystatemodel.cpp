@@ -34,6 +34,14 @@ public:
               MetricSource::ResponseHeaders, resetAt);
   }
 
+  void addTokenQuota(double remaining, const QDateTime &resetAt = QDateTime()) {
+    addMetric(MetricKind::TokenLimit, 200.0, QStringLiteral("token"), QString(),
+              QStringLiteral("daily"), MetricSource::ResponseHeaders, resetAt);
+    addMetric(MetricKind::TokenRemaining, remaining, QStringLiteral("token"),
+              QString(), QStringLiteral("daily"), MetricSource::ResponseHeaders,
+              resetAt);
+  }
+
   void setDailySpend(double spent, double budget) {
     setDailyBudget(budget);
     setDailyCost(spent);
@@ -101,6 +109,8 @@ private Q_SLOTS:
   void priorityTiesAreDeterministic();
   void panelAggregatesUseTypedDailyMetrics();
   void documentedAndLocalLimitsAreNotLiveQuota();
+  void quotaWindowsPreserveSourceAndReset();
+  void staleSnapshotsPrioritizeFreshnessOverCachedQuota();
 };
 
 void DailyStateModelTest::enabledSourcesAppearExactlyOnce() {
@@ -482,6 +492,63 @@ void DailyStateModelTest::documentedAndLocalLimitsAreNotLiveQuota() {
   QVERIFY(summary.value(QStringLiteral("remainingRequests")).toMap().isEmpty());
   QVERIFY(
       !summary.value(QStringLiteral("lowestRemainingQuota")).toMap().isEmpty());
+  const QVariantList windows = daily.source(QStringLiteral("openai"))
+                                   .value(QStringLiteral("quotaWindows"))
+                                   .toList();
+  QCOMPARE(windows.size(), 1);
+  QCOMPARE(
+      windows.first().toMap().value(QStringLiteral("sourceClass")).toString(),
+      QStringLiteral("configured_limit"));
+}
+
+void DailyStateModelTest::quotaWindowsPreserveSourceAndReset() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  const QDateTime requestReset = QDateTime::currentDateTimeUtc().addSecs(1800);
+  const QDateTime tokenReset = QDateTime::currentDateTimeUtc().addSecs(3600);
+  provider.makeReady();
+  provider.addQuota(4.0, requestReset);
+  provider.addTokenQuota(20.0, tokenReset);
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+
+  const QVariantList windows = daily.source(QStringLiteral("openai"))
+                                   .value(QStringLiteral("quotaWindows"))
+                                   .toList();
+  QCOMPARE(windows.size(), 2);
+  for (const QVariant &entry : windows) {
+    const QVariantMap window = entry.toMap();
+    QCOMPARE(window.value(QStringLiteral("sourceClass")).toString(),
+             QStringLiteral("actual"));
+    QCOMPARE(window.value(QStringLiteral("sourceKey")).toString(),
+             QStringLiteral("response_headers"));
+    QVERIFY(window.value(QStringLiteral("resetAt")).toDateTime().isValid());
+  }
+}
+
+void DailyStateModelTest::staleSnapshotsPrioritizeFreshnessOverCachedQuota() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  provider.makeReady();
+  provider.addQuota(0.0, QDateTime::currentDateTimeUtc().addSecs(3600));
+  provider.makeStale();
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+
+  const QVariantMap row = daily.source(QStringLiteral("openai"));
+  QCOMPARE(row.value(QStringLiteral("freshnessState")).toString(),
+           QStringLiteral("stale"));
+  QCOMPARE(row.value(QStringLiteral("attentionSeverity")).toString(),
+           QStringLiteral("warning"));
+  QCOMPARE(row.value(QStringLiteral("attentionReasonKey")).toString(),
+           QStringLiteral("stale_data"));
+  QVERIFY(!row.value(QStringLiteral("quotaWindows")).toList().isEmpty());
 }
 
 QTEST_MAIN(DailyStateModelTest)

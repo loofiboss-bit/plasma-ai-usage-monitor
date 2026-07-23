@@ -44,7 +44,8 @@ const QStringList kRoleNames{QStringLiteral("stableId"),
                              QStringLiteral("costValue"),
                              QStringLiteral("costSource"),
                              QStringLiteral("budgetAvailable"),
-                             QStringLiteral("budgetPercentUsed")};
+                             QStringLiteral("budgetPercentUsed"),
+                             QStringLiteral("quotaWindows")};
 
 bool metricAvailable(const QVariantMap &metric) {
   const QVariant value = metric.value(QStringLiteral("value"));
@@ -121,13 +122,30 @@ QVariantMap publicRow(QVariantMap row) {
   return row;
 }
 
+QString quotaSourceClass(const QString &source, const QString &precision = {}) {
+  if (actualSource(source))
+    return QStringLiteral("actual");
+  if (estimatedSource(source) || source == QLatin1String("user_config") ||
+      source == QLatin1String("local_activity") ||
+      precision == QLatin1String("self_tracked_local") ||
+      precision == QLatin1String("estimated"))
+    return QStringLiteral("local_estimate");
+  if (source == QLatin1String("published_documentation") ||
+      precision.startsWith(QLatin1String("official_")))
+    return QStringLiteral("configured_limit");
+  return QStringLiteral("unknown");
+}
+
 QVariantMap quota(const QString &kind, const QString &window, double used,
-                  double remaining, const QDateTime &resetAt) {
+                  double remaining, const QDateTime &resetAt,
+                  const QString &sourceClass, const QString &sourceKey) {
   QVariantMap result{
       {QStringLiteral("kind"), kind},
       {QStringLiteral("window"), window},
       {QStringLiteral("percentUsed"), qBound(0.0, used, 100.0)},
-      {QStringLiteral("percentRemaining"), qBound(0.0, remaining, 100.0)}};
+      {QStringLiteral("percentRemaining"), qBound(0.0, remaining, 100.0)},
+      {QStringLiteral("sourceClass"), sourceClass},
+      {QStringLiteral("sourceKey"), sourceKey}};
   if (resetAt.isValid())
     result.insert(QStringLiteral("resetAt"), resetAt);
   return result;
@@ -151,9 +169,9 @@ bool betterQuota(const QVariantMap &candidate, const QVariantMap &current) {
   return leftReset.isValid() && leftReset < rightReset;
 }
 
-QVariantMap providerQuota(const QVariantList &metrics,
-                          bool actualOnly = false) {
-  QVariantMap best;
+QVariantList providerQuotas(const QVariantList &metrics) {
+  QVariantList result;
+  QSet<QString> seen;
   for (const QVariant &entry : metrics) {
     const QVariantMap remainingMetric = entry.toMap();
     const QString kind =
@@ -161,10 +179,6 @@ QVariantMap providerQuota(const QVariantList &metrics,
     if (!metricAvailable(remainingMetric) ||
         (kind != QLatin1String("request_remaining") &&
          kind != QLatin1String("token_remaining")))
-      continue;
-    if (actualOnly &&
-        !actualSource(
-            remainingMetric.value(QStringLiteral("source")).toString()))
       continue;
     const QString limitKind = kind == QLatin1String("request_remaining")
                                   ? QStringLiteral("request_limit")
@@ -178,9 +192,6 @@ QVariantMap providerQuota(const QVariantList &metrics,
           possible.value(QStringLiteral("window")) ==
               remainingMetric.value(QStringLiteral("window")) &&
           metricAvailable(possible)) {
-        if (actualOnly &&
-            !actualSource(possible.value(QStringLiteral("source")).toString()))
-          continue;
         limitMetric = possible;
         break;
       }
@@ -191,14 +202,49 @@ QVariantMap providerQuota(const QVariantList &metrics,
     const double remaining =
         remainingMetric.value(QStringLiteral("value")).toDouble() * 100.0 /
         limit;
+    const QString remainingSource =
+        remainingMetric.value(QStringLiteral("source")).toString();
+    const QString limitSource =
+        limitMetric.value(QStringLiteral("source")).toString();
+    const QString sourceClass =
+        actualSource(remainingSource) && actualSource(limitSource)
+            ? QStringLiteral("actual")
+        : (estimatedSource(remainingSource) || estimatedSource(limitSource))
+            ? QStringLiteral("local_estimate")
+            : quotaSourceClass(limitSource);
     const QVariantMap candidate =
         quota(kind, remainingMetric.value(QStringLiteral("window")).toString(),
               100.0 - remaining, remaining,
-              asDateTime(remainingMetric.value(QStringLiteral("resetAt"))));
+              asDateTime(remainingMetric.value(QStringLiteral("resetAt"))),
+              sourceClass, remainingSource);
+    const QString key = candidate.value(QStringLiteral("kind")).toString() +
+                        QLatin1Char('|') +
+                        candidate.value(QStringLiteral("window")).toString() +
+                        QLatin1Char('|') + sourceClass;
+    if (!seen.contains(key)) {
+      result.append(candidate);
+      seen.insert(key);
+    }
+  }
+  return result;
+}
+
+QVariantMap bestQuota(const QVariantList &quotas, bool actualOnly = false) {
+  QVariantMap best;
+  for (const QVariant &entry : quotas) {
+    const QVariantMap candidate = entry.toMap();
+    if (actualOnly && candidate.value(QStringLiteral("sourceClass")) !=
+                          QLatin1String("actual"))
+      continue;
     if (betterQuota(candidate, best))
       best = candidate;
   }
   return best;
+}
+
+QVariantMap providerQuota(const QVariantList &metrics,
+                          bool actualOnly = false) {
+  return bestQuota(providerQuotas(metrics), actualOnly);
 }
 
 QVariantMap providerRemainingRequests(const QVariantList &metrics) {
@@ -239,15 +285,13 @@ QVariantMap providerRemainingRequests(const QVariantList &metrics) {
   return best;
 }
 
-QVariantMap toolQuota(SubscriptionToolBackend *tool, bool actualOnly = false) {
-  QVariantMap best;
+QVariantList toolQuotas(SubscriptionToolBackend *tool) {
+  QVariantList result;
+  QSet<QString> seen;
   for (const QVariant &entry : tool->quotaWindows()) {
     const QVariantMap window = entry.toMap();
     if (window.value(QStringLiteral("precision")) ==
         QLatin1String("availability_only"))
-      continue;
-    if (actualOnly &&
-        !actualSource(window.value(QStringLiteral("source")).toString()))
       continue;
     const bool hasUsed =
         finiteNumber(window.value(QStringLiteral("percentUsed")));
@@ -264,6 +308,9 @@ QVariantMap toolQuota(SubscriptionToolBackend *tool, bool actualOnly = false) {
         hasRemaining
             ? window.value(QStringLiteral("percentRemaining")).toDouble()
             : 100.0 - used;
+    const QString source = window.value(QStringLiteral("source")).toString();
+    const QString sourceClass = quotaSourceClass(
+        source, window.value(QStringLiteral("precision")).toString());
     const QVariantMap candidate = quota(
         window.value(QStringLiteral("kind"), QStringLiteral("quota"))
             .toString(),
@@ -271,29 +318,22 @@ QVariantMap toolQuota(SubscriptionToolBackend *tool, bool actualOnly = false) {
             .value(QStringLiteral("window"),
                    window.value(QStringLiteral("label")))
             .toString(),
-        used, remaining, asDateTime(window.value(QStringLiteral("resetAt"))));
-    if (betterQuota(candidate, best))
-      best = candidate;
+        used, remaining, asDateTime(window.value(QStringLiteral("resetAt"))),
+        sourceClass, source);
+    const QString key = candidate.value(QStringLiteral("kind")).toString() +
+                        QLatin1Char('|') +
+                        candidate.value(QStringLiteral("window")).toString() +
+                        QLatin1Char('|') + sourceClass;
+    if (!seen.contains(key)) {
+      result.append(candidate);
+      seen.insert(key);
+    }
   }
-  const auto consider = [&best](const QString &kind, const QString &window,
-                                int used, int limit, const QDateTime &resetAt) {
-    if (limit <= 0)
-      return;
-    const double percentUsed = static_cast<double>(used) * 100.0 / limit;
-    const QVariantMap candidate =
-        quota(kind, window, percentUsed, 100.0 - percentUsed, resetAt);
-    if (betterQuota(candidate, best))
-      best = candidate;
-  };
-  if (!actualOnly) {
-    consider(QStringLiteral("primary_quota"), tool->periodLabel(),
-             tool->usageCount(), tool->usageLimit(), tool->periodEnd());
-    if (tool->hasSecondaryLimit())
-      consider(QStringLiteral("secondary_quota"), tool->secondaryPeriodLabel(),
-               tool->secondaryUsageCount(), tool->secondaryUsageLimit(),
-               tool->secondaryPeriodEnd());
-  }
-  return best;
+  return result;
+}
+
+QVariantMap toolQuota(SubscriptionToolBackend *tool, bool actualOnly = false) {
+  return bestQuota(toolQuotas(tool), actualOnly);
 }
 
 QVariantList preferredCosts(const QVariantList &metrics) {
@@ -504,6 +544,7 @@ QVariantMap DailyStateModel::buildRow(const QVariantMap &readiness,
       {QStringLiteral("costSource"), QStringLiteral("unknown")},
       {QStringLiteral("budgetAvailable"), false},
       {QStringLiteral("budgetPercentUsed"), QVariant()},
+      {QStringLiteral("quotaWindows"), QVariantList()},
       {QStringLiteral("_actualCosts"), QVariantMap()},
       {QStringLiteral("_estimatedCosts"), QVariantMap()},
       {QStringLiteral("_fixedFees"), QVariantMap()},
@@ -527,8 +568,11 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
              freshnessKey(backend->freshness()));
   row.insert(QStringLiteral("_remainingRequests"),
              providerRemainingRequests(backend->metrics()));
-  row.insert(QStringLiteral("_actualQuota"),
-             providerQuota(backend->metrics(), true));
+  row.insert(QStringLiteral("quotaWindows"),
+             providerQuotas(backend->metrics()));
+  row.insert(
+      QStringLiteral("_actualQuota"),
+      bestQuota(row.value(QStringLiteral("quotaWindows")).toList(), true));
 
   bool actual = false;
   bool estimated = false;
@@ -660,7 +704,10 @@ QVariantMap DailyStateModel::buildToolRow(QVariantMap row,
                                           SubscriptionToolBackend *tool) const {
   if (tool == nullptr)
     return row;
-  row.insert(QStringLiteral("_actualQuota"), toolQuota(tool, true));
+  row.insert(QStringLiteral("quotaWindows"), toolQuotas(tool));
+  row.insert(
+      QStringLiteral("_actualQuota"),
+      bestQuota(row.value(QStringLiteral("quotaWindows")).toList(), true));
   QDateTime lastSuccess = tool->lastSyncTime();
   if (!lastSuccess.isValid() ||
       (tool->lastActivity().isValid() && tool->lastActivity() > lastSuccess))
@@ -782,15 +829,16 @@ QVariantMap DailyStateModel::finalizeRow(QVariantMap row,
     priority = 1;
     severity = QStringLiteral("critical");
     reason = error.isEmpty() ? readiness : error;
-  } else if (hasRemaining && remaining <= 0.0) {
+  } else if (!stale && hasRemaining && remaining <= 0.0) {
     priority = 2;
     severity = QStringLiteral("critical");
     reason = QStringLiteral("quota_exhausted");
-  } else if (hasRemaining && remaining <= 100.0 - m_criticalThreshold) {
+  } else if (!stale && hasRemaining &&
+             remaining <= 100.0 - m_criticalThreshold) {
     priority = 3;
     severity = QStringLiteral("critical");
     reason = QStringLiteral("quota_critical");
-  } else if (hasBudget && budget >= 100.0) {
+  } else if (!stale && hasBudget && budget >= 100.0) {
     priority = 4;
     severity = QStringLiteral("critical");
     reason = QStringLiteral("budget_critical");
@@ -798,9 +846,10 @@ QVariantMap DailyStateModel::finalizeRow(QVariantMap row,
     priority = 6;
     severity = QStringLiteral("warning");
     reason = QStringLiteral("stale_data");
-  } else if ((row.value(QStringLiteral("percentUsedAvailable")).toBool() &&
-              used >= m_warningThreshold) ||
-             (hasBudget && budget >= m_warningThreshold)) {
+  } else if (!stale &&
+             ((row.value(QStringLiteral("percentUsedAvailable")).toBool() &&
+               used >= m_warningThreshold) ||
+              (hasBudget && budget >= m_warningThreshold))) {
     priority = 7;
     severity = QStringLiteral("warning");
     reason = hasBudget && budget >= m_warningThreshold

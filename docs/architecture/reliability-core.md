@@ -68,6 +68,13 @@ availability role. An available numeric zero remains zero. An unavailable value
 is an invalid `QVariant`; callers must check its availability role and must not
 coerce it to zero.
 
+`quotaWindows` contains every compatible normalized quota window for the source.
+Each row carries `kind`, `window`, `percentUsed`, `percentRemaining`,
+`sourceClass`, `sourceKey`, and `resetAt` only when the source contract provides
+one. `sourceClass` is `actual`, `local_estimate`, `configured_limit`, or
+`unknown`. Notifications may group threshold-crossing windows, but must keep
+these classes visible and must never treat an `unknown` window as exhausted.
+
 The aggregate `summary` contains enabled, useful, actual, estimated, balance,
 connectivity-only, attention, and stale counts; highest severity and the most
 urgent source; lowest remaining quota; nearest reset; actual spend, estimated
@@ -98,6 +105,14 @@ modes. Compact-mode compatibility maps `count` to `active-sources`, `critical`
 to `attention`, and `cost` to `actual-spend`; legacy `dailycost` and `requests`
 remain readable only when the Daily State Model exposes a compatible available
 metric.
+
+Phase 5 notifications observe Daily State source changes instead of raw provider
+or tool warning signals. They use the row severity, reason, action, freshness,
+and normalized quota windows; one source produces at most one grouped quota
+notification per cooldown. Stale snapshots suppress cached quota changes.
+Recovery is emitted only after a real failed readiness state, and webhook text
+is built from the same compact, source-explicit, redacted payload as the desktop
+notification.
 
 ## Diagnostics and recovery
 

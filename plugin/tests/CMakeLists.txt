@@ -255,6 +255,17 @@ add_test(
             -platform offscreen
 )
 
+add_executable(test_notifications_qml
+    test_notifications_qml.cpp
+)
+target_link_libraries(test_notifications_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME notifications_qml
+    COMMAND test_notifications_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/notifications"
+            -platform offscreen
+)
+
 add_executable(test_history_qml
     test_history_qml.cpp
 )
