@@ -90,32 +90,35 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: i18n("Show in panel:")
             model: [
                 i18n("Icon only"),
-                i18n("Total cost"),
-                i18n("Active providers count"),
-                i18n("Daily cost"),
-                i18n("Remaining requests"),
-                i18n("Most critical provider")
+                i18n("Highest-priority source"),
+                i18n("Lowest live quota"),
+                i18n("Next live reset"),
+                i18n("Actual provider spend"),
+                i18n("Active sources")
             ]
             QQC2.ToolTip.text: i18n("Choose what to display next to the icon in the system panel")
             QQC2.ToolTip.visible: hovered
             QQC2.ToolTip.delay: 500
             currentIndex: {
                 switch (generalPage.cfg_compactDisplayMode) {
-                case "cost": return 1;
-                case "count": return 2;
-                case "dailycost": return 3;
-                case "requests": return 4;
-                case "critical": return 5;
+                case "critical":
+                case "attention": return 1;
+                case "lowest-quota": return 2;
+                case "next-reset": return 3;
+                case "cost":
+                case "actual-spend": return 4;
+                case "count":
+                case "active-sources": return 5;
                 default: return 0;
                 }
             }
             onCurrentIndexChanged: {
                 switch (currentIndex) {
-                case 1: generalPage.cfg_compactDisplayMode = "cost"; break;
-                case 2: generalPage.cfg_compactDisplayMode = "count"; break;
-                case 3: generalPage.cfg_compactDisplayMode = "dailycost"; break;
-                case 4: generalPage.cfg_compactDisplayMode = "requests"; break;
-                case 5: generalPage.cfg_compactDisplayMode = "critical"; break;
+                case 1: generalPage.cfg_compactDisplayMode = "attention"; break;
+                case 2: generalPage.cfg_compactDisplayMode = "lowest-quota"; break;
+                case 3: generalPage.cfg_compactDisplayMode = "next-reset"; break;
+                case 4: generalPage.cfg_compactDisplayMode = "actual-spend"; break;
+                case 5: generalPage.cfg_compactDisplayMode = "active-sources"; break;
                 default: generalPage.cfg_compactDisplayMode = "icon"; break;
                 }
             }

@@ -1,6 +1,5 @@
 import QtQuick
 import org.kde.notification
-import "Utils.js" as Utils
 
 Item {
     id: notifications
@@ -11,25 +10,24 @@ Item {
 
     required property var configuration
     required property var registry
+    required property var dailyState
     required property var usageDatabase
     required property var webhookNotifier
 
+    // Tests observe prepared payloads without contacting the desktop
+    // notification service or configured webhook endpoints.
+    property bool deliveryEnabled: true
     property var lastNotificationTimes: ({})
+    property var previousSourceStates: ({})
 
     readonly property string brandedNotificationIcon: "com.github.loofi.aiusagemonitor"
     readonly property string warningNotificationIcon: "dialog-warning"
     readonly property string errorNotificationIcon: "dialog-error"
 
-    Notification {
-        id: subscriptionNotification
-        componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
-        eventId: "quotaWarning"
-        title: i18n("AI Usage Monitor - Subscription")
-        iconName: notifications.warningNotificationIcon
-    }
+    signal notificationPrepared(var payload)
 
     Notification {
-        id: warningNotification
+        id: quotaNotification
         componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
         eventId: "quotaWarning"
         title: i18n("AI Usage Monitor")
@@ -37,7 +35,15 @@ Item {
     }
 
     Notification {
-        id: errorNotification
+        id: budgetNotification
+        componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
+        eventId: "budgetWarning"
+        title: i18n("AI Usage Monitor")
+        iconName: notifications.brandedNotificationIcon
+    }
+
+    Notification {
+        id: stateNotification
         componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
         eventId: "apiError"
         title: i18n("AI Usage Monitor")
@@ -45,17 +51,9 @@ Item {
     }
 
     Notification {
-        id: budgetNotification
+        id: recoveryNotification
         componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
-        eventId: "budgetWarning"
-        title: i18n("AI Usage Monitor - Budget")
-        iconName: notifications.brandedNotificationIcon
-    }
-
-    Notification {
-        id: connectionNotification
-        componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
-        eventId: "providerDisconnected"
+        eventId: "providerReconnected"
         title: i18n("AI Usage Monitor")
         iconName: notifications.brandedNotificationIcon
     }
@@ -69,15 +67,16 @@ Item {
     }
 
     function canNotify(eventKey) {
-        var cooldown = configuration.notificationCooldownMinutes * 60 * 1000;
+        var cooldown = Math.max(0, Number(configuration.notificationCooldownMinutes || 0))
+            * 60 * 1000;
         var now = Date.now();
         var last = lastNotificationTimes[eventKey] || 0;
         if (now - last < cooldown) {
             return false;
         }
 
-        var dndStart = configuration.dndStartHour;
-        var dndEnd = configuration.dndEndHour;
+        var dndStart = Number(configuration.dndStartHour);
+        var dndEnd = Number(configuration.dndEndHour);
         if (dndStart >= 0 && dndEnd >= 0) {
             var hour = new Date().getHours();
             if (dndStart < dndEnd) {
@@ -93,15 +92,333 @@ Item {
         return true;
     }
 
-    function sendErrorNotification(title, message) {
-        if (!canNotify("error_" + title)) {
-            return;
+    function sourceNotificationsEnabled(row) {
+        if (row.sourceKind === "provider") {
+            return registry.isProviderNotificationEnabled(row.displayName);
+        }
+        return registry.isToolNotificationEnabled(row.displayName);
+    }
+
+    function isFinitePercent(value) {
+        var number = Number(value);
+        return value !== undefined && value !== null
+            && isFinite(number) && number >= 0 && number <= 100;
+    }
+
+    function isFiniteNonNegative(value) {
+        var number = Number(value);
+        return value !== undefined && value !== null
+            && isFinite(number) && number >= 0;
+    }
+
+    function threshold(name, fallback) {
+        var value = Number(configuration[name]);
+        return isFinite(value) ? value : fallback;
+    }
+
+    function isRealFailure(row) {
+        if (!row || row.freshnessState === "stale") {
+            return false;
+        }
+        var readiness = row.readinessState || "";
+        return readiness === "failed"
+            || readiness === "needs_configuration"
+            || readiness === "unavailable_locally"
+            || readiness === "degraded";
+    }
+
+    function resetLabel(resetAt) {
+        if (resetAt === undefined || resetAt === null || resetAt === "") {
+            return "";
+        }
+        var parsed = new Date(resetAt);
+        if (isNaN(parsed.getTime())) {
+            return "";
+        }
+        return parsed.toLocaleString(Qt.locale(), Locale.ShortFormat);
+    }
+
+    function quotaSourceLabel(sourceClass) {
+        switch (sourceClass) {
+        case "actual":
+            return i18n("Live quota");
+        case "local_estimate":
+            return i18n("Local estimate");
+        case "configured_limit":
+            return i18n("Configured limit");
+        default:
+            return "";
+        }
+    }
+
+    function warningQuotaWindows(row) {
+        if (row.freshnessState === "stale") {
+            return [];
+        }
+        var windows = row.quotaWindows || [];
+        var result = [];
+        var warningRemaining = 100 - threshold("warningThreshold", 80);
+        for (var i = 0; i < windows.length; i++) {
+            var window = windows[i] || {};
+            if (quotaSourceLabel(window.sourceClass) === ""
+                    || !isFinitePercent(window.percentRemaining)
+                    || Number(window.percentRemaining) > warningRemaining) {
+                continue;
+            }
+            result.push(window);
+        }
+        return result;
+    }
+
+    function quotaMessage(row, windows) {
+        var lines = [];
+        for (var i = 0; i < windows.length; i++) {
+            var window = windows[i];
+            var name = window.window || window.kind || i18n("Quota window");
+            var remaining = Math.round(Number(window.percentRemaining));
+            var source = quotaSourceLabel(window.sourceClass);
+            var reset = resetLabel(window.resetAt);
+            lines.push(reset !== ""
+                ? i18n("%1: %2% remaining (%3), resets %4",
+                       name, remaining, source, reset)
+                : i18n("%1: %2% remaining (%3)",
+                       name, remaining, source));
+        }
+        return i18n("%1 quota status:", row.displayName) + "\n" + lines.join("\n");
+    }
+
+    function safeFailureMessage(row) {
+        var reason = row.attentionReasonKey || row.lastErrorKind || "failed";
+        switch (reason) {
+        case "authentication":
+            return i18n("%1 needs updated credentials.", row.displayName);
+        case "permission":
+            return i18n("%1 needs additional permission.", row.displayName);
+        case "needs_configuration":
+        case "configuration":
+            return i18n("%1 needs configuration.", row.displayName);
+        case "schema":
+        case "format_changed":
+            return i18n("%1 returned an unsupported data format.", row.displayName);
+        default:
+            return i18n("%1 could not refresh. Open the monitor for recovery steps.",
+                        row.displayName);
+        }
+    }
+
+    function notificationTarget(type) {
+        switch (type) {
+        case "quota":
+            return quotaNotification;
+        case "budget":
+            return budgetNotification;
+        case "recovery":
+            return recoveryNotification;
+        default:
+            return stateNotification;
+        }
+    }
+
+    function deliver(payload) {
+        if (!canNotify(payload.eventKey)) {
+            return false;
         }
 
-        errorNotification.title = title;
-        errorNotification.text = message;
-        errorNotification.sendEvent();
-        webhookNotifier.sendAlert("error_" + title, title, message, true);
+        notificationPrepared(payload);
+        if (!deliveryEnabled) {
+            return true;
+        }
+
+        var target = notificationTarget(payload.type);
+        target.title = payload.title;
+        target.text = payload.message;
+        target.urgency = payload.critical
+            ? Notification.CriticalUrgency
+            : (payload.type === "recovery"
+               ? Notification.LowUrgency
+               : Notification.NormalUrgency);
+        target.sendEvent();
+        webhookNotifier.sendAlert(payload.eventKey,
+                                  payload.title,
+                                  payload.message,
+                                  payload.critical);
+        return true;
+    }
+
+    function quotaPayload(row) {
+        var windows = warningQuotaWindows(row);
+        if (windows.length === 0) {
+            return ({});
+        }
+        var critical = row.attentionSeverity === "critical";
+        return {
+            type: "quota",
+            eventKey: "daily_quota_" + row.stableId,
+            sourceId: row.stableId,
+            actionKey: row.nextActionKey || "",
+            severity: critical ? "critical" : "warning",
+            title: critical
+                ? i18n("%1 quota critical", row.displayName)
+                : i18n("%1 quota warning", row.displayName),
+            message: quotaMessage(row, windows),
+            critical: critical,
+            quotaWindowCount: windows.length
+        };
+    }
+
+    function budgetPayload(row) {
+        if (!row.budgetAvailable
+                || !isFiniteNonNegative(row.budgetPercentUsed)) {
+            return ({});
+        }
+        var critical = row.attentionSeverity === "critical";
+        return {
+            type: "budget",
+            eventKey: "daily_budget_" + row.stableId,
+            sourceId: row.stableId,
+            actionKey: row.nextActionKey || "",
+            severity: row.attentionSeverity,
+            title: critical
+                ? i18n("%1 budget critical", row.displayName)
+                : i18n("%1 budget warning", row.displayName),
+            message: i18n("%1 budget usage is %2%.",
+                          row.displayName,
+                          Math.round(Number(row.budgetPercentUsed))),
+            critical: critical
+        };
+    }
+
+    function failurePayload(row) {
+        return {
+            type: "failure",
+            eventKey: "daily_failure_" + row.stableId,
+            sourceId: row.stableId,
+            actionKey: row.nextActionKey || "",
+            severity: row.attentionSeverity,
+            title: i18n("%1 needs attention", row.displayName),
+            message: safeFailureMessage(row),
+            critical: row.attentionSeverity === "critical"
+        };
+    }
+
+    function stalePayload(row) {
+        return {
+            type: "stale",
+            eventKey: "daily_stale_" + row.stableId,
+            sourceId: row.stableId,
+            actionKey: row.nextActionKey || "",
+            severity: row.attentionSeverity,
+            title: i18n("%1 data is stale", row.displayName),
+            message: i18n("%1 kept its last useful snapshot, but it could not be refreshed.",
+                          row.displayName),
+            critical: false
+        };
+    }
+
+    function recoveryPayload(row) {
+        return {
+            type: "recovery",
+            eventKey: "daily_recovery_" + row.stableId,
+            sourceId: row.stableId,
+            actionKey: row.nextActionKey || "",
+            severity: "none",
+            title: i18n("%1 recovered", row.displayName),
+            message: i18n("%1 is reporting again.", row.displayName),
+            critical: false
+        };
+    }
+
+    function processSourceRow(row) {
+        if (!row || !row.stableId) {
+            return false;
+        }
+
+        var previous = previousSourceStates[row.stableId];
+        previousSourceStates[row.stableId] = row;
+        if (!previous) {
+            return false;
+        }
+        if (!sourceNotificationsEnabled(row)) {
+            return false;
+        }
+
+        if (isRealFailure(previous) && !isRealFailure(row)) {
+            return configuration.notifyOnReconnect
+                ? deliver(recoveryPayload(row))
+                : false;
+        }
+        if (!configuration.alertsEnabled) {
+            return false;
+        }
+        if (isRealFailure(row)) {
+            var reason = row.attentionReasonKey || row.lastErrorKind || "";
+            var disconnected = reason === "network"
+                || reason === "network_error"
+                || reason === "timeout"
+                || reason === "backend_unavailable";
+            var failureAllowed = disconnected
+                ? configuration.notifyOnDisconnect
+                : configuration.notifyOnError;
+            return failureAllowed ? deliver(failurePayload(row)) : false;
+        }
+        if (row.freshnessState === "stale"
+                || row.attentionReasonKey === "stale_data") {
+            return configuration.notifyOnError
+                ? deliver(stalePayload(row))
+                : false;
+        }
+        if (row.attentionReasonKey === "quota_exhausted"
+                || row.attentionReasonKey === "quota_critical"
+                || row.attentionReasonKey === "quota_warning") {
+            var quota = quotaPayload(row);
+            if (!quota.eventKey) {
+                return false;
+            }
+            var quotaDelivered = deliver(quota);
+            if (quotaDelivered && usageDatabase
+                    && usageDatabase.recordRateLimitEvent) {
+                usageDatabase.recordRateLimitEvent(
+                    row.stableId,
+                    quota.severity,
+                    Math.round(Number(row.percentUsed)));
+            }
+            return quotaDelivered;
+        }
+        if ((row.attentionReasonKey === "budget_critical"
+                || row.attentionReasonKey === "budget_warning")
+                && configuration.notifyOnBudgetWarning) {
+            var budget = budgetPayload(row);
+            return budget.eventKey ? deliver(budget) : false;
+        }
+        return false;
+    }
+
+    function processSource(stableId) {
+        if (!dailyState || !dailyState.source) {
+            return false;
+        }
+        return processSourceRow(dailyState.source(stableId));
+    }
+
+    function synchronizeSources() {
+        if (!dailyState || !dailyState.prioritizedSourceIds) {
+            return;
+        }
+        var ids = dailyState.prioritizedSourceIds();
+        var active = {};
+        for (var i = 0; i < ids.length; i++) {
+            var id = ids[i];
+            active[id] = true;
+            if (!previousSourceStates[id]) {
+                previousSourceStates[id] = dailyState.source(id);
+            }
+        }
+        var known = Object.keys(previousSourceStates);
+        for (var j = 0; j < known.length; j++) {
+            if (!active[known[j]]) {
+                delete previousSourceStates[known[j]];
+            }
+        }
     }
 
     function sendUpdateAvailable(latestVersion, releaseUrl) {
@@ -114,184 +431,17 @@ Item {
         updateNotification.sendEvent();
     }
 
-    function handleQuotaWarning(provider, percentUsed) {
-        if (!configuration.alertsEnabled
-                || !registry.isProviderNotificationEnabled(provider)
-                || !canNotify("quota_" + provider)) {
-            return;
+    Connections {
+        target: notifications.dailyState
+
+        function onSourceChanged(stableId) {
+            notifications.processSource(stableId);
         }
 
-        usageDatabase.recordRateLimitEvent(provider,
-            percentUsed >= configuration.criticalThreshold ? "critical" : "warning",
-            percentUsed);
-
-        if (percentUsed >= configuration.criticalThreshold) {
-            warningNotification.text = i18n("%1: CRITICAL - %2% of rate limit used!", provider, percentUsed);
-            warningNotification.urgency = Notification.CriticalUrgency;
-            warningNotification.sendEvent();
-            webhookNotifier.sendAlert("quota_" + provider,
-                                      i18n("%1 rate limit critical", provider),
-                                      warningNotification.text,
-                                      true);
-        } else if (percentUsed >= configuration.warningThreshold) {
-            warningNotification.text = i18n("%1: Warning - %2% of rate limit used", provider, percentUsed);
-            warningNotification.urgency = Notification.NormalUrgency;
-            warningNotification.sendEvent();
-            webhookNotifier.sendAlert("quota_" + provider,
-                                      i18n("%1 rate limit warning", provider),
-                                      warningNotification.text,
-                                      false);
+        function onCountChanged() {
+            notifications.synchronizeSources();
         }
     }
 
-    function handleBudgetWarning(provider, period, spent, budget, currency) {
-        if (!configuration.alertsEnabled
-                || !configuration.notifyOnBudgetWarning
-                || !registry.isProviderNotificationEnabled(provider)
-                || !canNotify("budgetwarn_" + provider + "_" + period)) {
-            return;
-        }
-
-        budgetNotification.text = i18n("%1: %2 budget at %3% — %4 / %5",
-                                       provider,
-                                       period,
-                                       Math.round(spent / budget * 100),
-                                       Utils.formatMoney(spent, currency || "USD"),
-                                       Utils.formatMoney(budget, currency || "USD"));
-        budgetNotification.urgency = Notification.NormalUrgency;
-        budgetNotification.sendEvent();
-        webhookNotifier.sendAlert("budgetwarn_" + provider + "_" + period,
-                                  i18n("%1 %2 budget warning", provider, period),
-                                  budgetNotification.text,
-                                  false);
-    }
-
-    function handleBudgetExceeded(provider, period, spent, budget, currency) {
-        if (!configuration.alertsEnabled
-                || !configuration.notifyOnBudgetWarning
-                || !registry.isProviderNotificationEnabled(provider)
-                || !canNotify("budget_" + provider + "_" + period)) {
-            return;
-        }
-
-        budgetNotification.text = i18n("%1: %2 budget exceeded! %3 / %4",
-                                       provider, period,
-                                       Utils.formatMoney(spent, currency || "USD"),
-                                       Utils.formatMoney(budget, currency || "USD"));
-        budgetNotification.urgency = Notification.CriticalUrgency;
-        budgetNotification.sendEvent();
-        webhookNotifier.sendAlert("budget_" + provider + "_" + period,
-                                  i18n("%1 %2 budget exceeded", provider, period),
-                                  budgetNotification.text,
-                                  true);
-    }
-
-    function handleProviderDisconnected(provider) {
-        if (!configuration.notifyOnDisconnect
-                || !registry.isProviderNotificationEnabled(provider)
-                || !canNotify("disconnect_" + provider)) {
-            return;
-        }
-
-        connectionNotification.eventId = "providerDisconnected";
-        connectionNotification.iconName = brandedNotificationIcon;
-        connectionNotification.text = i18n("%1 has disconnected", provider);
-        connectionNotification.urgency = Notification.NormalUrgency;
-        connectionNotification.sendEvent();
-        webhookNotifier.sendAlert("disconnect_" + provider,
-                                  i18n("%1 disconnected", provider),
-                                  connectionNotification.text,
-                                  true);
-    }
-
-    function handleProviderReconnected(provider) {
-        if (!configuration.notifyOnReconnect
-                || !registry.isProviderNotificationEnabled(provider)
-                || !canNotify("reconnect_" + provider)) {
-            return;
-        }
-
-        connectionNotification.eventId = "providerReconnected";
-        connectionNotification.iconName = brandedNotificationIcon;
-        connectionNotification.text = i18n("%1 has reconnected", provider);
-        connectionNotification.urgency = Notification.LowUrgency;
-        connectionNotification.sendEvent();
-        webhookNotifier.sendAlert("reconnect_" + provider,
-                                  i18n("%1 reconnected", provider),
-                                  connectionNotification.text,
-                                  false);
-    }
-
-    function handleToolLimitWarning(toolName, percentUsed) {
-        if (!configuration.alertsEnabled
-                || !registry.isToolNotificationEnabled(toolName)
-                || !canNotify("tool_warning_" + toolName)) {
-            return;
-        }
-
-        var constrainedModels = [];
-        if (toolName === "Google Antigravity") {
-            var tools = registry.allSubscriptionTools || [];
-            for (var i = 0; i < tools.length; i++) {
-                if (tools[i].name !== toolName || !tools[i].monitor) continue;
-                var rows = tools[i].monitor.quotaWindows || [];
-                for (var j = 0; j < rows.length; j++) {
-                    if ((rows[j].percentUsed || 0) >= configuration.warningThreshold)
-                        constrainedModels.push(rows[j].label);
-                }
-            }
-        }
-        subscriptionNotification.text = constrainedModels.length > 0
-            ? i18n("%1: %2% used across %3", toolName, Math.round(percentUsed), constrainedModels.join(", "))
-            : i18n("%1: %2% of usage limit reached", toolName, Math.round(percentUsed));
-        subscriptionNotification.urgency = percentUsed >= configuration.criticalThreshold
-            ? Notification.CriticalUrgency
-            : Notification.NormalUrgency;
-        subscriptionNotification.sendEvent();
-        webhookNotifier.sendAlert("tool_warning_" + toolName,
-                                  i18n("%1 usage warning", toolName),
-                                  subscriptionNotification.text,
-                                  percentUsed >= configuration.criticalThreshold);
-    }
-
-    function handleToolLimitReached(toolName) {
-        if (!configuration.alertsEnabled
-                || !registry.isToolNotificationEnabled(toolName)
-                || !canNotify("tool_limit_" + toolName)) {
-            return;
-        }
-
-        subscriptionNotification.text = i18n("%1: Usage limit reached!", toolName);
-        subscriptionNotification.urgency = Notification.CriticalUrgency;
-        subscriptionNotification.sendEvent();
-        webhookNotifier.sendAlert("tool_limit_" + toolName,
-                                  i18n("%1 usage limit reached", toolName),
-                                  subscriptionNotification.text,
-                                  true);
-    }
-
-    function handleToolSyncDiagnostic(toolName, code, message) {
-        if (!configuration.alertsEnabled
-                || !registry.isToolNotificationEnabled(toolName)
-                || code === "not_logged_in"
-                || code === "cookies_not_found"
-                || !canNotify("tool_sync_" + toolName + "_" + code)) {
-            return;
-        }
-
-        var severity = Notification.LowUrgency;
-        if (code === "session_expired" || code === "format_changed" || code === "organization_missing") {
-            severity = Notification.CriticalUrgency;
-        } else if (code === "network_error" || code === "invalid_response" || code === "unsupported_browser") {
-            severity = Notification.NormalUrgency;
-        }
-
-        subscriptionNotification.text = i18n("%1 sync: %2", toolName, message);
-        subscriptionNotification.urgency = severity;
-        subscriptionNotification.sendEvent();
-        webhookNotifier.sendAlert("tool_sync_" + toolName + "_" + code,
-                                  i18n("%1 sync diagnostic", toolName),
-                                  subscriptionNotification.text,
-                                  severity === Notification.CriticalUrgency);
-    }
+    Component.onCompleted: Qt.callLater(synchronizeSources)
 }

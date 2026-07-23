@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [15.0.0] — 2026-07-23
+
+### Added
+- Add one typed Daily State Model for panel, Overview, History freshness, and notifications, with deterministic source priority and nullable metrics.
+- Add action-first Overview cards for recovery, lowest synchronized quota, next live reset, separated spend categories, and compact source groups.
+- Add retained provider and subscription-tool discovery, explicit chart gaps, compatibility-checked comparisons, and asynchronous History queries.
+- Add one asynchronous Analyst snapshot with coverage, sample requirements, compatible drivers, anomaly methodology, and period-specific reports.
+- Add fixture-driven daily UI, notification, History, Analyst, performance, and accessibility release gates.
+
+### Changed
+- Replace provider connection-count panel semantics with attention, lowest-quota, next-reset, actual-spend, and active-source modes.
+- Show each provider and coding tool with its own logo in the daily source list.
+- Keep actual provider spend, local estimates, fixed subscription fees, balances, connectivity, and mixed currencies visibly separate.
+- Group notification threshold changes per source and suppress stale quota changes while preserving source and action context.
+- Document the Daily Control model, v14 compact-mode migration, retained history, Analyst methodology, and reproducible v15 release media.
+
+### Fixed
+- Preserve unavailable values as unavailable through panel modes, charts, reports, alerts, and exports instead of coercing them to zero.
+- Prevent disabled sources from disappearing from History and prevent missing buckets from rendering as recorded zeroes.
+- Prevent superseded History or Analyst requests from replacing newer UI state.
+
+## [14.1.2] — 2026-07-22
+
+### Changed
+- Use one source-readiness summary for the panel accessibility label, compact count, and popup footer, including verified local tools and connectivity-only results.
+- Present Analyst output/input ratio as a neutral measurement only when compatible history exists, and render missing or zero-activity heatmap days outside the activity gradient.
+- Make `docs/user-guide/` the sole editable user-documentation source and gate its generated `docs/wiki/` mirror against drift.
+- Generalize the Fedora 44 RPM lifecycle gate around explicit base and candidate packages, with v14.1.1 as the required maintenance-release base.
+
+### Fixed
+- Stop unavailable provider cost, remaining-request, and quota defaults from appearing as real zero values or healthy status in compact panel modes.
+- Include verified tool-only configurations in panel health and include provider and tool quota windows in the most constrained source display.
+- Remove the synthetic output/input `10x` fallback, prompt-quality labels, recommendation text, and trend coloring from Analyst.
+- Distinguish a missing heatmap observation from an explicitly recorded zero in hover details.
+
 ## [14.1.1] — 2026-07-19
 
 ### Changed
@@ -802,7 +837,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v15.0.0...HEAD
+[15.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v15.0.0
+[14.1.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v14.1.2
 [14.1.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.0...v14.1.1
 [14.1.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.1...v14.1.0
 [14.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.0...v14.0.1

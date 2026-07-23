@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
 /**
@@ -12,6 +11,9 @@ Canvas {
     property var activityData: [] // List of { date: "YYYY-MM-DD", value: ... }
     property double maxIntensity: 1.0
     property color baseColor: Kirigami.Theme.highlightColor
+    readonly property color emptyColor: Qt.rgba(Kirigami.Theme.textColor.r,
+                                                 Kirigami.Theme.textColor.g,
+                                                 Kirigami.Theme.textColor.b, 0.08)
     property int cellSize: 12
     property int spacing: 2
     property int rows: 7
@@ -20,7 +22,7 @@ Canvas {
     implicitWidth: columns * (cellSize + spacing) + spacing
     implicitHeight: rows * (cellSize + spacing) + spacing
     
-    signal hovered(string date, double value)
+    signal hovered(string date, var value, bool recorded)
     signal clicked(string date)
 
     onActivityDataChanged: requestPaint()
@@ -50,13 +52,14 @@ Canvas {
                 currentDate.setDate(startDate.getDate() + (col * 7) + row);
                 
                 var dateStr = currentDate.toISOString().split('T')[0];
-                var value = dataMap[dateStr] || 0;
+                var recorded = Object.prototype.hasOwnProperty.call(dataMap, dateStr);
+                var value = recorded ? Number(dataMap[dateStr]) : 0;
                 
                 var x = col * (cellSize + spacing) + spacing;
                 var y = row * (cellSize + spacing) + spacing;
                 
                 // Draw square
-                ctx.fillStyle = getIntensityColor(value);
+                ctx.fillStyle = getIntensityColor(value, recorded);
                 
                 // Rounded corners for modern look
                 var r = 2;
@@ -84,10 +87,8 @@ Canvas {
         }
     }
 
-    function getIntensityColor(value) {
-        if (value <= 0) {
-            return Kirigami.Theme.hoverColor; // Empty state color
-        }
+    function getIntensityColor(value, recorded) {
+        if (!recorded || value <= 0) return emptyColor;
         
         var ratio = maxIntensity > 0 ? (value / maxIntensity) : 0;
         // 5-step scale
@@ -98,6 +99,14 @@ Canvas {
         else if (ratio > 0.2) alpha = 0.4;
         
         return Qt.rgba(baseColor.r, baseColor.g, baseColor.b, alpha);
+    }
+
+    function valueForDate(date) {
+        for (var i = 0; i < activityData.length; i++) {
+            if (activityData[i].date === date)
+                return { recorded: true, value: Number(activityData[i].value) };
+        }
+        return { recorded: false, value: undefined };
     }
 
     MouseArea {
@@ -119,16 +128,10 @@ Canvas {
                 targetDate.setDate(startDate.getDate() + (col * 7) + row);
                 var dateStr = targetDate.toISOString().split('T')[0];
                 
-                var val = 0;
-                for (var i = 0; i < activityData.length; i++) {
-                    if (activityData[i].date === dateStr) {
-                        val = activityData[i].value;
-                        break;
-                    }
-                }
+                var point = heatmap.valueForDate(dateStr);
                 
                 if (targetDate <= today) {
-                    heatmap.hovered(dateStr, val);
+                    heatmap.hovered(dateStr, point.value, point.recorded);
                 }
             }
         }

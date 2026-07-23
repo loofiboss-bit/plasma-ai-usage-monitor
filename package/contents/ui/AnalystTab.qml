@@ -1,573 +1,294 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
-import com.github.loofi.aiusagemonitor as AIUsage
-import "Utils.js" as Utils
+import com.github.loofi.aiusagemonitor 1.0
+import "components" as Components
 
 Kirigami.ScrollablePage {
     id: analystPage
 
     title: i18n("The Analyst")
+    Accessible.name: analystState.loading
+        ? i18n("Analyst view loading")
+        : i18n("Analyst view ready")
 
-    property var activityData: []
-    property double maxIntensity: 1.0
-    property double avgEfficiency: 0.0
-    property string efficiencyTrend: "neutral"
-    property var overview: ({})
-
-    readonly property var db: plasmoid.configuration.historyEnabled ? root.usageDb : null
-
-    function enabledProviderEntries() {
-        var entries = [];
-        var providers = root.allProviders || [];
-        for (var i = 0; i < providers.length; ++i) {
-            if (providers[i].enabled) {
-                entries.push({
-                    label: providers[i].name,
-                    entry: providers[i]
-                });
-            }
-        }
-        return entries;
-    }
-
-    function selectedProviderEntry() {
-        var entries = enabledProviderEntries();
-        if (entries.length === 0) {
-            return null;
-        }
-        var idx = diagnosticsProviderCombo.currentIndex;
-        if (idx < 0 || idx >= entries.length) {
-            idx = 0;
-        }
-        return entries[idx].entry;
-    }
-
-    function refreshData() {
-        if (!db || typeof db.getYearlyActivity !== "function"
-                || typeof db.getEfficiencySeries !== "function"
-                || typeof db.getAnalystOverview !== "function") {
-            activityData = [];
-            overview = ({});
-            avgEfficiency = 0.0;
-            efficiencyTrend = "neutral";
-            return;
-        }
-
-        var activity = db.getYearlyActivity(plasmoid.configuration.analystIntensityMode);
-        activityData = activity.days || [];
-        maxIntensity = activity.maxIntensity || 1.0;
-
-        var efficiency = db.getEfficiencySeries(30);
-        avgEfficiency = 0.0;
-        efficiencyTrend = "neutral";
-        if (efficiency.length > 0) {
-            var sum = 0;
-            for (var i = 0; i < efficiency.length; ++i) {
-                sum += efficiency[i].value || 0;
-            }
-            avgEfficiency = sum / efficiency.length;
-
-            if (efficiency.length >= 14) {
-                var recentSum = 0;
-                var olderSum = 0;
-                for (var j = 0; j < 7; ++j) {
-                    recentSum += efficiency[efficiency.length - 1 - j].value || 0;
-                    olderSum += efficiency[efficiency.length - 8 - j].value || 0;
-                }
-                var recentAvg = recentSum / 7;
-                var olderAvg = olderSum / 7;
-                if (recentAvg > olderAvg * 1.05) {
-                    efficiencyTrend = "up";
-                } else if (recentAvg < olderAvg * 0.95) {
-                    efficiencyTrend = "down";
-                }
-            }
-        }
-
-        overview = db.getAnalystOverview(30) || ({});
-    }
-
-    function formatCurrency(value) {
-        if (overview.mixedCurrencies) return i18n("Mixed currencies");
-        return Utils.formatMoney(value || 0, overview.currency || "USD");
-    }
-
-    function formatPercent(value) {
-        var numeric = Number(value || 0);
-        var prefix = numeric > 0 ? "+" : "";
-        return prefix + numeric.toFixed(1) + "%";
-    }
-
-    function formatDateLabel(value) {
-        if (!value) {
-            return "";
-        }
-        return Qt.formatDate(new Date(value + "T00:00:00"), "MMM d");
-    }
-
-    function relativeRefresh(entry) {
-        if (!entry || !entry.backend || !entry.backend.lastRefreshed) {
-            return i18n("Never");
-        }
-        return Utils.formatRelativeTime(new Date(entry.backend.lastRefreshed));
-    }
-
-    function authConfigured(entry) {
-        if (!entry || !entry.backend) {
-            return false;
-        }
-        if (entry.requiresApiKey === false) {
-            return true;
-        }
-        try {
-            return entry.backend.hasApiKey();
-        } catch (error) {
-            return false;
+    readonly property var db: plasmoid.configuration.historyEnabled
+        ? root.usageDb
+        : null
+    Components.AnalystState {
+        id: analystState
+        db: analystPage.db
+        onReportReady: function(report) {
+            clipboard.setText(report);
         }
     }
 
-    function endpointLabel(entry) {
-        if (!entry || !entry.backend) {
-            return i18n("Unavailable");
-        }
-        if (entry.backend.customBaseUrl && entry.backend.customBaseUrl.length > 0) {
-            return entry.backend.customBaseUrl;
-        }
-        return i18n("Default provider endpoint");
-    }
-
-    function costSourceLabel(entry) {
-        if (!entry || !entry.backend) {
-            return i18n("Unknown");
-        }
-        return entry.backend.isEstimatedCost
-            ? i18n("Estimated from pricing tables")
-            : i18n("Provider-reported billing");
-    }
-
-    function anomalySummary() {
-        var anomalies = overview.anomalies || [];
-        if (anomalies.length === 0) {
-            return i18n("No anomalies");
-        }
-        var first = anomalies[0];
-        return i18n("%1 on %2", formatCurrency(first.value), formatDateLabel(first.date));
-    }
-
-    function buildReport(days) {
-        if (!db) {
-            return i18n("History is disabled. Enable history to generate Analyst reports.");
-        }
-
-        var reportOverview = db.getAnalystOverview(days) || ({});
-        var reportEfficiency = db.getEfficiencySeries(days) || [];
-        var lines = [];
-        lines.push(i18n("AI Usage Monitor Analyst Report (%1 days)", days));
-        lines.push(i18n("Generated: %1", new Date().toLocaleString()));
-        lines.push("");
-        lines.push(i18n("Current daily spend: %1", formatCurrency(reportOverview.currentDailyCost)));
-        lines.push(i18n("Average daily spend: %1", formatCurrency(reportOverview.averageDailyCost)));
-        lines.push(i18n("Week-over-week trend: %1", formatPercent(reportOverview.weekOverWeekPercent)));
-        lines.push(i18n("Volatility: %1", formatPercent(reportOverview.volatilityPercent)));
-
-        if (reportEfficiency.length > 0) {
-            var total = 0;
-            for (var i = 0; i < reportEfficiency.length; ++i) {
-                total += reportEfficiency[i].value || 0;
-            }
-            lines.push(i18n("Average prompt efficiency: %1x", (total / reportEfficiency.length).toFixed(2)));
-        }
-
-        lines.push("");
-        lines.push(i18n("Top spend drivers:"));
-        var drivers = reportOverview.topDrivers || [];
-        if (drivers.length === 0) {
-            lines.push(i18n("- No cost drivers available yet"));
-        } else {
-            for (var j = 0; j < Math.min(3, drivers.length); ++j) {
-                var driver = drivers[j];
-                lines.push(i18n("- %1 (%2): %3%4",
-                                driver.provider,
-                                driver.model,
-                                formatCurrency(driver.value),
-                                driver.estimated ? i18n(" estimated") : ""));
-            }
-        }
-
-        lines.push("");
-        lines.push(i18n("Detected anomalies:"));
-        var anomalies = reportOverview.anomalies || [];
-        if (anomalies.length === 0) {
-            lines.push(i18n("- None in the selected window"));
-        } else {
-            for (var k = 0; k < Math.min(3, anomalies.length); ++k) {
-                var anomaly = anomalies[k];
-                lines.push(i18n("- %1 at %2 (%3)",
-                                formatDateLabel(anomaly.date),
-                                formatCurrency(anomaly.value),
-                                formatPercent(anomaly.deltaPercent)));
-            }
-        }
-
-        return lines.join("\n");
-    }
-
-    function copyDiagnostics() {
-        var entry = selectedProviderEntry();
-        if (!entry || !entry.backend) {
-            return;
-        }
-
-        var lines = [];
-        lines.push(i18n("Provider Diagnostics: %1", entry.name));
-        lines.push(i18n("Connected: %1", entry.backend.connected ? i18n("Yes") : i18n("No")));
-        lines.push(i18n("Auth configured: %1", authConfigured(entry) ? i18n("Yes") : i18n("No")));
-        lines.push(i18n("Cost source: %1", costSourceLabel(entry)));
-        lines.push(i18n("Endpoint: %1", endpointLabel(entry)));
-        lines.push(i18n("Last refresh: %1", relativeRefresh(entry)));
-        lines.push(i18n("Error count: %1", entry.backend.errorCount || 0));
-        if (entry.backend.error && entry.backend.error.length > 0) {
-            lines.push(i18n("Last error: %1", entry.backend.error));
-        }
-        clipboard.setText(lines.join("\n"));
-    }
-
-    Component.onCompleted: refreshData()
-    onVisibleChanged: if (visible) refreshData()
+    Component.onCompleted: analystState.refreshData()
+    onVisibleChanged: if (visible && analystState.reportRequestId === "")
+        analystState.refreshData()
 
     actions: [
         Kirigami.Action {
             icon.name: "view-refresh"
             text: i18n("Refresh")
-            onTriggered: refreshData()
+            enabled: analystState.reportRequestId === ""
+            onTriggered: analystState.refreshData()
+        },
+        Kirigami.Action {
+            icon.name: "edit-copy"
+            text: i18n("Copy 7-day report")
+            enabled: analystPage.db !== null
+                && !analystState.loading
+                && analystState.reportRequestId === ""
+            onTriggered: analystState.requestReport(7)
+        },
+        Kirigami.Action {
+            icon.name: "edit-copy"
+            text: i18n("Copy 30-day report")
+            enabled: analystPage.db !== null
+                && !analystState.loading
+                && analystState.reportRequestId === ""
+            onTriggered: analystState.requestReport(30)
         }
     ]
 
-    AIUsage.ClipboardHelper {
+    ClipboardHelper {
         id: clipboard
     }
 
     ColumnLayout {
         spacing: Kirigami.Units.largeSpacing
 
-        RowLayout {
+        Controls.BusyIndicator {
+            Layout.alignment: Qt.AlignHCenter
+            visible: analystState.loading
+            running: visible
+        }
+
+        Kirigami.InlineMessage {
             Layout.fillWidth: true
-            spacing: Kirigami.Units.largeSpacing
-
-            EfficiencyMetricCard {
-                Layout.fillWidth: true
-                efficiencyRatio: avgEfficiency
-                trend: efficiencyTrend
-            }
-
-            Kirigami.Card {
-                Layout.fillWidth: true
-
-                header: Kirigami.Heading {
-                    text: i18n("Week-over-Week Spend")
-                    level: 3
-                }
-
-                contentItem: ColumnLayout {
-                    spacing: Kirigami.Units.smallSpacing
-
-                    Controls.Label {
-                        text: formatPercent(overview.weekOverWeekPercent)
-                        font.pointSize: 22
-                        font.weight: Font.Bold
-                        color: Number(overview.weekOverWeekPercent || 0) > 0
-                            ? Kirigami.Theme.negativeTextColor
-                            : (Number(overview.weekOverWeekPercent || 0) < 0
-                               ? Kirigami.Theme.positiveTextColor
-                               : Kirigami.Theme.disabledTextColor)
-                    }
-
-                    Controls.Label {
-                        text: i18n("Average daily spend: %1", formatCurrency(overview.averageDailyCost))
-                        color: Kirigami.Theme.disabledTextColor
-                    }
-                }
-            }
-
-            Kirigami.Card {
-                Layout.fillWidth: true
-
-                header: Kirigami.Heading {
-                    text: i18n("Volatility")
-                    level: 3
-                }
-
-                contentItem: ColumnLayout {
-                    spacing: Kirigami.Units.smallSpacing
-
-                    Controls.Label {
-                        text: formatPercent(overview.volatilityPercent)
-                        font.pointSize: 22
-                        font.weight: Font.Bold
-                    }
-
-                    Controls.Label {
-                        text: i18n("%1 anomaly days in window", overview.anomalyCount || 0)
-                        color: Kirigami.Theme.disabledTextColor
-                    }
-
-                    Controls.Label {
-                        text: anomalySummary()
-                        wrapMode: Text.WordWrap
-                    }
-                }
-            }
+            visible: !analystState.loading && !analystState.hasSnapshot
+            type: Kirigami.MessageType.Information
+            text: analystState.reasonText(analystState.snapshot.errorKey || "history_unavailable",
+                             0, 0)
         }
 
         Kirigami.Card {
             Layout.fillWidth: true
+            visible: analystState.hasSnapshot
 
-            header: RowLayout {
-                Layout.fillWidth: true
-                Kirigami.Heading {
-                    text: i18n("Activity Heatmap (Last 365 Days)")
-                    level: 3
-                    Layout.fillWidth: true
-                }
-                Controls.ComboBox {
-                    model: [i18n("Cost Intensity"), i18n("Volume Intensity")]
-                    currentIndex: plasmoid.configuration.analystIntensityMode
-                    onActivated: function(index) {
-                        plasmoid.configuration.analystIntensityMode = index;
-                        refreshData();
-                    }
-                }
-                Controls.CheckBox {
-                    text: i18n("Normalize Outliers")
-                    checked: plasmoid.configuration.analystNormalization
-                    onToggled: {
-                        plasmoid.configuration.analystNormalization = checked;
-                        refreshData();
-                    }
-                }
+            header: Kirigami.Heading {
+                text: i18n("Data coverage")
+                level: 3
             }
 
             contentItem: ColumnLayout {
-                spacing: Kirigami.Units.mediumSpacing
+                spacing: Kirigami.Units.smallSpacing
 
-                Controls.ScrollView {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 120
-                    contentWidth: heatmap.width
-                    clip: true
-
-                    ActivityHeatmap {
-                        id: heatmap
-                        activityData: analystPage.activityData
-                        maxIntensity: analystPage.maxIntensity
-                        baseColor: Kirigami.Theme.highlightColor
-
-                        onHovered: function(date, value) {
-                            hoverLabel.text = i18n("%1: %2",
-                                                   date,
-                                                   plasmoid.configuration.analystIntensityMode === 0
-                                                       ? formatCurrency(value)
-                                                       : Utils.formatNumber(value) + i18n(" tokens"));
-                        }
-                    }
+                Controls.Label {
+                    objectName: "coverageLabel"
+                    text: i18n("%1 of %2 days contain compatible observations (%3%)",
+                               analystState.coverage.observedDayCount || 0,
+                               analystState.coverage.requestedDayCount || 30,
+                               Number(analystState.coverage.percent || 0).toFixed(0))
+                    wrapMode: Text.WordWrap
                 }
 
                 Controls.Label {
-                    id: hoverLabel
-                    Layout.alignment: Qt.AlignHCenter
-                    text: i18n("Hover over a day to inspect activity")
+                    text: i18n("Period: %1 – %2",
+                               analystState.formatDate(analystState.snapshot.from),
+                               analystState.formatDate(analystState.snapshot.to))
+                    color: Kirigami.Theme.disabledTextColor
+                }
+
+                Controls.Label {
+                    text: i18n("%1 actual and %2 estimated compatible cost samples",
+                               analystState.snapshot.actualSampleCount || 0,
+                               analystState.snapshot.estimatedSampleCount || 0)
                     color: Kirigami.Theme.disabledTextColor
                 }
             }
         }
 
-        RowLayout {
+        Kirigami.InlineMessage {
             Layout.fillWidth: true
-            spacing: Kirigami.Units.largeSpacing
-
-            Kirigami.Card {
-                Layout.fillWidth: true
-
-                header: Kirigami.Heading {
-                    text: i18n("Top Cost Drivers")
-                    level: 3
-                }
-
-                contentItem: ColumnLayout {
-                    spacing: Kirigami.Units.smallSpacing
-
-                    Repeater {
-                        model: overview.topDrivers || []
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
-
-                            Controls.Label {
-                                text: (index + 1) + "."
-                                color: Kirigami.Theme.disabledTextColor
-                            }
-
-                            Controls.Label {
-                                Layout.fillWidth: true
-                                text: modelData.provider + "  [" + modelData.model + "]"
-                                elide: Text.ElideRight
-                            }
-
-                            Controls.Label {
-                                text: formatCurrency(modelData.value)
-                                font.weight: Font.DemiBold
-                            }
-                        }
-                    }
-
-                    Controls.Label {
-                        visible: (overview.topDrivers || []).length === 0
-                        text: i18n("No spend drivers recorded yet.")
-                        color: Kirigami.Theme.disabledTextColor
-                    }
-                }
-            }
-
-            Kirigami.Card {
-                Layout.fillWidth: true
-
-                header: Kirigami.Heading {
-                    text: i18n("Model Exposure")
-                    level: 3
-                }
-
-                contentItem: ColumnLayout {
-                    spacing: Kirigami.Units.smallSpacing
-
-                    Repeater {
-                        model: overview.topModels || []
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Kirigami.Units.smallSpacing
-
-                            Controls.Label {
-                                Layout.fillWidth: true
-                                text: modelData.model
-                                elide: Text.ElideRight
-                            }
-
-                            Controls.Label {
-                                text: formatCurrency(modelData.value)
-                                font.weight: Font.DemiBold
-                            }
-                        }
-                    }
-
-                    Controls.Label {
-                        visible: (overview.topModels || []).length === 0
-                        text: i18n("Model metadata will appear after providers refresh.")
-                        color: Kirigami.Theme.disabledTextColor
-                    }
-                }
-            }
+            visible: analystState.hasSnapshot
+                && !analystState.kpi("averageDailySpend").available
+            type: analystState.snapshot.mixedCurrencies
+                ? Kirigami.MessageType.Warning
+                : Kirigami.MessageType.Information
+            text: analystState.reasonText(
+                analystState.kpi("averageDailySpend").reasonKey,
+                analystState.kpi("averageDailySpend").sampleCount,
+                analystState.kpi("averageDailySpend").minimumSamples)
         }
 
         Kirigami.Card {
             Layout.fillWidth: true
+            visible: analystState.hasSnapshot
+                && analystState.kpi("averageDailySpend").available
 
             header: Kirigami.Heading {
-                text: i18n("Provider Diagnostics")
+                text: i18n("Spend trend")
                 level: 3
             }
 
             contentItem: ColumnLayout {
                 spacing: Kirigami.Units.mediumSpacing
 
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Kirigami.Units.largeSpacing
-
-                    Controls.ComboBox {
-                        id: diagnosticsProviderCombo
-                        Layout.fillWidth: true
-                        model: enabledProviderEntries()
-                        textRole: "label"
-                        onCurrentIndexChanged: {}
-                    }
-
-                    Controls.Button {
-                        text: i18n("Copy")
-                        icon.name: "edit-copy"
-                        enabled: enabledProviderEntries().length > 0
-                        onClicked: copyDiagnostics()
-                    }
-                }
-
                 GridLayout {
                     Layout.fillWidth: true
-                    columns: 2
+                    columns: width >= Kirigami.Units.gridUnit * 36 ? 3 : 1
                     columnSpacing: Kirigami.Units.largeSpacing
                     rowSpacing: Kirigami.Units.smallSpacing
 
-                    Controls.Label { text: i18n("Auth") }
-                    Controls.Label {
-                        text: authConfigured(selectedProviderEntry()) ? i18n("Configured") : i18n("Missing")
-                        color: authConfigured(selectedProviderEntry())
-                            ? Kirigami.Theme.positiveTextColor
-                            : Kirigami.Theme.negativeTextColor
+                    ColumnLayout {
+                        Controls.Label {
+                            text: analystState.averageSpendLabel(
+                                analystState.snapshot)
+                            color: Kirigami.Theme.disabledTextColor
+                        }
+                        Controls.Label {
+                            objectName: "averageSpendValue"
+                            text: analystState.formatMoney(
+                                analystState.kpi("averageDailySpend").value,
+                                analystState.snapshot.currency)
+                            font.pointSize: 20
+                            font.weight: Font.Bold
+                        }
                     }
 
-                    Controls.Label { text: i18n("Connection") }
-                    Controls.Label {
-                        text: selectedProviderEntry() && selectedProviderEntry().backend && selectedProviderEntry().backend.connected
-                            ? i18n("Healthy")
-                            : i18n("Disconnected")
-                        color: selectedProviderEntry() && selectedProviderEntry().backend && selectedProviderEntry().backend.connected
-                            ? Kirigami.Theme.positiveTextColor
-                            : Kirigami.Theme.negativeTextColor
+                    ColumnLayout {
+                        Controls.Label {
+                            text: i18n("Week over week")
+                            color: Kirigami.Theme.disabledTextColor
+                        }
+                        Controls.Label {
+                            text: analystState.kpi("weekOverWeekChange").available
+                                ? analystState.formatPercent(analystState.kpi("weekOverWeekChange").value)
+                                : i18n("Unavailable")
+                            font.pointSize: 20
+                            font.weight: Font.Bold
+                        }
+                        Controls.Label {
+                            visible: !analystState.kpi("weekOverWeekChange").available
+                            text: analystState.reasonText(
+                                analystState.kpi("weekOverWeekChange").reasonKey,
+                                analystState.kpi("weekOverWeekChange").sampleCount,
+                                analystState.kpi("weekOverWeekChange").minimumSamples)
+                            wrapMode: Text.WordWrap
+                            color: Kirigami.Theme.disabledTextColor
+                        }
                     }
 
-                    Controls.Label { text: i18n("Last refresh") }
-                    Controls.Label { text: relativeRefresh(selectedProviderEntry()) }
-
-                    Controls.Label { text: i18n("Cost source") }
-                    Controls.Label {
-                        text: costSourceLabel(selectedProviderEntry())
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-
-                    Controls.Label { text: i18n("Endpoint") }
-                    Controls.Label {
-                        text: endpointLabel(selectedProviderEntry())
-                        wrapMode: Text.WordWrap
-                        Layout.fillWidth: true
-                    }
-
-                    Controls.Label { text: i18n("Requests remaining") }
-                    Controls.Label {
-                        text: selectedProviderEntry() && selectedProviderEntry().backend
-                            ? Number(selectedProviderEntry().backend.rateLimitRequestsRemaining || 0).toString()
-                            : i18n("N/A")
+                    ColumnLayout {
+                        Controls.Label {
+                            text: i18n("Volatility")
+                            color: Kirigami.Theme.disabledTextColor
+                        }
+                        Controls.Label {
+                            text: analystState.kpi("volatility").available
+                                ? analystState.formatPercent(analystState.kpi("volatility").value)
+                                : i18n("Unavailable")
+                            font.pointSize: 20
+                            font.weight: Font.Bold
+                        }
+                        Controls.Label {
+                            visible: !analystState.kpi("volatility").available
+                            text: analystState.reasonText(
+                                analystState.kpi("volatility").reasonKey,
+                                analystState.kpi("volatility").sampleCount,
+                                analystState.kpi("volatility").minimumSamples)
+                            wrapMode: Text.WordWrap
+                            color: Kirigami.Theme.disabledTextColor
+                        }
                     }
                 }
 
-                Controls.Label {
-                    visible: selectedProviderEntry() && selectedProviderEntry().backend && selectedProviderEntry().backend.error
-                    text: selectedProviderEntry() && selectedProviderEntry().backend
-                        ? i18n("Last error: %1", selectedProviderEntry().backend.error)
-                        : ""
-                    color: Kirigami.Theme.negativeTextColor
-                    wrapMode: Text.WordWrap
+                MultiSeriesChart {
                     Layout.fillWidth: true
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 12
+                    metric: "cost"
+                    seriesData: analystState.spendChartSeries()
                 }
             }
         }
 
         Kirigami.Card {
             Layout.fillWidth: true
+            visible: analystState.hasSnapshot
+                && analystState.snapshot.activityAvailable === true
 
             header: Kirigami.Heading {
-                text: i18n("Anomalies")
+                text: i18n("Activity trend")
+                level: 3
+            }
+
+            contentItem: ColumnLayout {
+                spacing: Kirigami.Units.mediumSpacing
+
+                MultiSeriesChart {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 11
+                    visible: analystState.seriesHasValues("tokens")
+                    metric: "tokens"
+                    seriesData: analystState.activityChartSeries("tokens")
+                }
+
+                MultiSeriesChart {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Kirigami.Units.gridUnit * 11
+                    visible: analystState.seriesHasValues("requests")
+                    metric: "requests"
+                    seriesData: analystState.activityChartSeries("requests")
+                }
+
+                ColumnLayout {
+                    visible: analystState.seriesHasValues("toolUsage")
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Kirigami.Heading {
+                        text: i18n("Local tool activity")
+                        level: 4
+                    }
+
+                    MultiSeriesChart {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Kirigami.Units.gridUnit * 11
+                        metric: "requests"
+                        seriesData: analystState.activityChartSeries("toolUsage")
+                    }
+                }
+
+                EfficiencyMetricCard {
+                    Layout.fillWidth: true
+                    visible: analystState.kpi("outputInputRatio").available
+                    efficiencyRatio: Number(
+                        analystState.kpi("outputInputRatio").value)
+                }
+
+                Controls.Label {
+                    visible: !analystState.kpi("outputInputRatio").available
+                    text: analystState.reasonText(
+                        analystState.kpi("outputInputRatio").reasonKey,
+                        analystState.kpi("outputInputRatio").sampleCount,
+                        analystState.kpi("outputInputRatio").minimumSamples)
+                    wrapMode: Text.WordWrap
+                    color: Kirigami.Theme.disabledTextColor
+                }
+            }
+        }
+
+        Kirigami.Card {
+            Layout.fillWidth: true
+            visible: analystState.hasSnapshot
+                && (analystState.snapshot.topDrivers || []).length > 0
+
+            header: Kirigami.Heading {
+                text: i18n("Top compatible spend drivers")
                 level: 3
             }
 
@@ -575,32 +296,81 @@ Kirigami.ScrollablePage {
                 spacing: Kirigami.Units.smallSpacing
 
                 Repeater {
-                    model: overview.anomalies || []
+                    model: analystState.snapshot.topDrivers || []
 
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
 
                         Controls.Label {
+                            text: (index + 1) + "."
+                            color: Kirigami.Theme.disabledTextColor
+                        }
+
+                        ColumnLayout {
                             Layout.fillWidth: true
-                            text: formatDateLabel(modelData.date)
+                            spacing: 0
+
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                text: modelData.provider + "  [" + modelData.model + "]"
+                                elide: Text.ElideRight
+                            }
+                            Controls.Label {
+                                text: modelData.quality === "estimated"
+                                    ? i18n("Estimated")
+                                    : i18n("Actual")
+                                color: Kirigami.Theme.disabledTextColor
+                            }
                         }
 
                         Controls.Label {
-                            text: formatCurrency(modelData.value)
+                            text: analystState.formatMoney(modelData.value,
+                                              modelData.currency)
                             font.weight: Font.DemiBold
                         }
+                    }
+                }
+            }
+        }
 
-                        Controls.Label {
-                            text: formatPercent(modelData.deltaPercent)
-                            color: Kirigami.Theme.negativeTextColor
-                        }
+        Kirigami.Card {
+            Layout.fillWidth: true
+            visible: analystState.hasSnapshot
+                && analystState.snapshot.anomaliesAvailable === true
+
+            header: Kirigami.Heading {
+                text: i18n("Anomaly candidates")
+                level: 3
+            }
+
+            contentItem: ColumnLayout {
+                spacing: Kirigami.Units.smallSpacing
+
+                Controls.Label {
+                    visible: (analystState.snapshot.anomalies || []).length === 0
+                    text: i18n("No day crossed the documented threshold.")
+                    color: Kirigami.Theme.disabledTextColor
+                }
+
+                Repeater {
+                    model: analystState.snapshot.anomalies || []
+
+                    Controls.Label {
+                        Layout.fillWidth: true
+                        text: i18n("%1: %2, compared with a %3 period baseline",
+                                   modelData.date,
+                                   analystState.formatMoney(modelData.value,
+                                               modelData.currency),
+                                   analystState.formatMoney(modelData.baseline,
+                                               modelData.currency))
+                        wrapMode: Text.WordWrap
                     }
                 }
 
                 Controls.Label {
-                    visible: (overview.anomalies || []).length === 0
-                    text: i18n("No anomalous daily spend spikes detected in the active window.")
+                    text: i18n("Candidates require at least seven recorded days, two standard deviations above the period mean, and a material absolute increase.")
+                    wrapMode: Text.WordWrap
                     color: Kirigami.Theme.disabledTextColor
                 }
             }
@@ -608,45 +378,17 @@ Kirigami.ScrollablePage {
 
         Kirigami.Card {
             Layout.fillWidth: true
-            visible: intelligenceEngine && intelligenceEngine.enabled
+            visible: analystState.hasSnapshot
 
             header: Kirigami.Heading {
-                text: i18n("Insights & Reports")
+                text: i18n("Period summary")
                 level: 3
             }
 
-            contentItem: ColumnLayout {
-                spacing: Kirigami.Units.mediumSpacing
-
-                Controls.Label {
-                    text: intelligenceEngine ? intelligenceEngine.lastAnalystInsight : i18n("No insights available.")
-                    wrapMode: Text.WordWrap
-                    Layout.fillWidth: true
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: Kirigami.Units.smallSpacing
-
-                    Controls.Button {
-                        text: intelligenceEngine && intelligenceEngine.busy ? i18n("Generating...") : i18n("Generate Insight")
-                        icon.name: "view-refresh"
-                        enabled: !(intelligenceEngine && intelligenceEngine.busy)
-                        onClicked: generateAnalystInsight()
-                    }
-
-                    Controls.Button {
-                        text: i18n("Copy Weekly Report")
-                        icon.name: "edit-copy"
-                        onClicked: clipboard.setText(buildReport(7))
-                    }
-
-                    Controls.Button {
-                        text: i18n("Copy Monthly Report")
-                        icon.name: "edit-copy"
-                        onClicked: clipboard.setText(buildReport(30))
-                    }
-                }
+            contentItem: Controls.Label {
+                objectName: "writtenSummary"
+                text: analystState.writtenSummary()
+                wrapMode: Text.WordWrap
             }
         }
     }

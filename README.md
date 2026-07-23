@@ -4,11 +4,11 @@
   <img src="assets/logo.png" alt="AI Usage Monitor logo" width="180">
 </p>
 
-AI Usage Monitor puts provider-reported usage and spend, local coding-tool activity, and read-only connection checks in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
+AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **14.1.1 (First Successful Use)** guides you from source choice to a safe verification. The result says whether the source returned usage or spend, a balance, a local estimate, or connectivity only. Scheduled provider checks are read-only, and missing values stay unknown instead of becoming false zeroes.
+Version **15.0.0 (Daily Control)** prioritizes the source that needs attention, the lowest live quota, and the next live reset. Actual data, local estimates, balances, fixed fees, and unavailable values remain separate from the panel through History and Analyst.
 
-![AI Usage Monitor main window](assets/screenshots/main-window.png)
+![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 
 ## Install on Fedora
 
@@ -47,9 +47,13 @@ For source builds and other installation details, read the [installation guide](
 
 The [GitHub wiki](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/wiki) provides the same task-based entry points for people who prefer GitHub's wiki navigation.
 
+`docs/user-guide/` is the only editable source for end-user documentation. The
+versioned `docs/wiki/` mirror is generated; update it with
+`python3 scripts/generate_wiki_docs.py` and never edit it by hand.
+
 ## What it monitors
 
-OpenAI can report account usage and spend with an Admin API key. OpenRouter can report key usage, LiteLLM can report gateway spend, and DeepSeek can report a balance. Many other providers expose only model discovery or account connectivity. AI Usage Monitor labels those results as connection checks and does not turn them into invented usage data.
+OpenAI can report account usage and spend with an Admin API key. OpenRouter can report key usage, LiteLLM can report gateway spend, and DeepSeek can report a balance. Many other providers expose only model discovery or account connectivity. AI Usage Monitor labels those results as connection checks and does not turn them into invented usage data. A tool-only setup is a complete daily monitor when the tool reports a live quota or a clearly labeled local estimate.
 
 Hosted-provider support includes:
 
@@ -65,10 +69,11 @@ The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilo
 
 - Guided first success for one provider or detected local tool
 - Source-focused Settings with search, monitoring-level filters, and one detail pane
-- Overview sections for reporting providers, connection checks, local tools, and sources that need attention
+- Action-first Overview for attention, lowest live quota, next reset, spend categories, and source quality
 - Provider usage, spend, balances, limits, and connection state where the provider exposes them
-- Local history with single-provider and comparison views
-- Analyst view with spend trends, activity heatmap, anomalies, and top drivers
+- Retained local history for enabled, disabled, and history-only sources, with explicit chart gaps
+- Analyst snapshots with documented sample requirements, coverage, spend trends, activity, anomalies, and compatible drivers
+- Compact panel modes for attention, lowest live quota, next reset, actual spend, and active sources
 - Daily and monthly budget warnings
 - KDE notifications plus optional Slack and Discord webhooks
 - Scheduled JSON or CSV exports
@@ -89,14 +94,15 @@ Read [Understanding the data](docs/user-guide/understanding-data.md) before sett
 
 | View | Screenshot |
 | --- | --- |
-| Guided first success | ![Guided first success source choice](assets/screenshots/guided-first-success.png) |
-| Verified result | ![Verified setup result with its monitoring level](assets/screenshots/verified-success.png) |
-| Overview | ![Overview with reporting providers and connection checks](assets/screenshots/main-window.png) |
-| Provider result | ![Provider result with source and quality labels](assets/screenshots/provider-intelligence.png) |
-| Provider settings | ![Provider settings](assets/screenshots/settings-view.png) |
-| History | ![History with compatible units and currency](assets/screenshots/history-view.png) |
-| Analyst | ![Analyst view with the current navigation](assets/screenshots/analyst-view.png) |
-| Panel | ![Compact panel state](assets/screenshots/panel-view.png) |
+| Narrow Overview | ![Narrow Overview popup with separate actual, estimated, balance, and fixed-fee data](assets/screenshots/overview-popup.png) |
+| Attention | ![Overview prioritizing a critical Codex CLI quota](assets/screenshots/attention-state.png) |
+| Quota and reset | ![Overview showing the lowest live quota and next live reset](assets/screenshots/quota-reset-state.png) |
+| Tool-only setup | ![Overview driven only by coding-tool sources](assets/screenshots/tool-only-overview.png) |
+| Retained disabled source | ![History keeping a disabled OpenAI source selectable](assets/screenshots/retained-history.png) |
+| Real history gap | ![History chart with an explicit missing-data gap](assets/screenshots/history-gap.png) |
+| Analyst with sufficient data | ![Analyst snapshot with documented coverage and compatible spend](assets/screenshots/analyst-sufficient.png) |
+| Analyst with insufficient data | ![Analyst explaining unavailable results when samples are insufficient](assets/screenshots/analyst-insufficient.png) |
+| Panel lowest quota | ![Compact panel showing the lowest provider-reported or synchronized quota](assets/screenshots/panel-lowest-quota.png) |
 
 ## Distribution notes
 

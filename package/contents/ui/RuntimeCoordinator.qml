@@ -11,7 +11,6 @@ Item {
     required property var registry
     required property var secrets
     required property var usageDatabase
-    required property var notificationController
     required property var scheduler
     required property var metricsServer
     required property var webhookNotifier
@@ -22,6 +21,8 @@ Item {
     required property var windsurfMonitor
     required property var jetbrainsAiMonitor
     required property var antigravityMonitor
+
+    property bool startupRefreshCompleted: false
 
     function loadIntegrationSecrets() {
         if (registry.demoMode) {
@@ -80,6 +81,15 @@ Item {
 
         loadIntegrationSecrets();
         syncMetricsPayload();
+    }
+
+    function refreshCredentialProviders(reason) {
+        var providers = registry.allProviders || [];
+        for (var i = 0; i < providers.length; i++) {
+            if (providers[i].requiresApiKey !== false) {
+                scheduler.refreshProvider(providers[i], reason, false);
+            }
+        }
     }
 
     function recordProviderSnapshot(providerName, backend) {
@@ -266,43 +276,12 @@ Item {
         }
     }
 
-    function providerRateLimitPercent(backend) {
-        if (!backend) {
-            return 0;
-        }
-        var requestPercent = -1;
-        var tokenPercent = -1;
-        var requestLimit = backend.metric ? backend.metric("request_limit") : {};
-        var requestRemaining = backend.metric ? backend.metric("request_remaining") : {};
-        var tokenLimit = backend.metric ? backend.metric("token_limit") : {};
-        var tokenRemaining = backend.metric ? backend.metric("token_remaining") : {};
-        if (requestLimit.available && requestRemaining.available && Number(requestLimit.value) > 0) {
-            requestPercent = 100 - (Number(requestRemaining.value) * 100 / Number(requestLimit.value));
-        }
-        if (tokenLimit.available && tokenRemaining.available && Number(tokenLimit.value) > 0) {
-            tokenPercent = 100 - (Number(tokenRemaining.value) * 100 / Number(tokenLimit.value));
-        }
-        return Math.max(requestPercent, tokenPercent);
-    }
-
-    function evaluateProviderQuota(displayName, backend) {
-        var usedPercent = providerRateLimitPercent(backend);
-        if (usedPercent >= 0 && usedPercent >= (configuration.warningThreshold || 80)) {
-            notificationController.handleQuotaWarning(displayName, Math.round(usedPercent));
-        }
-    }
-
     function connectProviderSignals() {
         var providers = registry.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
             var backend = provider.backend;
 
-            backend.budgetWarning.connect(notificationController.handleBudgetWarning);
-            backend.budgetExceeded.connect(notificationController.handleBudgetExceeded);
-            backend.providerDisconnected.connect(notificationController.handleProviderDisconnected);
-            backend.providerReconnected.connect(notificationController.handleProviderReconnected);
-            backend.errorChanged.connect(makeErrorHandler(provider.name, provider.configKey, backend));
             backend.dataUpdated.connect(makeSnapshotHandler(provider.dbName, backend));
         }
     }
@@ -311,27 +290,13 @@ Item {
         var tools = registry.allSubscriptionTools || [];
         for (var i = 0; i < tools.length; i++) {
             var monitor = tools[i].monitor;
-            monitor.limitWarning.connect(notificationController.handleToolLimitWarning);
-            monitor.usageLimitReached.connect(notificationController.handleToolLimitReached);
-            monitor.syncDiagnostic.connect(notificationController.handleToolSyncDiagnostic);
             monitor.usageUpdated.connect(makeToolSnapshotHandler(monitor));
         }
-    }
-
-    function makeErrorHandler(displayName, configKey, backend) {
-        return function() {
-            if (backend.error
-                    && configuration.notifyOnError
-                    && configuration[configKey + "NotificationsEnabled"]) {
-                notificationController.sendErrorNotification(i18n("%1 Error", displayName), backend.error);
-            }
-        };
     }
 
     function makeSnapshotHandler(dbName, backend) {
         return function() {
             recordProviderSnapshot(dbName, backend);
-            evaluateProviderQuota(dbName, backend);
         };
     }
 
@@ -358,7 +323,11 @@ Item {
 
         function onWalletOpenChanged() {
             if (runtime.secrets.walletOpen) {
-                runtime.loadApiKeys(runtime.scheduler.refreshCredentialChanged, true);
+                runtime.loadApiKeys(runtime.scheduler.refreshCredentialChanged, false);
+                if (runtime.startupRefreshCompleted) {
+                    runtime.refreshCredentialProviders(
+                        runtime.scheduler.refreshCredentialChanged);
+                }
             }
         }
 
@@ -509,6 +478,7 @@ Item {
         interval: 200
         repeat: false
         onTriggered: {
+            runtime.startupRefreshCompleted = true;
             if (runtime.secrets.walletOpen) {
                 runtime.loadApiKeys(runtime.scheduler.refreshStartup, false);
                 runtime.scheduler.refreshAll(runtime.scheduler.refreshStartup);

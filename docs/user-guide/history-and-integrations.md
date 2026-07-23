@@ -11,9 +11,40 @@ The popup provides:
 - a detail view for one provider or subscription tool
 - comparison charts across compatible sources
 - cost, token, request, and rate-limit metrics
+- 24-hour, 7-day, 30-day, and 90-day ranges
 - an Analyst view with activity, change, volatility, anomalies, and top drivers
 
-Only compatible units and currencies should be compared. Unknown values remain absent rather than becoming zero.
+Sources with retained data remain selectable after they are disabled. A source
+that is no longer part of the current catalog is labeled **History only**.
+Metric choices appear only when compatible stored observations exist.
+
+Only compatible units, measurement semantics, and currencies can be compared.
+The comparison explains why it was rejected instead of combining incompatible
+values. Unknown values remain absent rather than becoming zero, and missing
+time buckets appear as chart gaps. Coverage text below the chart reports stored
+samples, plotted points, gaps, stale data, and history-only state.
+
+Analyst loads one background snapshot for its exact 30-day period. It starts
+with coverage and then shows only sections supported by compatible history:
+spend, activity, top drivers, anomaly candidates, and a written summary.
+Insufficient history is explained as unavailable instead of appearing as
+`0.0`. Actual and estimated spend stay labeled separately. Mixed currencies
+pause spend analysis without hiding compatible token, request, or local-tool
+activity.
+
+**Output / Input Ratio** is available only after at least three days with
+compatible snapshots and positive input tokens. It is a neutral relationship
+between two reported quantities, not a quality, productivity, prompt-clarity,
+or efficiency score.
+
+The 7-day and 30-day copy actions each build a report from their own period.
+Reports include coverage, currency status, actual and estimated sample counts,
+unavailable explanations, and the analysis method. Provider and installation
+diagnostics remain under **Settings → Diagnostics**.
+
+History and Analyst requests are asynchronous. Changing source, metric, range,
+or report period supersedes the older request; a late result cannot replace the
+newer selection.
 
 The database is stored at:
 
@@ -25,7 +56,9 @@ Use the History settings page to inspect its size or prune rows older than the r
 
 ## JSON and CSV export
 
-The popup can export the selected view. History settings can also write JSON or CSV on a schedule.
+The popup's **Export file** action writes the selected series as JSON or CSV.
+Copying CSV to the clipboard is available as a separate secondary action.
+History settings can also write JSON or CSV on a schedule.
 
 Choose a directory you own. Scheduled export writes atomically so a partial run does not replace the last complete file.
 

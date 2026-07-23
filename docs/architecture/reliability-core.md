@@ -25,7 +25,7 @@ The generated [provider capability matrix](../provider-capabilities.md) is check
 ## Source readiness contract
 
 `SourceReadinessModel` is the single QML-facing readiness authority for all 18
-providers and 6 local tools. Each source appears once with a stable ID, source
+providers and 7 local tools. Each source appears once with a stable ID, source
 kind, monitoring level, required credential slots, local installation state,
 enabled state, last verified time, safe verification capability, and a redacted
 next action.
@@ -44,6 +44,93 @@ usage/spend and gateway sources, then balance/connectivity sources, and finally
 local tools that are not detected. Onboarding, Settings, Overview, and
 Diagnostics must consume this model instead of independently deriving status.
 
+## Daily state contract
+
+`DailyStateModel` is the typed Phase 1 projection for daily surfaces. It observes
+`SourceReadinessModel`, provider Metric Contract v2 rows, subscription-tool quota
+windows, budgets, thresholds, and freshness. Only enabled sources are rows, and
+each catalog stable ID can occur once. `NativeMonitor.dailyState` exposes the
+same model instance to the panel, Overview, notifications, and later analytical
+surfaces; those consumers must not build independent provider or tool loops.
+
+Every row uses non-localized keys. Identity and state are `stableId`,
+`displayName`, `sourceKind`, `monitoringLevel`, `readinessState`, `qualityClass`,
+`freshnessState`, `lastSuccess`, `lastAttempt`, `lastErrorKind`, and
+`nextActionKey`. Quality classes are `actual`, `estimated`, `balance`,
+`connectivity_only`, and `unavailable`. Freshness is `fresh`, `aging`, `stale`,
+or `never`.
+
+Metric state is exposed through `hasUsefulData`, `hasActualData`,
+`hasEstimatedData`, `hasBalance`, `connectivityOnly`, `primaryMetricKind`,
+`primaryMetricAvailable`, `primaryMetricValue`, and `primaryMetricUnit`.
+Optional quota, reset, cost, and budget scalars always have a matching
+availability role. An available numeric zero remains zero. An unavailable value
+is an invalid `QVariant`; callers must check its availability role and must not
+coerce it to zero.
+
+`quotaWindows` contains every compatible normalized quota window for the source.
+Each row carries `kind`, `window`, `percentUsed`, `percentRemaining`,
+`sourceClass`, `sourceKey`, and `resetAt` only when the source contract provides
+one. `sourceClass` is `actual`, `local_estimate`, `configured_limit`, or
+`unknown`. Notifications may group threshold-crossing windows, but must keep
+these classes visible and must never treat an `unknown` window as exhausted.
+
+The aggregate `summary` contains enabled, useful, actual, estimated, balance,
+connectivity-only, attention, and stale counts; highest severity and the most
+urgent source; lowest remaining quota; nearest reset; actual spend, estimated
+spend, and fixed subscription fees as separate ISO-currency maps; and the most
+recent successful aggregate completion time. Mixed currencies are never summed
+into a scalar. A row with multiple cost currencies reports `currency` as
+`MIXED`, leaves `costAvailable` false, and remains represented in the aggregate
+currency maps.
+
+Attention order is deterministic: actionable failure, exhausted quota,
+critical quota, critical budget, stale useful data, warning threshold, ready to
+verify, healthy connectivity-only, then normal reporting. Ties use lower
+remaining quota, earlier reset, and finally immutable catalog order. Severity
+keys are `critical`, `warning`, `info`, and `none`; reason keys remain stable and
+non-localized.
+
+Phase 2 daily surfaces consume this model through `DailyOverviewState`. The
+normal Overview and compact representation do not maintain independent provider
+or tool summary loops. Overview renders one top recovery action, then actual
+quota/reset facts, separated spend categories, and compact source groups.
+Connectivity-only sources stay collapsed by default.
+
+The live-quota aggregates accept only provider-reported or synchronized quota
+windows. A published documentation limit and a locally configured activity
+limit remain available on their source card as estimates, but they cannot drive
+the Overview live-quota section or the `lowest-quota` and `next-reset` panel
+modes. Compact-mode compatibility maps `count` to `active-sources`, `critical`
+to `attention`, and `cost` to `actual-spend`; legacy `dailycost` and `requests`
+remain readable only when the Daily State Model exposes a compatible available
+metric.
+
+Phase 5 notifications observe Daily State source changes instead of raw provider
+or tool warning signals. They use the row severity, reason, action, freshness,
+and normalized quota windows; one source produces at most one grouped quota
+notification per cooldown. Stale snapshots suppress cached quota changes.
+Recovery is emitted only after a real failed readiness state, and webhook text
+is built from the same compact, source-explicit, redacted payload as the desktop
+notification.
+
+## Daily presentation contract
+
+The panel, Overview, notifications, History freshness labels, and release media
+consume the same non-localized Daily State keys. Overview orders recovery before
+quota/reset facts and secondary source detail. A tool-only configuration is a
+complete supported state; it does not require a synthetic provider row.
+
+Compact modes are `icon`, `attention`, `lowest-quota`, `next-reset`,
+`actual-spend`, and `active-sources`. v14 values migrate as follows: `count` to
+`active-sources`, `critical` to `attention`, and `cost` to `actual-spend`.
+Legacy `dailycost` and `requests` values are display-only compatibility modes
+and remain unavailable when no compatible real metric exists.
+
+Release-media fixtures are isolated behind both `PLASMA_AI_MONITOR_DEMO` and a
+`media-*` smoke view. They use a temporary data directory and never open the
+user's KWallet, history database, Plasma configuration, or active panel layout.
+
 ## Diagnostics and recovery
 
 `AppInfo` owns native installation, version, Plasma, distribution, and read-only
@@ -61,6 +148,86 @@ separate minimal report for missing or mismatched native plugins.
 ## SQLite schema v4
 
 History stays local and uses WAL mode. Schema v4 stores normalized observations and permits null values. Migration from v3 is transactional, idempotent, and backed up before changes.
+
+Phase 3 history discovery uses the union of configured provider descriptors,
+configured subscription tools, retained provider observations, and retained tool
+snapshots. The UI merges these by `sourceKind` plus database identity, so
+disabling or removing a source does not hide its retained rows. A source is
+shown as enabled, disabled, or history-only. Metric selectors are derived from
+compatible stored values; a capability claim alone cannot create a metric tab.
+
+`UsageDatabase::requestHistoryCatalog()` and
+`UsageDatabase::requestHistorySeries()` are the asynchronous QML boundary.
+Series results include source identity, kind, metric, unit, currency,
+observation semantics, quality classes, sample and plotted-point counts,
+observation bounds, bucket size, gaps, freshness, and history-only state.
+Requests are superseding: a completed older generation cannot replace a newer
+selection.
+
+Unavailable observations are omitted while an available numeric zero remains a
+point. Missing buckets become explicit chart gaps. Source, semantic, scope,
+window, or currency changes start a separate series. Multi-source comparisons
+fail closed when units, semantics, or currencies differ. Rolling tool quota is
+a gauge and is never summed or relabeled as calendar-day usage.
+
+The Analyst output/input query retains the schema-v4 compatibility projection
+and returns only days with positive total input. It does not synthesize ratios
+for missing input and does not interpret the ratio as prompt quality.
+
+## Analyst snapshot contract
+
+`UsageDatabase::requestAnalyst()` is the only QML-facing Analyst query. It runs
+on a worker-owned database connection and returns one internally consistent
+snapshot for the exact requested UTC range. Requests are superseding, so an
+older completion cannot replace the current view or report request. Opening the
+Analyst view does not run synchronous SQL on the UI thread.
+
+The snapshot carries its request range, generation time, currency status,
+coverage, actual and estimated sample counts, daily spend, activity,
+output/input ratio, compatible drivers, anomaly candidates, method metadata,
+and an explicit availability result for every derived KPI. Unavailable KPI
+values remain invalid variants and have a stable reason key plus the observed
+and required sample counts.
+
+Only `interval_total` cost and explicitly identified local estimates contribute
+to spend analysis. A typed daily cost window is persisted as an interval total;
+cumulative, all-time, current, probe-only, unknown, and connectivity values do
+not become daily spend. Actual and estimated costs remain separate. Mixed
+currencies pause cost-derived results unless one currency is explicitly
+selected, while compatible token, request, and local-tool activity remains
+available.
+
+Average daily spend requires three recorded days. Volatility and anomaly
+candidates require seven. Week-over-week change requires two complete
+seven-day windows and a non-zero previous window. Anomaly candidates use the
+period mean and population standard deviation, require two standard deviations
+above the mean, and also require an increase of at least one currency unit or
+50 percent of the baseline. Output/input ratio requires three compatible days
+with positive input and remains descriptive only.
+
+Seven-day and 30-day reports each request their own snapshot. Reports include
+coverage, quality counts, currency status, unavailable explanations, and method
+notes. They never reuse a different period's UI state or include endpoints,
+credentials, cookies, account identifiers, or unrestricted backend errors.
+Endpoint and installation diagnostics remain exclusively in Diagnostics.
+
+## Daily UI test boundaries
+
+Phase 6 keeps daily behavior independently testable without changing its public
+QML imports or backend contracts. `AnalystState` owns Analyst requests, result
+supersession, availability formatting, chart-series projection, and report
+generation; `AnalystTab` remains the visual surface. `HistoryController` owns
+catalog and series requests, selection normalization, result supersession,
+series decoration, coverage text, and export projection; `HistoryView` remains
+the navigation and chart surface.
+
+`CompactMetricState` selects the configured panel metric from a supplied Daily
+State summary, so compact behavior can be fixture-tested without loading the
+plasmoid. `MetricAvailabilityFormatter` is the shared boundary for unavailable
+placeholders, reason text, dates, percentages, currencies, and KPI fallback
+objects. `DailyOverviewState` delegates its compatibility compact API to the
+same selector. Available numeric zero remains distinct from unavailable state
+through every extracted object.
 
 Calendar totals include only compatible interval-total observations. Gauges, cumulative counters, and rolling windows are not relabeled as calendar totals. Queries preserve ISO currency and source quality.
 

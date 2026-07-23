@@ -268,6 +268,12 @@ void OpenAIProvider::onCostsReply(QNetworkReply *reply)
     setCurrency(QStringLiteral("USD"));
     setDataQuality(QStringLiteral("actual_billing"));
     setDailyCost(totalCost); // 24h window = daily cost
+    const QDateTime observedAt = QDateTime::currentDateTimeUtc();
+    setProviderMetric(MetricKind::Cost, totalCost, QStringLiteral("USD"),
+                      QStringLiteral("USD"), QStringLiteral("organization"),
+                      QStringLiteral("day"), MetricSource::BillingApi,
+                      QStringLiteral("actual"), {}, observedAt.addDays(-1),
+                      observedAt);
     setCapabilityStatus(QStringLiteral("daily_billing"), QStringLiteral("available"));
     checkAllDone();
 }

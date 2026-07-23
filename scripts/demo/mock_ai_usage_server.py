@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import threading
+from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -36,9 +38,23 @@ class DemoData:
 
 class DemoRequestHandler(BaseHTTPRequestHandler):
     demo_data: DemoData
+    request_log: Path | None = None
+    request_log_lock = threading.Lock()
 
     def _path(self) -> str:
         return urlparse(self.path).path
+
+    def _record_request(self) -> None:
+        if self.request_log is None:
+            return
+        event = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "method": self.command,
+            "path": self._path(),
+        }
+        with self.request_log_lock:
+            with self.request_log.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(event, separators=(",", ":")) + "\n")
 
     def _read_json_body(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0") or 0)
@@ -206,6 +222,7 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
         return "mistral"
 
     def do_GET(self) -> None:  # noqa: N802 - stdlib hook name
+        self._record_request()
         path = self._path()
 
         if path in {"/healthz", "/health"}:
@@ -329,6 +346,7 @@ class DemoRequestHandler(BaseHTTPRequestHandler):
         self._send_not_found(path)
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib hook name
+        self._record_request()
         path = self._path()
         payload = self._read_json_body()
 
@@ -398,13 +416,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--host", default="127.0.0.1", help="Host interface to bind")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port to bind")
     parser.add_argument("--preset", type=Path, default=DEFAULT_PRESET, help="Path to the JSON preset file")
+    parser.add_argument(
+        "--request-log",
+        type=Path,
+        help="Optional JSON Lines request log for runtime measurements",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
     demo_data = DemoData.from_path(args.preset)
-    handler = type("ConfiguredDemoRequestHandler", (DemoRequestHandler,), {"demo_data": demo_data})
+    handler = type(
+        "ConfiguredDemoRequestHandler",
+        (DemoRequestHandler,),
+        {"demo_data": demo_data, "request_log": args.request_log},
+    )
     server = ThreadingHTTPServer((args.host, args.port), handler)
     base_url = f"http://{server.server_address[0]}:{server.server_address[1]}"
 

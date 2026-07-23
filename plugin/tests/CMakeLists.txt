@@ -77,6 +77,23 @@ target_link_libraries(test_usagedatabase_series
 
 add_test(NAME usagedatabase_series COMMAND test_usagedatabase_series)
 
+# --- Unified retained history contract test ---
+add_executable(test_history_contract
+    test_history_contract.cpp
+    ${TEST_USAGE_DB_SRC}
+)
+
+target_include_directories(test_history_contract
+    PRIVATE ${CMAKE_SOURCE_DIR}/plugin
+)
+
+target_link_libraries(test_history_contract
+    PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent
+)
+
+add_test(NAME history_contract COMMAND test_history_contract)
+set_tests_properties(history_contract PROPERTIES TIMEOUT 30)
+
 # --- History mapping regression test ---
 add_executable(test_history_mapping_regression
     test_history_mapping_regression.cpp
@@ -216,6 +233,107 @@ add_test(
             -platform offscreen
 )
 
+add_executable(test_dailytruth_qml
+    test_dailytruth_qml.cpp
+)
+target_link_libraries(test_dailytruth_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME dailytruth_qml
+    COMMAND test_dailytruth_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/dailytruth"
+            -platform offscreen
+)
+
+add_executable(test_dailycontrol_qml
+    test_dailycontrol_qml.cpp
+)
+target_link_libraries(test_dailycontrol_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME dailycontrol_qml
+    COMMAND test_dailycontrol_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/dailycontrol"
+            -platform offscreen
+)
+
+add_executable(test_notifications_qml
+    test_notifications_qml.cpp
+)
+target_link_libraries(test_notifications_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME notifications_qml
+    COMMAND test_notifications_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/notifications"
+            -platform offscreen
+)
+
+add_executable(test_history_qml
+    test_history_qml.cpp
+)
+target_link_libraries(test_history_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME history_qml
+    COMMAND test_history_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/history"
+            -platform offscreen
+)
+
+add_executable(test_phase6_qml
+    test_phase6_qml.cpp
+)
+target_link_libraries(test_phase6_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME phase6_qml
+    COMMAND test_phase6_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/phase6"
+            -platform offscreen
+)
+
+add_executable(test_phase7_qml
+    test_phase7_qml.cpp
+)
+target_link_libraries(test_phase7_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME phase7_qml
+    COMMAND test_phase7_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/phase7"
+            -platform offscreen
+)
+
+set(QML_TEST_NAMES
+    secretchangeset_qml
+    dependencybootstrap_qml
+    guidedsetup_qml
+    providersettings_qml
+    overview_qml
+    dailytruth_qml
+    dailycontrol_qml
+    notifications_qml
+    history_qml
+    phase6_qml
+    phase7_qml
+)
+set_tests_properties(${QML_TEST_NAMES} PROPERTIES
+    ENVIRONMENT
+        "QML_IMPORT_PATH=${CMAKE_BINARY_DIR}/plugin;QML2_IMPORT_PATH=${CMAKE_BINARY_DIR}/plugin"
+)
+
+set(QML_TEST_TARGETS
+    test_secretchangeset_qml
+    test_dependencybootstrap_qml
+    test_guidedsetup_qml
+    test_providersettings_qml
+    test_overview_qml
+    test_dailytruth_qml
+    test_dailycontrol_qml
+    test_notifications_qml
+    test_history_qml
+    test_phase6_qml
+    test_phase7_qml
+)
+foreach(qml_test_target IN LISTS QML_TEST_TARGETS)
+    add_dependencies(${qml_test_target} aiusagemonitorplugin)
+endforeach()
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp
@@ -277,6 +395,18 @@ add_executable(test_sourcereadinessmodel
 target_include_directories(test_sourcereadinessmodel PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
 target_link_libraries(test_sourcereadinessmodel PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
 add_test(NAME sourcereadinessmodel COMMAND test_sourcereadinessmodel)
+
+add_executable(test_dailystatemodel
+    test_dailystatemodel.cpp
+    ${TEST_CATALOG_SRC}
+    ${CMAKE_SOURCE_DIR}/plugin/providerbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/subscriptiontoolbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/sourcereadinessmodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/dailystatemodel.cpp
+)
+target_include_directories(test_dailystatemodel PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_dailystatemodel PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
+add_test(NAME dailystatemodel COMMAND test_dailystatemodel)
 
 add_executable(test_appinfo
     test_appinfo.cpp
@@ -361,6 +491,23 @@ target_link_libraries(test_usagedatabase_analyst
 )
 
 add_test(NAME usagedatabase_analyst COMMAND test_usagedatabase_analyst)
+
+# --- Phase 7 release performance and async lifecycle gate ---
+add_executable(test_phase7_performance
+    test_phase7_performance.cpp
+    ${TEST_USAGE_DB_SRC}
+)
+
+target_include_directories(test_phase7_performance
+    PRIVATE ${CMAKE_SOURCE_DIR}/plugin
+)
+
+target_link_libraries(test_phase7_performance
+    PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent
+)
+
+add_test(NAME phase7_performance COMMAND test_phase7_performance)
+set_tests_properties(phase7_performance PROPERTIES TIMEOUT 60)
 
 # --- Script-based tests ---
 add_test(NAME version_consistency COMMAND ${CMAKE_SOURCE_DIR}/scripts/check_version_consistency.sh)

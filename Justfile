@@ -37,9 +37,11 @@ check:
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
     python3 scripts/check_kcm_contracts.py
+    python3 scripts/check_daily_ui_accessibility.py
     python3 scripts/check_qml_registered_types.py
     python3 scripts/check_non_invasive_monitoring.py
     python3 scripts/check_provider_capability_docs.py
+    python3 scripts/generate_wiki_docs.py --check
     python3 scripts/check_demo_contract.py
     python3 scripts/check_release_policy.py
     python3 scripts/check_release_media.py
@@ -48,6 +50,10 @@ check:
 # Regenerate the provider capability matrix from Catalog v5
 generate-provider-docs:
     python3 scripts/generate_provider_capabilities.py
+
+# Regenerate the versioned GitHub wiki mirror from docs/user-guide
+generate-wiki-docs:
+    python3 scripts/generate_wiki_docs.py
 
 # Validate install prerequisites (dependencies + runtime commands)
 doctor:
@@ -77,19 +83,31 @@ release-check: build-debug
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
     python3 scripts/check_kcm_contracts.py
+    python3 scripts/check_daily_ui_accessibility.py
     python3 scripts/check_qml_registered_types.py
     python3 scripts/check_non_invasive_monitoring.py
     python3 scripts/check_provider_capability_docs.py
+    python3 scripts/generate_wiki_docs.py --check
     python3 scripts/check_demo_contract.py
     python3 scripts/check_release_policy.py
     python3 scripts/check_release_media.py
     bash scripts/test_verify_exact_tag.sh
     PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --strict --build-dir build/debug --expected-version "$(< VERSION)"
-    @if command -v appstreamcli >/dev/null 2>&1; then appstreamcli validate com.github.loofi.aiusagemonitor.metainfo.xml; else echo "Warning: appstreamcli not found, skipping validation. Run 'sudo dnf install appstream' on Fedora."; exit 1; fi
+    @if command -v appstreamcli >/dev/null 2>&1; then appstreamcli validate --no-net com.github.loofi.aiusagemonitor.metainfo.xml; else echo "Warning: appstreamcli not found, skipping validation. Run 'sudo dnf install appstream' on Fedora."; exit 1; fi
     @if command -v rpmlint >/dev/null 2>&1; then rpmlint plasma-ai-usage-monitor.spec; else echo "Warning: rpmlint not found, skipping validation. Run 'sudo dnf install rpmlint' on Fedora."; exit 1; fi
     bash scripts/package_source_tarball.sh --check
     bash scripts/package_plasmoid.sh --check
     python3 scripts/check_package_payload.py
+
+# Phase 7 database performance, async lifecycle, accessibility, and QML gates
+phase7-check: build-debug
+    ctest --test-dir build/debug --output-on-failure -R 'phase7_performance|phase7_qml|daily_ui_accessibility'
+    cmake --preset release -DCMAKE_INSTALL_PREFIX=/usr
+    cmake --build --preset release --parallel $(nproc) --target test_phase7_performance
+    ctest --test-dir build/release --output-on-failure -R phase7_performance
+    python3 scripts/check_daily_ui_accessibility.py
+    python3 scripts/qml_lint.py --build-dir build/debug
+    QT_QPA_PLATFORM=offscreen dbus-run-session -- bash scripts/smoke_test_plasmoid.sh build/debug
 
 # Fedora KDE 44 release environment validation
 fedora44-check:
@@ -199,9 +217,9 @@ copr-submit TAG PROJECT="loofitheboss/plasma-ai-usage-monitor":
     mkdir -p dist
     bash scripts/copr_submit_build.sh --project "{{PROJECT}}" --tag "{{TAG}}" --output-dir dist
 
-# Verify clean Fedora 44 install plus v13 upgrade, rollback, re-upgrade, reinstall, and removal
-rpm-lifecycle-check V13_RPM V14_RPM:
-    bash scripts/test_fedora44_rpm_lifecycle.sh "{{V13_RPM}}" "{{V14_RPM}}"
+# Verify clean Fedora 44 install plus base upgrade, rollback, re-upgrade, reinstall, and removal
+rpm-lifecycle-check BASE_RPM CANDIDATE_RPM:
+    bash scripts/test_fedora44_rpm_lifecycle.sh "{{BASE_RPM}}" "{{CANDIDATE_RPM}}"
 
 # Enable the COPR repository
 copr-enable:

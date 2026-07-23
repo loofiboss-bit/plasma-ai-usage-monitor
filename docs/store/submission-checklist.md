@@ -1,85 +1,84 @@
-## v14.1 GitHub and KDE Store submission checklist
+# v15 GitHub and KDE Store submission checklist
 
-Use this checklist after the stabilization work and screenshot refresh are complete.
+Use this checklist after runtime, performance, accessibility, documentation, and
+release media are complete.
 
 ## Preconditions
 
-- roadmap and changelog reflect the release you are shipping
-- `scripts/package_plasmoid.sh --check` passes
-- AppStream metadata validates cleanly
-- canonical screenshots have been reviewed in a real Fedora KDE session
-- the install story is described honestly: the plasmoid archive is valid, but the compiled plugin is still required separately
+- `just release-check` passes against the exact candidate tree
+- the Fedora 44 performance and accessibility evidence is complete
+- roadmap, changelog, user guide, generated wiki, AppStream, and RPM metadata agree
+- the nine canonical screenshots pass `scripts/check_release_media.py`
+- the install story remains explicit: the Store archive is the frontend and the matching compiled plugin is required
 
-## GitHub release pack
-
-Prepare the same assets for the manual GitHub release pack:
-
-- source tarball
-- `com.github.loofi.aiusagemonitor.plasmoid`
-- updated README screenshots
-- changelog section for the release
-- release notes that explain Google Antigravity monitoring, dynamic model quotas, and the local-daemon security boundary
-- confirm the COPR package still points at GitHub SCM on `main`; keep auto-rebuild disabled so prerelease tags cannot publish stable RPMs
-
-## KDE Store listing notes
-
-Use wording that highlights the value of the widget without overpromising the current packaging model.
+## Listing copy
 
 ### Short description
 
-Verify provider-reported AI usage and spend, local coding-tool activity, and read-only connection checks from the Plasma panel.
+See AI usage, quota, resets, and spend truthfully from the Plasma panel.
 
-### Suggested longer positioning points
+### Long description
 
-- Guided first success configures and verifies one useful source
-- reporting data, balances, local estimates, and connectivity stay distinct
-- local history, Analyst, exports, budgets, and notifications
-- local-first storage with secrets in KWallet and no hosted backend
-- the Store archive is the frontend; install the matching native plugin first from COPR or a source build
+AI Usage Monitor turns provider-reported usage and spend, synchronized
+coding-tool quota, local activity, balances, and safe connection checks into one
+daily Plasma view. It prioritizes the source that needs attention, the lowest
+live quota, and the next live reset without converting missing data to zero.
+
+Actual data, local estimates, fixed subscription fees, balances, connectivity,
+and currencies remain separate. Disabled-source history stays selectable,
+missing periods remain chart gaps, and Analyst explains coverage and sample
+requirements before presenting a result.
+
+Secrets stay in KWallet and history stays in a local SQLite database. There is
+no telemetry or hosted backend. The KDE Store package contains the frontend;
+install the matching native plugin from COPR or a source build first.
 
 ## Screenshot inventory
 
-Upload the eight reviewed Breeze Dark captures from the same isolated demo-user session:
+Upload the nine reviewed Breeze Dark captures from the same isolated session:
 
-- `assets/screenshots/guided-first-success.png`
-- `assets/screenshots/verified-success.png`
-- `assets/screenshots/main-window.png`
-- `assets/screenshots/provider-intelligence.png`
-- `assets/screenshots/settings-view.png`
-- `assets/screenshots/history-view.png`
-- `assets/screenshots/analyst-view.png`
-- `assets/screenshots/panel-view.png`
+- `assets/screenshots/overview-popup.png`
+- `assets/screenshots/attention-state.png`
+- `assets/screenshots/quota-reset-state.png`
+- `assets/screenshots/tool-only-overview.png`
+- `assets/screenshots/retained-history.png`
+- `assets/screenshots/history-gap.png`
+- `assets/screenshots/analyst-sufficient.png`
+- `assets/screenshots/analyst-insufficient.png`
+- `assets/screenshots/panel-lowest-quota.png`
+
+The manifest must identify the capture commit, date, Plasma version, scale,
+fixture digest, scenario for every file, and file hashes.
+
+## GitHub release pack
+
+- source tarball
+- `com.github.loofi.aiusagemonitor.plasmoid`
+- SHA-256 checksums
+- SPDX source SBOM
+- v15 changelog and release notes
+- exact-tag provenance from the release workflow
+
+Release notes must call out Daily State semantics, truthful quota/reset rules,
+retained History, Analyst methodology, v14 compact-mode migration, and the
+frontend/native-plugin packaging boundary.
 
 ## Manual publication sequence
 
-1. verify the target version in `ROADMAP.md`, `package/metadata.json`, `com.github.loofi.aiusagemonitor.metainfo.xml`, `CMakeLists.txt`, and `plasma-ai-usage-monitor.spec`
-2. push the release commit and tag
-3. publish the draft GitHub release created by the exact-tag workflow and verify its assets
-4. submit the exact stable tag explicitly with `just copr-submit v14.1.0 loofitheboss/plasma-ai-usage-monitor`
-5. confirm the COPR build succeeded before announcing the release
-6. update the README-linked screenshots if filenames stayed stable but content changed
-7. upload the refreshed screenshot set and listing copy to KDE Store
-8. confirm the listing language mentions the compiled plugin requirement clearly
+1. verify `docs/release/v15.0.0-checklist.md` is complete
+2. push the release commit and exact annotated tag
+3. verify CI and the draft GitHub release assets against that tag
+4. publish the GitHub release
+5. submit the exact stable tag to COPR and verify Fedora 44 installation
+6. upload the listing copy and nine screenshots to KDE Store
+7. confirm the Store page still states the compiled-plugin requirement before the install action
+8. read back GitHub, COPR, AppStream-facing metadata, and the Store listing independently
 
-## COPR verification
+## Final review
 
-Use this to confirm the Fedora update path is still healthy:
-
-```bash
-curl -s 'https://copr.fedorainfracloud.org/api_3/package/?ownername=loofitheboss&projectname=plasma-ai-usage-monitor&packagename=plasma-ai-usage-monitor&with_latest_build=true'
-```
-
-Expected fields:
-
-- `"source_type": "scm"`
-- `"clone_url": "https://github.com/loofiboss-bit/plasma-ai-usage-monitor.git"`
-- `"committish": "main"`
-- `"source_build_method": "make_srpm"`
-- `"auto_rebuild": false`
-
-## Final review prompts
-
-- does the first screenshot immediately explain what the widget does?
-- do the images show the widget in action instead of empty or ambiguous states?
-- does the listing avoid implying a fully self-contained store install if that is still untrue?
-- do the GitHub release notes and store listing tell the same story?
+- unavailable values never look like actual zeroes
+- the quota/reset screenshots use synchronized or provider-reported windows
+- the tool-only screenshot does not imply an API provider is required
+- History labels the disabled source and visible gap
+- Analyst sufficient and insufficient states match the documented thresholds
+- GitHub, COPR, and KDE Store describe the same v15 product

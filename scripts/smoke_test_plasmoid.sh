@@ -22,6 +22,7 @@ run_smoke() {
   local view="$2"
   local import_path="$3"
   local scale_factor="${4:-1}"
+  local color_scheme="${5:-}"
   local log_file="${LOG_DIR}/${label}.log"
 
   set +e
@@ -31,6 +32,7 @@ run_smoke() {
   XDG_CACHE_HOME="${PREFIX}/cache" \
   QML2_IMPORT_PATH="$import_path" \
   QT_SCALE_FACTOR="$scale_factor" \
+  KDE_COLOR_SCHEME_PATH="$color_scheme" \
   PLASMA_AI_MONITOR_DEMO=1 \
   PLASMA_AI_MONITOR_SMOKE_VIEW="$view" \
   timeout 6s plasmawindowed com.github.loofi.aiusagemonitor >"$log_file" 2>&1
@@ -48,16 +50,25 @@ run_smoke() {
   fi
 }
 
-for view in overview history analyst; do
+for view in overview history analyst onboarding; do
   run_smoke "$view" "$view" "$qml_path"
 done
 
-for scale_factor in 1 1.25 1.5 2; do
-  run_smoke "onboarding-scale-${scale_factor//./-}" "onboarding" "$qml_path" "$scale_factor"
+for scale_factor in 1.25 1.5 2; do
+  for view in overview history analyst onboarding; do
+    run_smoke "${view}-scale-${scale_factor//./-}" "$view" "$qml_path" "$scale_factor"
+  done
 done
+
+run_smoke "overview-theme-light" "overview" "$qml_path" 1 \
+  "/usr/share/color-schemes/BreezeLight.colors"
+run_smoke "overview-theme-dark" "overview" "$qml_path" 1 \
+  "/usr/share/color-schemes/BreezeDark.colors"
+run_smoke "overview-theme-high-contrast" "overview" "$qml_path" 1 \
+  "${ROOT_DIR}/scripts/fixtures/accessibility/HighContrast.colors"
 
 run_smoke "plugin-unavailable" "overview" "${FIXTURE_DIR}/plugin-unavailable:${qml_path}"
 run_smoke "plugin-older" "overview" "${FIXTURE_DIR}/plugin-older:${qml_path}"
 run_smoke "plugin-newer" "overview" "${FIXTURE_DIR}/plugin-newer:${qml_path}"
 
-echo "Full plasmoid smoke passed: main views, Guided First Success at 100/125/150/200%, and plugin recovery modes"
+echo "Full plasmoid smoke passed: main views at 100/125/150/200%, light/dark/high-contrast themes, and plugin recovery modes"

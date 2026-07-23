@@ -8,7 +8,7 @@ SESSION_ROOT="$(mktemp -d)"
 PREFIX="${SESSION_ROOT}/prefix"
 CONFIG_HOME="${SESSION_ROOT}/config"
 CACHE_HOME="${SESSION_ROOT}/cache"
-KWIN_SCRIPT_NAME="ai-usage-monitor-v14-capture"
+KWIN_SCRIPT_NAME="ai-usage-monitor-v15-capture"
 WINDOW_PID=""
 SERVER_PID=""
 NESTED_PID=""
@@ -76,6 +76,7 @@ KWIN_SCRIPT_LOADED=1
 focus_capture_window() {
   local match_query="$1"
   local expected_pid="$2"
+  local layout_script="$3"
   local match_output
   local match_id
   local candidate_id
@@ -84,7 +85,7 @@ focus_capture_window() {
   busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
     unloadScript s "$KWIN_SCRIPT_NAME" >/dev/null 2>&1 || true
   busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting loadScript \
-    ss "$ROOT_DIR/scripts/demo/kwin_capture_layout.js" "$KWIN_SCRIPT_NAME" >/dev/null
+    ss "$layout_script" "$KWIN_SCRIPT_NAME" >/dev/null
   busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting start >/dev/null
   sleep 1
 
@@ -115,22 +116,50 @@ capture_view() {
   local view="$1"
   local filename="$2"
   local settle_seconds="$3"
+  local layout="${4:-wide}"
   local temporary="${OUTPUT_DIR}/.${filename}.capture"
   local dimensions
   local width
   local height
   local view_config_home="${CONFIG_HOME}/${view}"
   local view_cache_home="${CACHE_HOME}/${view}"
+  local view_data_home="${SESSION_ROOT}/data/${view}"
+  local layout_script="$ROOT_DIR/scripts/demo/kwin_capture_layout.js"
   local match_query="AI Usage Monitor"
 
-  mkdir -p "$view_config_home" "$view_cache_home"
+  mkdir -p "$view_config_home" "$view_cache_home" "$view_data_home"
+  if [[ "$layout" == "narrow" ]]; then
+    layout_script="$ROOT_DIR/scripts/demo/kwin_capture_narrow.js"
+  fi
+  case "$view" in
+    media-history-retained)
+      python3 "$ROOT_DIR/scripts/demo/generate_v15_media_history.py" \
+        --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
+        --scenario retained
+      ;;
+    media-history-gap)
+      python3 "$ROOT_DIR/scripts/demo/generate_v15_media_history.py" \
+        --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
+        --scenario gap
+      ;;
+    media-analyst-sufficient)
+      python3 "$ROOT_DIR/scripts/demo/generate_v15_media_history.py" \
+        --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
+        --scenario analyst-sufficient
+      ;;
+    media-analyst-insufficient)
+      python3 "$ROOT_DIR/scripts/demo/generate_v15_media_history.py" \
+        --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
+        --scenario analyst-insufficient
+      ;;
+  esac
   cp /usr/share/color-schemes/BreezeDark.colors "$view_config_home/kdeglobals"
   XDG_CONFIG_HOME="$view_config_home" kwriteconfig6 \
     --file kdeglobals --group General --key ColorScheme BreezeDark
   XDG_CONFIG_HOME="$view_config_home" kwriteconfig6 \
     --file plasmarc --group Theme --key name breeze-dark
 
-  XDG_DATA_HOME="$PREFIX/share" \
+  XDG_DATA_HOME="$view_data_home" \
   XDG_DATA_DIRS="$PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \
   XDG_CONFIG_HOME="$view_config_home" \
   XDG_CACHE_HOME="$view_cache_home" \
@@ -165,7 +194,7 @@ capture_view() {
   if [[ "$view" == "settings" ]]; then
     match_query="AI Usage Monitor Settings"
   fi
-  focus_capture_window "$match_query" "$WINDOW_PID"
+  focus_capture_window "$match_query" "$WINDOW_PID" "$layout_script"
   spectacle --activewindow --background --nonotify --output "$temporary"
   for _ in {1..20}; do
     [[ -s "$temporary" ]] && break
@@ -179,7 +208,13 @@ capture_view() {
   dimensions="$(identify -format '%w %h' "$temporary")"
   width="${dimensions%% *}"
   height="${dimensions##* }"
-  if (( width < 1200 || width > 1800 || height < 700 || height > 980 )); then
+  if [[ "$layout" == "narrow" ]]; then
+    if (( width < 820 || width > 1000 || height < 1050 || height > 1300 )); then
+      echo "Narrow capture has unexpected geometry: $filename (${width}x${height})" >&2
+      unlink "$temporary"
+      exit 1
+    fi
+  elif (( width < 1200 || width > 2100 || height < 700 || height > 1100 )); then
     echo "Capture has unexpected geometry: $filename (${width}x${height})" >&2
     unlink "$temporary"
     exit 1
@@ -219,7 +254,7 @@ focus_nested_panel() {
 }
 
 capture_panel() {
-  local filename="panel-view.png"
+  local filename="panel-lowest-quota.png"
   local temporary="${OUTPUT_DIR}/.${filename}.capture"
   local raw="${temporary}.raw.png"
   local panel_config_home="${CONFIG_HOME}/panel"
@@ -239,7 +274,7 @@ capture_panel() {
   XDG_CONFIG_HOME="$panel_config_home" kwriteconfig6 \
     --file plasmarc --group Theme --key name breeze-dark
 
-  panel_script='var existing = panels(); for (var i = 0; i < existing.length; ++i) existing[i].remove(); var panel = new Panel; panel.location = "bottom"; panel.height = 58; panel.addWidget("org.kde.plasma.kickoff"); var monitor = panel.addWidget("com.github.loofi.aiusagemonitor"); monitor.currentConfigGroup = ["General"]; monitor.writeConfig("compactDisplayMode", "cost"); panel.addWidget("org.kde.plasma.panelspacer"); panel.addWidget("org.kde.plasma.digitalclock");'
+  panel_script='var existing = panels(); for (var i = 0; i < existing.length; ++i) existing[i].remove(); var panel = new Panel; panel.location = "bottom"; panel.height = 58; panel.addWidget("org.kde.plasma.kickoff"); var monitor = panel.addWidget("com.github.loofi.aiusagemonitor"); monitor.currentConfigGroup = ["General"]; monitor.writeConfig("compactDisplayMode", "lowest-quota"); panel.addWidget("org.kde.plasma.panelspacer"); panel.addWidget("org.kde.plasma.digitalclock");'
 
   # The quoted script expands its variables inside the isolated D-Bus session.
   # shellcheck disable=SC2016
@@ -252,6 +287,7 @@ capture_panel() {
     QML2_IMPORT_PATH="$QML_PATH" \
     KDE_COLOR_SCHEME_PATH="/usr/share/color-schemes/BreezeDark.colors" \
     PLASMA_AI_MONITOR_DEMO=1 \
+    PLASMA_AI_MONITOR_SMOKE_VIEW=media-panel \
     bash -c '
       kwin_wayland --wayland-display "$WAYLAND_DISPLAY" -s "$1" \
         --width 1600 --height 900 --scale 1 --xwayland --no-lockscreen \
@@ -312,7 +348,7 @@ capture_panel() {
   dimensions="$(identify -format '%w %h' "$temporary")"
   width="${dimensions%% *}"
   height="${dimensions##* }"
-  if (( width < 1200 || width > 1800 || height < 700 || height > 980 )); then
+  if (( width < 1200 || width > 2100 || height < 700 || height > 1100 )); then
     echo "Panel capture has unexpected geometry: ${width}x${height}" >&2
     unlink "$temporary"
     exit 1
@@ -326,25 +362,42 @@ capture_panel() {
   echo "Captured $filename (${width}x${height}) from an isolated Plasma panel"
 }
 
-capture_view onboarding-source guided-first-success.png 5
-capture_view onboarding-result verified-success.png 5
-capture_view overview main-window.png 7
-capture_view provider-detail provider-intelligence.png 5
-capture_view settings settings-view.png 6
-capture_view history history-view.png 5
-capture_view analyst analyst-view.png 5
+capture_view media-overview overview-popup.png 6 narrow
+capture_view media-attention attention-state.png 5
+capture_view media-quota quota-reset-state.png 5
+capture_view media-tool-only tool-only-overview.png 5
+capture_view media-history-retained retained-history.png 10
+capture_view media-history-gap history-gap.png 10
+capture_view media-analyst-sufficient analyst-sufficient.png 6
+capture_view media-analyst-insufficient analyst-insufficient.png 6
 capture_panel
 
 SESSION_ID="$(cat /proc/sys/kernel/random/uuid)"
-FIXTURE_SHA="$(sha256sum "$ROOT_DIR/scripts/demo/showcase_preset.json" | cut -d' ' -f1)"
+FIXTURE_SHA="$(
+  cd "$ROOT_DIR"
+  sha256sum \
+    scripts/demo/showcase_preset.json \
+    scripts/demo/generate_v15_media_history.py \
+    package/contents/ui/components/MediaDailyState.qml \
+    | sha256sum | cut -d' ' -f1
+)"
+SOURCE_TREE_SHA="$(
+  cd "$ROOT_DIR"
+  git ls-files --cached --others --exclude-standard -- VERSION package scripts/demo \
+    | sort \
+    | while IFS= read -r path; do
+        [[ -f "$path" ]] && sha256sum "$path"
+      done \
+    | sha256sum | cut -d' ' -f1
+)"
 CAPTURE_COMMIT="${CAPTURE_COMMIT:-$(git -C "$ROOT_DIR" rev-parse HEAD)}"
 CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 PLASMA_VERSION="$(plasmashell --version | awk '{print $2}')"
 ASSETS_JSON="$(
   for filename in \
-    guided-first-success.png verified-success.png main-window.png \
-    provider-intelligence.png settings-view.png history-view.png \
-    analyst-view.png panel-view.png; do
+    overview-popup.png attention-state.png quota-reset-state.png \
+    tool-only-overview.png retained-history.png history-gap.png \
+    analyst-sufficient.png analyst-insufficient.png panel-lowest-quota.png; do
     sha256sum "${OUTPUT_DIR}/${filename}"
   done | jq -Rn '[inputs | split("  ") | {(.[1] | split("/") | last): .[0]}] | add'
 )"
@@ -353,6 +406,7 @@ jq -n \
   --arg version "$(<"$ROOT_DIR/VERSION")" \
   --arg sessionId "$SESSION_ID" \
   --arg fixtureSha256 "$FIXTURE_SHA" \
+  --arg sourceTreeSha256 "$SOURCE_TREE_SHA" \
   --arg plasmaSession "Fedora KDE Plasma" \
   --arg theme "Breeze Dark" \
   --arg environment "isolated demo user" \
@@ -362,10 +416,23 @@ jq -n \
   --arg scale "100%" \
   --argjson assets "$ASSETS_JSON" \
   '{version: $version, sessionId: $sessionId, fixtureSha256: $fixtureSha256,
+    sourceTreeSha256: $sourceTreeSha256,
     plasmaSession: $plasmaSession, theme: $theme, environment: $environment,
     captureCommit: $captureCommit, capturedAt: $capturedAt,
-    plasmaVersion: $plasmaVersion, scale: $scale, assets: $assets}' \
-  >"${OUTPUT_DIR}/v14-media-manifest.json"
+    plasmaVersion: $plasmaVersion, scale: $scale,
+    scenarios: {
+      "overview-popup.png": "media-overview",
+      "attention-state.png": "media-attention",
+      "quota-reset-state.png": "media-quota",
+      "tool-only-overview.png": "media-tool-only",
+      "retained-history.png": "media-history-retained",
+      "history-gap.png": "media-history-gap",
+      "analyst-sufficient.png": "media-analyst-sufficient",
+      "analyst-insufficient.png": "media-analyst-insufficient",
+      "panel-lowest-quota.png": "media-panel"
+    },
+    assets: $assets}' \
+  >"${OUTPUT_DIR}/v15-media-manifest.json"
 
 python3 "$ROOT_DIR/scripts/check_release_media.py"
-echo "v14 media capture complete: $OUTPUT_DIR"
+echo "v15 media capture complete: $OUTPUT_DIR"

@@ -1,33 +1,25 @@
-# AI Usage Monitor wiki
+<!-- Generated from docs/user-guide/README.md by scripts/generate_wiki_docs.py; do not edit. -->
+# User guide
 
-AI Usage Monitor is a KDE Plasma 6 widget for provider-reported usage and spend, local coding-tool activity, and read-only connection checks. Version 14.0.1 is the current release.
+Install both required parts, verify one useful source in **Guided first success**, and learn what the result can prove before adding alerts or integrations. Daily Control then keeps attention, live quota, reset, spend quality, retained history, and analysis coverage consistent across the panel and popup.
 
-## New user path
+## Set up the widget
 
-1. [Install the complete package](Installation)
-2. [Verify one useful source](Getting-Started)
-3. [Learn what each value can prove](Understanding-the-Data)
-4. [Configure providers](Providers)
-5. [Add subscription tools](Subscription-Tools)
+1. [Install or update](Installation)
+2. [Reach your first successful source](Getting-Started)
+3. [Understand the data](Understanding-the-Data)
 
-## Daily use
+## Add data sources
+
+- [API providers](Providers)
+- [Subscription tools and Browser Sync Labs](Subscription-Tools)
+
+## Use the data
 
 - [History, exports, Prometheus, and webhooks](History-and-Integrations)
 - [Troubleshooting](Troubleshooting)
 - [Privacy and security](Privacy-and-Security)
 
-## Important limits
+## Before asking for help
 
-Provider APIs expose different information. Some report billing or key usage; many report only model access. Guided first success names the result, and Overview keeps reporting providers separate from connection checks. Missing values stay unknown.
-
-The Fedora COPR and source build are complete installations. Install the matching compiled plugin before the frontend-only KDE Store plasmoid.
-
-The version-controlled [user guide](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/tree/main/docs/user-guide) contains the canonical commands and technical details.
-
-## Project links
-
-- [Latest release](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/latest)
-- [Changelog](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/CHANGELOG.md)
-- [Provider capability matrix](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/provider-capabilities.md)
-- [Report a bug](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues)
-- [Report a vulnerability privately](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/security/advisories/new)
+Open **Settings → Diagnostics** and check the frontend and native-plugin versions, install layers, database, source readiness, KWallet, and catalogs. The native **Copy support report** action omits endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values.

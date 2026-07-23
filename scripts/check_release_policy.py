@@ -17,8 +17,9 @@ def fail(message: str) -> None:
 
 
 version = (ROOT / "VERSION").read_text().strip()
-if not re.fullmatch(r"14\.\d+\.\d+", version):
-    fail(f"release policy requires a stable v14 release, got {version}")
+match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)", version)
+if not match or int(match.group(1)) < 14:
+    fail(f"release policy requires a stable v14-or-newer release, got {version}")
 
 checklist_path = ROOT / f"docs/release/v{version}-checklist.md"
 if not checklist_path.is_file():
@@ -29,9 +30,9 @@ required_policy = (
     "and never block publication."
 )
 if required_policy not in checklist:
-    fail("current v14 checklist must declare provider credentials non-blocking")
+    fail("current checklist must declare provider credentials non-blocking")
 if f"Publish `v{version}` directly from the verified `main` commit" not in checklist:
-    fail("current v14 checklist must require direct stable publication")
+    fail("current checklist must require direct stable publication")
 
 release_surfaces = [
     ".github/workflows/release.yml",
@@ -63,6 +64,6 @@ for prerelease_marker in ("alpha|beta|rc", "rc_tag", "prerelease"):
 if 'type="development"' in (ROOT / "com.github.loofi.aiusagemonitor.metainfo.xml").read_text():
     fail("AppStream still marks the stable version as development")
 if "Current development release" in (ROOT / "README.md").read_text():
-    fail("README still labels v14 as a development release")
+    fail("README still labels the stable version as a development release")
 
 print("Release policy OK: credential-free direct stable gate with no prerelease or soak")

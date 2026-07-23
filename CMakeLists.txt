@@ -46,12 +46,26 @@ if(BUILD_TESTING)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_release_media.py"
     )
     add_test(
+        NAME release_media_source_archive
+        COMMAND "${CMAKE_COMMAND}" -E env
+                AI_USAGE_MONITOR_MEDIA_FORCE_FILESYSTEM=1
+                "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_release_media.py"
+    )
+    add_test(
         NAME kcm_contracts
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_kcm_contracts.py"
     )
     add_test(
+        NAME wiki_docs
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_wiki_docs.py" --check
+    )
+    add_test(
         NAME exact_tag_promotion
         COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_verify_exact_tag.sh"
+    )
+    add_test(
+        NAME daily_ui_accessibility
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_daily_ui_accessibility.py"
     )
 endif()
 

@@ -13,6 +13,6 @@ jobs:
       - run: dnf install -y git python3 bash just appstream rpmlint ShellCheck
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: just check
-      - run: appstreamcli validate com.github.loofi.aiusagemonitor.metainfo.xml
+      - run: appstreamcli validate --no-net com.github.loofi.aiusagemonitor.metainfo.xml
       - run: rpmlint plasma-ai-usage-monitor.spec
       - run: shellcheck scripts/*.sh scripts/demo/*.sh

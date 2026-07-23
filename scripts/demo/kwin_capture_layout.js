@@ -22,7 +22,7 @@ function prepareCaptureWindow(window) {
     window.keepAbove = true;
     workspace.raiseWindow(window);
     workspace.activeWindow = window;
-    print("V14_CAPTURE_WINDOW=" + window.internalId);
+    print("V15_CAPTURE_WINDOW=" + window.internalId);
 }
 
 workspace.windowList().forEach(prepareCaptureWindow);

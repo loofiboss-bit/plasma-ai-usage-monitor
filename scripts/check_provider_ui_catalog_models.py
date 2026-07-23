@@ -76,11 +76,17 @@ def main() -> None:
         fail(f"native provider backends are not stable in the registry: {', '.join(missing_backends)}")
 
     cost_summary = COST_SUMMARY.read_text(encoding="utf-8")
-    mode_delegate = re.search(
-        r"PlasmaComponents\.ToolButton\s*\{(?P<body>.*?)\n\s*\}", cost_summary, re.S
-    )
-    if not mode_delegate or "required property var modelData" not in mode_delegate.group("body"):
-        fail("cost view mode delegate must declare modelData under bound component behavior")
+    if "required property var summary" not in cost_summary:
+        fail("cost summary must consume the unified Daily State summary")
+    if "property var providers" in cost_summary or "property var subscriptionTools" in cost_summary:
+        fail("cost summary must not rebuild spend state from provider or tool loops")
+    for aggregate in (
+        "actualSpendTotals",
+        "estimatedSpendTotals",
+        "fixedSubscriptionFees",
+    ):
+        if aggregate not in cost_summary:
+            fail(f"cost summary does not render typed aggregate: {aggregate}")
 
     print(f"Provider UI catalog check OK: {len(provider_keys)} model pickers are catalog-driven")
 

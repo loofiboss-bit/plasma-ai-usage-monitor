@@ -1,26 +1,26 @@
 # Roadmap
 
-**Current release:** 14.1.1, First Successful Use
+**Current release:** 15.0.0, Daily Control
 
-**Last updated:** 2026-07-18
+**Last updated:** 2026-07-23
 
-AI Usage Monitor remains a desktop-native, local-first Plasma widget. v14 makes one verified source the first-run goal and keeps provider-reported data, local estimates, balances, and connection checks separate.
+AI Usage Monitor remains a desktop-native, local-first Plasma widget. v15 makes daily status actionable while preserving the source and quality boundaries established by v13 and v14.
 
 ## Current priorities
 
-### Protect the first-success path
+### Protect daily truth
 
-- Keep Guided first success focused on one useful source.
-- Keep the monitoring level visible before verification.
-- Keep authentication, permission, endpoint, and unsupported-metric errors distinct.
-- Test missing and mismatched native plugins without importing the plugin first.
+- Keep unavailable values distinct from real numeric zeroes.
+- Keep lowest-quota and next-reset modes limited to synchronized or provider-reported windows.
+- Keep actual spend, estimates, balances, and fixed fees separate by currency.
+- Keep deterministic recovery actions ahead of secondary dashboard detail.
 
-### Trustworthy metrics
+### Useful retained history
 
-- Preserve unknown values throughout the UI, history, exports, alerts, and Prometheus.
-- Keep actual billing, estimates, balances, published caps, and connectivity separate.
-- Review provider and subscription catalogs on a documented schedule.
-- Add provider billing endpoints only when deterministic fixtures prove their semantics.
+- Preserve disabled-source history and explicit chart gaps.
+- Compare only compatible units, semantics, scopes, windows, and currencies.
+- Keep Analyst methodology, coverage, and sample requirements visible.
+- Keep History and Analyst queries asynchronous and bounded at 100k observations.
 
 ### Reliable Fedora delivery
 
@@ -39,6 +39,7 @@ AI Usage Monitor remains a desktop-native, local-first Plasma widget. v14 makes 
 
 | Release | Result |
 | --- | --- |
+| 15.0.0 Daily Control | Shared daily source state, action-first Overview, truthful compact modes, retained History, evidence-bound Analyst, unified notifications, and performance/accessibility gates |
 | 14.0.0 First Successful Use | Dependency-safe startup, Guided first success, source-focused Settings, outcome-first Overview, and native Diagnostics |
 | 13.0.0 Provider Intelligence | Read-only scheduled monitoring, nullable metric contract, SQLite schema v4, Catalog v5 adapters, LiteLLM, Cerebras, Fireworks, and Perplexity |
 | 12.0.x Reliability Core | Typed refresh lifecycle, source-aware history, catalog-driven models, KWallet caching, correct Fedora plugin packaging |

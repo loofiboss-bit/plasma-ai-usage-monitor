@@ -8,11 +8,12 @@
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QFileInfo>
+#include <QMap>
 #include <QSaveFile>
 #include <QFile>
 #include <QUuid>
 #include <QDebug>
-#include <QMap>
+#include <QSet>
 #include <QTimeZone>
 #include <QFutureWatcher>
 #include <QtConcurrentRun>
@@ -28,6 +29,44 @@ struct BucketAggregate {
     double sum = 0.0;
     int count = 0;
     QDateTime bucketStart;
+};
+
+struct HistorySample {
+    QDateTime timestamp;
+    QDateTime firstObservation;
+    QDateTime lastObservation;
+    double value = 0.0;
+    int sampleCount = 1;
+    QString unit;
+    QString currency;
+    QString semantic;
+    QString source;
+    QString quality;
+    QString scope;
+    QString window;
+    QDateTime resetAt;
+};
+
+struct HistoryBucket {
+    double sum = 0.0;
+    double last = 0.0;
+    int count = 0;
+    QDateTime bucketStart;
+};
+
+struct HistorySegment {
+    QString unit;
+    QString currency;
+    QString semantic;
+    QString source;
+    QString scope;
+    QString window;
+    QDateTime resetAt;
+    QSet<QString> qualityClasses;
+    QMap<qint64, HistoryBucket> buckets;
+    int sampleCount = 0;
+    QDateTime firstObservation;
+    QDateTime lastObservation;
 };
 
 struct DailyOverviewRow {
@@ -55,9 +94,7 @@ QDateTime parseSnapshotTimestamp(const QString &raw)
         return {};
     }
 
-    if (dt.timeSpec() == Qt::UTC
-        || dt.timeSpec() == Qt::OffsetFromUTC
-        || dt.timeSpec() == Qt::TimeZone) {
+    if (dt.timeSpec() == Qt::UTC || dt.timeSpec() == Qt::OffsetFromUTC || dt.timeSpec() == Qt::TimeZone) {
         return dt.toUTC();
     }
 
@@ -69,12 +106,13 @@ QString toDbDateTimeString(const QDateTime &dt)
     return dt.toUTC().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
 }
 
-int effectiveBucketSeconds(const QDateTime &fromUtc, const QDateTime &toUtc, int bucketMinutes)
+int effectiveBucketSeconds(const QDateTime &fromUtc, const QDateTime &toUtc,
+                           int bucketMinutes)
 {
     int baseBucketSecs = qBound(1, bucketMinutes, 24 * 60) * 60;
     qint64 rangeSecs = qMax<qint64>(1, fromUtc.secsTo(toUtc));
-    int minBucketSecs = static_cast<int>(
-        std::ceil(static_cast<double>(rangeSecs) / static_cast<double>(MAX_SERIES_POINTS)));
+    int minBucketSecs = static_cast<int>(std::ceil(
+        static_cast<double>(rangeSecs) / static_cast<double>(MAX_SERIES_POINTS)));
     return qMax(baseBucketSecs, minBucketSecs);
 }
 
@@ -103,10 +141,178 @@ QVariantList bucketToPoints(const QMap<qint64, BucketAggregate> &buckets)
     return points;
 }
 
+QString normalizedQualityClass(const QString &source, const QString &quality,
+                               const QString &semantic)
+{
+    const QString normalizedSource = source.trimmed().toLower();
+    const QString normalizedQuality = quality.trimmed().toLower();
+    if (semantic == QLatin1String("local_estimate") || normalizedQuality.contains(QStringLiteral("estimated")) || normalizedSource.contains(QStringLiteral("estimated")) || normalizedSource == QLatin1String("self_tracked") || normalizedSource == QLatin1String("browser_sync")) {
+        return QStringLiteral("estimated");
+    }
+    if (normalizedSource.contains(QStringLiteral("connectivity")) || normalizedSource.contains(QStringLiteral("model_discovery"))) {
+        return QStringLiteral("connectivity_only");
+    }
+    if (normalizedSource == QLatin1String("unknown") && (normalizedQuality.isEmpty() || normalizedQuality == QLatin1String("unknown"))) {
+        return QStringLiteral("unavailable");
+    }
+    return QStringLiteral("actual");
+}
+
+QString historyMetricForObservation(const QString &kind)
+{
+    if (kind == QLatin1String("cost")) {
+        return QStringLiteral("cost");
+    }
+    if (kind == QLatin1String("input_tokens") || kind == QLatin1String("output_tokens")) {
+        return QStringLiteral("tokens");
+    }
+    if (kind == QLatin1String("requests")) {
+        return QStringLiteral("requests");
+    }
+    return {};
+}
+
+QString historySegmentKey(const HistorySample &sample)
+{
+    return QStringList{sample.unit, sample.currency, sample.semantic,
+                       sample.source, sample.scope, sample.window}
+        .join(QChar(0x1f));
+}
+
+QVariantMap buildHistorySeriesPayload(const QVariantMap &sourceDescriptor,
+                                      const QString &metric,
+                                      const QList<HistorySample> &samples,
+                                      const QDateTime &fromUtc,
+                                      const QDateTime &toUtc,
+                                      int bucketMinutes)
+{
+    const int bucketSecs = effectiveBucketSeconds(fromUtc, toUtc, bucketMinutes);
+    QMap<QString, HistorySegment> segments;
+
+    for (const HistorySample &sample : samples) {
+        if (!sample.timestamp.isValid() || sample.timestamp < fromUtc || sample.timestamp > toUtc) {
+            continue;
+        }
+        const QString key = historySegmentKey(sample);
+        HistorySegment &segment = segments[key];
+        segment.unit = sample.unit;
+        segment.currency = sample.currency;
+        segment.semantic = sample.semantic;
+        segment.source = sample.source;
+        segment.scope = sample.scope;
+        segment.window = sample.window;
+        if (sample.resetAt.isValid()) {
+            segment.resetAt = sample.resetAt;
+        }
+        segment.qualityClasses.insert(
+            normalizedQualityClass(sample.source, sample.quality, sample.semantic));
+        segment.sampleCount += qMax(1, sample.sampleCount);
+        const QDateTime firstObservation = sample.firstObservation.isValid()
+            ? sample.firstObservation
+            : sample.timestamp;
+        const QDateTime lastObservation = sample.lastObservation.isValid()
+            ? sample.lastObservation
+            : sample.timestamp;
+        if (!segment.firstObservation.isValid()
+            || firstObservation < segment.firstObservation) {
+            segment.firstObservation = firstObservation;
+        }
+        if (!segment.lastObservation.isValid()
+            || lastObservation > segment.lastObservation) {
+            segment.lastObservation = lastObservation;
+        }
+
+        const qint64 bucketIndex = fromUtc.secsTo(sample.timestamp) / bucketSecs;
+        HistoryBucket &bucket = segment.buckets[bucketIndex];
+        if (!bucket.bucketStart.isValid()) {
+            bucket.bucketStart = fromUtc.addSecs(bucketIndex * bucketSecs);
+        }
+        bucket.sum += sample.value;
+        bucket.last = sample.value;
+        bucket.count++;
+    }
+
+    QVariantList resultSeries;
+    for (auto it = segments.constBegin(); it != segments.constEnd(); ++it) {
+        const HistorySegment &segment = it.value();
+        QVariantList points;
+        bool containsGaps = false;
+        qint64 previousIndex = -1;
+        for (auto bucketIt = segment.buckets.constBegin();
+             bucketIt != segment.buckets.constEnd(); ++bucketIt) {
+            const HistoryBucket &bucket = bucketIt.value();
+            if (bucket.count <= 0 || !bucket.bucketStart.isValid()) {
+                continue;
+            }
+            if (previousIndex >= 0 && bucketIt.key() - previousIndex > 1) {
+                QVariantMap gap;
+                gap.insert(QStringLiteral("timestamp"),
+                           fromUtc.addSecs((previousIndex + 1) * bucketSecs)
+                               .toString(Qt::ISODate));
+                gap.insert(QStringLiteral("value"), QVariant());
+                gap.insert(QStringLiteral("available"), false);
+                points.append(gap);
+                containsGaps = true;
+            }
+
+            QVariantMap point;
+            point.insert(QStringLiteral("timestamp"),
+                         bucket.bucketStart.toString(Qt::ISODate));
+            const bool intervalTotal = segment.semantic == QLatin1String("interval_total");
+            point.insert(QStringLiteral("value"),
+                         intervalTotal ? bucket.sum : bucket.last);
+            point.insert(QStringLiteral("available"), true);
+            points.append(point);
+            previousIndex = bucketIt.key();
+        }
+
+        QVariantMap row;
+        row.insert(QStringLiteral("sourceId"),
+                   sourceDescriptor.value(QStringLiteral("historyId")));
+        row.insert(QStringLiteral("dbName"),
+                   sourceDescriptor.value(QStringLiteral("dbName")));
+        row.insert(QStringLiteral("displayName"),
+                   sourceDescriptor.value(
+                       QStringLiteral("displayName"),
+                       sourceDescriptor.value(QStringLiteral("dbName"))));
+        row.insert(QStringLiteral("sourceKind"),
+                   sourceDescriptor.value(QStringLiteral("sourceKind")));
+        row.insert(QStringLiteral("metricKind"), metric);
+        row.insert(QStringLiteral("unit"), segment.unit);
+        row.insert(QStringLiteral("currency"), segment.currency);
+        row.insert(QStringLiteral("semantic"), segment.semantic);
+        row.insert(QStringLiteral("source"), segment.source);
+        row.insert(QStringLiteral("scope"), segment.scope);
+        row.insert(QStringLiteral("window"), segment.window);
+        row.insert(QStringLiteral("resetAt"), segment.resetAt);
+        QStringList qualityClasses = segment.qualityClasses.values();
+        qualityClasses.sort();
+        row.insert(QStringLiteral("sourceQualityClasses"), qualityClasses);
+        row.insert(QStringLiteral("sampleCount"), segment.sampleCount);
+        row.insert(QStringLiteral("availablePointCount"), segment.buckets.size());
+        row.insert(QStringLiteral("firstObservation"), segment.firstObservation);
+        row.insert(QStringLiteral("lastObservation"), segment.lastObservation);
+        row.insert(QStringLiteral("bucketSizeSeconds"), bucketSecs);
+        row.insert(QStringLiteral("containsGaps"), containsGaps);
+        row.insert(QStringLiteral("stale"),
+                   sourceDescriptor.value(QStringLiteral("stale"), false));
+        row.insert(QStringLiteral("historyOnly"),
+                   sourceDescriptor.value(QStringLiteral("historyOnly"), false));
+        row.insert(QStringLiteral("points"), points);
+        resultSeries.append(row);
+    }
+
+    QVariantMap payload;
+    payload.insert(QStringLiteral("ok"), true);
+    payload.insert(QStringLiteral("errorKey"), QString());
+    payload.insert(QStringLiteral("metricKind"), metric);
+    payload.insert(QStringLiteral("series"), resultSeries);
+    return payload;
+}
+
 QString csvField(const QString &value)
 {
-    if (!value.contains(QLatin1Char(',')) && !value.contains(QLatin1Char('"'))
-        && !value.contains(QLatin1Char('\n')) && !value.contains(QLatin1Char('\r'))) {
+    if (!value.contains(QLatin1Char(',')) && !value.contains(QLatin1Char('"')) && !value.contains(QLatin1Char('\n')) && !value.contains(QLatin1Char('\r'))) {
         return value;
     }
     QString escaped = value;
@@ -117,7 +323,8 @@ QString csvField(const QString &value)
 
 UsageDatabase::UsageDatabase(QObject *parent)
     : QObject(parent)
-    , m_connectionName(QStringLiteral("aiusagemonitor_history_%1").arg(s_instanceCounter.fetch_add(1)))
+    , m_connectionName(QStringLiteral("aiusagemonitor_history_%1")
+                           .arg(s_instanceCounter.fetch_add(1)))
 {
 }
 
@@ -151,13 +358,41 @@ void UsageDatabase::setRetentionDays(int days)
     }
 }
 
+int UsageDatabase::pendingWorkerCount() const
+{
+    return m_pendingWorkerCount;
+}
+
+int UsageDatabase::databaseConnectionCount() const
+{
+    int count = 0;
+    const QStringList names = QSqlDatabase::connectionNames();
+    for (const QString &name : names) {
+        if (name.startsWith(QLatin1String("aiusagemonitor_history_"))) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+void UsageDatabase::beginWorker()
+{
+    ++m_pendingWorkerCount;
+    Q_EMIT pendingWorkerCountChanged();
+}
+
+void UsageDatabase::finishWorker()
+{
+    m_pendingWorkerCount = qMax(0, m_pendingWorkerCount - 1);
+    Q_EMIT pendingWorkerCountChanged();
+}
+
 void UsageDatabase::initDatabase()
 {
     if (m_initialized)
         return;
 
-    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
-                      + QStringLiteral("/plasma-ai-usage-monitor");
+    QString dataDir = QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation) + QStringLiteral("/plasma-ai-usage-monitor");
     QDir().mkpath(dataDir);
 
     QString dbPath = dataDir + QStringLiteral("/usage_history.db");
@@ -166,7 +401,8 @@ void UsageDatabase::initDatabase()
     m_db.setDatabaseName(dbPath);
 
     if (!m_db.open()) {
-        qWarning() << "UsageDatabase: Failed to open database:" << m_db.lastError().text();
+        qWarning() << "UsageDatabase: Failed to open database:"
+                   << m_db.lastError().text();
         return;
     }
 
@@ -184,74 +420,65 @@ void UsageDatabase::createTables()
     QSqlQuery query(m_db);
 
     // Usage snapshots -- one row per provider per refresh
-    query.exec(QStringLiteral(
-        "CREATE TABLE IF NOT EXISTS usage_snapshots ("
-        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "  timestamp DATETIME DEFAULT (datetime('now')),"
-        "  provider TEXT NOT NULL,"
-        "  model TEXT DEFAULT '',"
-        "  input_tokens INTEGER DEFAULT 0,"
-        "  output_tokens INTEGER DEFAULT 0,"
-        "  request_count INTEGER DEFAULT 0,"
-        "  cost REAL DEFAULT 0.0,"
-        "  is_estimated_cost INTEGER DEFAULT 0,"
-        "  daily_cost REAL DEFAULT 0.0,"
-        "  monthly_cost REAL DEFAULT 0.0,"
-        "  rl_requests INTEGER DEFAULT 0,"
-        "  rl_requests_remaining INTEGER DEFAULT 0,"
-        "  rl_tokens INTEGER DEFAULT 0,"
-        "  rl_tokens_remaining INTEGER DEFAULT 0,"
-        "  cost_source TEXT NOT NULL DEFAULT 'unknown',"
-        "  usage_source TEXT NOT NULL DEFAULT 'unknown',"
-        "  currency TEXT DEFAULT 'USD',"
-        "  data_quality TEXT DEFAULT 'unknown'"
-        ")"
-    ));
+    query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS usage_snapshots ("
+                              "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                              "  timestamp DATETIME DEFAULT (datetime('now')),"
+                              "  provider TEXT NOT NULL,"
+                              "  model TEXT DEFAULT '',"
+                              "  input_tokens INTEGER DEFAULT 0,"
+                              "  output_tokens INTEGER DEFAULT 0,"
+                              "  request_count INTEGER DEFAULT 0,"
+                              "  cost REAL DEFAULT 0.0,"
+                              "  is_estimated_cost INTEGER DEFAULT 0,"
+                              "  daily_cost REAL DEFAULT 0.0,"
+                              "  monthly_cost REAL DEFAULT 0.0,"
+                              "  rl_requests INTEGER DEFAULT 0,"
+                              "  rl_requests_remaining INTEGER DEFAULT 0,"
+                              "  rl_tokens INTEGER DEFAULT 0,"
+                              "  rl_tokens_remaining INTEGER DEFAULT 0,"
+                              "  cost_source TEXT NOT NULL DEFAULT 'unknown',"
+                              "  usage_source TEXT NOT NULL DEFAULT 'unknown',"
+                              "  currency TEXT DEFAULT 'USD',"
+                              "  data_quality TEXT DEFAULT 'unknown'"
+                              ")"));
 
     // Indexes for efficient time-range queries
-    query.exec(QStringLiteral(
-        "CREATE INDEX IF NOT EXISTS idx_snapshots_provider_time "
-        "ON usage_snapshots(provider, timestamp)"
-    ));
+    query.exec(
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_snapshots_provider_time "
+                       "ON usage_snapshots(provider, timestamp)"));
 
     // Rate limit events -- recorded when thresholds are hit
-    query.exec(QStringLiteral(
-        "CREATE TABLE IF NOT EXISTS rate_limit_events ("
-        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "  timestamp DATETIME DEFAULT (datetime('now')),"
-        "  provider TEXT NOT NULL,"
-        "  event_type TEXT NOT NULL,"
-        "  percent_used INTEGER DEFAULT 0"
-        ")"
-    ));
+    query.exec(QStringLiteral("CREATE TABLE IF NOT EXISTS rate_limit_events ("
+                              "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                              "  timestamp DATETIME DEFAULT (datetime('now')),"
+                              "  provider TEXT NOT NULL,"
+                              "  event_type TEXT NOT NULL,"
+                              "  percent_used INTEGER DEFAULT 0"
+                              ")"));
 
-    query.exec(QStringLiteral(
-        "CREATE INDEX IF NOT EXISTS idx_ratelimit_provider_time "
-        "ON rate_limit_events(provider, timestamp)"
-    ));
+    query.exec(
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_ratelimit_provider_time "
+                       "ON rate_limit_events(provider, timestamp)"));
 
     // Subscription tool usage snapshots
-    query.exec(QStringLiteral(
-        "CREATE TABLE IF NOT EXISTS subscription_tool_usage ("
-        "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
-        "  timestamp DATETIME DEFAULT (datetime('now')),"
-        "  tool_name TEXT NOT NULL,"
-        "  usage_count INTEGER DEFAULT 0,"
-        "  usage_limit INTEGER DEFAULT 0,"
-        "  period_type TEXT NOT NULL,"
-        "  plan_tier TEXT DEFAULT '',"
-        "  limit_reached BOOLEAN DEFAULT 0"
-        ")"
-    ));
+    query.exec(
+        QStringLiteral("CREATE TABLE IF NOT EXISTS subscription_tool_usage ("
+                       "  id INTEGER PRIMARY KEY AUTOINCREMENT,"
+                       "  timestamp DATETIME DEFAULT (datetime('now')),"
+                       "  tool_name TEXT NOT NULL,"
+                       "  usage_count INTEGER DEFAULT 0,"
+                       "  usage_limit INTEGER DEFAULT 0,"
+                       "  period_type TEXT NOT NULL,"
+                       "  plan_tier TEXT DEFAULT '',"
+                       "  limit_reached BOOLEAN DEFAULT 0"
+                       ")"));
 
-    query.exec(QStringLiteral(
-        "CREATE INDEX IF NOT EXISTS idx_tool_usage_name_time "
-        "ON subscription_tool_usage(tool_name, timestamp)"
-    ));
+    query.exec(
+        QStringLiteral("CREATE INDEX IF NOT EXISTS idx_tool_usage_name_time "
+                       "ON subscription_tool_usage(tool_name, timestamp)"));
 
     // Migrate older databases created before analyst metadata existed.
-    ensureColumnExists(QStringLiteral("usage_snapshots"),
-                       QStringLiteral("model"),
+    ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("model"),
                        QStringLiteral("TEXT DEFAULT ''"));
     ensureColumnExists(QStringLiteral("usage_snapshots"),
                        QStringLiteral("is_estimated_cost"),
@@ -270,32 +497,40 @@ void UsageDatabase::createTables()
                        QStringLiteral("TEXT DEFAULT 'unknown'"));
 
     if (!migrateToObservationSchemaV3()) {
-        qWarning() << "UsageDatabase: observation schema v3 migration failed; legacy history remains intact";
+        qWarning() << "UsageDatabase: observation schema v3 migration failed; "
+                      "legacy history remains intact";
     } else if (!migrateToObservationSchemaV4()) {
-        qWarning() << "UsageDatabase: observation schema v4 migration failed; v3 history remains intact";
+        qWarning() << "UsageDatabase: observation schema v4 migration failed; v3 "
+                      "history remains intact";
     } else {
         // Keep the original labels in migrated rows.  This explicit table is
         // the stable compatibility contract used by exports and future
         // migrations to interpret v11/v12 source names without rewriting
         // historical evidence.
-        query.exec(QStringLiteral(
-            "CREATE TABLE IF NOT EXISTS metric_source_mapping ("
-            " legacy_source TEXT PRIMARY KEY, normalized_source TEXT NOT NULL, meaning TEXT NOT NULL)"));
+        query.exec(
+            QStringLiteral("CREATE TABLE IF NOT EXISTS metric_source_mapping ("
+                           " legacy_source TEXT PRIMARY KEY, normalized_source "
+                           "TEXT NOT NULL, meaning TEXT NOT NULL)"));
         const QStringList mappings = {
             QStringLiteral("actual_api|usage_api|Provider-reported usage"),
             QStringLiteral("billing_api|billing_api|Provider-reported billing"),
             QStringLiteral("usage_api|usage_api|Provider-reported usage"),
-            QStringLiteral("estimated_from_usage|estimated_pricing|Local pricing estimate"),
-            QStringLiteral("connectivity_probe|connectivity_probe|Manual connectivity probe"),
-            QStringLiteral("connectivity_read_only|connectivity_probe|Read-only connectivity check"),
-            QStringLiteral("model_discovery_api|connectivity_probe|Read-only model discovery"),
+            QStringLiteral(
+                "estimated_from_usage|estimated_pricing|Local pricing estimate"),
+            QStringLiteral(
+                "connectivity_probe|connectivity_probe|Manual connectivity probe"),
+            QStringLiteral("connectivity_read_only|connectivity_probe|Read-only "
+                           "connectivity check"),
+            QStringLiteral(
+                "model_discovery_api|connectivity_probe|Read-only model discovery"),
             QStringLiteral("self_tracked|self_tracked|Local self-tracked value"),
             QStringLiteral("browser_sync|browser_sync|Local browser-derived value"),
             QStringLiteral("unknown|unknown|Unavailable or unknown source"),
         };
         QSqlQuery mappingQuery(m_db);
         mappingQuery.prepare(QStringLiteral(
-            "INSERT OR IGNORE INTO metric_source_mapping(legacy_source,normalized_source,meaning) "
+            "INSERT OR IGNORE INTO "
+            "metric_source_mapping(legacy_source,normalized_source,meaning) "
             "VALUES(?,?,?)"));
         for (const QString &mapping : mappings) {
             const QStringList fields = mapping.split(QLatin1Char('|'));
@@ -303,8 +538,15 @@ void UsageDatabase::createTables()
             mappingQuery.bindValue(1, fields.value(1));
             mappingQuery.bindValue(2, fields.value(2));
             if (!mappingQuery.exec()) {
-                qWarning() << "UsageDatabase: source mapping insert failed" << mappingQuery.lastError().text();
+                qWarning() << "UsageDatabase: source mapping insert failed"
+                           << mappingQuery.lastError().text();
             }
+        }
+        if (!query.exec(QStringLiteral(
+                "CREATE INDEX IF NOT EXISTS idx_observations_provider_epoch_kind "
+                "ON observations(provider, unixepoch(observed_at_utc), metric_kind)"))) {
+            qWarning() << "UsageDatabase: history performance index creation failed"
+                       << query.lastError().text();
         }
     }
 }
@@ -324,7 +566,8 @@ bool UsageDatabase::migrateToObservationSchemaV3()
     const QString backupPath = databasePath + QStringLiteral(".v11-backup");
     if (QFileInfo::exists(databasePath) && !QFileInfo::exists(backupPath)) {
         if (!QFile::copy(databasePath, backupPath)) {
-            qWarning() << "UsageDatabase: unable to create pre-v12 backup" << backupPath;
+            qWarning() << "UsageDatabase: unable to create pre-v12 backup"
+                       << backupPath;
             return false;
         }
     }
@@ -345,17 +588,17 @@ bool UsageDatabase::migrateToObservationSchemaV3()
         " unit TEXT NOT NULL,"
         " value REAL NOT NULL,"
         " currency TEXT,"
-        " semantic TEXT NOT NULL CHECK(semantic IN ('gauge','cumulative_counter','interval_total','local_estimate')),"
+        " semantic TEXT NOT NULL CHECK(semantic IN "
+        "('gauge','cumulative_counter','interval_total','local_estimate')),"
         " source TEXT NOT NULL,"
         " data_quality TEXT NOT NULL DEFAULT 'unknown',"
         " model_scope TEXT DEFAULT '',"
         " project_scope TEXT DEFAULT '',"
         " correlation_id TEXT NOT NULL"
         ")");
-    if (!query.exec(createSql)
-        || !query.exec(QStringLiteral(
-            "CREATE INDEX IF NOT EXISTS idx_observations_provider_time_source_currency "
-            "ON observations(provider, observed_at_utc, source, currency)"))) {
+    if (!query.exec(createSql) || !query.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS "
+                                                             "idx_observations_provider_time_source_currency "
+                                                             "ON observations(provider, observed_at_utc, source, currency)"))) {
         m_db.rollback();
         return false;
     }
@@ -368,15 +611,28 @@ bool UsageDatabase::migrateToObservationSchemaV3()
     if (countQuery.value(0).toLongLong() == 0) {
         const QString correlation = QStringLiteral("'legacy-' || id");
         const QString migrationSql = QStringLiteral(
-            "INSERT INTO observations(provider, observed_at_utc, metric_kind, unit, value, currency, semantic, source, data_quality, model_scope, correlation_id) "
-            "SELECT provider, timestamp, 'cost', COALESCE(NULLIF(currency,''),'USD'), cost, COALESCE(NULLIF(currency,''),'USD'), "
-            "CASE WHEN is_estimated_cost != 0 THEN 'local_estimate' ELSE 'gauge' END, cost_source, data_quality, model, %1 FROM usage_snapshots "
-            "UNION ALL SELECT provider, timestamp, 'input_tokens', 'token', input_tokens, NULL, 'cumulative_counter', usage_source, data_quality, model, %1 FROM usage_snapshots "
-            "UNION ALL SELECT provider, timestamp, 'output_tokens', 'token', output_tokens, NULL, 'cumulative_counter', usage_source, data_quality, model, %1 FROM usage_snapshots "
-            "UNION ALL SELECT provider, timestamp, 'requests', 'request', request_count, NULL, 'cumulative_counter', usage_source, data_quality, model, %1 FROM usage_snapshots")
-            .arg(correlation);
+                                         "INSERT INTO observations(provider, observed_at_utc, metric_kind, "
+                                         "unit, value, currency, semantic, source, data_quality, "
+                                         "model_scope, correlation_id) "
+                                         "SELECT provider, timestamp, 'cost', "
+                                         "COALESCE(NULLIF(currency,''),'USD'), cost, "
+                                         "COALESCE(NULLIF(currency,''),'USD'), "
+                                         "CASE WHEN is_estimated_cost != 0 THEN 'local_estimate' ELSE "
+                                         "'gauge' END, cost_source, data_quality, model, %1 FROM "
+                                         "usage_snapshots "
+                                         "UNION ALL SELECT provider, timestamp, 'input_tokens', 'token', "
+                                         "input_tokens, NULL, 'cumulative_counter', usage_source, "
+                                         "data_quality, model, %1 FROM usage_snapshots "
+                                         "UNION ALL SELECT provider, timestamp, 'output_tokens', 'token', "
+                                         "output_tokens, NULL, 'cumulative_counter', usage_source, "
+                                         "data_quality, model, %1 FROM usage_snapshots "
+                                         "UNION ALL SELECT provider, timestamp, 'requests', 'request', "
+                                         "request_count, NULL, 'cumulative_counter', usage_source, "
+                                         "data_quality, model, %1 FROM usage_snapshots")
+                                         .arg(correlation);
         if (!query.exec(migrationSql)) {
-            qWarning() << "UsageDatabase: v3 migration insert failed" << query.lastError().text();
+            qWarning() << "UsageDatabase: v3 migration insert failed"
+                       << query.lastError().text();
             m_db.rollback();
             return false;
         }
@@ -402,9 +658,9 @@ bool UsageDatabase::migrateToObservationSchemaV4()
 
     const QString databasePath = m_db.databaseName();
     const QString backupPath = databasePath + QStringLiteral(".v13-backup");
-    if (QFileInfo::exists(databasePath) && !QFileInfo::exists(backupPath)
-        && !QFile::copy(databasePath, backupPath)) {
-        qWarning() << "UsageDatabase: unable to create pre-v13 backup" << backupPath;
+    if (QFileInfo::exists(databasePath) && !QFileInfo::exists(backupPath) && !QFile::copy(databasePath, backupPath)) {
+        qWarning() << "UsageDatabase: unable to create pre-v13 backup"
+                   << backupPath;
         return false;
     }
     if (!m_db.transaction()) {
@@ -418,23 +674,29 @@ bool UsageDatabase::migrateToObservationSchemaV4()
         " provider TEXT NOT NULL,"
         " observed_at_utc DATETIME NOT NULL DEFAULT (datetime('now')),"
         " interval_start_utc DATETIME, interval_end_utc DATETIME,"
-        " metric_kind TEXT NOT NULL, unit TEXT NOT NULL, value REAL NULL, currency TEXT,"
-        " semantic TEXT NOT NULL CHECK(semantic IN ('gauge','cumulative_counter','interval_total','local_estimate')),"
+        " metric_kind TEXT NOT NULL, unit TEXT NOT NULL, value REAL NULL, "
+        "currency TEXT,"
+        " semantic TEXT NOT NULL CHECK(semantic IN "
+        "('gauge','cumulative_counter','interval_total','local_estimate')),"
         " source TEXT NOT NULL, data_quality TEXT NOT NULL DEFAULT 'unknown',"
-        " scope TEXT NOT NULL DEFAULT 'api_key', window TEXT NOT NULL DEFAULT 'current',"
-        " model_scope TEXT DEFAULT '', project_scope TEXT DEFAULT '', reset_at_utc DATETIME,"
-        " correlation_id TEXT NOT NULL)" );
-    if (!query.exec(createSql)
-        || !query.exec(QStringLiteral(
-            "INSERT INTO observations_v4(id,provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,model_scope,project_scope,correlation_id) "
-            "SELECT id,provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,model_scope,project_scope,correlation_id FROM observations"))
-        || !query.exec(QStringLiteral("DROP TABLE observations"))
-        || !query.exec(QStringLiteral("ALTER TABLE observations_v4 RENAME TO observations"))
-        || !query.exec(QStringLiteral(
-            "CREATE INDEX idx_observations_provider_time_source_currency "
-            "ON observations(provider, observed_at_utc, source, currency)"))
+        " scope TEXT NOT NULL DEFAULT 'api_key', window TEXT NOT NULL DEFAULT "
+        "'current',"
+        " model_scope TEXT DEFAULT '', project_scope TEXT DEFAULT '', "
+        "reset_at_utc DATETIME,"
+        " correlation_id TEXT NOT NULL)");
+    if (!query.exec(createSql) || !query.exec(QStringLiteral("INSERT INTO "
+                                                             "observations_v4(id,provider,observed_at_utc,interval_start_utc,"
+                                                             "interval_end_utc,metric_kind,unit,value,currency,semantic,source,"
+                                                             "data_quality,model_scope,project_scope,correlation_id) "
+                                                             "SELECT "
+                                                             "id,provider,observed_at_utc,interval_start_utc,interval_end_utc,"
+                                                             "metric_kind,unit,value,currency,semantic,source,data_quality,model_"
+                                                             "scope,project_scope,correlation_id FROM observations"))
+        || !query.exec(QStringLiteral("DROP TABLE observations")) || !query.exec(QStringLiteral("ALTER TABLE observations_v4 RENAME TO observations")) || !query.exec(QStringLiteral("CREATE INDEX idx_observations_provider_time_source_currency "
+                                                                                                                                                                                     "ON observations(provider, observed_at_utc, source, currency)"))
         || !query.exec(QStringLiteral("PRAGMA user_version = 4"))) {
-        qWarning() << "UsageDatabase: v4 migration failed" << query.lastError().text();
+        qWarning() << "UsageDatabase: v4 migration failed"
+                   << query.lastError().text();
         m_db.rollback();
         return false;
     }
@@ -460,45 +722,42 @@ void UsageDatabase::ensureColumnExists(const QString &table,
 
     QSqlQuery alter(m_db);
     const QString sql = QStringLiteral("ALTER TABLE %1 ADD COLUMN %2 %3")
-        .arg(table, column, definition);
+                            .arg(table, column, definition);
     if (!alter.exec(sql)) {
-        qWarning() << "UsageDatabase: Failed to add column" << column << "to" << table
-                   << ":" << alter.lastError().text();
+        qWarning() << "UsageDatabase: Failed to add column" << column << "to"
+                   << table << ":" << alter.lastError().text();
     }
 }
 
-void UsageDatabase::recordSnapshot(const QString &provider,
-                                    qint64 inputTokens,
-                                    qint64 outputTokens,
-                                    int requestCount,
-                                    double cost,
-                                    double dailyCost,
-                                    double monthlyCost,
-                                    int rateLimitRequests,
-                                    int rateLimitRequestsRemaining,
-                                    int rateLimitTokens,
-                                    int rateLimitTokensRemaining,
-                                    const QString &model,
-                                    bool isEstimatedCost,
-                                    const QString &costSource,
-                                    const QString &usageSource,
-                                    const QString &currency,
-                                    const QString &dataQuality)
+void UsageDatabase::recordSnapshot(
+    const QString &provider, qint64 inputTokens, qint64 outputTokens,
+    int requestCount, double cost, double dailyCost, double monthlyCost,
+    int rateLimitRequests, int rateLimitRequestsRemaining, int rateLimitTokens,
+    int rateLimitTokensRemaining, const QString &model, bool isEstimatedCost,
+    const QString &costSource, const QString &usageSource,
+    const QString &currency, const QString &dataQuality)
 {
     if (!m_enabled)
         return;
 
-    // Throttle writes: skip if the same provider wrote recently AND data hasn't changed
+    // Throttle writes: skip if the same provider wrote recently AND data hasn't
+    // changed
     qint64 now = QDateTime::currentSecsSinceEpoch();
     qint64 lastWrite = m_lastWriteTime.value(provider, 0);
-    const QByteArray normalizedState = QStringLiteral(
-        "%1|%2|%3|%4|%5|%6|%7|%8|%9|%10|%11|%12|%13|%14|%15|%16")
-        .arg(inputTokens).arg(outputTokens).arg(requestCount)
-        .arg(cost, 0, 'g', 17).arg(dailyCost, 0, 'g', 17).arg(monthlyCost, 0, 'g', 17)
-        .arg(rateLimitRequests).arg(rateLimitRequestsRemaining)
-        .arg(rateLimitTokens).arg(rateLimitTokensRemaining)
-        .arg(model, costSource, usageSource, currency, dataQuality)
-        .arg(isEstimatedCost ? 1 : 0).toUtf8();
+    const QByteArray normalizedState = QStringLiteral("%1|%2|%3|%4|%5|%6|%7|%8|%9|%10|%11|%12|%13|%14|%15|%16")
+                                           .arg(inputTokens)
+                                           .arg(outputTokens)
+                                           .arg(requestCount)
+                                           .arg(cost, 0, 'g', 17)
+                                           .arg(dailyCost, 0, 'g', 17)
+                                           .arg(monthlyCost, 0, 'g', 17)
+                                           .arg(rateLimitRequests)
+                                           .arg(rateLimitRequestsRemaining)
+                                           .arg(rateLimitTokens)
+                                           .arg(rateLimitTokensRemaining)
+                                           .arg(model, costSource, usageSource, currency, dataQuality)
+                                           .arg(isEstimatedCost ? 1 : 0)
+                                           .toUtf8();
     const bool dataChanged = m_lastWrittenState.value(provider) != normalizedState;
     bool throttled = (now - lastWrite) < WRITE_THROTTLE_SECS;
 
@@ -516,11 +775,12 @@ void UsageDatabase::recordSnapshot(const QString &provider,
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral(
         "INSERT INTO usage_snapshots "
-        "(provider, model, input_tokens, output_tokens, request_count, cost, is_estimated_cost, "
-        "daily_cost, monthly_cost, rl_requests, rl_requests_remaining, rl_tokens, rl_tokens_remaining, "
+        "(provider, model, input_tokens, output_tokens, request_count, cost, "
+        "is_estimated_cost, "
+        "daily_cost, monthly_cost, rl_requests, rl_requests_remaining, "
+        "rl_tokens, rl_tokens_remaining, "
         "cost_source, usage_source, currency, data_quality) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-    ));
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     query.addBindValue(provider);
     query.addBindValue(model.trimmed());
     query.addBindValue(inputTokens);
@@ -534,16 +794,23 @@ void UsageDatabase::recordSnapshot(const QString &provider,
     query.addBindValue(rateLimitRequestsRemaining);
     query.addBindValue(rateLimitTokens);
     query.addBindValue(rateLimitTokensRemaining);
-    query.addBindValue(costSource.trimmed().isEmpty() ? QStringLiteral("unknown") : costSource.trimmed());
-    query.addBindValue(usageSource.trimmed().isEmpty() ? QStringLiteral("unknown") : usageSource.trimmed());
-    query.addBindValue(currency.trimmed().isEmpty() ? QStringLiteral("USD") : currency.trimmed().toUpper());
-    query.addBindValue(dataQuality.trimmed().isEmpty() ? QStringLiteral("unknown") : dataQuality.trimmed());
+    query.addBindValue(costSource.trimmed().isEmpty() ? QStringLiteral("unknown")
+                                                      : costSource.trimmed());
+    query.addBindValue(usageSource.trimmed().isEmpty() ? QStringLiteral("unknown")
+                                                       : usageSource.trimmed());
+    query.addBindValue(currency.trimmed().isEmpty()
+                           ? QStringLiteral("USD")
+                           : currency.trimmed().toUpper());
+    query.addBindValue(dataQuality.trimmed().isEmpty() ? QStringLiteral("unknown")
+                                                       : dataQuality.trimmed());
 
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to record snapshot:" << query.lastError().text();
+        qWarning() << "UsageDatabase: Failed to record snapshot:"
+                   << query.lastError().text();
         m_db.rollback();
-    } else if (!recordObservations(provider, model, inputTokens, outputTokens, requestCount,
-                                   cost, currency, costSource, usageSource, dataQuality)) {
+    } else if (!recordObservations(provider, model, inputTokens, outputTokens,
+                                   requestCount, cost, currency, costSource,
+                                   usageSource, dataQuality)) {
         qWarning() << "UsageDatabase: Failed to record normalized observations";
         m_db.rollback();
     } else if (!m_db.commit()) {
@@ -555,21 +822,20 @@ void UsageDatabase::recordSnapshot(const QString &provider,
 }
 
 bool UsageDatabase::recordObservations(const QString &provider,
-                                       const QString &model,
-                                       qint64 inputTokens,
-                                       qint64 outputTokens,
-                                       int requestCount,
-                                       double cost,
-                                       const QString &currency,
+                                       const QString &model, qint64 inputTokens,
+                                       qint64 outputTokens, int requestCount,
+                                       double cost, const QString &currency,
                                        const QString &costSource,
                                        const QString &usageSource,
                                        const QString &dataQuality)
 {
     const QString correlationId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     const QString currencyCode = currency.trimmed().isEmpty()
-        ? QStringLiteral("USD") : currency.trimmed().toUpper();
+        ? QStringLiteral("USD")
+        : currency.trimmed().toUpper();
     const QString quality = dataQuality.trimmed().isEmpty()
-        ? QStringLiteral("unknown") : dataQuality.trimmed();
+        ? QStringLiteral("unknown")
+        : dataQuality.trimmed();
 
     struct Observation {
         QString kind;
@@ -581,19 +847,35 @@ bool UsageDatabase::recordObservations(const QString &provider,
     };
     const QList<Observation> observations = {
         {QStringLiteral("cost"), currencyCode, cost, currencyCode,
-         costSource == QLatin1String("estimated_from_usage") ? QStringLiteral("local_estimate") : QStringLiteral("gauge"),
-         costSource.trimmed().isEmpty() ? QStringLiteral("unknown") : costSource.trimmed()},
-        {QStringLiteral("input_tokens"), QStringLiteral("token"), static_cast<double>(inputTokens), {},
-         QStringLiteral("cumulative_counter"), usageSource},
-        {QStringLiteral("output_tokens"), QStringLiteral("token"), static_cast<double>(outputTokens), {},
-         QStringLiteral("cumulative_counter"), usageSource},
-        {QStringLiteral("requests"), QStringLiteral("request"), static_cast<double>(requestCount), {},
-         QStringLiteral("cumulative_counter"), usageSource},
+         costSource == QLatin1String("estimated_from_usage")
+             ? QStringLiteral("local_estimate")
+             : QStringLiteral("gauge"),
+         costSource.trimmed().isEmpty() ? QStringLiteral("unknown")
+                                        : costSource.trimmed()},
+        {QStringLiteral("input_tokens"),
+         QStringLiteral("token"),
+         static_cast<double>(inputTokens),
+         {},
+         QStringLiteral("cumulative_counter"),
+         usageSource},
+        {QStringLiteral("output_tokens"),
+         QStringLiteral("token"),
+         static_cast<double>(outputTokens),
+         {},
+         QStringLiteral("cumulative_counter"),
+         usageSource},
+        {QStringLiteral("requests"),
+         QStringLiteral("request"),
+         static_cast<double>(requestCount),
+         {},
+         QStringLiteral("cumulative_counter"),
+         usageSource},
     };
 
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral(
-        "INSERT INTO observations(provider, metric_kind, unit, value, currency, semantic, source, data_quality, model_scope, correlation_id) "
+        "INSERT INTO observations(provider, metric_kind, unit, value, currency, "
+        "semantic, source, data_quality, model_scope, correlation_id) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     for (const Observation &observation : observations) {
         query.bindValue(0, provider);
@@ -607,41 +889,77 @@ bool UsageDatabase::recordObservations(const QString &provider,
         query.bindValue(8, model.trimmed());
         query.bindValue(9, correlationId);
         if (!query.exec()) {
-            qWarning() << "UsageDatabase: observation insert failed" << query.lastError().text();
+            qWarning() << "UsageDatabase: observation insert failed"
+                       << query.lastError().text();
             return false;
         }
     }
     return true;
 }
 
-bool UsageDatabase::recordProviderMetrics(const QString &provider, const QVariantList &metrics)
+bool UsageDatabase::recordProviderMetrics(const QString &provider,
+                                          const QVariantList &metrics)
 {
-    if (!m_enabled) return false;
+    if (!m_enabled)
+        return false;
     initDatabase();
-    if (!m_initialized || !m_db.transaction()) return false;
+    if (!m_initialized || !m_db.transaction())
+        return false;
 
     const QString correlationId = QUuid::createUuid().toString(QUuid::WithoutBraces);
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral(
-        "INSERT INTO observations(provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,window,reset_at_utc,correlation_id) "
+        "INSERT INTO "
+        "observations(provider,observed_at_utc,interval_start_utc,interval_end_"
+        "utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,"
+        "window,reset_at_utc,correlation_id) "
         "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
     for (const QVariant &entry : metrics) {
         const QVariantMap metric = entry.toMap();
+        const QString requestedSemantic =
+            metric.value(QStringLiteral("semantic")).toString();
+        const QSet<QString> validSemantics{
+            QStringLiteral("gauge"), QStringLiteral("cumulative_counter"),
+            QStringLiteral("interval_total"), QStringLiteral("local_estimate")};
+        QString semantic = requestedSemantic;
+        if (!validSemantics.contains(semantic)) {
+            const QString quality =
+                metric.value(QStringLiteral("quality")).toString().toLower();
+            const QString source =
+                metric.value(QStringLiteral("source")).toString().toLower();
+            if (quality.contains(QStringLiteral("estimated"))
+                || source.contains(QStringLiteral("estimated"))) {
+                semantic = QStringLiteral("local_estimate");
+            } else {
+                semantic = QStringLiteral("gauge");
+            }
+        }
         query.bindValue(0, provider);
-        query.bindValue(1, metric.value(QStringLiteral("observedAt"), QDateTime::currentDateTimeUtc()));
+        const QDateTime observedAt = metric
+                                         .value(QStringLiteral("observedAt"),
+                                                QDateTime::currentDateTimeUtc())
+                                         .toDateTime();
+        query.bindValue(1,
+                        toDbDateTimeString(observedAt.isValid()
+                                               ? observedAt
+                                               : QDateTime::currentDateTimeUtc()));
         query.bindValue(2, metric.value(QStringLiteral("periodStart")));
         query.bindValue(3, metric.value(QStringLiteral("periodEnd")));
-        query.bindValue(4, metric.value(QStringLiteral("kind"), QStringLiteral("unknown")));
-        query.bindValue(5, metric.value(QStringLiteral("unit"), QStringLiteral("unknown")));
-        query.bindValue(6, metric.value(QStringLiteral("available")).toBool()
-                              ? metric.value(QStringLiteral("value")) : QVariant());
+        query.bindValue(
+            4, metric.value(QStringLiteral("kind"), QStringLiteral("unknown")));
+        query.bindValue(
+            5, metric.value(QStringLiteral("unit"), QStringLiteral("unknown")));
+        query.bindValue(6, metric.value(QStringLiteral("available")).toBool() ? metric.value(QStringLiteral("value")) : QVariant());
         query.bindValue(7, metric.value(QStringLiteral("currency")));
-        query.bindValue(8, metric.value(QStringLiteral("quality")).toString() == QLatin1String("estimated")
-                              ? QStringLiteral("local_estimate") : QStringLiteral("gauge"));
-        query.bindValue(9, metric.value(QStringLiteral("source"), QStringLiteral("unknown")));
-        query.bindValue(10, metric.value(QStringLiteral("quality"), QStringLiteral("unknown")));
-        query.bindValue(11, metric.value(QStringLiteral("scope"), QStringLiteral("api_key")));
-        query.bindValue(12, metric.value(QStringLiteral("window"), QStringLiteral("current")));
+        query.bindValue(8, semantic);
+        query.bindValue(
+            9, metric.value(QStringLiteral("source"), QStringLiteral("unknown")));
+        query.bindValue(
+            10, metric.value(QStringLiteral("quality"), QStringLiteral("unknown")));
+        query.bindValue(
+            11, metric.value(QStringLiteral("scope"), QStringLiteral("api_key")));
+        query.bindValue(
+            12, metric.value(QStringLiteral("window"), QStringLiteral("current")));
         query.bindValue(13, metric.value(QStringLiteral("resetAt")));
         query.bindValue(14, correlationId);
         if (!query.exec()) {
@@ -653,8 +971,8 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider, const QVarian
 }
 
 void UsageDatabase::recordRateLimitEvent(const QString &provider,
-                                          const QString &eventType,
-                                          int percentUsed)
+                                         const QString &eventType,
+                                         int percentUsed)
 {
     if (!m_enabled)
         return;
@@ -664,35 +982,38 @@ void UsageDatabase::recordRateLimitEvent(const QString &provider,
         return;
 
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral(
-        "INSERT INTO rate_limit_events (provider, event_type, percent_used) VALUES (?, ?, ?)"
-    ));
+    query.prepare(QStringLiteral("INSERT INTO rate_limit_events (provider, "
+                                 "event_type, percent_used) VALUES (?, ?, ?)"));
     query.addBindValue(provider);
     query.addBindValue(eventType);
     query.addBindValue(percentUsed);
 
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to record rate limit event:" << query.lastError().text();
+        qWarning() << "UsageDatabase: Failed to record rate limit event:"
+                   << query.lastError().text();
     }
 }
 
-void UsageDatabase::recordToolSnapshot(const QString &toolName,
-                                        int usageCount,
-                                        int usageLimit,
-                                        const QString &periodType,
-                                        const QString &planTier,
-                                        bool limitReached)
+void UsageDatabase::recordToolSnapshot(const QString &toolName, int usageCount,
+                                       int usageLimit,
+                                       const QString &periodType,
+                                       const QString &planTier,
+                                       bool limitReached)
 {
     if (!m_enabled)
         return;
 
-    // Throttle writes: skip if the same tool wrote recently AND data hasn't changed
+    // Throttle writes: skip if the same tool wrote recently AND data hasn't
+    // changed
     qint64 now = QDateTime::currentSecsSinceEpoch();
     QString throttleKey = QStringLiteral("tool:") + toolName;
     qint64 lastWrite = m_lastWriteTime.value(throttleKey, 0);
     const QByteArray normalizedState = QStringLiteral("%1|%2|%3|%4|%5")
-        .arg(usageCount).arg(usageLimit).arg(periodType, planTier)
-        .arg(limitReached ? 1 : 0).toUtf8();
+                                           .arg(usageCount)
+                                           .arg(usageLimit)
+                                           .arg(periodType, planTier)
+                                           .arg(limitReached ? 1 : 0)
+                                           .toUtf8();
     const bool dataChanged = m_lastWrittenState.value(throttleKey) != normalizedState;
     bool throttled = (now - lastWrite) < WRITE_THROTTLE_SECS;
 
@@ -704,11 +1025,10 @@ void UsageDatabase::recordToolSnapshot(const QString &toolName,
         return;
 
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral(
-        "INSERT INTO subscription_tool_usage "
-        "(tool_name, usage_count, usage_limit, period_type, plan_tier, limit_reached) "
-        "VALUES (?, ?, ?, ?, ?, ?)"
-    ));
+    query.prepare(QStringLiteral("INSERT INTO subscription_tool_usage "
+                                 "(tool_name, usage_count, usage_limit, "
+                                 "period_type, plan_tier, limit_reached) "
+                                 "VALUES (?, ?, ?, ?, ?, ?)"));
     query.addBindValue(toolName);
     query.addBindValue(usageCount);
     query.addBindValue(usageLimit);
@@ -717,7 +1037,8 @@ void UsageDatabase::recordToolSnapshot(const QString &toolName,
     query.addBindValue(limitReached ? 1 : 0);
 
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to record tool snapshot:" << query.lastError().text();
+        qWarning() << "UsageDatabase: Failed to record tool snapshot:"
+                   << query.lastError().text();
     } else {
         m_lastWriteTime[throttleKey] = now;
         m_lastWrittenState[throttleKey] = normalizedState;
@@ -725,8 +1046,8 @@ void UsageDatabase::recordToolSnapshot(const QString &toolName,
 }
 
 QVariantList UsageDatabase::getSnapshots(const QString &provider,
-                                          const QDateTime &from,
-                                          const QDateTime &to) const
+                                         const QDateTime &from,
+                                         const QDateTime &to) const
 {
     QVariantList results;
 
@@ -734,20 +1055,23 @@ QVariantList UsageDatabase::getSnapshots(const QString &provider,
         return results;
 
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral(
-        "SELECT timestamp, model, input_tokens, output_tokens, request_count, cost, "
-        "is_estimated_cost, daily_cost, monthly_cost, rl_requests, rl_requests_remaining, "
-        "rl_tokens, rl_tokens_remaining, cost_source, usage_source, currency, data_quality "
-        "FROM usage_snapshots "
-        "WHERE provider = ? AND timestamp >= ? AND timestamp <= ? "
-        "ORDER BY timestamp ASC LIMIT 10000"
-    ));
+    query.prepare(
+        QStringLiteral("SELECT timestamp, model, input_tokens, output_tokens, "
+                       "request_count, cost, "
+                       "is_estimated_cost, daily_cost, monthly_cost, "
+                       "rl_requests, rl_requests_remaining, "
+                       "rl_tokens, rl_tokens_remaining, cost_source, "
+                       "usage_source, currency, data_quality "
+                       "FROM usage_snapshots "
+                       "WHERE provider = ? AND timestamp >= ? AND timestamp <= ? "
+                       "ORDER BY timestamp ASC LIMIT 10000"));
     query.addBindValue(provider);
     query.addBindValue(toDbDateTimeString(from));
     query.addBindValue(toDbDateTimeString(to));
 
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: getSnapshots query failed:" << query.lastError().text();
+        qWarning() << "UsageDatabase: getSnapshots query failed:"
+                   << query.lastError().text();
         return results;
     }
 
@@ -777,8 +1101,8 @@ QVariantList UsageDatabase::getSnapshots(const QString &provider,
 }
 
 QVariantList UsageDatabase::getDailyCosts(const QString &provider,
-                                           const QDateTime &from,
-                                           const QDateTime &to) const
+                                          const QDateTime &from,
+                                          const QDateTime &to) const
 {
     QVariantList results;
 
@@ -786,19 +1110,21 @@ QVariantList UsageDatabase::getDailyCosts(const QString &provider,
         return results;
 
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral(
-        "SELECT date(observed_at_utc) AS day, currency, SUM(value) AS interval_total "
-        "FROM observations "
-        "WHERE provider = ? AND metric_kind = 'cost' AND semantic = 'interval_total' "
-        "AND observed_at_utc >= ? AND observed_at_utc <= ? "
-        "GROUP BY day, currency ORDER BY day ASC, currency ASC"
-    ));
+    query.prepare(
+        QStringLiteral("SELECT date(observed_at_utc) AS day, currency, "
+                       "SUM(value) AS interval_total "
+                       "FROM observations "
+                       "WHERE provider = ? AND metric_kind = 'cost' AND semantic "
+                       "= 'interval_total' "
+                       "AND observed_at_utc >= ? AND observed_at_utc <= ? "
+                       "GROUP BY day, currency ORDER BY day ASC, currency ASC"));
     query.addBindValue(provider);
     query.addBindValue(toDbDateTimeString(from));
     query.addBindValue(toDbDateTimeString(to));
 
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: getDailyCosts query failed:" << query.lastError().text();
+        qWarning() << "UsageDatabase: getDailyCosts query failed:"
+                   << query.lastError().text();
         return results;
     }
 
@@ -825,15 +1151,15 @@ QVariantMap UsageDatabase::getSummary(const QString &provider,
 
     QVariantMap currencyTotals;
     QSqlQuery moneyQuery(m_db);
-    moneyQuery.prepare(QStringLiteral(
-        "SELECT currency, SUM(value) FROM observations o "
-        "WHERE provider = ? AND metric_kind = 'cost' "
-        "AND observed_at_utc >= ? AND observed_at_utc <= ? "
-        "AND id IN (SELECT MAX(id) FROM observations "
-        "WHERE provider = ? AND metric_kind = 'cost' "
-        "AND observed_at_utc >= ? AND observed_at_utc <= ? "
-        "GROUP BY provider, currency) "
-        "GROUP BY currency ORDER BY currency"));
+    moneyQuery.prepare(
+        QStringLiteral("SELECT currency, SUM(value) FROM observations o "
+                       "WHERE provider = ? AND metric_kind = 'cost' "
+                       "AND observed_at_utc >= ? AND observed_at_utc <= ? "
+                       "AND id IN (SELECT MAX(id) FROM observations "
+                       "WHERE provider = ? AND metric_kind = 'cost' "
+                       "AND observed_at_utc >= ? AND observed_at_utc <= ? "
+                       "GROUP BY provider, currency) "
+                       "GROUP BY currency ORDER BY currency"));
     const QString fromText = toDbDateTimeString(from);
     const QString toText = toDbDateTimeString(to);
     moneyQuery.addBindValue(provider);
@@ -843,7 +1169,8 @@ QVariantMap UsageDatabase::getSummary(const QString &provider,
     moneyQuery.addBindValue(fromText);
     moneyQuery.addBindValue(toText);
     if (!moneyQuery.exec()) {
-        qWarning() << "UsageDatabase: monetary summary query failed:" << moneyQuery.lastError().text();
+        qWarning() << "UsageDatabase: monetary summary query failed:"
+                   << moneyQuery.lastError().text();
         return result;
     }
     while (moneyQuery.next()) {
@@ -852,12 +1179,14 @@ QVariantMap UsageDatabase::getSummary(const QString &provider,
     result[QStringLiteral("currencyTotals")] = currencyTotals;
     result[QStringLiteral("mixedCurrencies")] = currencyTotals.size() > 1;
     result[QStringLiteral("totalCost")] = currencyTotals.size() == 1
-        ? currencyTotals.constBegin().value().toDouble() : 0.0;
+        ? currencyTotals.constBegin().value().toDouble()
+        : 0.0;
 
     QSqlQuery usageQuery(m_db);
     usageQuery.prepare(QStringLiteral(
         "SELECT MAX(request_count), MAX(input_tokens + output_tokens), COUNT(*) "
-        "FROM usage_snapshots WHERE provider = ? AND timestamp >= ? AND timestamp <= ?"));
+        "FROM usage_snapshots WHERE provider = ? AND timestamp >= ? AND "
+        "timestamp <= ?"));
     usageQuery.addBindValue(provider);
     usageQuery.addBindValue(fromText);
     usageQuery.addBindValue(toText);
@@ -883,49 +1212,611 @@ QVariantMap UsageDatabase::getSummary(const QString &provider,
 
 void UsageDatabase::requestHistory(const QString &requestId,
                                    const QString &provider,
-                                   const QDateTime &from,
-                                   const QDateTime &to)
+                                   const QDateTime &from, const QDateTime &to)
 {
     initDatabase();
+    beginWorker();
     auto *watcher = new QFutureWatcher<QVariantMap>(this);
     connect(watcher, &QFutureWatcher<QVariantMap>::finished, this,
             [this, watcher, requestId]() {
-        Q_EMIT historyReady(requestId, watcher->result());
-        watcher->deleteLater();
-    });
+                Q_EMIT historyReady(requestId, watcher->result());
+                finishWorker();
+                watcher->deleteLater();
+            });
     watcher->setFuture(QtConcurrent::run([provider, from, to]() {
         UsageDatabase workerDatabase;
         workerDatabase.init();
         QVariantMap payload;
-        payload.insert(QStringLiteral("snapshots"), workerDatabase.getSnapshots(provider, from, to));
-        payload.insert(QStringLiteral("dailyCosts"), workerDatabase.getDailyCosts(provider, from, to));
-        payload.insert(QStringLiteral("summary"), workerDatabase.getSummary(provider, from, to));
+        payload.insert(QStringLiteral("snapshots"),
+                       workerDatabase.getSnapshots(provider, from, to));
+        payload.insert(QStringLiteral("dailyCosts"),
+                       workerDatabase.getDailyCosts(provider, from, to));
+        payload.insert(QStringLiteral("summary"),
+                       workerDatabase.getSummary(provider, from, to));
         return payload;
     }));
 }
 
-void UsageDatabase::requestComparison(const QString &requestId,
-                                      const QStringList &names,
-                                      const QDateTime &from,
-                                      const QDateTime &to,
-                                      const QString &source,
-                                      const QString &metric,
-                                      int bucketMinutes)
+void UsageDatabase::requestComparison(
+    const QString &requestId, const QStringList &names, const QDateTime &from,
+    const QDateTime &to, const QString &source, const QString &metric,
+    int bucketMinutes)
 {
     initDatabase();
+    beginWorker();
     auto *watcher = new QFutureWatcher<QVariantList>(this);
     connect(watcher, &QFutureWatcher<QVariantList>::finished, this,
             [this, watcher, requestId]() {
-        Q_EMIT comparisonReady(requestId, watcher->result());
-        watcher->deleteLater();
-    });
-    watcher->setFuture(QtConcurrent::run(
-        [names, from, to, source, metric, bucketMinutes]() {
+                Q_EMIT comparisonReady(requestId, watcher->result());
+                finishWorker();
+                watcher->deleteLater();
+            });
+    watcher->setFuture(
+        QtConcurrent::run([names, from, to, source, metric, bucketMinutes]() {
             UsageDatabase workerDatabase;
             workerDatabase.init();
             return source == QLatin1String("tools")
-                ? workerDatabase.getToolSeries(names, from, to, metric, bucketMinutes)
-                : workerDatabase.getProviderSeries(names, from, to, metric, bucketMinutes);
+                ? workerDatabase.getToolSeries(names, from, to, metric,
+                                               bucketMinutes)
+                : workerDatabase.getProviderSeries(names, from, to, metric,
+                                                   bucketMinutes);
+        }));
+}
+
+QVariantList UsageDatabase::getHistoryCatalog() const
+{
+    QVariantList catalog;
+    if (!m_initialized) {
+        return catalog;
+    }
+
+    QStringList providers = getProviders();
+    QSqlQuery observedProviders(m_db);
+    if (observedProviders.exec(QStringLiteral(
+            "SELECT DISTINCT provider FROM observations ORDER BY provider"))) {
+        while (observedProviders.next()) {
+            const QString provider = observedProviders.value(0).toString();
+            if (!providers.contains(provider)) {
+                providers.append(provider);
+            }
+        }
+    }
+    providers.sort(Qt::CaseInsensitive);
+
+    for (const QString &provider : std::as_const(providers)) {
+        QSet<QString> observationKinds;
+        QDateTime firstObservation;
+        QDateTime lastObservation;
+        int sampleCount = 0;
+
+        QSqlQuery metricsQuery(m_db);
+        metricsQuery.prepare(
+            QStringLiteral("SELECT metric_kind, observed_at_utc FROM observations "
+                           "WHERE provider = ? AND value IS NOT NULL "
+                           "AND lower(source) != 'unknown' "
+                           "AND lower(source) NOT LIKE '%connectivity%' "
+                           "AND lower(source) NOT LIKE '%model_discovery%' "
+                           "ORDER BY observed_at_utc"));
+        metricsQuery.addBindValue(provider);
+        if (metricsQuery.exec()) {
+            while (metricsQuery.next()) {
+                const QString kind = metricsQuery.value(0).toString();
+                const QDateTime timestamp = parseSnapshotTimestamp(metricsQuery.value(1).toString());
+                observationKinds.insert(kind);
+                if (timestamp.isValid()) {
+                    if (!firstObservation.isValid() || timestamp < firstObservation) {
+                        firstObservation = timestamp;
+                    }
+                    if (!lastObservation.isValid() || timestamp > lastObservation) {
+                        lastObservation = timestamp;
+                    }
+                }
+                sampleCount++;
+            }
+        }
+
+        // A schema-v4 database may contain legacy snapshots whose normalized
+        // observations were intentionally marked unknown. Keep the source
+        // discoverable, but do not advertise unsupported metrics for it.
+        if (!firstObservation.isValid()) {
+            QSqlQuery boundsQuery(m_db);
+            boundsQuery.prepare(
+                QStringLiteral("SELECT MIN(timestamp), MAX(timestamp), COUNT(*) "
+                               "FROM usage_snapshots WHERE provider = ?"));
+            boundsQuery.addBindValue(provider);
+            if (boundsQuery.exec() && boundsQuery.next()) {
+                firstObservation = parseSnapshotTimestamp(boundsQuery.value(0).toString());
+                lastObservation = parseSnapshotTimestamp(boundsQuery.value(1).toString());
+                sampleCount = boundsQuery.value(2).toInt();
+            }
+        }
+
+        QStringList metrics;
+        if (observationKinds.contains(QStringLiteral("cost"))) {
+            metrics.append(QStringLiteral("cost"));
+        }
+        if (observationKinds.contains(QStringLiteral("input_tokens")) || observationKinds.contains(QStringLiteral("output_tokens"))) {
+            metrics.append(QStringLiteral("tokens"));
+        }
+        if (observationKinds.contains(QStringLiteral("requests"))) {
+            metrics.append(QStringLiteral("requests"));
+        }
+
+        QSqlQuery ratePairQuery(m_db);
+        ratePairQuery.prepare(QStringLiteral(
+            "SELECT 1 FROM observations limits "
+            "JOIN observations remaining "
+            "ON remaining.provider = limits.provider "
+            "AND remaining.correlation_id = limits.correlation_id "
+            "AND remaining.scope = limits.scope "
+            "AND remaining.window = limits.window "
+            "AND remaining.source = limits.source "
+            "WHERE limits.provider = ? AND limits.value > 0 "
+            "AND remaining.value IS NOT NULL "
+            "AND lower(limits.source) != 'unknown' "
+            "AND lower(remaining.source) != 'unknown' "
+            "AND lower(limits.source) NOT LIKE '%connectivity%' "
+            "AND lower(remaining.source) NOT LIKE '%connectivity%' "
+            "AND ((limits.metric_kind = 'request_limit' "
+            "AND remaining.metric_kind = 'request_remaining') "
+            "OR (limits.metric_kind = 'token_limit' "
+            "AND remaining.metric_kind = 'token_remaining')) "
+            "LIMIT 1"));
+        ratePairQuery.addBindValue(provider);
+        if (ratePairQuery.exec() && ratePairQuery.next()) {
+            metrics.append(QStringLiteral("rateLimitUsed"));
+        }
+
+        QVariantMap row;
+        row.insert(QStringLiteral("historyId"),
+                   QStringLiteral("provider:") + provider);
+        row.insert(QStringLiteral("dbName"), provider);
+        row.insert(QStringLiteral("displayName"), provider);
+        row.insert(QStringLiteral("sourceKind"), QStringLiteral("provider"));
+        row.insert(QStringLiteral("metricKinds"), metrics);
+        row.insert(QStringLiteral("sampleCount"), sampleCount);
+        row.insert(QStringLiteral("firstObservation"), firstObservation);
+        row.insert(QStringLiteral("lastObservation"), lastObservation);
+        catalog.append(row);
+    }
+
+    const QStringList tools = getToolNames();
+    for (const QString &tool : tools) {
+        QSqlQuery query(m_db);
+        query.prepare(
+            QStringLiteral("SELECT MIN(timestamp), MAX(timestamp), COUNT(*), "
+                           "SUM(CASE WHEN usage_limit > 0 THEN 1 ELSE 0 END) "
+                           "FROM subscription_tool_usage WHERE tool_name = ?"));
+        query.addBindValue(tool);
+        if (!query.exec() || !query.next()) {
+            continue;
+        }
+
+        QStringList metrics{QStringLiteral("usageCount")};
+        if (query.value(3).toInt() > 0) {
+            metrics.append(QStringLiteral("percentUsed"));
+            metrics.append(QStringLiteral("remaining"));
+        }
+
+        QVariantMap row;
+        row.insert(QStringLiteral("historyId"), QStringLiteral("tool:") + tool);
+        row.insert(QStringLiteral("dbName"), tool);
+        row.insert(QStringLiteral("displayName"), tool);
+        row.insert(QStringLiteral("sourceKind"), QStringLiteral("tool"));
+        row.insert(QStringLiteral("metricKinds"), metrics);
+        row.insert(QStringLiteral("sampleCount"), query.value(2).toInt());
+        row.insert(QStringLiteral("firstObservation"),
+                   parseSnapshotTimestamp(query.value(0).toString()));
+        row.insert(QStringLiteral("lastObservation"),
+                   parseSnapshotTimestamp(query.value(1).toString()));
+        catalog.append(row);
+    }
+
+    return catalog;
+}
+
+void UsageDatabase::requestHistoryCatalog(const QString &requestId)
+{
+    initDatabase();
+    m_latestHistoryCatalogRequestId = requestId;
+    beginWorker();
+    auto *watcher = new QFutureWatcher<QVariantList>(this);
+    connect(watcher, &QFutureWatcher<QVariantList>::finished, this,
+            [this, watcher, requestId]() {
+                if (m_latestHistoryCatalogRequestId == requestId) {
+                    Q_EMIT historyCatalogReady(requestId, watcher->result());
+                }
+                finishWorker();
+                watcher->deleteLater();
+            });
+    watcher->setFuture(QtConcurrent::run([]() {
+        UsageDatabase workerDatabase;
+        workerDatabase.init();
+        return workerDatabase.getHistoryCatalog();
+    }));
+}
+
+QVariantMap UsageDatabase::getHistorySeries(const QVariantList &sources,
+                                            const QDateTime &from,
+                                            const QDateTime &to,
+                                            const QString &metric,
+                                            int bucketMinutes) const
+{
+    QVariantMap result;
+    result.insert(QStringLiteral("ok"), false);
+    result.insert(QStringLiteral("errorKey"), QStringLiteral("invalid_request"));
+    result.insert(QStringLiteral("metricKind"), metric);
+    result.insert(QStringLiteral("series"), QVariantList());
+
+    const QSet<QString> supportedMetrics{
+        QStringLiteral("cost"), QStringLiteral("tokens"),
+        QStringLiteral("requests"), QStringLiteral("rateLimitUsed"),
+        QStringLiteral("usageCount"), QStringLiteral("percentUsed"),
+        QStringLiteral("remaining")};
+    const QDateTime fromUtc = from.toUTC();
+    const QDateTime toUtc = to.toUTC();
+    if (!m_initialized || sources.isEmpty() || !supportedMetrics.contains(metric) || !fromUtc.isValid() || !toUtc.isValid() || fromUtc >= toUtc) {
+        return result;
+    }
+
+    QVariantList allSeries;
+    for (const QVariant &sourceValue : sources) {
+        QVariantMap descriptor = sourceValue.toMap();
+        const QString sourceKind = descriptor.value(QStringLiteral("sourceKind")).toString();
+        const QString dbName = descriptor.value(QStringLiteral("dbName")).toString();
+        if (dbName.isEmpty() || (sourceKind != QLatin1String("provider") && sourceKind != QLatin1String("tool"))) {
+            continue;
+        }
+        if (!descriptor.contains(QStringLiteral("historyId"))) {
+            descriptor.insert(QStringLiteral("historyId"),
+                              sourceKind + QLatin1Char(':') + dbName);
+        }
+
+        QList<HistorySample> samples;
+        if (sourceKind == QLatin1String("tool")) {
+            if (metric != QLatin1String("usageCount") && metric != QLatin1String("percentUsed") && metric != QLatin1String("remaining")) {
+                continue;
+            }
+            QSqlQuery query(m_db);
+            query.prepare(QStringLiteral(
+                "SELECT timestamp, usage_count, usage_limit, period_type "
+                "FROM subscription_tool_usage "
+                "WHERE tool_name = ? AND timestamp >= ? AND timestamp <= ? "
+                "ORDER BY timestamp"));
+            query.addBindValue(dbName);
+            query.addBindValue(toDbDateTimeString(fromUtc));
+            query.addBindValue(toDbDateTimeString(toUtc));
+            if (!query.exec()) {
+                continue;
+            }
+            while (query.next()) {
+                const int usageCount = query.value(1).toInt();
+                const int usageLimit = query.value(2).toInt();
+                if ((metric == QLatin1String("percentUsed") || metric == QLatin1String("remaining")) && usageLimit <= 0) {
+                    continue;
+                }
+                HistorySample sample;
+                sample.timestamp = parseSnapshotTimestamp(query.value(0).toString());
+                sample.value = metric == QLatin1String("usageCount")
+                    ? static_cast<double>(usageCount)
+                    : metric == QLatin1String("remaining")
+                    ? static_cast<double>(qMax(0, usageLimit - usageCount))
+                    : static_cast<double>(usageCount) * 100.0 / static_cast<double>(usageLimit);
+                sample.unit = metric == QLatin1String("percentUsed")
+                    ? QStringLiteral("percent")
+                    : QStringLiteral("count");
+                sample.semantic = QStringLiteral("rolling_gauge");
+                sample.source = QStringLiteral("local_tool");
+                sample.quality = QStringLiteral("estimated");
+                sample.scope = QStringLiteral("subscription");
+                sample.window = query.value(3).toString();
+                samples.append(sample);
+            }
+        } else {
+            if (metric == QLatin1String("usageCount") || metric == QLatin1String("percentUsed") || metric == QLatin1String("remaining")) {
+                continue;
+            }
+
+            if (metric == QLatin1String("cost")
+                || metric == QLatin1String("requests")) {
+                const QString expectedKind = metric == QLatin1String("cost")
+                    ? QStringLiteral("cost")
+                    : QStringLiteral("requests");
+                const int bucketSecs =
+                    effectiveBucketSeconds(fromUtc, toUtc, bucketMinutes);
+                QSqlQuery query(m_db);
+                query.prepare(QStringLiteral(
+                    "WITH filtered AS ("
+                    " SELECT id, observed_at_utc, unit, value, currency, semantic,"
+                    " source, data_quality, scope, window, reset_at_utc,"
+                    " CAST((unixepoch(observed_at_utc) - ?) / ? AS INTEGER)"
+                    " AS bucket_index"
+                    " FROM observations WHERE provider = ?"
+                    " AND unixepoch(observed_at_utc) >= ?"
+                    " AND unixepoch(observed_at_utc) <= ?"
+                    " AND metric_kind = ? AND value IS NOT NULL"
+                    " AND lower(source) != 'unknown'"
+                    " AND lower(source) NOT LIKE '%connectivity%'"
+                    " AND lower(source) NOT LIKE '%model_discovery%'"
+                    "), ranked AS ("
+                    " SELECT *,"
+                    " SUM(value) OVER bucket AS bucket_sum,"
+                    " COUNT(*) OVER bucket AS bucket_count,"
+                    " MIN(unixepoch(observed_at_utc)) OVER segment"
+                    " AS segment_first,"
+                    " MAX(unixepoch(observed_at_utc)) OVER segment"
+                    " AS segment_last,"
+                    " ROW_NUMBER() OVER (bucket ORDER BY"
+                    " unixepoch(observed_at_utc) DESC, id DESC) AS bucket_rank"
+                    " FROM filtered"
+                    " WINDOW bucket AS (PARTITION BY bucket_index, unit,"
+                    " currency, semantic, source, data_quality, scope, window),"
+                    " segment AS (PARTITION BY unit, currency, semantic, source,"
+                    " scope, window)"
+                    ")"
+                    " SELECT bucket_index, unit,"
+                    " CASE WHEN semantic = 'interval_total' THEN bucket_sum"
+                    " ELSE value END,"
+                    " currency, semantic, source, data_quality, scope, window,"
+                    " reset_at_utc, bucket_count, segment_first, segment_last"
+                    " FROM ranked WHERE bucket_rank = 1"
+                    " ORDER BY bucket_index"));
+                query.addBindValue(fromUtc.toSecsSinceEpoch());
+                query.addBindValue(bucketSecs);
+                query.addBindValue(dbName);
+                query.addBindValue(fromUtc.toSecsSinceEpoch());
+                query.addBindValue(toUtc.toSecsSinceEpoch());
+                query.addBindValue(expectedKind);
+                if (!query.exec()) {
+                    qWarning() << "UsageDatabase: bucketed history query failed"
+                               << query.lastError().text();
+                    continue;
+                }
+                while (query.next()) {
+                    HistorySample sample;
+                    sample.timestamp =
+                        fromUtc.addSecs(query.value(0).toLongLong() * bucketSecs);
+                    sample.unit = metric == QLatin1String("cost")
+                        ? QStringLiteral("currency")
+                        : QStringLiteral("request");
+                    sample.value = query.value(2).toDouble();
+                    const QString rawCurrency =
+                        query.value(3).toString().trimmed().toUpper();
+                    const QString rawUnit =
+                        query.value(1).toString().trimmed().toUpper();
+                    sample.currency = metric == QLatin1String("cost")
+                        ? (!rawCurrency.isEmpty() ? rawCurrency
+                           : rawUnit.size() == 3 ? rawUnit
+                                                 : QStringLiteral("UNKNOWN"))
+                        : QString();
+                    sample.semantic = query.value(4).toString();
+                    sample.source = query.value(5).toString();
+                    sample.quality = query.value(6).toString();
+                    sample.scope = query.value(7).toString();
+                    sample.window = query.value(8).toString();
+                    sample.resetAt =
+                        parseSnapshotTimestamp(query.value(9).toString());
+                    sample.sampleCount = query.value(10).toInt();
+                    sample.firstObservation =
+                        QDateTime::fromSecsSinceEpoch(query.value(11).toLongLong(),
+                                                     QTimeZone::utc());
+                    sample.lastObservation =
+                        QDateTime::fromSecsSinceEpoch(query.value(12).toLongLong(),
+                                                     QTimeZone::utc());
+                    samples.append(sample);
+                }
+            } else {
+                QSqlQuery query(m_db);
+                query.prepare(QStringLiteral(
+                    "SELECT observed_at_utc, metric_kind, unit, value, "
+                    "currency, "
+                    "semantic, source, data_quality, scope, window, "
+                    "reset_at_utc, "
+                    "correlation_id "
+                    "FROM observations WHERE provider = ? "
+                    "AND unixepoch(observed_at_utc) >= ? "
+                    "AND unixepoch(observed_at_utc) <= ? "
+                    "AND value IS NOT NULL "
+                    "AND lower(source) != 'unknown' "
+                    "AND lower(source) NOT LIKE '%connectivity%' "
+                    "AND lower(source) NOT LIKE '%model_discovery%' "
+                    "ORDER BY observed_at_utc, id"));
+                query.addBindValue(dbName);
+                query.addBindValue(fromUtc.toSecsSinceEpoch());
+                query.addBindValue(toUtc.toSecsSinceEpoch());
+                if (!query.exec()) {
+                    continue;
+                }
+
+                struct ObservationRow {
+                    QDateTime timestamp;
+                    QString kind;
+                    QString unit;
+                    double value = 0.0;
+                    QString currency;
+                    QString semantic;
+                    QString source;
+                    QString quality;
+                    QString scope;
+                    QString window;
+                    QDateTime resetAt;
+                    QString correlationId;
+                };
+                QList<ObservationRow> rows;
+                while (query.next()) {
+                    ObservationRow row;
+                    row.timestamp =
+                        parseSnapshotTimestamp(query.value(0).toString());
+                    row.kind = query.value(1).toString();
+                    row.unit = query.value(2).toString();
+                    row.value = query.value(3).toDouble();
+                    row.currency =
+                        query.value(4).toString().trimmed().toUpper();
+                    row.semantic = query.value(5).toString();
+                    row.source = query.value(6).toString();
+                    row.quality = query.value(7).toString();
+                    row.scope = query.value(8).toString();
+                    row.window = query.value(9).toString();
+                    row.resetAt =
+                        parseSnapshotTimestamp(query.value(10).toString());
+                    row.correlationId = query.value(11).toString();
+                    rows.append(row);
+                }
+
+                if (metric == QLatin1String("tokens")) {
+                    QMap<QString, HistorySample> tokenGroups;
+                    for (const ObservationRow &row : std::as_const(rows)) {
+                        if (historyMetricForObservation(row.kind) !=
+                            QLatin1String("tokens")) {
+                            continue;
+                        }
+                        const QString groupKey =
+                            QStringList{
+                                row.correlationId,
+                                row.timestamp.toString(Qt::ISODateWithMs),
+                                row.semantic,
+                                row.source,
+                                row.quality,
+                                row.scope,
+                                row.window}
+                                .join(QChar(0x1f));
+                        HistorySample &sample = tokenGroups[groupKey];
+                        sample.timestamp = row.timestamp;
+                        sample.value += row.value;
+                        sample.unit = QStringLiteral("token");
+                        sample.semantic = row.semantic;
+                        sample.source = row.source;
+                        sample.quality = row.quality;
+                        sample.scope = row.scope;
+                        sample.window = row.window;
+                        sample.resetAt = row.resetAt;
+                    }
+                    samples = tokenGroups.values();
+                } else if (metric == QLatin1String("rateLimitUsed")) {
+                    struct LimitPair {
+                        ObservationRow limit;
+                        ObservationRow remaining;
+                        bool hasLimit = false;
+                        bool hasRemaining = false;
+                    };
+                    QMap<QString, LimitPair> pairs;
+                    for (const ObservationRow &row : std::as_const(rows)) {
+                        const bool isRequest =
+                            row.kind == QLatin1String("request_limit") ||
+                            row.kind == QLatin1String("request_remaining");
+                        const bool isToken =
+                            row.kind == QLatin1String("token_limit") ||
+                            row.kind == QLatin1String("token_remaining");
+                        if (!isRequest && !isToken) {
+                            continue;
+                        }
+                        const QString family = isRequest
+                                                   ? QStringLiteral("request")
+                                                   : QStringLiteral("token");
+                        const QString key =
+                            QStringList{row.correlationId, family, row.scope,
+                                        row.window, row.source}
+                                .join(QChar(0x1f));
+                        LimitPair &pair = pairs[key];
+                        if (row.kind.endsWith(QStringLiteral("_limit"))) {
+                            pair.limit = row;
+                            pair.hasLimit = true;
+                        } else {
+                            pair.remaining = row;
+                            pair.hasRemaining = true;
+                        }
+                    }
+                    for (const LimitPair &pair : std::as_const(pairs)) {
+                        if (!pair.hasLimit || !pair.hasRemaining ||
+                            pair.limit.value <= 0.0) {
+                            continue;
+                        }
+                        HistorySample sample;
+                        sample.timestamp = pair.remaining.timestamp;
+                        sample.value =
+                            qBound(0.0,
+                                   (pair.limit.value - pair.remaining.value) *
+                                       100.0 / pair.limit.value,
+                                   100.0);
+                        sample.unit = QStringLiteral("percent");
+                        sample.semantic = QStringLiteral("rolling_gauge");
+                        sample.source = pair.remaining.source;
+                        sample.quality = pair.remaining.quality;
+                        sample.scope = pair.remaining.scope;
+                        sample.window = pair.remaining.window;
+                        sample.resetAt = pair.remaining.resetAt;
+                        samples.append(sample);
+                    }
+                }
+            }
+        }
+
+        const QVariantMap sourcePayload = buildHistorySeriesPayload(
+            descriptor, metric, samples, fromUtc, toUtc, bucketMinutes);
+        allSeries.append(sourcePayload.value(QStringLiteral("series")).toList());
+    }
+
+    if (sources.size() > 1 && !allSeries.isEmpty()) {
+        QSet<QString> units;
+        QSet<QString> currencies;
+        QSet<QString> semantics;
+        for (const QVariant &seriesValue : std::as_const(allSeries)) {
+            const QVariantMap series = seriesValue.toMap();
+            units.insert(series.value(QStringLiteral("unit")).toString());
+            const QString currency = series.value(QStringLiteral("currency")).toString();
+            if (!currency.isEmpty()) {
+                currencies.insert(currency);
+            }
+            semantics.insert(series.value(QStringLiteral("semantic")).toString());
+        }
+        if (units.size() > 1) {
+            result.insert(QStringLiteral("errorKey"),
+                          QStringLiteral("incompatible_units"));
+            return result;
+        }
+        if (metric == QLatin1String("cost") && currencies.size() > 1) {
+            result.insert(QStringLiteral("errorKey"),
+                          QStringLiteral("mixed_currencies"));
+            return result;
+        }
+        if (semantics.size() > 1) {
+            result.insert(QStringLiteral("errorKey"),
+                          QStringLiteral("incompatible_semantics"));
+            return result;
+        }
+    }
+
+    result.insert(QStringLiteral("ok"), true);
+    result.insert(QStringLiteral("errorKey"), QString());
+    result.insert(QStringLiteral("series"), allSeries);
+    return result;
+}
+
+void UsageDatabase::requestHistorySeries(const QString &requestId,
+                                         const QVariantList &sources,
+                                         const QDateTime &from,
+                                         const QDateTime &to,
+                                         const QString &metric,
+                                         int bucketMinutes)
+{
+    initDatabase();
+    m_latestHistorySeriesRequestId = requestId;
+    beginWorker();
+    auto *watcher = new QFutureWatcher<QVariantMap>(this);
+    connect(watcher, &QFutureWatcher<QVariantMap>::finished, this,
+            [this, watcher, requestId]() {
+                if (m_latestHistorySeriesRequestId == requestId) {
+                    Q_EMIT historySeriesReady(requestId, watcher->result());
+                }
+                finishWorker();
+                watcher->deleteLater();
+            });
+    watcher->setFuture(
+        QtConcurrent::run([sources, from, to, metric, bucketMinutes]() {
+            UsageDatabase workerDatabase;
+            workerDatabase.init();
+            return workerDatabase.getHistorySeries(sources, from, to, metric,
+                                                   bucketMinutes);
         }));
 }
 
@@ -938,8 +1829,7 @@ QStringList UsageDatabase::getProviders() const
 
     QSqlQuery query(m_db);
     query.exec(QStringLiteral(
-        "SELECT DISTINCT provider FROM usage_snapshots ORDER BY provider"
-    ));
+        "SELECT DISTINCT provider FROM usage_snapshots ORDER BY provider"));
 
     while (query.next()) {
         providers.append(query.value(0).toString());
@@ -949,8 +1839,8 @@ QStringList UsageDatabase::getProviders() const
 }
 
 QVariantList UsageDatabase::getToolSnapshots(const QString &toolName,
-                                               const QDateTime &from,
-                                               const QDateTime &to) const
+                                             const QDateTime &from,
+                                             const QDateTime &to) const
 {
     QVariantList results;
 
@@ -963,14 +1853,14 @@ QVariantList UsageDatabase::getToolSnapshots(const QString &toolName,
         "plan_tier, limit_reached "
         "FROM subscription_tool_usage "
         "WHERE tool_name = ? AND timestamp >= ? AND timestamp <= ? "
-        "ORDER BY timestamp ASC"
-    ));
+        "ORDER BY timestamp ASC"));
     query.addBindValue(toolName);
     query.addBindValue(toDbDateTimeString(from));
     query.addBindValue(toDbDateTimeString(to));
 
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: getToolSnapshots query failed:" << query.lastError().text();
+        qWarning() << "UsageDatabase: getToolSnapshots query failed:"
+                   << query.lastError().text();
         return results;
     }
 
@@ -983,8 +1873,7 @@ QVariantList UsageDatabase::getToolSnapshots(const QString &toolName,
         row[QStringLiteral("planTier")] = query.value(4).toString();
         row[QStringLiteral("limitReached")] = query.value(5).toBool();
         int limit = query.value(2).toInt();
-        row[QStringLiteral("percentUsed")] = limit > 0
-            ? qRound(query.value(1).toDouble() / limit * 100.0) : 0;
+        row[QStringLiteral("percentUsed")] = limit > 0 ? qRound(query.value(1).toDouble() / limit * 100.0) : 0;
         results.append(row);
     }
 
@@ -999,9 +1888,8 @@ QStringList UsageDatabase::getToolNames() const
         return names;
 
     QSqlQuery query(m_db);
-    query.exec(QStringLiteral(
-        "SELECT DISTINCT tool_name FROM subscription_tool_usage ORDER BY tool_name"
-    ));
+    query.exec(QStringLiteral("SELECT DISTINCT tool_name FROM "
+                              "subscription_tool_usage ORDER BY tool_name"));
 
     while (query.next()) {
         names.append(query.value(0).toString());
@@ -1022,10 +1910,7 @@ QVariantList UsageDatabase::getProviderSeries(const QStringList &providers,
         return results;
     }
 
-    if (metric != QStringLiteral("cost")
-        && metric != QStringLiteral("tokens")
-        && metric != QStringLiteral("requests")
-        && metric != QStringLiteral("rateLimitUsed")) {
+    if (metric != QStringLiteral("cost") && metric != QStringLiteral("tokens") && metric != QStringLiteral("requests") && metric != QStringLiteral("rateLimitUsed")) {
         return results;
     }
 
@@ -1048,15 +1933,14 @@ QVariantList UsageDatabase::getProviderSeries(const QStringList &providers,
             "rl_requests, rl_requests_remaining, currency "
             "FROM usage_snapshots "
             "WHERE provider = ? AND timestamp >= ? AND timestamp <= ? "
-            "ORDER BY timestamp ASC"
-        ));
+            "ORDER BY timestamp ASC"));
         query.addBindValue(provider);
         query.addBindValue(toDbDateTimeString(fromUtc));
         query.addBindValue(toDbDateTimeString(toUtc));
 
         if (!query.exec()) {
-            qWarning() << "UsageDatabase: getProviderSeries query failed for" << provider
-                       << ":" << query.lastError().text();
+            qWarning() << "UsageDatabase: getProviderSeries query failed for"
+                       << provider << ":" << query.lastError().text();
             continue;
         }
 
@@ -1072,8 +1956,10 @@ QVariantList UsageDatabase::getProviderSeries(const QStringList &providers,
             }
             const QString rowCurrency = query.value(7).toString().trimmed().toUpper();
             if (!rowCurrency.isEmpty()) {
-                if (currency.isEmpty()) currency = rowCurrency;
-                else if (currency != rowCurrency) mixedCurrency = true;
+                if (currency.isEmpty())
+                    currency = rowCurrency;
+                else if (currency != rowCurrency)
+                    mixedCurrency = true;
             }
 
             double value = 0.0;
@@ -1137,9 +2023,7 @@ QVariantList UsageDatabase::getToolSeries(const QStringList &tools,
         return results;
     }
 
-    if (metric != QStringLiteral("percentUsed")
-        && metric != QStringLiteral("usageCount")
-        && metric != QStringLiteral("remaining")) {
+    if (metric != QStringLiteral("percentUsed") && metric != QStringLiteral("usageCount") && metric != QStringLiteral("remaining")) {
         return results;
     }
 
@@ -1161,8 +2045,7 @@ QVariantList UsageDatabase::getToolSeries(const QStringList &tools,
             "SELECT timestamp, usage_count, usage_limit "
             "FROM subscription_tool_usage "
             "WHERE tool_name = ? AND timestamp >= ? AND timestamp <= ? "
-            "ORDER BY timestamp ASC"
-        ));
+            "ORDER BY timestamp ASC"));
         query.addBindValue(tool);
         query.addBindValue(toDbDateTimeString(fromUtc));
         query.addBindValue(toDbDateTimeString(toUtc));
@@ -1228,14 +2111,16 @@ QVariantList UsageDatabase::getToolSeries(const QStringList &tools,
     return results;
 }
 
-QString UsageDatabase::exportCsv(const QString &provider,
-                                  const QDateTime &from,
-                                  const QDateTime &to) const
+QString UsageDatabase::exportCsv(const QString &provider, const QDateTime &from,
+                                 const QDateTime &to) const
 {
     QString csv;
-    csv += QStringLiteral("timestamp,provider,model,input_tokens,output_tokens,request_count,"
-                          "cost,is_estimated_cost,daily_cost,monthly_cost,rl_requests,rl_requests_remaining,"
-                          "rl_tokens,rl_tokens_remaining,cost_source,usage_source,currency,data_quality\n");
+    csv += QStringLiteral(
+        "timestamp,provider,model,input_tokens,output_tokens,request_count,"
+        "cost,is_estimated_cost,daily_cost,monthly_cost,rl_requests,rl_requests_"
+        "remaining,"
+        "rl_tokens,rl_tokens_remaining,cost_source,usage_source,currency,data_"
+        "quality\n");
 
     QVariantList snapshots = getSnapshots(provider, from, to);
     for (const QVariant &snap : snapshots) {
@@ -1248,7 +2133,8 @@ QString UsageDatabase::exportCsv(const QString &provider,
             QString::number(row[QStringLiteral("outputTokens")].toLongLong()),
             QString::number(row[QStringLiteral("requestCount")].toInt()),
             QString::number(row[QStringLiteral("cost")].toDouble(), 'f', 6),
-            row[QStringLiteral("isEstimatedCost")].toBool() ? QStringLiteral("1") : QStringLiteral("0"),
+            row[QStringLiteral("isEstimatedCost")].toBool() ? QStringLiteral("1")
+                                                            : QStringLiteral("0"),
             QString::number(row[QStringLiteral("dailyCost")].toDouble(), 'f', 6),
             QString::number(row[QStringLiteral("monthlyCost")].toDouble(), 'f', 6),
             QString::number(row[QStringLiteral("rlRequests")].toInt()),
@@ -1258,8 +2144,7 @@ QString UsageDatabase::exportCsv(const QString &provider,
             row[QStringLiteral("costSource")].toString(),
             row[QStringLiteral("usageSource")].toString(),
             row[QStringLiteral("currency")].toString(),
-            row[QStringLiteral("dataQuality")].toString()
-        };
+            row[QStringLiteral("dataQuality")].toString()};
         QStringList escapedFields;
         escapedFields.reserve(fields.size());
         for (const QString &field : fields) {
@@ -1272,8 +2157,8 @@ QString UsageDatabase::exportCsv(const QString &provider,
 }
 
 QString UsageDatabase::exportJson(const QString &provider,
-                                   const QDateTime &from,
-                                   const QDateTime &to) const
+                                  const QDateTime &from,
+                                  const QDateTime &to) const
 {
     QVariantList snapshots = getSnapshots(provider, from, to);
 
@@ -1292,8 +2177,9 @@ QString UsageDatabase::exportJson(const QString &provider,
     return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Indented));
 }
 
-QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
-                                                const QStringList &formats) const
+QStringList
+UsageDatabase::exportAllToDirectory(const QString &dirPath,
+                                    const QStringList &formats) const
 {
     QStringList writtenFiles;
 
@@ -1303,11 +2189,13 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
 
     QDir dir(dirPath);
     if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
-        qWarning() << "UsageDatabase: Failed to create export directory:" << dirPath;
+        qWarning() << "UsageDatabase: Failed to create export directory:"
+                   << dirPath;
         return writtenFiles;
     }
 
-    const QString timestamp = QDateTime::currentDateTimeUtc().toString(QStringLiteral("yyyyMMdd-HHmmss"));
+    const QString timestamp = QDateTime::currentDateTimeUtc().toString(
+        QStringLiteral("yyyyMMdd-HHmmss"));
     const QStringList requestedFormats = formats.isEmpty()
         ? QStringList{QStringLiteral("json"), QStringLiteral("csv")}
         : formats;
@@ -1317,8 +2205,9 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
         QSaveFile jsonFile(jsonPath);
         if (jsonFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             jsonFile.write("{\n  \"schemaVersion\": 4,\n  \"exportedAt\": ");
-            const QByteArray exportedAt = QJsonDocument(QJsonArray{
-                QDateTime::currentDateTimeUtc().toString(Qt::ISODate)}).toJson(QJsonDocument::Compact);
+            const QByteArray exportedAt = QJsonDocument(
+                                              QJsonArray{QDateTime::currentDateTimeUtc().toString(Qt::ISODate)})
+                                              .toJson(QJsonDocument::Compact);
             jsonFile.write(exportedAt.mid(1, exportedAt.size() - 2));
             jsonFile.write(",\n  \"providerSnapshots\": [\n");
 
@@ -1328,11 +2217,13 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
                     QJsonObject row;
                     const QSqlRecord record = query.record();
                     for (int i = 0; i < record.count(); ++i) {
-                        row.insert(record.fieldName(i), query.isNull(i)
-                            ? QJsonValue(QJsonValue::Null)
-                            : QJsonValue::fromVariant(query.value(i)));
+                        row.insert(record.fieldName(i),
+                                   query.isNull(i)
+                                       ? QJsonValue(QJsonValue::Null)
+                                       : QJsonValue::fromVariant(query.value(i)));
                     }
-                    if (!first) jsonFile.write(",\n");
+                    if (!first)
+                        jsonFile.write(",\n");
                     jsonFile.write("    ");
                     jsonFile.write(QJsonDocument(row).toJson(QJsonDocument::Compact));
                     first = false;
@@ -1341,27 +2232,39 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
 
             QSqlQuery providerQuery(m_db);
             providerQuery.setForwardOnly(true);
-            const bool providersOk = providerQuery.exec(QStringLiteral(
-                "SELECT provider,timestamp,model,input_tokens,output_tokens,request_count,cost,is_estimated_cost,"
-                "daily_cost,monthly_cost,rl_requests,rl_requests_remaining,rl_tokens,rl_tokens_remaining,"
-                "cost_source,usage_source,currency,data_quality FROM usage_snapshots ORDER BY id"));
-            if (providersOk) streamJsonRows(providerQuery);
+            const bool providersOk = providerQuery.exec(
+                QStringLiteral("SELECT "
+                               "provider,timestamp,model,input_tokens,output_tokens,"
+                               "request_count,cost,is_estimated_cost,"
+                               "daily_cost,monthly_cost,rl_requests,rl_requests_"
+                               "remaining,rl_tokens,rl_tokens_remaining,"
+                               "cost_source,usage_source,currency,data_quality FROM "
+                               "usage_snapshots ORDER BY id"));
+            if (providersOk)
+                streamJsonRows(providerQuery);
 
             jsonFile.write("\n  ],\n  \"observations\": [\n");
             QSqlQuery observationQuery(m_db);
             observationQuery.setForwardOnly(true);
             const bool observationsOk = observationQuery.exec(QStringLiteral(
-                "SELECT provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,window,model_scope,project_scope,reset_at_utc,correlation_id "
+                "SELECT "
+                "provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_"
+                "kind,unit,value,currency,semantic,source,data_quality,scope,window,"
+                "model_scope,project_scope,reset_at_utc,correlation_id "
                 "FROM observations ORDER BY id"));
-            if (observationsOk) streamJsonRows(observationQuery);
+            if (observationsOk)
+                streamJsonRows(observationQuery);
 
             jsonFile.write("\n  ],\n  \"toolSnapshots\": [\n");
             QSqlQuery toolQuery(m_db);
             toolQuery.setForwardOnly(true);
-            const bool toolsOk = toolQuery.exec(QStringLiteral(
-                "SELECT tool_name,timestamp,usage_count,usage_limit,period_type,plan_tier,limit_reached "
-                "FROM subscription_tool_usage ORDER BY id"));
-            if (toolsOk) streamJsonRows(toolQuery);
+            const bool toolsOk = toolQuery.exec(
+                QStringLiteral("SELECT "
+                               "tool_name,timestamp,usage_count,usage_limit,period_"
+                               "type,plan_tier,limit_reached "
+                               "FROM subscription_tool_usage ORDER BY id"));
+            if (toolsOk)
+                streamJsonRows(toolQuery);
             jsonFile.write("\n  ]\n}\n");
 
             if (providersOk && observationsOk && toolsOk && jsonFile.commit()) {
@@ -1373,37 +2276,60 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
     }
 
     if (requestedFormats.contains(QStringLiteral("csv"))) {
-        const QString observationsCsvPath = dir.filePath(QStringLiteral("ai-usage-observations-%1.csv").arg(timestamp));
+        const QString observationsCsvPath = dir.filePath(
+            QStringLiteral("ai-usage-observations-%1.csv").arg(timestamp));
         QSaveFile observationsFile(observationsCsvPath);
         if (observationsFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            observationsFile.write("provider,observed_at,interval_start,interval_end,metric_kind,unit,value,currency,semantic,source,data_quality,scope,window,model_scope,project_scope,reset_at,correlation_id\r\n");
-            QSqlQuery query(m_db); query.setForwardOnly(true);
-            const bool queryOk = query.exec(QStringLiteral(
-                "SELECT provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,window,model_scope,project_scope,reset_at_utc,correlation_id FROM observations ORDER BY id"));
-            while (queryOk && query.next()) {
-                QStringList fields; for (int i = 0; i < 17; ++i) fields.append(csvField(query.value(i).toString()));
-                observationsFile.write((fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
-            }
-            if (queryOk && observationsFile.commit()) writtenFiles.append(observationsCsvPath);
-            else observationsFile.cancelWriting();
-        }
-
-        const QString providerCsvPath = dir.filePath(QStringLiteral("ai-usage-providers-%1.csv").arg(timestamp));
-        QSaveFile providerFile(providerCsvPath);
-        if (providerFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            providerFile.write("provider,timestamp,model,input_tokens,output_tokens,request_count,cost,is_estimated_cost,"
-                               "daily_cost,monthly_cost,rl_requests,rl_requests_remaining,rl_tokens,rl_tokens_remaining,"
-                               "cost_source,usage_source,currency,data_quality\r\n");
+            observationsFile.write(
+                "provider,observed_at,interval_start,interval_end,metric_kind,unit,"
+                "value,currency,semantic,source,data_quality,scope,window,model_"
+                "scope,project_scope,reset_at,correlation_id\r\n");
             QSqlQuery query(m_db);
             query.setForwardOnly(true);
             const bool queryOk = query.exec(QStringLiteral(
-                "SELECT provider,timestamp,model,input_tokens,output_tokens,request_count,cost,is_estimated_cost,"
-                "daily_cost,monthly_cost,rl_requests,rl_requests_remaining,rl_tokens,rl_tokens_remaining,"
-                "cost_source,usage_source,currency,data_quality FROM usage_snapshots ORDER BY id"));
+                "SELECT "
+                "provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_"
+                "kind,unit,value,currency,semantic,source,data_quality,scope,window,"
+                "model_scope,project_scope,reset_at_utc,correlation_id FROM "
+                "observations ORDER BY id"));
             while (queryOk && query.next()) {
                 QStringList fields;
-                for (int i = 0; i < 18; ++i) fields.append(csvField(query.value(i).toString()));
-                providerFile.write((fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
+                for (int i = 0; i < 17; ++i)
+                    fields.append(csvField(query.value(i).toString()));
+                observationsFile.write(
+                    (fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
+            }
+            if (queryOk && observationsFile.commit())
+                writtenFiles.append(observationsCsvPath);
+            else
+                observationsFile.cancelWriting();
+        }
+
+        const QString providerCsvPath = dir.filePath(
+            QStringLiteral("ai-usage-providers-%1.csv").arg(timestamp));
+        QSaveFile providerFile(providerCsvPath);
+        if (providerFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            providerFile.write("provider,timestamp,model,input_tokens,output_tokens,"
+                               "request_count,cost,is_estimated_cost,"
+                               "daily_cost,monthly_cost,rl_requests,rl_requests_"
+                               "remaining,rl_tokens,rl_tokens_remaining,"
+                               "cost_source,usage_source,currency,data_quality\r\n");
+            QSqlQuery query(m_db);
+            query.setForwardOnly(true);
+            const bool queryOk = query.exec(
+                QStringLiteral("SELECT "
+                               "provider,timestamp,model,input_tokens,output_tokens,"
+                               "request_count,cost,is_estimated_cost,"
+                               "daily_cost,monthly_cost,rl_requests,rl_requests_"
+                               "remaining,rl_tokens,rl_tokens_remaining,"
+                               "cost_source,usage_source,currency,data_quality FROM "
+                               "usage_snapshots ORDER BY id"));
+            while (queryOk && query.next()) {
+                QStringList fields;
+                for (int i = 0; i < 18; ++i)
+                    fields.append(csvField(query.value(i).toString()));
+                providerFile.write(
+                    (fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
             }
             if (queryOk && providerFile.commit()) {
                 writtenFiles.append(providerCsvPath);
@@ -1415,17 +2341,23 @@ QStringList UsageDatabase::exportAllToDirectory(const QString &dirPath,
         const QString toolCsvPath = dir.filePath(QStringLiteral("ai-usage-tools-%1.csv").arg(timestamp));
         QSaveFile toolFile(toolCsvPath);
         if (toolFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            toolFile.write("tool,timestamp,usage_count,usage_limit,period_type,plan_tier,limit_reached,percent_used\r\n");
+            toolFile.write("tool,timestamp,usage_count,usage_limit,period_type,plan_"
+                           "tier,limit_reached,percent_used\r\n");
             QSqlQuery query(m_db);
             query.setForwardOnly(true);
-            const bool queryOk = query.exec(QStringLiteral(
-                "SELECT tool_name,timestamp,usage_count,usage_limit,period_type,plan_tier,limit_reached,"
-                "CASE WHEN usage_limit > 0 THEN (usage_count * 100.0 / usage_limit) ELSE 0 END "
-                "FROM subscription_tool_usage ORDER BY id"));
+            const bool queryOk = query.exec(
+                QStringLiteral("SELECT "
+                               "tool_name,timestamp,usage_count,usage_limit,period_"
+                               "type,plan_tier,limit_reached,"
+                               "CASE WHEN usage_limit > 0 THEN (usage_count * 100.0 "
+                               "/ usage_limit) ELSE 0 END "
+                               "FROM subscription_tool_usage ORDER BY id"));
             while (queryOk && query.next()) {
                 QStringList fields;
-                for (int i = 0; i < 8; ++i) fields.append(csvField(query.value(i).toString()));
-                toolFile.write((fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
+                for (int i = 0; i < 8; ++i)
+                    fields.append(csvField(query.value(i).toString()));
+                toolFile.write(
+                    (fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
             }
             if (queryOk && toolFile.commit()) {
                 writtenFiles.append(toolCsvPath);
@@ -1443,12 +2375,14 @@ void UsageDatabase::requestExportAll(const QString &requestId,
                                      const QStringList &formats)
 {
     initDatabase();
+    beginWorker();
     auto *watcher = new QFutureWatcher<QStringList>(this);
     connect(watcher, &QFutureWatcher<QStringList>::finished, this,
             [this, watcher, requestId]() {
-        Q_EMIT exportFinished(requestId, watcher->result());
-        watcher->deleteLater();
-    });
+                Q_EMIT exportFinished(requestId, watcher->result());
+                finishWorker();
+                watcher->deleteLater();
+            });
     watcher->setFuture(QtConcurrent::run([dirPath, formats]() {
         UsageDatabase workerDatabase;
         workerDatabase.init();
@@ -1477,42 +2411,42 @@ void UsageDatabase::pruneOldData()
     int totalDeleted = 0;
 
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral(
-        "DELETE FROM usage_snapshots WHERE timestamp < ?"
-    ));
+    query.prepare(
+        QStringLiteral("DELETE FROM usage_snapshots WHERE timestamp < ?"));
     query.addBindValue(cutoffStr);
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to prune snapshots:" << query.lastError().text();
+        qWarning() << "UsageDatabase: Failed to prune snapshots:"
+                   << query.lastError().text();
+    } else {
+        totalDeleted += query.numRowsAffected();
+    }
+
+    query.prepare(
+        QStringLiteral("DELETE FROM rate_limit_events WHERE timestamp < ?"));
+    query.addBindValue(cutoffStr);
+    if (!query.exec()) {
+        qWarning() << "UsageDatabase: Failed to prune events:"
+                   << query.lastError().text();
     } else {
         totalDeleted += query.numRowsAffected();
     }
 
     query.prepare(QStringLiteral(
-        "DELETE FROM rate_limit_events WHERE timestamp < ?"
-    ));
+        "DELETE FROM subscription_tool_usage WHERE timestamp < ?"));
     query.addBindValue(cutoffStr);
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to prune events:" << query.lastError().text();
+        qWarning() << "UsageDatabase: Failed to prune tool usage:"
+                   << query.lastError().text();
     } else {
         totalDeleted += query.numRowsAffected();
     }
 
-    query.prepare(QStringLiteral(
-        "DELETE FROM subscription_tool_usage WHERE timestamp < ?"
-    ));
+    query.prepare(
+        QStringLiteral("DELETE FROM observations WHERE observed_at_utc < ?"));
     query.addBindValue(cutoffStr);
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to prune tool usage:" << query.lastError().text();
-    } else {
-        totalDeleted += query.numRowsAffected();
-    }
-
-    query.prepare(QStringLiteral(
-        "DELETE FROM observations WHERE observed_at_utc < ?"
-    ));
-    query.addBindValue(cutoffStr);
-    if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to prune observations:" << query.lastError().text();
+        qWarning() << "UsageDatabase: Failed to prune observations:"
+                   << query.lastError().text();
     } else {
         totalDeleted += query.numRowsAffected();
     }
@@ -1552,10 +2486,12 @@ QVariantMap UsageDatabase::getYearlyActivity(int mode) const
         QSqlQuery currencyQuery(m_db);
         currencyQuery.exec(QStringLiteral(
             "SELECT DISTINCT currency FROM observations WHERE metric_kind='cost' "
-            "AND semantic='interval_total' AND observed_at_utc >= date('now','-365 days') "
+            "AND semantic='interval_total' AND observed_at_utc >= date('now','-365 "
+            "days') "
             "ORDER BY currency"));
         QStringList currencies;
-        while (currencyQuery.next()) currencies.append(currencyQuery.value(0).toString());
+        while (currencyQuery.next())
+            currencies.append(currencyQuery.value(0).toString());
         result[QStringLiteral("currencies")] = currencies;
         result[QStringLiteral("mixedCurrencies")] = currencies.size() > 1;
         if (currencies.size() > 1) {
@@ -1570,15 +2506,18 @@ QVariantMap UsageDatabase::getYearlyActivity(int mode) const
             "AND observed_at_utc >= date('now','-365 days') "
             "GROUP BY date(observed_at_utc) ORDER BY date(observed_at_utc)"));
     } else {
-        query.prepare(QStringLiteral(
-            "SELECT day, SUM(provider_tokens) FROM ("
-            " SELECT date(timestamp) AS day, provider, MAX(input_tokens + output_tokens) AS provider_tokens "
-            " FROM usage_snapshots WHERE timestamp >= date('now','-365 days') GROUP BY day, provider"
-            ") GROUP BY day ORDER BY day"));
+        query.prepare(
+            QStringLiteral("SELECT day, SUM(provider_tokens) FROM ("
+                           " SELECT date(timestamp) AS day, provider, "
+                           "MAX(input_tokens + output_tokens) AS provider_tokens "
+                           " FROM usage_snapshots WHERE timestamp >= "
+                           "date('now','-365 days') GROUP BY day, provider"
+                           ") GROUP BY day ORDER BY day"));
     }
 
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: getYearlyActivity query failed:" << query.lastError().text();
+        qWarning() << "UsageDatabase: getYearlyActivity query failed:"
+                   << query.lastError().text();
         result["maxIntensity"] = 0.0;
         result["days"] = days;
         return result;
@@ -1609,44 +2548,36 @@ QVariantList UsageDatabase::getEfficiencySeries(int daysCount) const
         return series;
 
     QSqlQuery query(m_db);
-    query.prepare(QStringLiteral(
-        "SELECT day, "
-        "SUM(provider_input) as total_in, "
-        "SUM(provider_output) as total_out "
-        "FROM ("
-        "  SELECT date(timestamp) as day, provider, "
-        "         MAX(input_tokens) as provider_input, "
-        "         MAX(output_tokens) as provider_output "
-        "  FROM usage_snapshots "
-        "  WHERE timestamp >= date('now', '-%1 days') "
-        "  GROUP BY day, provider"
-        ") "
-        "GROUP BY day "
-        "ORDER BY day ASC"
-    ).arg(daysCount));
+    query.prepare(QStringLiteral("SELECT day, "
+                                 "SUM(provider_input) as total_in, "
+                                 "SUM(provider_output) as total_out "
+                                 "FROM ("
+                                 "  SELECT date(timestamp) as day, provider, "
+                                 "         MAX(input_tokens) as provider_input, "
+                                 "         MAX(output_tokens) as provider_output "
+                                 "  FROM usage_snapshots "
+                                 "  WHERE timestamp >= date('now', '-%1 days') "
+                                 "  GROUP BY day, provider"
+                                 ") "
+                                 "GROUP BY day "
+                                 "HAVING SUM(provider_input) > 0 "
+                                 "ORDER BY day ASC")
+                      .arg(daysCount));
 
     if (!query.exec()) {
-        qWarning() << "UsageDatabase: getEfficiencySeries query failed:" << query.lastError().text();
+        qWarning() << "UsageDatabase: getEfficiencySeries query failed:"
+                   << query.lastError().text();
         return series;
     }
 
     while (query.next()) {
         QVariantMap entry;
         entry[QStringLiteral("date")] = query.value(0).toString();
-        
+
         double input = query.value(1).toDouble();
         double output = query.value(2).toDouble();
-        
-        double ratio = 0.0;
-        if (input > 0) {
-            ratio = output / input;
-        } else if (output > 0) {
-            // If we have output but no input (unlikely but possible in some APIs),
-            // we could cap it or return a high value. Let's cap at 10x for safety.
-            ratio = 10.0;
-        }
 
-        entry[QStringLiteral("value")] = ratio;
+        entry[QStringLiteral("value")] = output / input;
         series.append(entry);
     }
 
@@ -1674,13 +2605,17 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
 
     const int clampedDays = qBound(7, days, 365);
     QSqlQuery currencyQuery(m_db);
-    currencyQuery.prepare(QStringLiteral(
-        "SELECT DISTINCT currency FROM observations WHERE metric_kind='cost' "
-        "AND source != 'connectivity_probe' AND observed_at_utc >= date('now','-%1 days') "
-        "ORDER BY currency").arg(clampedDays));
+    currencyQuery.prepare(
+        QStringLiteral(
+            "SELECT DISTINCT currency FROM observations WHERE metric_kind='cost' "
+            "AND source != 'connectivity_probe' AND observed_at_utc >= "
+            "date('now','-%1 days') "
+            "ORDER BY currency")
+            .arg(clampedDays));
     QStringList currencies;
     if (currencyQuery.exec()) {
-        while (currencyQuery.next()) currencies.append(currencyQuery.value(0).toString());
+        while (currencyQuery.next())
+            currencies.append(currencyQuery.value(0).toString());
     }
     result[QStringLiteral("currencies")] = currencies;
     result[QStringLiteral("mixedCurrencies")] = currencies.size() > 1;
@@ -1691,12 +2626,15 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
     QList<DailyOverviewRow> dailyRows;
 
     QSqlQuery dayQuery(m_db);
-    dayQuery.prepare(QStringLiteral(
-        "SELECT date(observed_at_utc) AS day, SUM(value) AS total_cost, 0, COUNT(DISTINCT provider) "
-        "FROM observations WHERE metric_kind='cost' AND semantic='interval_total' "
-        "AND source != 'connectivity_probe' AND observed_at_utc >= date('now','-%1 days') "
-        "GROUP BY date(observed_at_utc) ORDER BY day"
-    ).arg(clampedDays));
+    dayQuery.prepare(
+        QStringLiteral("SELECT date(observed_at_utc) AS day, SUM(value) AS "
+                       "total_cost, 0, COUNT(DISTINCT provider) "
+                       "FROM observations WHERE metric_kind='cost' AND "
+                       "semantic='interval_total' "
+                       "AND source != 'connectivity_probe' AND observed_at_utc "
+                       ">= date('now','-%1 days') "
+                       "GROUP BY date(observed_at_utc) ORDER BY day")
+            .arg(clampedDays));
 
     if (!dayQuery.exec()) {
         qWarning() << "UsageDatabase: getAnalystOverview daily query failed:"
@@ -1743,8 +2681,7 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
                 variance += delta * delta;
             }
             variance /= static_cast<double>(costs.size());
-            result[QStringLiteral("volatilityPercent")] =
-                (std::sqrt(variance) / averageDailyCost) * 100.0;
+            result[QStringLiteral("volatilityPercent")] = (std::sqrt(variance) / averageDailyCost) * 100.0;
         }
 
         if (dailyRows.size() >= 14) {
@@ -1757,8 +2694,7 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
             for (int i = split; i < dailyRows.size(); ++i) {
                 currentWeek += dailyRows.at(i).totalCost;
             }
-            result[QStringLiteral("weekOverWeekPercent")] =
-                percentChange(previousWeek, currentWeek);
+            result[QStringLiteral("weekOverWeekPercent")] = percentChange(previousWeek, currentWeek);
         }
 
         QVariantList anomalies;
@@ -1782,16 +2718,17 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
     }
 
     QSqlQuery latestQuery(m_db);
-    latestQuery.prepare(QStringLiteral(
-        "SELECT provider, model, cost, is_estimated_cost, daily_cost, monthly_cost, "
-        "       cost_source, usage_source, data_quality "
-        "FROM usage_snapshots "
-        "WHERE id IN ("
-        "  SELECT MAX(id) FROM usage_snapshots "
-        "  WHERE timestamp >= date('now', '-%1 days') "
-        "  GROUP BY provider"
-        ")"
-    ).arg(clampedDays));
+    latestQuery.prepare(
+        QStringLiteral("SELECT provider, model, cost, is_estimated_cost, "
+                       "daily_cost, monthly_cost, "
+                       "       cost_source, usage_source, data_quality "
+                       "FROM usage_snapshots "
+                       "WHERE id IN ("
+                       "  SELECT MAX(id) FROM usage_snapshots "
+                       "  WHERE timestamp >= date('now', '-%1 days') "
+                       "  GROUP BY provider"
+                       ")")
+            .arg(clampedDays));
 
     if (!latestQuery.exec()) {
         qWarning() << "UsageDatabase: getAnalystOverview driver query failed:"
@@ -1828,14 +2765,15 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
         if (row.estimated || row.costSource == QLatin1String("estimated_from_usage")) {
             result[QStringLiteral("hasEstimatedData")] = true;
         }
-        if (row.costSource == QLatin1String("connectivity_probe")
-            || row.usageSource == QLatin1String("connectivity_probe")) {
+        if (row.costSource == QLatin1String("connectivity_probe") || row.usageSource == QLatin1String("connectivity_probe")) {
             result[QStringLiteral("hasProbeOnlyData")] = true;
             continue;
         }
 
-        row.value = monthlyCost > 0.0 ? monthlyCost
-            : (dailyCost > 0.0 ? dailyCost * static_cast<double>(daysInMonth) : cost);
+        row.value = monthlyCost > 0.0
+            ? monthlyCost
+            : (dailyCost > 0.0 ? dailyCost * static_cast<double>(daysInMonth)
+                               : cost);
         if (row.value <= 0.0) {
             continue;
         }
@@ -1846,14 +2784,13 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
 
         drivers.append(row);
         modelTotals[row.model] += row.value;
-        modelEstimated[row.model] = modelEstimated.value(row.model, false)
-            || row.estimated
-            || row.costSource == QLatin1String("estimated_from_usage");
+        modelEstimated[row.model] = modelEstimated.value(row.model, false) || row.estimated || row.costSource == QLatin1String("estimated_from_usage");
     }
 
-    std::sort(drivers.begin(), drivers.end(), [](const DriverRow &lhs, const DriverRow &rhs) {
-        return lhs.value > rhs.value;
-    });
+    std::sort(drivers.begin(), drivers.end(),
+              [](const DriverRow &lhs, const DriverRow &rhs) {
+                  return lhs.value > rhs.value;
+              });
 
     QVariantList topDrivers;
     const int driverLimit = std::min(5, static_cast<int>(drivers.size()));
@@ -1886,9 +2823,10 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
         models.append(row);
     }
 
-    std::sort(models.begin(), models.end(), [](const ModelRow &lhs, const ModelRow &rhs) {
-        return lhs.value > rhs.value;
-    });
+    std::sort(models.begin(), models.end(),
+              [](const ModelRow &lhs, const ModelRow &rhs) {
+                  return lhs.value > rhs.value;
+              });
 
     QVariantList topModels;
     const int modelLimit = std::min(5, static_cast<int>(models.size()));
@@ -1903,4 +2841,526 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
     result[QStringLiteral("topModels")] = topModels;
 
     return result;
+}
+
+QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDateTime &to,
+                                              const QString &requestedCurrency) const
+{
+    const QDateTime fromUtc = from.toUTC();
+    const QDateTime toUtc = to.toUTC();
+    const auto kpi = [](bool available, const QVariant &value, const QString &reasonKey, int sampleCount,
+                        int minimumSamples) {
+        QVariantMap result;
+        result.insert(QStringLiteral("available"), available);
+        result.insert(QStringLiteral("value"), available ? value : QVariant());
+        result.insert(QStringLiteral("reasonKey"), available ? QString() : reasonKey);
+        result.insert(QStringLiteral("sampleCount"), sampleCount);
+        result.insert(QStringLiteral("minimumSamples"), minimumSamples);
+        return result;
+    };
+
+    QVariantMap snapshot;
+    snapshot.insert(QStringLiteral("from"), fromUtc);
+    snapshot.insert(QStringLiteral("to"), toUtc);
+    snapshot.insert(QStringLiteral("generatedAt"), QDateTime::currentDateTimeUtc());
+    snapshot.insert(QStringLiteral("ok"), m_initialized && fromUtc.isValid() && toUtc.isValid() && fromUtc <= toUtc);
+    snapshot.insert(QStringLiteral("errorKey"),
+                    snapshot.value(QStringLiteral("ok")).toBool() ? QString() : QStringLiteral("invalid_request"));
+
+    QVariantMap methods{
+        {QStringLiteral("averageDailySpendMinimumDays"), 3},
+        {QStringLiteral("weekOverWeekDaysPerWindow"), 7},
+        {QStringLiteral("volatilityMinimumDays"), 7},
+        {QStringLiteral("ratioMinimumDays"), 3},
+        {QStringLiteral("anomalyMinimumDays"), 7},
+        {QStringLiteral("anomalyBaseline"), QStringLiteral("period_mean_and_population_standard_deviation")},
+        {QStringLiteral("anomalySigmaThreshold"), 2.0},
+        {QStringLiteral("anomalyMinimumRelativeIncreasePercent"), 50.0},
+        {QStringLiteral("anomalyMinimumAbsoluteIncrease"), 1.0},
+    };
+    snapshot.insert(QStringLiteral("methods"), methods);
+
+    QVariantMap unavailableKpis{
+        {QStringLiteral("averageDailySpend"), kpi(false, {}, QStringLiteral("no_compatible_cost"), 0, 3)},
+        {QStringLiteral("weekOverWeekChange"), kpi(false, {}, QStringLiteral("incomplete_comparison_windows"), 0, 14)},
+        {QStringLiteral("volatility"), kpi(false, {}, QStringLiteral("insufficient_daily_samples"), 0, 7)},
+        {QStringLiteral("outputInputRatio"), kpi(false, {}, QStringLiteral("insufficient_ratio_samples"), 0, 3)},
+    };
+    snapshot.insert(QStringLiteral("kpis"), unavailableKpis);
+    snapshot.insert(QStringLiteral("spendSeries"), QVariantList{});
+    snapshot.insert(QStringLiteral("activitySeries"), QVariantList{});
+    snapshot.insert(QStringLiteral("ratioSeries"), QVariantList{});
+    snapshot.insert(QStringLiteral("topDrivers"), QVariantList{});
+    snapshot.insert(QStringLiteral("anomalies"), QVariantList{});
+    snapshot.insert(QStringLiteral("actualSampleCount"), 0);
+    snapshot.insert(QStringLiteral("estimatedSampleCount"), 0);
+    snapshot.insert(QStringLiteral("currencies"), QStringList{});
+    snapshot.insert(QStringLiteral("currency"), QString());
+    snapshot.insert(QStringLiteral("currencyStatus"), QStringLiteral("none"));
+    snapshot.insert(QStringLiteral("mixedCurrencies"), false);
+
+    if (!snapshot.value(QStringLiteral("ok")).toBool()) {
+        snapshot.insert(QStringLiteral("coverage"), QVariantMap{{QStringLiteral("requestedDayCount"), 0},
+                                                                {QStringLiteral("observedDayCount"), 0},
+                                                                {QStringLiteral("percent"), 0.0},
+                                                                {QStringLiteral("firstObservation"), QVariant()},
+                                                                {QStringLiteral("lastObservation"), QVariant()}});
+        return snapshot;
+    }
+
+    struct DailyCost {
+        double actual = 0.0;
+        double estimated = 0.0;
+        int actualSamples = 0;
+        int estimatedSamples = 0;
+    };
+    struct Driver {
+        QString provider;
+        QString model;
+        QString quality;
+        double value = 0.0;
+        int sampleCount = 0;
+    };
+    struct DailyActivity {
+        double tokens = 0.0;
+        double requests = 0.0;
+        double toolUsage = 0.0;
+        int tokenSamples = 0;
+        int requestSamples = 0;
+        int toolSamples = 0;
+    };
+
+    QSet<QString> currencies;
+    struct CostObservation {
+        QString date;
+        QString provider;
+        QString model;
+        QString currency;
+        QString quality;
+        QString semantic;
+        QString source;
+        QString scope;
+        QString window;
+        double value = 0.0;
+    };
+    QList<CostObservation> costObservations;
+    QSqlQuery costQuery(m_db);
+    costQuery.setForwardOnly(true);
+    costQuery.prepare(QStringLiteral("SELECT date(observed_at_utc), provider, model_scope, currency, "
+                                     "source, data_quality, semantic, value, scope, window "
+                                     "FROM observations "
+                                     "WHERE metric_kind='cost' AND value IS NOT NULL "
+                                     "AND observed_at_utc >= ? AND observed_at_utc <= ? "
+                                     "AND lower(source) != 'unknown' "
+                                     "AND lower(source) NOT LIKE '%connectivity%' "
+                                     "AND lower(source) NOT LIKE '%model_discovery%' "
+                                     "AND semantic IN ('gauge','interval_total','local_estimate') "
+                                     "ORDER BY observed_at_utc, id"));
+    costQuery.addBindValue(toDbDateTimeString(fromUtc));
+    costQuery.addBindValue(toDbDateTimeString(toUtc));
+    if (costQuery.exec()) {
+        while (costQuery.next()) {
+            CostObservation observation;
+            observation.date = costQuery.value(0).toString();
+            observation.provider = costQuery.value(1).toString();
+            observation.model = costQuery.value(2).toString();
+            observation.currency = costQuery.value(3).toString().trimmed().toUpper();
+            const QString source = costQuery.value(4).toString();
+            const QString quality = costQuery.value(5).toString();
+            observation.semantic = costQuery.value(6).toString();
+            observation.source = source;
+            observation.scope = costQuery.value(8).toString();
+            observation.window = costQuery.value(9).toString();
+            observation.quality =
+                normalizedQualityClass(source, quality, observation.semantic);
+            observation.value = costQuery.value(7).toDouble();
+            if (!observation.currency.isEmpty()) {
+                currencies.insert(observation.currency);
+                costObservations.append(observation);
+            }
+        }
+    } else {
+        snapshot.insert(QStringLiteral("ok"), false);
+        snapshot.insert(QStringLiteral("errorKey"), QStringLiteral("cost_query_failed"));
+    }
+
+    QStringList currencyList = currencies.values();
+    currencyList.sort();
+    snapshot.insert(QStringLiteral("currencies"), currencyList);
+    const QString normalizedRequestedCurrency = requestedCurrency.trimmed().toUpper();
+    QString analysisCurrency;
+    if (!normalizedRequestedCurrency.isEmpty()) {
+        analysisCurrency = normalizedRequestedCurrency;
+        snapshot.insert(QStringLiteral("currencyStatus"), QStringLiteral("selected"));
+    } else if (currencyList.size() == 1) {
+        analysisCurrency = currencyList.constFirst();
+        snapshot.insert(QStringLiteral("currencyStatus"), QStringLiteral("single"));
+    } else if (currencyList.size() > 1) {
+        snapshot.insert(QStringLiteral("currencyStatus"), QStringLiteral("mixed"));
+        snapshot.insert(QStringLiteral("mixedCurrencies"), true);
+    }
+    snapshot.insert(QStringLiteral("currency"), analysisCurrency);
+
+    QMap<QString, DailyCost> dailyCosts;
+    QMap<QString, Driver> driverTotals;
+    int actualSampleCount = 0;
+    int estimatedSampleCount = 0;
+    if (!analysisCurrency.isEmpty()) {
+        QList<CostObservation> effectiveCostObservations;
+        QMap<QString, CostObservation> latestGauges;
+        for (const CostObservation &observation :
+             std::as_const(costObservations)) {
+            if (observation.currency != analysisCurrency) {
+                continue;
+            }
+            if (observation.semantic == QLatin1String("gauge")) {
+                const QString key =
+                    QStringList{observation.date,
+                                observation.provider,
+                                observation.model,
+                                observation.currency,
+                                observation.quality,
+                                observation.source,
+                                observation.scope,
+                                observation.window}
+                        .join(QChar(0x1f));
+                latestGauges.insert(key, observation);
+            } else {
+                effectiveCostObservations.append(observation);
+            }
+        }
+        effectiveCostObservations.append(latestGauges.values());
+        for (const CostObservation &observation :
+             std::as_const(effectiveCostObservations)) {
+            const bool estimated = observation.quality == QLatin1String("estimated");
+            DailyCost &day = dailyCosts[observation.date];
+            if (estimated) {
+                day.estimated += observation.value;
+                day.estimatedSamples++;
+                estimatedSampleCount++;
+            } else {
+                day.actual += observation.value;
+                day.actualSamples++;
+                actualSampleCount++;
+            }
+
+            const QString model =
+                observation.model.trimmed().isEmpty() ? observation.provider : observation.model.trimmed();
+            const QString key = observation.provider + QChar(0x1f) + model + QChar(0x1f) + observation.quality;
+            Driver &driver = driverTotals[key];
+            driver.provider = observation.provider;
+            driver.model = model;
+            driver.quality = observation.quality;
+            driver.value += observation.value;
+            driver.sampleCount++;
+        }
+    }
+    snapshot.insert(QStringLiteral("actualSampleCount"), actualSampleCount);
+    snapshot.insert(QStringLiteral("estimatedSampleCount"), estimatedSampleCount);
+
+    QVariantList spendSeries;
+    QList<double> combinedDailyCosts;
+    double totalSpend = 0.0;
+    for (auto it = dailyCosts.constBegin(); it != dailyCosts.constEnd(); ++it) {
+        const DailyCost &day = it.value();
+        QVariantMap point;
+        point.insert(QStringLiteral("date"), it.key());
+        point.insert(QStringLiteral("actualAvailable"), day.actualSamples > 0);
+        point.insert(QStringLiteral("actual"), day.actualSamples > 0 ? QVariant(day.actual) : QVariant());
+        point.insert(QStringLiteral("estimatedAvailable"), day.estimatedSamples > 0);
+        point.insert(QStringLiteral("estimated"), day.estimatedSamples > 0 ? QVariant(day.estimated) : QVariant());
+        point.insert(QStringLiteral("currency"), analysisCurrency);
+        point.insert(QStringLiteral("sampleCount"), day.actualSamples + day.estimatedSamples);
+        spendSeries.append(point);
+        const double combined = day.actual + day.estimated;
+        combinedDailyCosts.append(combined);
+        totalSpend += combined;
+    }
+    snapshot.insert(QStringLiteral("spendSeries"), spendSeries);
+
+    QList<Driver> drivers = driverTotals.values();
+    std::sort(drivers.begin(), drivers.end(), [](const Driver &lhs, const Driver &rhs) {
+        if (!qFuzzyCompare(lhs.value + 1.0, rhs.value + 1.0)) {
+            return lhs.value > rhs.value;
+        }
+        if (lhs.provider != rhs.provider) {
+            return lhs.provider < rhs.provider;
+        }
+        return lhs.model < rhs.model;
+    });
+    QVariantList topDrivers;
+    for (int index = 0; index < std::min(5, static_cast<int>(drivers.size())); ++index) {
+        const Driver &driver = drivers.at(index);
+        topDrivers.append(QVariantMap{{QStringLiteral("provider"), driver.provider},
+                                      {QStringLiteral("model"), driver.model},
+                                      {QStringLiteral("value"), driver.value},
+                                      {QStringLiteral("quality"), driver.quality},
+                                      {QStringLiteral("estimated"), driver.quality == QLatin1String("estimated")},
+                                      {QStringLiteral("currency"), analysisCurrency},
+                                      {QStringLiteral("sampleCount"), driver.sampleCount}});
+    }
+    snapshot.insert(QStringLiteral("topDrivers"), topDrivers);
+
+    QVariantMap kpis = snapshot.value(QStringLiteral("kpis")).toMap();
+    const QString costUnavailableReason = snapshot.value(QStringLiteral("mixedCurrencies")).toBool()
+                                              ? QStringLiteral("mixed_currencies")
+                                              : QStringLiteral("no_compatible_cost");
+    if (dailyCosts.size() >= 3) {
+        kpis.insert(QStringLiteral("averageDailySpend"),
+                    kpi(true, totalSpend / static_cast<double>(dailyCosts.size()), {}, dailyCosts.size(), 3));
+    } else {
+        kpis.insert(QStringLiteral("averageDailySpend"),
+                    kpi(false, {},
+                        dailyCosts.isEmpty() ? costUnavailableReason : QStringLiteral("insufficient_daily_samples"),
+                        dailyCosts.size(), 3));
+    }
+
+    if (dailyCosts.size() >= 7) {
+        const double mean = totalSpend / static_cast<double>(combinedDailyCosts.size());
+        double variance = 0.0;
+        for (double value : std::as_const(combinedDailyCosts)) {
+            const double delta = value - mean;
+            variance += delta * delta;
+        }
+        variance /= static_cast<double>(combinedDailyCosts.size());
+        const double standardDeviation = std::sqrt(variance);
+        const bool volatilityAvailable = !qFuzzyIsNull(mean);
+        kpis.insert(QStringLiteral("volatility"),
+                    kpi(volatilityAvailable,
+                        volatilityAvailable ? QVariant((standardDeviation / std::abs(mean)) * 100.0) : QVariant(),
+                        volatilityAvailable ? QString() : QStringLiteral("zero_baseline"), dailyCosts.size(), 7));
+
+        QVariantList anomalies;
+        const double absoluteThreshold = std::max(1.0, std::abs(mean) * 0.5);
+        int dayIndex = 0;
+        for (auto it = dailyCosts.constBegin(); it != dailyCosts.constEnd(); ++it, ++dayIndex) {
+            const double value = combinedDailyCosts.at(dayIndex);
+            const double increase = value - mean;
+            if (increase < absoluteThreshold || value < mean + (2.0 * standardDeviation)) {
+                continue;
+            }
+            anomalies.append(QVariantMap{{QStringLiteral("date"), it.key()},
+                                         {QStringLiteral("value"), value},
+                                         {QStringLiteral("currency"), analysisCurrency},
+                                         {QStringLiteral("baseline"), mean},
+                                         {QStringLiteral("standardDeviation"), standardDeviation},
+                                         {QStringLiteral("deltaPercent"),
+                                          qFuzzyIsNull(mean) ? QVariant() : QVariant(percentChange(mean, value))}});
+        }
+        snapshot.insert(QStringLiteral("anomalies"), anomalies);
+        snapshot.insert(QStringLiteral("anomaliesAvailable"), true);
+        snapshot.insert(QStringLiteral("anomaliesReasonKey"), QString());
+    } else {
+        kpis.insert(QStringLiteral("volatility"),
+                    kpi(false, {},
+                        dailyCosts.isEmpty() ? costUnavailableReason : QStringLiteral("insufficient_daily_samples"),
+                        dailyCosts.size(), 7));
+        snapshot.insert(QStringLiteral("anomaliesAvailable"), false);
+        snapshot.insert(QStringLiteral("anomaliesReasonKey"),
+                        dailyCosts.isEmpty() ? costUnavailableReason : QStringLiteral("insufficient_daily_samples"));
+    }
+
+    const QDate comparisonEnd = toUtc.date();
+    bool completeComparison = true;
+    double currentWeek = 0.0;
+    double previousWeek = 0.0;
+    for (int offset = 0; offset < 14; ++offset) {
+        const QString day = comparisonEnd.addDays(-offset).toString(Qt::ISODate);
+        if (!dailyCosts.contains(day)) {
+            completeComparison = false;
+            break;
+        }
+        const DailyCost &row = dailyCosts.value(day);
+        const double value = row.actual + row.estimated;
+        if (offset < 7) {
+            currentWeek += value;
+        } else {
+            previousWeek += value;
+        }
+    }
+    if (completeComparison && !qFuzzyIsNull(previousWeek)) {
+        kpis.insert(QStringLiteral("weekOverWeekChange"),
+                    kpi(true, percentChange(previousWeek, currentWeek), {}, 14, 14));
+    } else {
+        kpis.insert(QStringLiteral("weekOverWeekChange"),
+                    kpi(false, {},
+                        completeComparison ? QStringLiteral("zero_previous_window")
+                                           : QStringLiteral("incomplete_comparison_windows"),
+                        dailyCosts.size(), 14));
+    }
+
+    QMap<QString, QMap<QString, QPair<QString, double>>> activityBySource;
+    QMap<QString, QMap<QString, int>> activitySamplesBySource;
+    QSqlQuery activityQuery(m_db);
+    activityQuery.setForwardOnly(true);
+    activityQuery.prepare(QStringLiteral("SELECT date(observed_at_utc), provider, metric_kind, semantic, value "
+                                         "FROM observations "
+                                         "WHERE metric_kind IN ('input_tokens','output_tokens','requests') "
+                                         "AND value IS NOT NULL AND observed_at_utc >= ? "
+                                         "AND observed_at_utc <= ? "
+                                         "AND lower(source) != 'unknown' "
+                                         "AND lower(source) NOT LIKE '%connectivity%' "
+                                         "AND lower(source) NOT LIKE '%model_discovery%' "
+                                         "ORDER BY observed_at_utc"));
+    activityQuery.addBindValue(toDbDateTimeString(fromUtc));
+    activityQuery.addBindValue(toDbDateTimeString(toUtc));
+    if (activityQuery.exec()) {
+        while (activityQuery.next()) {
+            const QString day = activityQuery.value(0).toString();
+            const QString sourceKey =
+                activityQuery.value(1).toString() + QChar(0x1f) + activityQuery.value(2).toString();
+            const QString semantic = activityQuery.value(3).toString();
+            const double value = activityQuery.value(4).toDouble();
+            QPair<QString, double> &aggregate = activityBySource[day][sourceKey];
+            if (aggregate.first.isEmpty()) {
+                aggregate.first = semantic;
+                aggregate.second = value;
+            } else if (semantic == QLatin1String("interval_total")) {
+                aggregate.second += value;
+            } else {
+                aggregate.second = std::max(aggregate.second, value);
+            }
+            activitySamplesBySource[day][sourceKey]++;
+        }
+    }
+
+    QMap<QString, DailyActivity> dailyActivity;
+    for (auto dayIt = activityBySource.constBegin(); dayIt != activityBySource.constEnd(); ++dayIt) {
+        DailyActivity &day = dailyActivity[dayIt.key()];
+        for (auto sourceIt = dayIt.value().constBegin(); sourceIt != dayIt.value().constEnd(); ++sourceIt) {
+            const QString metricKind = sourceIt.key().section(QChar(0x1f), 1, 1);
+            if (metricKind == QLatin1String("requests")) {
+                day.requests += sourceIt.value().second;
+                day.requestSamples += activitySamplesBySource.value(dayIt.key()).value(sourceIt.key());
+            } else {
+                day.tokens += sourceIt.value().second;
+                day.tokenSamples += activitySamplesBySource.value(dayIt.key()).value(sourceIt.key());
+            }
+        }
+    }
+
+    QSqlQuery toolQuery(m_db);
+    toolQuery.setForwardOnly(true);
+    toolQuery.prepare(QStringLiteral("SELECT date(timestamp), tool_name, MAX(usage_count), COUNT(*) "
+                                     "FROM subscription_tool_usage "
+                                     "WHERE timestamp >= ? AND timestamp <= ? "
+                                     "GROUP BY date(timestamp), tool_name ORDER BY date(timestamp)"));
+    toolQuery.addBindValue(toDbDateTimeString(fromUtc));
+    toolQuery.addBindValue(toDbDateTimeString(toUtc));
+    if (toolQuery.exec()) {
+        while (toolQuery.next()) {
+            DailyActivity &day = dailyActivity[toolQuery.value(0).toString()];
+            day.toolUsage += toolQuery.value(2).toDouble();
+            day.toolSamples += toolQuery.value(3).toInt();
+        }
+    }
+
+    QVariantList activitySeries;
+    for (auto it = dailyActivity.constBegin(); it != dailyActivity.constEnd(); ++it) {
+        const DailyActivity &day = it.value();
+        activitySeries.append(
+            QVariantMap{{QStringLiteral("date"), it.key()},
+                        {QStringLiteral("tokensAvailable"), day.tokenSamples > 0},
+                        {QStringLiteral("tokens"), day.tokenSamples > 0 ? QVariant(day.tokens) : QVariant()},
+                        {QStringLiteral("requestsAvailable"), day.requestSamples > 0},
+                        {QStringLiteral("requests"), day.requestSamples > 0 ? QVariant(day.requests) : QVariant()},
+                        {QStringLiteral("toolUsageAvailable"), day.toolSamples > 0},
+                        {QStringLiteral("toolUsage"), day.toolSamples > 0 ? QVariant(day.toolUsage) : QVariant()},
+                        {QStringLiteral("sampleCount"), day.tokenSamples + day.requestSamples + day.toolSamples}});
+    }
+    snapshot.insert(QStringLiteral("activitySeries"), activitySeries);
+    snapshot.insert(QStringLiteral("activityAvailable"), !activitySeries.isEmpty());
+    snapshot.insert(QStringLiteral("activityReasonKey"),
+                    activitySeries.isEmpty() ? QStringLiteral("no_compatible_activity") : QString());
+
+    QVariantList ratioSeries;
+    QSqlQuery ratioQuery(m_db);
+    ratioQuery.setForwardOnly(true);
+    ratioQuery.prepare(QStringLiteral("SELECT day, SUM(provider_input), SUM(provider_output) FROM ("
+                                      " SELECT date(timestamp) AS day, provider, "
+                                      " MAX(input_tokens) AS provider_input, "
+                                      " MAX(output_tokens) AS provider_output "
+                                      " FROM usage_snapshots "
+                                      " WHERE timestamp >= ? AND timestamp <= ? "
+                                      " AND lower(usage_source) != 'unknown' "
+                                      " AND lower(usage_source) NOT LIKE '%connectivity%' "
+                                      " AND lower(usage_source) NOT LIKE '%model_discovery%' "
+                                      " GROUP BY day, provider"
+                                      ") GROUP BY day HAVING SUM(provider_input) > 0 ORDER BY day"));
+    ratioQuery.addBindValue(toDbDateTimeString(fromUtc));
+    ratioQuery.addBindValue(toDbDateTimeString(toUtc));
+    double ratioTotal = 0.0;
+    if (ratioQuery.exec()) {
+        while (ratioQuery.next()) {
+            const double input = ratioQuery.value(1).toDouble();
+            const double output = ratioQuery.value(2).toDouble();
+            const double ratio = output / input;
+            ratioSeries.append(QVariantMap{{QStringLiteral("date"), ratioQuery.value(0).toString()},
+                                           {QStringLiteral("value"), ratio},
+                                           {QStringLiteral("inputTokens"), input},
+                                           {QStringLiteral("outputTokens"), output}});
+            ratioTotal += ratio;
+        }
+    }
+    snapshot.insert(QStringLiteral("ratioSeries"), ratioSeries);
+    if (ratioSeries.size() >= 3) {
+        kpis.insert(QStringLiteral("outputInputRatio"),
+                    kpi(true, ratioTotal / static_cast<double>(ratioSeries.size()), {}, ratioSeries.size(), 3));
+    } else {
+        kpis.insert(QStringLiteral("outputInputRatio"),
+                    kpi(false, {}, QStringLiteral("insufficient_ratio_samples"), ratioSeries.size(), 3));
+    }
+    snapshot.insert(QStringLiteral("kpis"), kpis);
+
+    QSet<QString> observedDays;
+    for (auto it = dailyCosts.constBegin(); it != dailyCosts.constEnd(); ++it) {
+        observedDays.insert(it.key());
+    }
+    for (auto it = dailyActivity.constBegin(); it != dailyActivity.constEnd(); ++it) {
+        observedDays.insert(it.key());
+    }
+    for (const QVariant &ratioValue : std::as_const(ratioSeries)) {
+        observedDays.insert(ratioValue.toMap().value(QStringLiteral("date")).toString());
+    }
+    const int requestedDays = static_cast<int>(qMax<qint64>(1, fromUtc.date().daysTo(toUtc.date()) + 1));
+    QStringList sortedObservedDays = observedDays.values();
+    sortedObservedDays.sort();
+    snapshot.insert(
+        QStringLiteral("coverage"),
+        QVariantMap{
+            {QStringLiteral("requestedDayCount"), requestedDays},
+            {QStringLiteral("observedDayCount"), observedDays.size()},
+            {QStringLiteral("percent"),
+             (static_cast<double>(observedDays.size()) / static_cast<double>(requestedDays)) * 100.0},
+            {QStringLiteral("firstObservation"),
+             sortedObservedDays.isEmpty() ? QVariant()
+                                          : QVariant(QDate::fromString(sortedObservedDays.constFirst(), Qt::ISODate))},
+            {QStringLiteral("lastObservation"),
+             sortedObservedDays.isEmpty() ? QVariant()
+                                          : QVariant(QDate::fromString(sortedObservedDays.constLast(), Qt::ISODate))},
+        });
+    return snapshot;
+}
+
+void UsageDatabase::requestAnalyst(const QString &requestId, const QDateTime &from, const QDateTime &to,
+                                   const QString &currency)
+{
+    initDatabase();
+    m_latestAnalystRequestId = requestId;
+    beginWorker();
+    auto *watcher = new QFutureWatcher<QVariantMap>(this);
+    connect(watcher, &QFutureWatcher<QVariantMap>::finished, this, [this, watcher, requestId]() {
+        if (m_latestAnalystRequestId == requestId) {
+            QVariantMap snapshot = watcher->result();
+            snapshot.insert(QStringLiteral("requestId"), requestId);
+            Q_EMIT analystReady(requestId, snapshot);
+        }
+        finishWorker();
+        watcher->deleteLater();
+    });
+    watcher->setFuture(QtConcurrent::run([from, to, currency]() {
+        UsageDatabase workerDatabase;
+        workerDatabase.init();
+        return workerDatabase.getAnalystSnapshot(from, to, currency);
+    }));
 }

@@ -12,7 +12,7 @@
         </entry>
         <entry name="compactDisplayMode" type="String">
             <default>icon</default>
-            <label>What to show in compact mode: icon, cost, count, dailycost, requests, critical</label>
+            <label>What to show in compact mode: icon, attention, lowest-quota, next-reset, actual-spend, active-sources</label>
         </entry>
         <entry name="setupWizardCompleted" type="Bool">
             <default>false</default>

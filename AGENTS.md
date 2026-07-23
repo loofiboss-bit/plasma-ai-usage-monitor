@@ -6,44 +6,46 @@
 ## Build, Test Commands
 
 ```bash
-# Preferred workflow (Justfile wraps the plain CMake commands below)
+# Preferred workflow (Justfile wraps the checked-in CMake presets)
 just build
 just build-debug
 just test
 just dev           # QML-only dev loop
 
-# Build
-cmake -B build && cmake --build build
+# Build directly
+cmake --preset debug -DCMAKE_INSTALL_PREFIX=/usr
+cmake --build --preset debug
 
 # Test
-cmake --build build --target test
+ctest --preset debug
 
 # Install locally
-cmake --install build --prefix ~/.local
+cmake --install build/debug --prefix ~/.local
 
 # Clean rebuild
-rm -rf build && cmake -B build && cmake --build build
+cmake --fresh --preset debug && cmake --build --preset debug
 ```
 
-- Use the plain CMake commands above for direct builds.
+- `CMakePresets.json` is the active build contract used by the Justfile.
 - Use `just dev` for QML-only changes and `just install` / `just reload` when C++ plugin code changes.
-- This repo currently uses plain CMake + ECM/KDEInstallDirs; do not assume `vcpkg.json` or `CMakePresets.json` exist.
+- This repo uses CMake + ECM/KDEInstallDirs and checked-in presets; do not assume `vcpkg.json` exists.
 
 ## Project Layout
 
 ```text
 plugin/
-├── contents/
-│   ├── ui/
-│   │   └── main.qml          # Main QML UI
-│   └── config/
-│       └── config.qml         # Configuration page
-├── metadata.json              # KDE plugin metadata
+├── *.cpp, *.h                 # Native QML plugin, providers, history, secrets
+└── tests/                     # Qt Test, Quick Test, and contract coverage
 package/
 ├── contents/
-│   └── ui/
-│       └── CompactRepresentation.qml
+│   ├── ui/                    # Plasma UI and configuration pages
+│   ├── config/main.xml        # Stable KConfig contract
+│   └── catalog/               # Provider and subscription catalogs
+└── metadata.json              # KDE package metadata
+docs/user-guide/               # Canonical editable user documentation
+docs/wiki/                     # Generated wiki mirror
 CMakeLists.txt                 # Build system
+CMakePresets.json              # Canonical configure/build/test presets
 ```
 
 ## Code Style

@@ -3,6 +3,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import com.github.loofi.aiusagemonitor 1.0
 import "Utils.js" as Utils
+import "components" as Components
 
 Item {
     id: root
@@ -74,6 +75,9 @@ Item {
     property alias usageDb: usageDatabase
     property alias refreshScheduler: refreshScheduler
     property alias sourceReadiness: sourceReadinessModel
+    property alias dailyState: dailyStateModel
+    readonly property var presentationDailyState: mediaDailyState.active
+        ? mediaDailyState : dailyStateModel
     property alias secretsManager: secrets
 
     property alias claudeCode: claudeCodeMonitor
@@ -142,10 +146,12 @@ Item {
     }
 
     function configureSourceReadiness() {
+        dailyStateModel.registerReadinessModel(sourceReadinessModel);
         var providers = providerRegistry.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
             sourceReadinessModel.registerProviderBackend(providers[i].configKey, providers[i].backend);
             sourceReadinessModel.setSourceEnabled(providers[i].configKey, providers[i].enabled);
+            dailyStateModel.registerProviderBackend(providers[i].configKey, providers[i].backend);
         }
 
         var localTools = [
@@ -159,6 +165,7 @@ Item {
         ];
         for (var j = 0; j < localTools.length; j++) {
             sourceReadinessModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
+            dailyStateModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
         }
     }
 
@@ -517,6 +524,16 @@ Item {
         }
     }
 
+    DailyStateModel {
+        id: dailyStateModel
+        warningThreshold: plasmoid.configuration.warningThreshold
+        criticalThreshold: plasmoid.configuration.criticalThreshold
+    }
+
+    Components.MediaDailyState {
+        id: mediaDailyState
+    }
+
     BrowserSyncService {
         id: browserSyncService
         browserType: plasmoid.configuration.browserSyncBrowser
@@ -711,6 +728,7 @@ Item {
         id: notificationController
         configuration: plasmoid.configuration
         registry: providerRegistry
+        dailyState: dailyStateModel
         usageDatabase: usageDatabase
         webhookNotifier: webhookNotifier
     }
@@ -734,7 +752,6 @@ Item {
         registry: providerRegistry
         secrets: secrets
         usageDatabase: usageDatabase
-        notificationController: notificationController
         scheduler: refreshScheduler
         metricsServer: metricsServer
         webhookNotifier: webhookNotifier

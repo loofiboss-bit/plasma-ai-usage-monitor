@@ -1,22 +1,22 @@
 {
-  "version": "14.1.1",
-  "sessionId": "f69a1d8a-596a-4332-a819-394de1f02357",
+  "version": "14.1.2",
+  "sessionId": "745bc434-24c4-490e-8eaa-37c4132c545c",
   "fixtureSha256": "468295c833203fbb8779de720d874c9432f6d6a323f49029fc63f46fbe06ec6e",
   "plasmaSession": "Fedora KDE Plasma",
   "theme": "Breeze Dark",
   "environment": "isolated demo user",
-  "captureCommit": "86aa64b9bc23c16f126a62081e38bfaeba7acdf0",
-  "capturedAt": "2026-07-18T12:53:01Z",
+  "captureCommit": "43ae7ff7537b052740c2b935449a6f49d2823821",
+  "capturedAt": "2026-07-22T19:58:10Z",
   "plasmaVersion": "6.7.3",
   "scale": "100%",
   "assets": {
-    "guided-first-success.png": "df21f36510256ea1a86937fb8fab969229e2a634c8626545b819096cfadf1af8",
-    "verified-success.png": "0b1347e5181afd0bdab8fc77dda6b3e6b91d96f8613e989c037e7670d55cf04d",
-    "main-window.png": "11378daffe899db19f05423ae0e1724b7316c4dfe2d2bdd0453ca20a0c87815d",
-    "provider-intelligence.png": "b84f5b255ed06b49b27444fffbcde8afcaa1ca9c8ae309502eb782c3b9a98509",
-    "settings-view.png": "b1429bc636819140ced2f8e4b6209fe131120f7e0daa7ad7b6c86718d3664100",
-    "history-view.png": "b8fb7d8802fccf29049636a4e7285fc53bd1b58134bb93f4872ee1fabfa11b3c",
-    "analyst-view.png": "060ddd19b0ebdc2c238c612d1af37198ab9b14cc27d51634ed054b90e63f091c",
-    "panel-view.png": "9dede10db68b280d2b40f660c3cd685043f9e716757deb12dd18c3c575da7a29"
+    "guided-first-success.png": "550cc7803ff5f5931927e1b437b4fb6d96078bb5fd7f63ff87d3e2cefebc231b",
+    "verified-success.png": "7e4ee8633ff476434c71981cedafd8494a565c5028aad66d334521a9bd95ed32",
+    "main-window.png": "cab887501de432e3e0b4140ba6b6c808733c645ff1bc0f7f6aa63eb481b839ba",
+    "provider-intelligence.png": "4f8a300eda426f255d1c3599cdb55c944fc619ead3927bfa7828ae37c8d83d8a",
+    "settings-view.png": "55250e497d6da9c2e7be0c61f71566304af126d5e167a5c7ba7758e4900a2fb0",
+    "history-view.png": "ba6fe2406d998f8b86ef1ab19a3696d02a55d97af64e5ec2c6ef2fb2ec76b540",
+    "analyst-view.png": "c2236c9e73a8959127958af701789c466e91e9128a2edce6e9a5670a181fd446",
+    "panel-view.png": "4086c129bc6e46b268f885062fecfc79fb97f2cdc2c84cad4b3212a2226331a5"
   }
 }

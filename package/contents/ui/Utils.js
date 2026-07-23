@@ -45,6 +45,23 @@ function formatCurrencyTotals(totals) {
     return parts.join(" + ");
 }
 
+function availableMetric(backend, kind, window) {
+    if (!backend) return null;
+    var metrics = backend.metrics || [];
+    for (var i = 0; i < metrics.length; i++) {
+        var metric = metrics[i] || {};
+        if (metric.kind !== kind || metric.available !== true) continue;
+        if (window !== undefined && window !== null && (metric.window || "") !== window) continue;
+        if (!Number.isFinite(Number(metric.value))) continue;
+        return metric;
+    }
+    return null;
+}
+
+function isActualCostSource(source) {
+    return ["billing_api", "usage_api", "actual_api"].indexOf(source || "unknown") >= 0;
+}
+
 function providerOutcomeBadgeKeys(usageSource, costSource, monitoringLevel, qualityClass) {
     var keys = [];
     function appendUnique(key) {

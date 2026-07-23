@@ -12,8 +12,10 @@ PlasmaExtras.Representation {
 
     implicitWidth: Kirigami.Units.gridUnit * 28
     implicitHeight: Kirigami.Units.gridUnit * 28
-    property int destination: AppInfo.smokeView === "history" ? 1
-                            : AppInfo.smokeView === "analyst" ? 2 : 0
+    property int destination: AppInfo.smokeView === "history"
+                              || AppInfo.smokeView.indexOf("media-history") === 0 ? 1
+                            : AppInfo.smokeView === "analyst"
+                              || AppInfo.smokeView.indexOf("media-analyst") === 0 ? 2 : 0
 
     readonly property bool hasConfiguration: {
         if (AppInfo.smokeView.indexOf("onboarding") === 0) return false;
@@ -50,18 +52,21 @@ PlasmaExtras.Representation {
             PlasmaComponents.ToolButton {
                 activeFocusOnTab: true
                 icon.name: "view-refresh"
+                Accessible.name: i18n("Refresh all configured sources")
                 onClicked: root.refreshAll()
-                PlasmaComponents.ToolTip { text: i18n("Refresh all configured providers") }
+                PlasmaComponents.ToolTip { text: i18n("Refresh all configured sources") }
             }
             PlasmaComponents.ToolButton {
                 activeFocusOnTab: true
                 icon.name: "tools-wizard"
+                Accessible.name: i18n("Run guided setup again")
                 onClicked: onboardingFlow.startAgain()
                 PlasmaComponents.ToolTip { text: i18n("Run guided setup again") }
             }
             PlasmaComponents.ToolButton {
                 activeFocusOnTab: true
                 icon.name: "configure"
+                Accessible.name: i18n("Configure AI Usage Monitor")
                 onClicked: plasmoid.internalAction("configure").trigger()
                 PlasmaComponents.ToolTip { text: i18n("Configure") }
             }
@@ -86,6 +91,7 @@ PlasmaExtras.Representation {
                     text: modelData
                     checked: fullRoot.destination === index
                     activeFocusOnTab: true
+                    Accessible.name: i18n("Open %1", modelData)
                     onClicked: fullRoot.destination = index
                 }
             }
@@ -119,6 +125,8 @@ PlasmaExtras.Representation {
             }
             PlasmaComponents.Button {
                 text: i18n("Resume setup")
+                activeFocusOnTab: true
+                Accessible.name: i18n("Resume guided setup")
                 onClicked: onboardingFlow.resume()
             }
         }
@@ -134,19 +142,6 @@ PlasmaExtras.Representation {
                   : "views/AnalystView.qml"
         }
 
-        PlasmaComponents.Label {
-            Layout.fillWidth: true
-            Layout.margins: Kirigami.Units.smallSpacing
-            visible: !fullRoot.showGuidedSetup
-            horizontalAlignment: Text.AlignHCenter
-            font.pointSize: Kirigami.Theme.smallFont.pointSize
-            opacity: 0.6
-            text: {
-                var dbSize = root.usageDb ? root.usageDb.databaseSize() : 0;
-                var dbText = dbSize > 0 ? i18n(" · DB %1 KB", Math.round(dbSize / 1024)) : "";
-                return i18n("%1 providers connected", root.connectedCount || 0) + dbText;
-            }
-        }
     }
 
     Component.onCompleted: {
