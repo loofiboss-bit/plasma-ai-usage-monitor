@@ -289,6 +289,18 @@ target_include_directories(test_sourcereadinessmodel PRIVATE ${CMAKE_SOURCE_DIR}
 target_link_libraries(test_sourcereadinessmodel PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
 add_test(NAME sourcereadinessmodel COMMAND test_sourcereadinessmodel)
 
+add_executable(test_dailystatemodel
+    test_dailystatemodel.cpp
+    ${TEST_CATALOG_SRC}
+    ${CMAKE_SOURCE_DIR}/plugin/providerbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/subscriptiontoolbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/sourcereadinessmodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/dailystatemodel.cpp
+)
+target_include_directories(test_dailystatemodel PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_dailystatemodel PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
+add_test(NAME dailystatemodel COMMAND test_dailystatemodel)
+
 add_executable(test_appinfo
     test_appinfo.cpp
     ${CMAKE_SOURCE_DIR}/plugin/appinfo.cpp

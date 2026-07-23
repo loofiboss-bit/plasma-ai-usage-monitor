@@ -74,6 +74,7 @@ Item {
     property alias usageDb: usageDatabase
     property alias refreshScheduler: refreshScheduler
     property alias sourceReadiness: sourceReadinessModel
+    property alias dailyState: dailyStateModel
     property alias secretsManager: secrets
 
     property alias claudeCode: claudeCodeMonitor
@@ -142,10 +143,12 @@ Item {
     }
 
     function configureSourceReadiness() {
+        dailyStateModel.registerReadinessModel(sourceReadinessModel);
         var providers = providerRegistry.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
             sourceReadinessModel.registerProviderBackend(providers[i].configKey, providers[i].backend);
             sourceReadinessModel.setSourceEnabled(providers[i].configKey, providers[i].enabled);
+            dailyStateModel.registerProviderBackend(providers[i].configKey, providers[i].backend);
         }
 
         var localTools = [
@@ -159,6 +162,7 @@ Item {
         ];
         for (var j = 0; j < localTools.length; j++) {
             sourceReadinessModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
+            dailyStateModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
         }
     }
 
@@ -515,6 +519,12 @@ Item {
             if (stableId === root.pendingSettingsVerificationSourceId)
                 root.finishSettingsVerification(sourceReadinessModel.source(stableId));
         }
+    }
+
+    DailyStateModel {
+        id: dailyStateModel
+        warningThreshold: plasmoid.configuration.warningThreshold
+        criticalThreshold: plasmoid.configuration.criticalThreshold
     }
 
     BrowserSyncService {

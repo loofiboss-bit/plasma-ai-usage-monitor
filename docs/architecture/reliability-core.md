@@ -50,6 +50,46 @@ attention states separate. Compact quota and cost modes consume only available
 typed metrics; unavailable scalar defaults cannot create healthy status or zero
 usage.
 
+## Daily state contract
+
+`DailyStateModel` is the typed Phase 1 projection for daily surfaces. It observes
+`SourceReadinessModel`, provider Metric Contract v2 rows, subscription-tool quota
+windows, budgets, thresholds, and freshness. Only enabled sources are rows, and
+each catalog stable ID can occur once. `NativeMonitor.dailyState` exposes the
+same model instance to the panel, Overview, notifications, and later analytical
+surfaces; those consumers must not build independent provider or tool loops.
+
+Every row uses non-localized keys. Identity and state are `stableId`,
+`displayName`, `sourceKind`, `monitoringLevel`, `readinessState`, `qualityClass`,
+`freshnessState`, `lastSuccess`, `lastAttempt`, `lastErrorKind`, and
+`nextActionKey`. Quality classes are `actual`, `estimated`, `balance`,
+`connectivity_only`, and `unavailable`. Freshness is `fresh`, `aging`, `stale`,
+or `never`.
+
+Metric state is exposed through `hasUsefulData`, `hasActualData`,
+`hasEstimatedData`, `hasBalance`, `connectivityOnly`, `primaryMetricKind`,
+`primaryMetricAvailable`, `primaryMetricValue`, and `primaryMetricUnit`.
+Optional quota, reset, cost, and budget scalars always have a matching
+availability role. An available numeric zero remains zero. An unavailable value
+is an invalid `QVariant`; callers must check its availability role and must not
+coerce it to zero.
+
+The aggregate `summary` contains enabled, useful, actual, estimated, balance,
+connectivity-only, attention, and stale counts; highest severity and the most
+urgent source; lowest remaining quota; nearest reset; actual spend, estimated
+spend, and fixed subscription fees as separate ISO-currency maps; and the most
+recent successful aggregate completion time. Mixed currencies are never summed
+into a scalar. A row with multiple cost currencies reports `currency` as
+`MIXED`, leaves `costAvailable` false, and remains represented in the aggregate
+currency maps.
+
+Attention order is deterministic: actionable failure, exhausted quota,
+critical quota, critical budget, stale useful data, warning threshold, ready to
+verify, healthy connectivity-only, then normal reporting. Ties use lower
+remaining quota, earlier reset, and finally immutable catalog order. Severity
+keys are `critical`, `warning`, `info`, and `none`; reason keys remain stable and
+non-localized.
+
 ## Diagnostics and recovery
 
 `AppInfo` owns native installation, version, Plasma, distribution, and read-only
