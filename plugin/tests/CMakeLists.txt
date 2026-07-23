@@ -299,6 +299,41 @@ add_test(
             -platform offscreen
 )
 
+set(QML_TEST_NAMES
+    secretchangeset_qml
+    dependencybootstrap_qml
+    guidedsetup_qml
+    providersettings_qml
+    overview_qml
+    dailytruth_qml
+    dailycontrol_qml
+    notifications_qml
+    history_qml
+    phase6_qml
+    phase7_qml
+)
+set_tests_properties(${QML_TEST_NAMES} PROPERTIES
+    ENVIRONMENT
+        "QML_IMPORT_PATH=${CMAKE_BINARY_DIR}/plugin;QML2_IMPORT_PATH=${CMAKE_BINARY_DIR}/plugin"
+)
+
+set(QML_TEST_TARGETS
+    test_secretchangeset_qml
+    test_dependencybootstrap_qml
+    test_guidedsetup_qml
+    test_providersettings_qml
+    test_overview_qml
+    test_dailytruth_qml
+    test_dailycontrol_qml
+    test_notifications_qml
+    test_history_qml
+    test_phase6_qml
+    test_phase7_qml
+)
+foreach(qml_test_target IN LISTS QML_TEST_TARGETS)
+    add_dependencies(${qml_test_target} aiusagemonitorplugin)
+endforeach()
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp

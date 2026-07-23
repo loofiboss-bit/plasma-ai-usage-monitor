@@ -46,6 +46,12 @@ if(BUILD_TESTING)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_release_media.py"
     )
     add_test(
+        NAME release_media_source_archive
+        COMMAND "${CMAKE_COMMAND}" -E env
+                AI_USAGE_MONITOR_MEDIA_FORCE_FILESYSTEM=1
+                "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_release_media.py"
+    )
+    add_test(
         NAME kcm_contracts
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_kcm_contracts.py"
     )

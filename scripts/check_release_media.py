@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 import struct
 from pathlib import Path
@@ -47,6 +48,44 @@ def png_dimensions(path: Path) -> tuple[int, int]:
     return struct.unpack(">II", payload[16:24])
 
 
+def capture_source_paths() -> list[str]:
+    if not os.environ.get("AI_USAGE_MONITOR_MEDIA_FORCE_FILESYSTEM"):
+        result = subprocess.run(
+            [
+                "git",
+                "ls-files",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+                "--",
+                "VERSION",
+                "package",
+                "scripts/demo",
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            return [
+                relative
+                for relative in result.stdout.splitlines()
+                if (ROOT / relative).is_file()
+            ]
+
+    paths = [ROOT / "VERSION"]
+    paths.extend((ROOT / "package").rglob("*"))
+    paths.extend((ROOT / "scripts" / "demo").rglob("*"))
+    return [
+        str(path.relative_to(ROOT))
+        for path in paths
+        if path.is_file()
+        and "__pycache__" not in path.parts
+        and path.suffix not in {".pyc", ".pyo"}
+    ]
+
+
 version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 manifest_path = SCREENSHOTS / "v15-media-manifest.json"
 if not manifest_path.is_file():
@@ -85,27 +124,7 @@ expected_fixture = hashlib.sha256(
 if manifest["fixtureSha256"] != expected_fixture:
     fail("manifest fixture hash does not match the v15 media fixtures")
 
-source_paths = [
-    relative
-    for relative in subprocess.run(
-    [
-        "git",
-        "ls-files",
-        "--cached",
-        "--others",
-        "--exclude-standard",
-        "--",
-        "VERSION",
-        "package",
-        "scripts/demo",
-    ],
-    cwd=ROOT,
-    check=True,
-    capture_output=True,
-    text=True,
-    ).stdout.splitlines()
-    if (ROOT / relative).is_file()
-]
+source_paths = capture_source_paths()
 expected_source_tree = hashlib.sha256(
     "".join(
         hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
