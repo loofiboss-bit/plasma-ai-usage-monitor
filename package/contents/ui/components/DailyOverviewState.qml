@@ -1,5 +1,4 @@
 import QtQuick
-import "../Utils.js" as Utils
 
 QtObject {
     id: state
@@ -28,6 +27,10 @@ QtObject {
         function onSummaryChanged() { state.revision++; }
         function onSourceChanged(stableId) { state.revision++; }
         function onCountChanged() { state.revision++; }
+    }
+
+    property CompactMetricState compactMetricState: CompactMetricState {
+        summary: state.summary
     }
 
     function emptySummary() {
@@ -182,55 +185,14 @@ QtObject {
     }
 
     function normalizeCompactMode(mode) {
-        var migration = {
-            count: "active-sources",
-            critical: "attention",
-            cost: "actual-spend"
-        };
-        var normalized = migration[mode] || mode;
-        var supported = ["icon", "attention", "lowest-quota", "next-reset",
-                         "actual-spend", "active-sources", "dailycost", "requests"];
-        return supported.indexOf(normalized) >= 0 ? normalized : "icon";
+        return compactMetricState.normalizeMode(mode);
     }
 
     function compactStatusKey() {
-        var severity = summary.highestSeverity || "none";
-        if (severity !== "none") return severity;
-        if (Number(summary.reportingUsefulSourceCount || 0) > 0) return "healthy";
-        if (Number(summary.connectivityOnlySourceCount || 0) > 0) return "connectivity";
-        return Number(summary.enabledSourceCount || 0) > 0 ? "unverified" : "hidden";
+        return compactMetricState.statusKey();
     }
 
     function compactText(mode) {
-        var normalized = normalizeCompactMode(mode);
-        if (normalized === "attention") {
-            var urgent = summary.mostUrgentSource || {};
-            if (urgent.stableId) return urgent.displayName;
-            if (Number(summary.reportingUsefulSourceCount || 0) > 0) return i18n("All clear");
-            if (Number(summary.connectivityOnlySourceCount || 0) > 0)
-                return i18n("Connectivity only");
-            return "\u2014";
-        }
-        if (normalized === "lowest-quota") {
-            var quota = summary.lowestActualRemainingQuota || {};
-            return quota.stableId
-                ? i18n("%1% · %2", Math.round(Number(quota.percentRemaining)), quota.displayName)
-                : "\u2014";
-        }
-        if (normalized === "next-reset") {
-            var reset = summary.nearestActualReset || {};
-            return reset.stableId ? relativeReset(reset.resetAt) : "\u2014";
-        }
-        if (normalized === "actual-spend")
-            return Utils.formatCurrencyTotals(summary.providerActualSpendTotals || {});
-        if (normalized === "active-sources")
-            return Number(summary.reportingUsefulSourceCount || 0).toString();
-        if (normalized === "dailycost")
-            return Utils.formatCurrencyTotals(summary.providerDailyActualSpendTotals || {});
-        if (normalized === "requests") {
-            var requests = summary.remainingRequests || {};
-            return requests.stableId ? i18n("%1 req", requests.value) : "\u2014";
-        }
-        return "";
+        return compactMetricState.displayText(mode);
     }
 }

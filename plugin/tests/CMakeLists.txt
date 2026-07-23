@@ -277,6 +277,17 @@ add_test(
             -platform offscreen
 )
 
+add_executable(test_phase6_qml
+    test_phase6_qml.cpp
+)
+target_link_libraries(test_phase6_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME phase6_qml
+    COMMAND test_phase6_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/phase6"
+            -platform offscreen
+)
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp

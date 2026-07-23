@@ -12,14 +12,15 @@ MouseArea {
     readonly property var providers: root.allProviders ?? []
     readonly property var subscriptionTools: root.allSubscriptionTools ?? []
 
-    Components.DailyOverviewState {
+    Components.CompactMetricState {
         id: compactState
-        dailyState: root.dailyState
+        summary: root.dailyState && root.dailyState.summary
+            ? root.dailyState.summary : ({})
     }
 
-    readonly property string displayMode: compactState.normalizeCompactMode(
+    readonly property string displayMode: compactState.normalizeMode(
         plasmoid.configuration.compactDisplayMode)
-    readonly property string statusKey: compactState.compactStatusKey()
+    readonly property string statusKey: compactState.statusKey()
     readonly property bool anyLoading: {
         for (var i = 0; i < providers.length; i++) {
             if (providers[i] && providers[i].enabled && providers[i].backend
@@ -102,7 +103,7 @@ MouseArea {
     }
 
     function displayText() {
-        return compactState.compactText(displayMode);
+        return compactState.displayText(displayMode);
     }
 
     function accessibleText() {

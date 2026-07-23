@@ -194,6 +194,24 @@ notes. They never reuse a different period's UI state or include endpoints,
 credentials, cookies, account identifiers, or unrestricted backend errors.
 Endpoint and installation diagnostics remain exclusively in Diagnostics.
 
+## Daily UI test boundaries
+
+Phase 6 keeps daily behavior independently testable without changing its public
+QML imports or backend contracts. `AnalystState` owns Analyst requests, result
+supersession, availability formatting, chart-series projection, and report
+generation; `AnalystTab` remains the visual surface. `HistoryController` owns
+catalog and series requests, selection normalization, result supersession,
+series decoration, coverage text, and export projection; `HistoryView` remains
+the navigation and chart surface.
+
+`CompactMetricState` selects the configured panel metric from a supplied Daily
+State summary, so compact behavior can be fixture-tested without loading the
+plasmoid. `MetricAvailabilityFormatter` is the shared boundary for unavailable
+placeholders, reason text, dates, percentages, currencies, and KPI fallback
+objects. `DailyOverviewState` delegates its compatibility compact API to the
+same selector. Available numeric zero remains distinct from unavailable state
+through every extracted object.
+
 Calendar totals include only compatible interval-total observations. Gauges, cumulative counters, and rolling windows are not relabeled as calendar totals. Queries preserve ISO currency and source quality.
 
 Large exports use worker instances, forward-only queries, and atomic output files so memory use does not grow with history size and partial files do not replace complete exports.
