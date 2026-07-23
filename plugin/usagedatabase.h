@@ -22,6 +22,7 @@ class UsageDatabase : public QObject
 
     Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(int retentionDays READ retentionDays WRITE setRetentionDays NOTIFY retentionDaysChanged)
+    Q_PROPERTY(int pendingWorkerCount READ pendingWorkerCount NOTIFY pendingWorkerCountChanged)
 
 public:
     explicit UsageDatabase(QObject *parent = nullptr);
@@ -31,6 +32,8 @@ public:
     void setEnabled(bool enabled);
     int retentionDays() const;
     void setRetentionDays(int days);
+    int pendingWorkerCount() const;
+    int databaseConnectionCount() const;
 
     /**
      * Record a usage snapshot for a provider.
@@ -274,6 +277,7 @@ public:
 Q_SIGNALS:
     void enabledChanged();
     void retentionDaysChanged();
+    void pendingWorkerCountChanged();
     void historyReady(const QString &requestId, const QVariantMap &payload);
     void comparisonReady(const QString &requestId, const QVariantList &series);
     void historyCatalogReady(const QString &requestId, const QVariantList &sources);
@@ -283,6 +287,8 @@ Q_SIGNALS:
 
 private:
     void initDatabase();
+    void beginWorker();
+    void finishWorker();
     void createTables();
     bool migrateToObservationSchemaV3();
     bool migrateToObservationSchemaV4();
@@ -306,6 +312,7 @@ private:
     QString m_latestHistoryCatalogRequestId;
     QString m_latestHistorySeriesRequestId;
     QString m_latestAnalystRequestId;
+    int m_pendingWorkerCount = 0;
 
     static std::atomic<int> s_instanceCounter;
 

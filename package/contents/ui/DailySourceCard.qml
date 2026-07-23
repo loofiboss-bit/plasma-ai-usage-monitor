@@ -17,7 +17,8 @@ Rectangle {
     border.width: 1
     border.color: Qt.alpha(accentColor(), 0.24)
     Accessible.role: Accessible.StaticText
-    Accessible.name: row.displayName + ". " + stateText() + ". " + metricText()
+    Accessible.name: row.displayName + ". " + attentionText() + stateText()
+        + ". " + metricText()
 
     RowLayout {
         id: content
@@ -44,8 +45,12 @@ Rectangle {
             }
             PlasmaComponents.Label {
                 Layout.fillWidth: true
-                text: card.stateText()
-                color: Kirigami.Theme.disabledTextColor
+                text: card.attentionText() + card.stateText()
+                color: card.row.attentionSeverity === "critical"
+                    ? Kirigami.Theme.negativeTextColor
+                    : card.row.attentionSeverity === "warning"
+                        ? Kirigami.Theme.neutralTextColor
+                        : Kirigami.Theme.disabledTextColor
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 elide: Text.ElideRight
             }
@@ -96,6 +101,12 @@ Rectangle {
             unavailable: i18n("Data unavailable")
         };
         return labels[row.qualityClass] || i18n("Data unavailable");
+    }
+
+    function attentionText() {
+        if (row.attentionSeverity === "critical") return i18n("Critical · ");
+        if (row.attentionSeverity === "warning") return i18n("Warning · ");
+        return "";
     }
 
     function metricText() {

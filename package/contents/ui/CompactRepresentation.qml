@@ -50,13 +50,25 @@ MouseArea {
             visible: compactRoot.statusKey !== "hidden"
             anchors.right: parent.right
             anchors.bottom: parent.bottom
-            width: Kirigami.Units.smallSpacing * 3
+            width: Kirigami.Units.smallSpacing * 3.5
             height: width
             radius: width / 2
             color: compactRoot.statusColor()
             border.width: 1
             border.color: Kirigami.Theme.backgroundColor
             Behavior on color { ColorAnimation { duration: 200 } }
+
+            PlasmaComponents.Label {
+                objectName: "compactSeveritySymbol"
+                anchors.centerIn: parent
+                visible: compactRoot.statusKey === "critical"
+                    || compactRoot.statusKey === "warning"
+                text: "!"
+                color: Kirigami.Theme.backgroundColor
+                font.bold: true
+                font.pixelSize: Math.max(8, parent.height - 3)
+                Accessible.ignored: true
+            }
         }
     }
 

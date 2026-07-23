@@ -288,6 +288,17 @@ add_test(
             -platform offscreen
 )
 
+add_executable(test_phase7_qml
+    test_phase7_qml.cpp
+)
+target_link_libraries(test_phase7_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME phase7_qml
+    COMMAND test_phase7_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/phase7"
+            -platform offscreen
+)
+
 add_executable(test_refreshscheduler
     test_refreshscheduler.cpp
     ${CMAKE_SOURCE_DIR}/plugin/refreshschedulermodel.cpp
@@ -445,6 +456,23 @@ target_link_libraries(test_usagedatabase_analyst
 )
 
 add_test(NAME usagedatabase_analyst COMMAND test_usagedatabase_analyst)
+
+# --- Phase 7 release performance and async lifecycle gate ---
+add_executable(test_phase7_performance
+    test_phase7_performance.cpp
+    ${TEST_USAGE_DB_SRC}
+)
+
+target_include_directories(test_phase7_performance
+    PRIVATE ${CMAKE_SOURCE_DIR}/plugin
+)
+
+target_link_libraries(test_phase7_performance
+    PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent
+)
+
+add_test(NAME phase7_performance COMMAND test_phase7_performance)
+set_tests_properties(phase7_performance PROPERTIES TIMEOUT 60)
 
 # --- Script-based tests ---
 add_test(NAME version_consistency COMMAND ${CMAKE_SOURCE_DIR}/scripts/check_version_consistency.sh)

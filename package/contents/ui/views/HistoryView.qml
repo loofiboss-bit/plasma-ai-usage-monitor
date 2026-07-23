@@ -16,6 +16,9 @@ ColumnLayout {
 
     property string pendingExportFormat: "csv"
     property string exportStatus: ""
+    Accessible.name: historyController.loading
+        ? i18n("History view loading")
+        : i18n("History view ready")
 
     Components.HistoryController {
         id: historyController
@@ -47,6 +50,10 @@ ColumnLayout {
             text: historyController.compareMode ? i18n("Compare") : i18n("Detail")
             checkable: true
             checked: historyController.compareMode
+            activeFocusOnTab: true
+            Accessible.name: historyController.compareMode
+                ? i18n("Show comparison history")
+                : i18n("Show one source history")
             onClicked: {
                 historyController.compareMode = !historyController.compareMode;
                 historyController.normalizeSelection();
@@ -56,6 +63,7 @@ ColumnLayout {
         PlasmaComponents.ToolButton {
             icon.name: "view-refresh"
             enabled: !historyController.loading
+            activeFocusOnTab: true
             Accessible.name: i18n("Refresh history")
             onClicked: historyController.refreshCatalog()
         }
@@ -71,6 +79,7 @@ ColumnLayout {
             id: rangeCombo
             model: [i18n("24 hours"), i18n("7 days"), i18n("30 days"), i18n("90 days")]
             currentIndex: historyController.rangeIndex
+            activeFocusOnTab: true
             Accessible.name: i18n("History range")
             onActivated: {
                 historyController.rangeIndex = currentIndex;
@@ -85,6 +94,7 @@ ColumnLayout {
             textRole: "text"
             valueRole: "value"
             currentIndex: historyController.sourceIndex()
+            activeFocusOnTab: true
             Accessible.name: i18n("History source")
             onActivated: {
                 historyController.selectedSourceId = currentValue || "";
@@ -99,6 +109,7 @@ ColumnLayout {
             textRole: "text"
             valueRole: "value"
             currentIndex: historyController.metricIndex()
+            activeFocusOnTab: true
             Accessible.name: i18n("History metric")
             onActivated: {
                 historyController.selectedMetric = currentValue || "";
@@ -108,6 +119,8 @@ ColumnLayout {
         PlasmaComponents.Button {
             text: i18n("Export file")
             icon.name: "document-export"
+            activeFocusOnTab: true
+            Accessible.name: i18n("Export history to a file")
             enabled: !historyController.loading
                 && historyController.seriesData.length > 0
             onClicked: exportMenu.open()
@@ -129,6 +142,7 @@ ColumnLayout {
             icon.name: "edit-copy"
             enabled: !historyController.loading
                 && historyController.seriesData.length > 0
+            activeFocusOnTab: true
             Accessible.name: i18n("Copy history as CSV")
             onClicked: clipboard.setText(historyController.exportPayload("csv"))
         }

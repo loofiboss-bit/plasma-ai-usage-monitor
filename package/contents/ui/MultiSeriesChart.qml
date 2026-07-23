@@ -26,6 +26,8 @@ Item {
     property real marginBottom: 28
 
     implicitHeight: Kirigami.Units.gridUnit * 11
+    Accessible.role: Accessible.Graphic
+    Accessible.name: accessibleSummary()
 
     ColumnLayout {
         anchors.fill: parent
@@ -359,6 +361,30 @@ Item {
         return false;
     }
 
+    function accessibleSummary() {
+        var visible = visibleSeries();
+        if (visible.length === 0)
+            return i18n("%1 chart. No compatible data.", metricLabel());
+        var descriptions = [];
+        for (var i = 0; i < visible.length; ++i) {
+            var points = visible[i].points || [];
+            var available = 0;
+            var gaps = 0;
+            for (var p = 0; p < points.length; ++p) {
+                if (points[p].available === false
+                        || points[p].value === null
+                        || points[p].value === undefined) {
+                    gaps++;
+                } else if (Number.isFinite(Number(points[p].value))) {
+                    available++;
+                }
+            }
+            descriptions.push(i18n("%1: %2 recorded points, %3 gaps",
+                                   visible[i].name, available, gaps));
+        }
+        return i18n("%1 chart. %2", metricLabel(), descriptions.join(i18n(" · ")));
+    }
+
     function visibleSeries() {
         var series = seriesData || [];
         var out = [];
@@ -373,7 +399,8 @@ Item {
             if (available) {
                 out.push({
                     name: series[i].name || i18n("Series %1", i + 1),
-                    color: series[i].color || paletteColor(i)
+                    color: series[i].color || paletteColor(i),
+                    points: points
                 });
             }
         }

@@ -22,6 +22,8 @@ Item {
     required property var jetbrainsAiMonitor
     required property var antigravityMonitor
 
+    property bool startupRefreshCompleted: false
+
     function loadIntegrationSecrets() {
         if (registry.demoMode) {
             if (copilotMonitor) copilotMonitor.githubToken = "";
@@ -79,6 +81,15 @@ Item {
 
         loadIntegrationSecrets();
         syncMetricsPayload();
+    }
+
+    function refreshCredentialProviders(reason) {
+        var providers = registry.allProviders || [];
+        for (var i = 0; i < providers.length; i++) {
+            if (providers[i].requiresApiKey !== false) {
+                scheduler.refreshProvider(providers[i], reason, false);
+            }
+        }
     }
 
     function recordProviderSnapshot(providerName, backend) {
@@ -312,7 +323,11 @@ Item {
 
         function onWalletOpenChanged() {
             if (runtime.secrets.walletOpen) {
-                runtime.loadApiKeys(runtime.scheduler.refreshCredentialChanged, true);
+                runtime.loadApiKeys(runtime.scheduler.refreshCredentialChanged, false);
+                if (runtime.startupRefreshCompleted) {
+                    runtime.refreshCredentialProviders(
+                        runtime.scheduler.refreshCredentialChanged);
+                }
             }
         }
 
@@ -463,6 +478,7 @@ Item {
         interval: 200
         repeat: false
         onTriggered: {
+            runtime.startupRefreshCompleted = true;
             if (runtime.secrets.walletOpen) {
                 runtime.loadApiKeys(runtime.scheduler.refreshStartup, false);
                 runtime.scheduler.refreshAll(runtime.scheduler.refreshStartup);

@@ -79,7 +79,15 @@ QtObject {
     function summaryText() {
         var enabled = Number(summary.enabledSourceCount || 0);
         var useful = Number(summary.reportingUsefulSourceCount || 0);
-        var parts = [i18n("%1 of %2 active sources", useful, enabled)];
+        var parts = [];
+        var urgent = summary.mostUrgentSource || {};
+        var severity = summary.highestSeverity || "none";
+        if (urgent.stableId && (severity === "critical" || severity === "warning")) {
+            parts.push(severity === "critical"
+                ? i18n("Critical: %1", urgent.displayName)
+                : i18n("Warning: %1", urgent.displayName));
+        }
+        parts.push(i18n("%1 of %2 active sources", useful, enabled));
         var connectivity = Number(summary.connectivityOnlySourceCount || 0);
         var attention = Number(summary.attentionSourceCount || 0);
         if (connectivity > 0)

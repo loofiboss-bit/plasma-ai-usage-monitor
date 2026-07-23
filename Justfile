@@ -37,6 +37,7 @@ check:
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
     python3 scripts/check_kcm_contracts.py
+    python3 scripts/check_daily_ui_accessibility.py
     python3 scripts/check_qml_registered_types.py
     python3 scripts/check_non_invasive_monitoring.py
     python3 scripts/check_provider_capability_docs.py
@@ -82,6 +83,7 @@ release-check: build-debug
     python3 scripts/check_no_hardcoded_pricing.py
     python3 scripts/check_config_portability.py
     python3 scripts/check_kcm_contracts.py
+    python3 scripts/check_daily_ui_accessibility.py
     python3 scripts/check_qml_registered_types.py
     python3 scripts/check_non_invasive_monitoring.py
     python3 scripts/check_provider_capability_docs.py
@@ -96,6 +98,16 @@ release-check: build-debug
     bash scripts/package_source_tarball.sh --check
     bash scripts/package_plasmoid.sh --check
     python3 scripts/check_package_payload.py
+
+# Phase 7 database performance, async lifecycle, accessibility, and QML gates
+phase7-check: build-debug
+    ctest --test-dir build/debug --output-on-failure -R 'phase7_performance|phase7_qml|daily_ui_accessibility'
+    cmake --preset release -DCMAKE_INSTALL_PREFIX=/usr
+    cmake --build --preset release --parallel $(nproc) --target test_phase7_performance
+    ctest --test-dir build/release --output-on-failure -R phase7_performance
+    python3 scripts/check_daily_ui_accessibility.py
+    python3 scripts/qml_lint.py --build-dir build/debug
+    QT_QPA_PLATFORM=offscreen dbus-run-session -- bash scripts/smoke_test_plasmoid.sh build/debug
 
 # Fedora KDE 44 release environment validation
 fedora44-check:

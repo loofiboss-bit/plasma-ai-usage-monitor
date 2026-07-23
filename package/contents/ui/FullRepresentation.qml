@@ -50,18 +50,21 @@ PlasmaExtras.Representation {
             PlasmaComponents.ToolButton {
                 activeFocusOnTab: true
                 icon.name: "view-refresh"
+                Accessible.name: i18n("Refresh all configured sources")
                 onClicked: root.refreshAll()
                 PlasmaComponents.ToolTip { text: i18n("Refresh all configured sources") }
             }
             PlasmaComponents.ToolButton {
                 activeFocusOnTab: true
                 icon.name: "tools-wizard"
+                Accessible.name: i18n("Run guided setup again")
                 onClicked: onboardingFlow.startAgain()
                 PlasmaComponents.ToolTip { text: i18n("Run guided setup again") }
             }
             PlasmaComponents.ToolButton {
                 activeFocusOnTab: true
                 icon.name: "configure"
+                Accessible.name: i18n("Configure AI Usage Monitor")
                 onClicked: plasmoid.internalAction("configure").trigger()
                 PlasmaComponents.ToolTip { text: i18n("Configure") }
             }
@@ -86,6 +89,7 @@ PlasmaExtras.Representation {
                     text: modelData
                     checked: fullRoot.destination === index
                     activeFocusOnTab: true
+                    Accessible.name: i18n("Open %1", modelData)
                     onClicked: fullRoot.destination = index
                 }
             }
@@ -119,6 +123,8 @@ PlasmaExtras.Representation {
             }
             PlasmaComponents.Button {
                 text: i18n("Resume setup")
+                activeFocusOnTab: true
+                Accessible.name: i18n("Resume guided setup")
                 onClicked: onboardingFlow.resume()
             }
         }

@@ -57,6 +57,10 @@ if(BUILD_TESTING)
         NAME exact_tag_promotion
         COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_verify_exact_tag.sh"
     )
+    add_test(
+        NAME daily_ui_accessibility
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_daily_ui_accessibility.py"
+    )
 endif()
 
 # Install the plasmoid package

@@ -11,6 +11,9 @@ Kirigami.ScrollablePage {
     id: analystPage
 
     title: i18n("The Analyst")
+    Accessible.name: analystState.loading
+        ? i18n("Analyst view loading")
+        : i18n("Analyst view ready")
 
     readonly property var db: plasmoid.configuration.historyEnabled
         ? root.usageDb
