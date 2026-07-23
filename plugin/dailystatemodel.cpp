@@ -59,6 +59,18 @@ bool finiteNumber(const QVariant &value) {
   return ok && std::isfinite(number);
 }
 
+QVariant catalogPriceAmount(const QVariantMap &price) {
+  const QVariant amount = price.value(QStringLiteral("amount"));
+  if (finiteNumber(amount))
+    return amount;
+  const QVariant rangeMinimum = price.value(QStringLiteral("rangeMin"));
+  if (price.value(QStringLiteral("precision")) ==
+          QLatin1String("official_range") &&
+      finiteNumber(rangeMinimum))
+    return rangeMinimum;
+  return QVariant();
+}
+
 QDateTime asDateTime(const QVariant &value) {
   QDateTime result = value.toDateTime();
   if (!result.isValid())
@@ -674,7 +686,7 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
                                      : QStringLiteral("mixed"));
 
   bool hasDailyCost = false;
-  bool hasMonthlyCost = false;
+  bool hasMonthlyCostMetric = false;
   for (const QVariant &entry : backend->metrics()) {
     const QVariantMap metric = entry.toMap();
     if (metric.value(QStringLiteral("kind")) != QLatin1String("cost") ||
@@ -682,9 +694,12 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
       continue;
     hasDailyCost = hasDailyCost || metric.value(QStringLiteral("window")) ==
                                        QLatin1String("day");
-    hasMonthlyCost = hasMonthlyCost || metric.value(QStringLiteral("window")) ==
-                                           QLatin1String("month");
+    hasMonthlyCostMetric =
+        hasMonthlyCostMetric || metric.value(QStringLiteral("window")) ==
+                                    QLatin1String("month");
   }
+  const bool hasMonthlyCost =
+      hasMonthlyCostMetric || backend->monthlyCost() > 0.0;
   double budgetPercent = -1.0;
   if (!backend->budgetCurrencyMismatch()) {
     if (hasDailyCost && backend->dailyBudget() > 0.0)
@@ -693,7 +708,7 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
       budgetPercent = qMax(budgetPercent, backend->monthlyCost() * 100.0 /
                                               backend->monthlyBudget());
   }
-  if (budgetPercent >= 0.0 && !combined.isEmpty()) {
+  if (budgetPercent >= 0.0) {
     row.insert(QStringLiteral("budgetAvailable"), true);
     row.insert(QStringLiteral("budgetPercentUsed"), budgetPercent);
   }
@@ -769,9 +784,10 @@ QVariantMap DailyStateModel::buildToolRow(QVariantMap row,
   const QVariantMap price = SubscriptionPlanCatalog::instance()->price(
       row.value(QStringLiteral("stableId")).toString(), tool->planTier());
   QVariantMap fixedFees;
-  if (finiteNumber(price.value(QStringLiteral("amount"))))
+  const QVariant priceAmount = catalogPriceAmount(price);
+  if (priceAmount.isValid())
     addCurrency(fixedFees, price.value(QStringLiteral("currency")).toString(),
-                price.value(QStringLiteral("amount")).toDouble());
+                priceAmount.toDouble());
   row.insert(QStringLiteral("_fixedFees"), fixedFees);
   if (tool->hasExtraUsage()) {
     QString currency = price.value(QStringLiteral("currency")).toString();

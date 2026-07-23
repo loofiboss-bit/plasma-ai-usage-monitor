@@ -176,6 +176,7 @@ TestCase {
         analystState.acceptResult(fakeDb.analystRequestId, {
             ok: true,
             marker: "current",
+            currency: "SEK",
             spendSeries: [{
                 date: "2026-07-01",
                 actualAvailable: true,
@@ -192,6 +193,8 @@ TestCase {
         verify(!analystState.loading);
         compare(analystState.snapshot.marker, "current");
         compare(analystState.spendChartSeries()[0].points[0].value, 0);
+        compare(analystState.spendChartSeries()[0].currency, "SEK");
+        compare(analystState.spendChartSeries()[1].currency, "SEK");
         verify(analystState.spendChartSeries()[0].points[0].available);
         verify(!analystState.spendChartSeries()[1].points[0].available);
         verify(analystState.seriesHasValues("tokens"));

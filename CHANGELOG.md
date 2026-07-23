@@ -838,7 +838,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KDE notifications for rate limit warnings
 
 [Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v15.0.0...HEAD
-[15.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.2...v15.0.0
+[15.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v15.0.0
 [14.1.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v14.1.2
 [14.1.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.0...v14.1.1
 [14.1.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.1...v14.1.0

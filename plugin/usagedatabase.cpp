@@ -927,16 +927,9 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider,
                 metric.value(QStringLiteral("quality")).toString().toLower();
             const QString source =
                 metric.value(QStringLiteral("source")).toString().toLower();
-            const QString kind =
-                metric.value(QStringLiteral("kind")).toString();
-            const QString window =
-                metric.value(QStringLiteral("window")).toString();
             if (quality.contains(QStringLiteral("estimated"))
                 || source.contains(QStringLiteral("estimated"))) {
                 semantic = QStringLiteral("local_estimate");
-            } else if (kind == QLatin1String("cost")
-                       && window == QLatin1String("day")) {
-                semantic = QStringLiteral("interval_total");
             } else {
                 semantic = QStringLiteral("gauge");
             }
@@ -1357,6 +1350,7 @@ QVariantList UsageDatabase::getHistoryCatalog() const
             "AND remaining.correlation_id = limits.correlation_id "
             "AND remaining.scope = limits.scope "
             "AND remaining.window = limits.window "
+            "AND remaining.source = limits.source "
             "WHERE limits.provider = ? AND limits.value > 0 "
             "AND remaining.value IS NOT NULL "
             "AND lower(limits.source) != 'unknown' "
@@ -2943,21 +2937,25 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
         QString model;
         QString currency;
         QString quality;
+        QString semantic;
+        QString source;
+        QString scope;
+        QString window;
         double value = 0.0;
     };
     QList<CostObservation> costObservations;
     QSqlQuery costQuery(m_db);
     costQuery.setForwardOnly(true);
     costQuery.prepare(QStringLiteral("SELECT date(observed_at_utc), provider, model_scope, currency, "
-                                     "source, data_quality, semantic, value "
+                                     "source, data_quality, semantic, value, scope, window "
                                      "FROM observations "
                                      "WHERE metric_kind='cost' AND value IS NOT NULL "
                                      "AND observed_at_utc >= ? AND observed_at_utc <= ? "
                                      "AND lower(source) != 'unknown' "
                                      "AND lower(source) NOT LIKE '%connectivity%' "
                                      "AND lower(source) NOT LIKE '%model_discovery%' "
-                                     "AND semantic IN ('interval_total','local_estimate') "
-                                     "ORDER BY observed_at_utc"));
+                                     "AND semantic IN ('gauge','interval_total','local_estimate') "
+                                     "ORDER BY observed_at_utc, id"));
     costQuery.addBindValue(toDbDateTimeString(fromUtc));
     costQuery.addBindValue(toDbDateTimeString(toUtc));
     if (costQuery.exec()) {
@@ -2969,8 +2967,12 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
             observation.currency = costQuery.value(3).toString().trimmed().toUpper();
             const QString source = costQuery.value(4).toString();
             const QString quality = costQuery.value(5).toString();
-            const QString semantic = costQuery.value(6).toString();
-            observation.quality = normalizedQualityClass(source, quality, semantic);
+            observation.semantic = costQuery.value(6).toString();
+            observation.source = source;
+            observation.scope = costQuery.value(8).toString();
+            observation.window = costQuery.value(9).toString();
+            observation.quality =
+                normalizedQualityClass(source, quality, observation.semantic);
             observation.value = costQuery.value(7).toDouble();
             if (!observation.currency.isEmpty()) {
                 currencies.insert(observation.currency);
@@ -3004,10 +3006,32 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
     int actualSampleCount = 0;
     int estimatedSampleCount = 0;
     if (!analysisCurrency.isEmpty()) {
-        for (const CostObservation &observation : std::as_const(costObservations)) {
+        QList<CostObservation> effectiveCostObservations;
+        QMap<QString, CostObservation> latestGauges;
+        for (const CostObservation &observation :
+             std::as_const(costObservations)) {
             if (observation.currency != analysisCurrency) {
                 continue;
             }
+            if (observation.semantic == QLatin1String("gauge")) {
+                const QString key =
+                    QStringList{observation.date,
+                                observation.provider,
+                                observation.model,
+                                observation.currency,
+                                observation.quality,
+                                observation.source,
+                                observation.scope,
+                                observation.window}
+                        .join(QChar(0x1f));
+                latestGauges.insert(key, observation);
+            } else {
+                effectiveCostObservations.append(observation);
+            }
+        }
+        effectiveCostObservations.append(latestGauges.values());
+        for (const CostObservation &observation :
+             std::as_const(effectiveCostObservations)) {
             const bool estimated = observation.quality == QLatin1String("estimated");
             DailyCost &day = dailyCosts[observation.date];
             if (estimated) {

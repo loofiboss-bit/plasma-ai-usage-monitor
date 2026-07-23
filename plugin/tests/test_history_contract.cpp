@@ -367,11 +367,32 @@ void HistoryContractTest::providerRateLimitRequiresCompatiblePair()
                                    QStringLiteral("request"), 25, true);
     limit.insert(QStringLiteral("resetAt"), now.addSecs(3600));
     remaining.insert(QStringLiteral("resetAt"), now.addSecs(3600));
+    limit.insert(QStringLiteral("source"), QStringLiteral("documented_limit"));
+    remaining.insert(QStringLiteral("source"),
+                     QStringLiteral("response_headers"));
     QVERIFY(db.recordProviderMetrics(QStringLiteral("Quota Provider"),
                                      {limit, remaining}));
 
-    const QVariantList catalog = db.getHistoryCatalog();
+    QVariantList catalog = db.getHistoryCatalog();
     bool advertised = false;
+    for (const QVariant &entry : catalog) {
+        const QVariantMap row = entry.toMap();
+        if (row.value(QStringLiteral("historyId")).toString()
+            != QLatin1String("provider:Quota Provider")) {
+            continue;
+        }
+        advertised = row.value(QStringLiteral("metricKinds"))
+                         .toStringList()
+                         .contains(QStringLiteral("rateLimitUsed"));
+    }
+    QVERIFY(!advertised);
+
+    limit.insert(QStringLiteral("source"), QStringLiteral("response_headers"));
+    QVERIFY(db.recordProviderMetrics(QStringLiteral("Quota Provider"),
+                                     {limit, remaining}));
+
+    catalog = db.getHistoryCatalog();
+    advertised = false;
     for (const QVariant &entry : catalog) {
         const QVariantMap row = entry.toMap();
         if (row.value(QStringLiteral("historyId")).toString()

@@ -50,6 +50,11 @@ public:
               MetricSource::BillingApi);
   }
 
+  void setMonthlySpend(double spent, double budget) {
+    setMonthlyBudget(budget);
+    setMonthlyCost(spent);
+  }
+
   void makeStale() {
     updateLastRefreshed(QDateTime::currentDateTimeUtc().addDays(-2));
   }
@@ -102,10 +107,12 @@ private Q_SLOTS:
   void toolOnlySummaryIsComplete();
   void unavailableAndAvailableZeroStayDistinct();
   void providerToolMixedCurrencyAndFeesAggregateSeparately();
+  void rangePricedToolUsesCatalogMinimumFee();
   void staleBalanceAndConnectivityRemainDistinct();
   void priorityRules_data();
   void priorityRules();
   void budgetPriorityRequiresTypedCost();
+  void monthlyBudgetUsesBackendBillingValue();
   void priorityTiesAreDeterministic();
   void panelAggregatesUseTypedDailyMetrics();
   void documentedAndLocalLimitsAreNotLiveQuota();
@@ -268,6 +275,23 @@ void DailyStateModelTest::
            2.5);
 }
 
+void DailyStateModelTest::rangePricedToolUsesCatalogMinimumFee() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyTool tool;
+  tool.setEnabled(true);
+  tool.install();
+  tool.setPlanTier(QStringLiteral("ai_pro"));
+
+  readiness.registerLocalTool(QStringLiteral("jetbrains-ai"), &tool);
+  daily.registerReadinessModel(&readiness);
+  daily.registerLocalTool(QStringLiteral("jetbrains-ai"), &tool);
+
+  const QVariantMap fixedFees =
+      daily.summary().value(QStringLiteral("fixedSubscriptionFees")).toMap();
+  QCOMPARE(fixedFees.value(QStringLiteral("USD")).toDouble(), 10.0);
+}
+
 void DailyStateModelTest::staleBalanceAndConnectivityRemainDistinct() {
   SourceReadinessModel readiness;
   DailyStateModel daily;
@@ -383,6 +407,24 @@ void DailyStateModelTest::budgetPriorityRequiresTypedCost() {
            QStringLiteral("critical"));
   QCOMPARE(row.value(QStringLiteral("attentionReasonKey")).toString(),
            QStringLiteral("budget_critical"));
+}
+
+void DailyStateModelTest::monthlyBudgetUsesBackendBillingValue() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  provider.makeReady();
+  provider.setMonthlySpend(80.0, 100.0);
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+
+  const QVariantMap row = daily.source(QStringLiteral("openai"));
+  QVERIFY(row.value(QStringLiteral("budgetAvailable")).toBool());
+  QCOMPARE(row.value(QStringLiteral("budgetPercentUsed")).toDouble(), 80.0);
+  QCOMPARE(row.value(QStringLiteral("attentionReasonKey")).toString(),
+           QStringLiteral("budget_warning"));
 }
 
 void DailyStateModelTest::priorityTiesAreDeterministic() {

@@ -128,8 +128,18 @@ QtObject {
             });
         }
         return [
-            { name: i18n("Actual"), color: "#10A37F", points: actual },
-            { name: i18n("Estimated"), color: "#D4A574", points: estimated }
+            {
+                name: i18n("Actual"),
+                color: "#10A37F",
+                currency: snapshot.currency || "",
+                points: actual
+            },
+            {
+                name: i18n("Estimated"),
+                color: "#D4A574",
+                currency: snapshot.currency || "",
+                points: estimated
+            }
         ];
     }
 

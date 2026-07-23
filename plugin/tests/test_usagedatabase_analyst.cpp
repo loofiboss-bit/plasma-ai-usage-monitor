@@ -393,9 +393,18 @@ void UsageDatabaseAnalystTest::testTypedDailyWindowIsAnalyzable()
     dailyMetric.remove(QStringLiteral("semantic"));
     dailyMetric.insert(QStringLiteral("window"), QStringLiteral("day"));
     QVERIFY(db.recordProviderMetrics(QStringLiteral("Daily"), {dailyMetric}));
+    dailyMetric.insert(QStringLiteral("observedAt"), observedAt.addSecs(1800));
+    QVERIFY(db.recordProviderMetrics(QStringLiteral("Daily"), {dailyMetric}));
 
     const QVariantMap snapshot = db.getAnalystSnapshot(observedAt.addDays(-6), observedAt.addSecs(3600));
-    QCOMPARE(snapshot.value(QStringLiteral("spendSeries")).toList().size(), 1);
+    const QVariantList spendSeries =
+        snapshot.value(QStringLiteral("spendSeries")).toList();
+    QCOMPARE(spendSeries.size(), 1);
+    QCOMPARE(spendSeries.constFirst()
+                 .toMap()
+                 .value(QStringLiteral("actual"))
+                 .toDouble(),
+             2.5);
     QCOMPARE(snapshot.value(QStringLiteral("actualSampleCount")).toInt(), 1);
 }
 

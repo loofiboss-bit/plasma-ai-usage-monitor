@@ -1,13 +1,13 @@
 {
   "version": "15.0.0",
-  "sessionId": "d925cf0b-5b59-40e7-bcd2-3d1618258464",
+  "sessionId": "df60cb2b-8209-44e4-85b8-29f66e59777c",
   "fixtureSha256": "15409bef32c96d823eb5413ef190ceb518408d0c47574191cdb8537af9d0379c",
-  "sourceTreeSha256": "0f861c93fef8e221529cb7730ecbc8480e9f192734e94ef33388818646afbd88",
+  "sourceTreeSha256": "5ad030aee7c9ae22e00b2892153f3421d8548da7e69785b7ce22a07c790dba41",
   "plasmaSession": "Fedora KDE Plasma",
   "theme": "Breeze Dark",
   "environment": "isolated demo user",
-  "captureCommit": "1a4620bf43c9e64407b5d04a373578f561254f63",
-  "capturedAt": "2026-07-23T11:39:50Z",
+  "captureCommit": "a1f8e52b956b9998f9c6357f9b631b41e3db754a",
+  "capturedAt": "2026-07-23T13:30:42Z",
   "plasmaVersion": "6.7.3",
   "scale": "100%",
   "scenarios": {
@@ -22,14 +22,14 @@
     "panel-lowest-quota.png": "media-panel"
   },
   "assets": {
-    "overview-popup.png": "84349cb6a3e95a1c8db80076a59dbf4dd1d7900fc28fb579465abb54648e9f6e",
-    "attention-state.png": "bb535a155b474eef6debbad4a030de6007a9dd106ad9cbf374167872c3bd0c8e",
-    "quota-reset-state.png": "23eff3178a89e3f26bacec47825fca42c3c769900760cdfbedc9e12eaece4409",
-    "tool-only-overview.png": "9823bbea66480c297011f5b8e8ff37d094420a9b0ef7a233729bde6c3ee45a46",
-    "retained-history.png": "7801ce59a2e8903c03c26936c261783a88dcaaafd1a3606a26feed22e4db01fd",
-    "history-gap.png": "aa06e57629a2e84dc6ed6dc7226f44377de8785f3dcd6074556283905b48667e",
-    "analyst-sufficient.png": "8dc5d2fbd03f5866bff7210e0741bfb99debeb56abda9f37235a1a6ec9587606",
-    "analyst-insufficient.png": "6f06437aa5f22679ee92d544bbd816c78ed926156bed3dd91156ef5b6184df32",
-    "panel-lowest-quota.png": "c01384934b23041a8f59aafe4b189e1ed7158ed94a1ecf206ab562bf4b41ce84"
+    "overview-popup.png": "9a455008dccd6ab8a1bba901a2bb617c9b8f556f646f59e5c2bd6067f8571e50",
+    "attention-state.png": "11afe7c24349d8471ead4797e522d8980acda9834a3baec83d8d3b6500109042",
+    "quota-reset-state.png": "8f537728143bfcd1f79ca65f52dec02a127d05a038b6775aaa843d3ad4caee80",
+    "tool-only-overview.png": "0240f7dfa5a6dc7c21bc16fa6fc82ce271d08dc6ce27801bad97c21546ec46d8",
+    "retained-history.png": "83615613f0b514c977b1168ebda992971e5cb9c05fb067da75980f624e050cb3",
+    "history-gap.png": "f3fc3f77c7d8d3bb536575986be0f89b61aec28251aed997779058d0cc052773",
+    "analyst-sufficient.png": "69324b1c480f81724a045dae2d370967c2d6df23204476c1726155153818d70c",
+    "analyst-insufficient.png": "02545e2e4c8934700bd77dc8a94ba13da72e22feb3abcd1303a160cd665f738c",
+    "panel-lowest-quota.png": "1a1e4ac3af82cb43309ff1e917c55032aa3c35e45472d81d9940f38b83dc1d13"
   }
 }
