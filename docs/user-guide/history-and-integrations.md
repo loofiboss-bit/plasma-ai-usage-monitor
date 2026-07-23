@@ -24,10 +24,23 @@ values. Unknown values remain absent rather than becoming zero, and missing
 time buckets appear as chart gaps. Coverage text below the chart reports stored
 samples, plotted points, gaps, stale data, and history-only state.
 
-Analyst's **Output / Input Ratio** is available only for days with compatible
-snapshots and positive input tokens. It is a neutral relationship between two
-reported quantities, not a prompt-quality or efficiency recommendation. Missing
-heatmap days are also kept distinct from explicit zero activity.
+Analyst loads one background snapshot for its exact 30-day period. It starts
+with coverage and then shows only sections supported by compatible history:
+spend, activity, top drivers, anomaly candidates, and a written summary.
+Insufficient history is explained as unavailable instead of appearing as
+`0.0`. Actual and estimated spend stay labeled separately. Mixed currencies
+pause spend analysis without hiding compatible token, request, or local-tool
+activity.
+
+**Output / Input Ratio** is available only after at least three days with
+compatible snapshots and positive input tokens. It is a neutral relationship
+between two reported quantities, not a quality, productivity, prompt-clarity,
+or efficiency score.
+
+The 7-day and 30-day copy actions each build a report from their own period.
+Reports include coverage, currency status, actual and estimated sample counts,
+unavailable explanations, and the analysis method. Provider and installation
+diagnostics remain under **Settings → Diagnostics**.
 
 The database is stored at:
 

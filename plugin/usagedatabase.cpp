@@ -875,12 +875,26 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider,
         const QSet<QString> validSemantics{
             QStringLiteral("gauge"), QStringLiteral("cumulative_counter"),
             QStringLiteral("interval_total"), QStringLiteral("local_estimate")};
-        const QString semantic = validSemantics.contains(requestedSemantic)
-            ? requestedSemantic
-            : metric.value(QStringLiteral("quality")).toString() ==
-                    QLatin1String("estimated")
-            ? QStringLiteral("local_estimate")
-            : QStringLiteral("gauge");
+        QString semantic = requestedSemantic;
+        if (!validSemantics.contains(semantic)) {
+            const QString quality =
+                metric.value(QStringLiteral("quality")).toString().toLower();
+            const QString source =
+                metric.value(QStringLiteral("source")).toString().toLower();
+            const QString kind =
+                metric.value(QStringLiteral("kind")).toString();
+            const QString window =
+                metric.value(QStringLiteral("window")).toString();
+            if (quality.contains(QStringLiteral("estimated"))
+                || source.contains(QStringLiteral("estimated"))) {
+                semantic = QStringLiteral("local_estimate");
+            } else if (kind == QLatin1String("cost")
+                       && window == QLatin1String("day")) {
+                semantic = QStringLiteral("interval_total");
+            } else {
+                semantic = QStringLiteral("gauge");
+            }
+        }
         query.bindValue(0, provider);
         const QDateTime observedAt = metric
                                          .value(QStringLiteral("observedAt"),
@@ -2694,4 +2708,494 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
     result[QStringLiteral("topModels")] = topModels;
 
     return result;
+}
+
+QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDateTime &to,
+                                              const QString &requestedCurrency) const
+{
+    const QDateTime fromUtc = from.toUTC();
+    const QDateTime toUtc = to.toUTC();
+    const auto kpi = [](bool available, const QVariant &value, const QString &reasonKey, int sampleCount,
+                        int minimumSamples) {
+        QVariantMap result;
+        result.insert(QStringLiteral("available"), available);
+        result.insert(QStringLiteral("value"), available ? value : QVariant());
+        result.insert(QStringLiteral("reasonKey"), available ? QString() : reasonKey);
+        result.insert(QStringLiteral("sampleCount"), sampleCount);
+        result.insert(QStringLiteral("minimumSamples"), minimumSamples);
+        return result;
+    };
+
+    QVariantMap snapshot;
+    snapshot.insert(QStringLiteral("from"), fromUtc);
+    snapshot.insert(QStringLiteral("to"), toUtc);
+    snapshot.insert(QStringLiteral("generatedAt"), QDateTime::currentDateTimeUtc());
+    snapshot.insert(QStringLiteral("ok"), m_initialized && fromUtc.isValid() && toUtc.isValid() && fromUtc <= toUtc);
+    snapshot.insert(QStringLiteral("errorKey"),
+                    snapshot.value(QStringLiteral("ok")).toBool() ? QString() : QStringLiteral("invalid_request"));
+
+    QVariantMap methods{
+        {QStringLiteral("averageDailySpendMinimumDays"), 3},
+        {QStringLiteral("weekOverWeekDaysPerWindow"), 7},
+        {QStringLiteral("volatilityMinimumDays"), 7},
+        {QStringLiteral("ratioMinimumDays"), 3},
+        {QStringLiteral("anomalyMinimumDays"), 7},
+        {QStringLiteral("anomalyBaseline"), QStringLiteral("period_mean_and_population_standard_deviation")},
+        {QStringLiteral("anomalySigmaThreshold"), 2.0},
+        {QStringLiteral("anomalyMinimumRelativeIncreasePercent"), 50.0},
+        {QStringLiteral("anomalyMinimumAbsoluteIncrease"), 1.0},
+    };
+    snapshot.insert(QStringLiteral("methods"), methods);
+
+    QVariantMap unavailableKpis{
+        {QStringLiteral("averageDailySpend"), kpi(false, {}, QStringLiteral("no_compatible_cost"), 0, 3)},
+        {QStringLiteral("weekOverWeekChange"), kpi(false, {}, QStringLiteral("incomplete_comparison_windows"), 0, 14)},
+        {QStringLiteral("volatility"), kpi(false, {}, QStringLiteral("insufficient_daily_samples"), 0, 7)},
+        {QStringLiteral("outputInputRatio"), kpi(false, {}, QStringLiteral("insufficient_ratio_samples"), 0, 3)},
+    };
+    snapshot.insert(QStringLiteral("kpis"), unavailableKpis);
+    snapshot.insert(QStringLiteral("spendSeries"), QVariantList{});
+    snapshot.insert(QStringLiteral("activitySeries"), QVariantList{});
+    snapshot.insert(QStringLiteral("ratioSeries"), QVariantList{});
+    snapshot.insert(QStringLiteral("topDrivers"), QVariantList{});
+    snapshot.insert(QStringLiteral("anomalies"), QVariantList{});
+    snapshot.insert(QStringLiteral("actualSampleCount"), 0);
+    snapshot.insert(QStringLiteral("estimatedSampleCount"), 0);
+    snapshot.insert(QStringLiteral("currencies"), QStringList{});
+    snapshot.insert(QStringLiteral("currency"), QString());
+    snapshot.insert(QStringLiteral("currencyStatus"), QStringLiteral("none"));
+    snapshot.insert(QStringLiteral("mixedCurrencies"), false);
+
+    if (!snapshot.value(QStringLiteral("ok")).toBool()) {
+        snapshot.insert(QStringLiteral("coverage"), QVariantMap{{QStringLiteral("requestedDayCount"), 0},
+                                                                {QStringLiteral("observedDayCount"), 0},
+                                                                {QStringLiteral("percent"), 0.0},
+                                                                {QStringLiteral("firstObservation"), QVariant()},
+                                                                {QStringLiteral("lastObservation"), QVariant()}});
+        return snapshot;
+    }
+
+    struct DailyCost {
+        double actual = 0.0;
+        double estimated = 0.0;
+        int actualSamples = 0;
+        int estimatedSamples = 0;
+    };
+    struct Driver {
+        QString provider;
+        QString model;
+        QString quality;
+        double value = 0.0;
+        int sampleCount = 0;
+    };
+    struct DailyActivity {
+        double tokens = 0.0;
+        double requests = 0.0;
+        double toolUsage = 0.0;
+        int tokenSamples = 0;
+        int requestSamples = 0;
+        int toolSamples = 0;
+    };
+
+    QSet<QString> currencies;
+    struct CostObservation {
+        QString date;
+        QString provider;
+        QString model;
+        QString currency;
+        QString quality;
+        double value = 0.0;
+    };
+    QList<CostObservation> costObservations;
+    QSqlQuery costQuery(m_db);
+    costQuery.setForwardOnly(true);
+    costQuery.prepare(QStringLiteral("SELECT date(observed_at_utc), provider, model_scope, currency, "
+                                     "source, data_quality, semantic, value "
+                                     "FROM observations "
+                                     "WHERE metric_kind='cost' AND value IS NOT NULL "
+                                     "AND observed_at_utc >= ? AND observed_at_utc <= ? "
+                                     "AND lower(source) != 'unknown' "
+                                     "AND lower(source) NOT LIKE '%connectivity%' "
+                                     "AND lower(source) NOT LIKE '%model_discovery%' "
+                                     "AND semantic IN ('interval_total','local_estimate') "
+                                     "ORDER BY observed_at_utc"));
+    costQuery.addBindValue(toDbDateTimeString(fromUtc));
+    costQuery.addBindValue(toDbDateTimeString(toUtc));
+    if (costQuery.exec()) {
+        while (costQuery.next()) {
+            CostObservation observation;
+            observation.date = costQuery.value(0).toString();
+            observation.provider = costQuery.value(1).toString();
+            observation.model = costQuery.value(2).toString();
+            observation.currency = costQuery.value(3).toString().trimmed().toUpper();
+            const QString source = costQuery.value(4).toString();
+            const QString quality = costQuery.value(5).toString();
+            const QString semantic = costQuery.value(6).toString();
+            observation.quality = normalizedQualityClass(source, quality, semantic);
+            observation.value = costQuery.value(7).toDouble();
+            if (!observation.currency.isEmpty()) {
+                currencies.insert(observation.currency);
+                costObservations.append(observation);
+            }
+        }
+    } else {
+        snapshot.insert(QStringLiteral("ok"), false);
+        snapshot.insert(QStringLiteral("errorKey"), QStringLiteral("cost_query_failed"));
+    }
+
+    QStringList currencyList = currencies.values();
+    currencyList.sort();
+    snapshot.insert(QStringLiteral("currencies"), currencyList);
+    const QString normalizedRequestedCurrency = requestedCurrency.trimmed().toUpper();
+    QString analysisCurrency;
+    if (!normalizedRequestedCurrency.isEmpty()) {
+        analysisCurrency = normalizedRequestedCurrency;
+        snapshot.insert(QStringLiteral("currencyStatus"), QStringLiteral("selected"));
+    } else if (currencyList.size() == 1) {
+        analysisCurrency = currencyList.constFirst();
+        snapshot.insert(QStringLiteral("currencyStatus"), QStringLiteral("single"));
+    } else if (currencyList.size() > 1) {
+        snapshot.insert(QStringLiteral("currencyStatus"), QStringLiteral("mixed"));
+        snapshot.insert(QStringLiteral("mixedCurrencies"), true);
+    }
+    snapshot.insert(QStringLiteral("currency"), analysisCurrency);
+
+    QMap<QString, DailyCost> dailyCosts;
+    QMap<QString, Driver> driverTotals;
+    int actualSampleCount = 0;
+    int estimatedSampleCount = 0;
+    if (!analysisCurrency.isEmpty()) {
+        for (const CostObservation &observation : std::as_const(costObservations)) {
+            if (observation.currency != analysisCurrency) {
+                continue;
+            }
+            const bool estimated = observation.quality == QLatin1String("estimated");
+            DailyCost &day = dailyCosts[observation.date];
+            if (estimated) {
+                day.estimated += observation.value;
+                day.estimatedSamples++;
+                estimatedSampleCount++;
+            } else {
+                day.actual += observation.value;
+                day.actualSamples++;
+                actualSampleCount++;
+            }
+
+            const QString model =
+                observation.model.trimmed().isEmpty() ? observation.provider : observation.model.trimmed();
+            const QString key = observation.provider + QChar(0x1f) + model + QChar(0x1f) + observation.quality;
+            Driver &driver = driverTotals[key];
+            driver.provider = observation.provider;
+            driver.model = model;
+            driver.quality = observation.quality;
+            driver.value += observation.value;
+            driver.sampleCount++;
+        }
+    }
+    snapshot.insert(QStringLiteral("actualSampleCount"), actualSampleCount);
+    snapshot.insert(QStringLiteral("estimatedSampleCount"), estimatedSampleCount);
+
+    QVariantList spendSeries;
+    QList<double> combinedDailyCosts;
+    double totalSpend = 0.0;
+    for (auto it = dailyCosts.constBegin(); it != dailyCosts.constEnd(); ++it) {
+        const DailyCost &day = it.value();
+        QVariantMap point;
+        point.insert(QStringLiteral("date"), it.key());
+        point.insert(QStringLiteral("actualAvailable"), day.actualSamples > 0);
+        point.insert(QStringLiteral("actual"), day.actualSamples > 0 ? QVariant(day.actual) : QVariant());
+        point.insert(QStringLiteral("estimatedAvailable"), day.estimatedSamples > 0);
+        point.insert(QStringLiteral("estimated"), day.estimatedSamples > 0 ? QVariant(day.estimated) : QVariant());
+        point.insert(QStringLiteral("currency"), analysisCurrency);
+        point.insert(QStringLiteral("sampleCount"), day.actualSamples + day.estimatedSamples);
+        spendSeries.append(point);
+        const double combined = day.actual + day.estimated;
+        combinedDailyCosts.append(combined);
+        totalSpend += combined;
+    }
+    snapshot.insert(QStringLiteral("spendSeries"), spendSeries);
+
+    QList<Driver> drivers = driverTotals.values();
+    std::sort(drivers.begin(), drivers.end(), [](const Driver &lhs, const Driver &rhs) {
+        if (!qFuzzyCompare(lhs.value + 1.0, rhs.value + 1.0)) {
+            return lhs.value > rhs.value;
+        }
+        if (lhs.provider != rhs.provider) {
+            return lhs.provider < rhs.provider;
+        }
+        return lhs.model < rhs.model;
+    });
+    QVariantList topDrivers;
+    for (int index = 0; index < std::min(5, static_cast<int>(drivers.size())); ++index) {
+        const Driver &driver = drivers.at(index);
+        topDrivers.append(QVariantMap{{QStringLiteral("provider"), driver.provider},
+                                      {QStringLiteral("model"), driver.model},
+                                      {QStringLiteral("value"), driver.value},
+                                      {QStringLiteral("quality"), driver.quality},
+                                      {QStringLiteral("estimated"), driver.quality == QLatin1String("estimated")},
+                                      {QStringLiteral("currency"), analysisCurrency},
+                                      {QStringLiteral("sampleCount"), driver.sampleCount}});
+    }
+    snapshot.insert(QStringLiteral("topDrivers"), topDrivers);
+
+    QVariantMap kpis = snapshot.value(QStringLiteral("kpis")).toMap();
+    const QString costUnavailableReason = snapshot.value(QStringLiteral("mixedCurrencies")).toBool()
+                                              ? QStringLiteral("mixed_currencies")
+                                              : QStringLiteral("no_compatible_cost");
+    if (dailyCosts.size() >= 3) {
+        kpis.insert(QStringLiteral("averageDailySpend"),
+                    kpi(true, totalSpend / static_cast<double>(dailyCosts.size()), {}, dailyCosts.size(), 3));
+    } else {
+        kpis.insert(QStringLiteral("averageDailySpend"),
+                    kpi(false, {},
+                        dailyCosts.isEmpty() ? costUnavailableReason : QStringLiteral("insufficient_daily_samples"),
+                        dailyCosts.size(), 3));
+    }
+
+    if (dailyCosts.size() >= 7) {
+        const double mean = totalSpend / static_cast<double>(combinedDailyCosts.size());
+        double variance = 0.0;
+        for (double value : std::as_const(combinedDailyCosts)) {
+            const double delta = value - mean;
+            variance += delta * delta;
+        }
+        variance /= static_cast<double>(combinedDailyCosts.size());
+        const double standardDeviation = std::sqrt(variance);
+        const bool volatilityAvailable = !qFuzzyIsNull(mean);
+        kpis.insert(QStringLiteral("volatility"),
+                    kpi(volatilityAvailable,
+                        volatilityAvailable ? QVariant((standardDeviation / std::abs(mean)) * 100.0) : QVariant(),
+                        volatilityAvailable ? QString() : QStringLiteral("zero_baseline"), dailyCosts.size(), 7));
+
+        QVariantList anomalies;
+        const double absoluteThreshold = std::max(1.0, std::abs(mean) * 0.5);
+        int dayIndex = 0;
+        for (auto it = dailyCosts.constBegin(); it != dailyCosts.constEnd(); ++it, ++dayIndex) {
+            const double value = combinedDailyCosts.at(dayIndex);
+            const double increase = value - mean;
+            if (increase < absoluteThreshold || value < mean + (2.0 * standardDeviation)) {
+                continue;
+            }
+            anomalies.append(QVariantMap{{QStringLiteral("date"), it.key()},
+                                         {QStringLiteral("value"), value},
+                                         {QStringLiteral("currency"), analysisCurrency},
+                                         {QStringLiteral("baseline"), mean},
+                                         {QStringLiteral("standardDeviation"), standardDeviation},
+                                         {QStringLiteral("deltaPercent"),
+                                          qFuzzyIsNull(mean) ? QVariant() : QVariant(percentChange(mean, value))}});
+        }
+        snapshot.insert(QStringLiteral("anomalies"), anomalies);
+        snapshot.insert(QStringLiteral("anomaliesAvailable"), true);
+        snapshot.insert(QStringLiteral("anomaliesReasonKey"), QString());
+    } else {
+        kpis.insert(QStringLiteral("volatility"),
+                    kpi(false, {},
+                        dailyCosts.isEmpty() ? costUnavailableReason : QStringLiteral("insufficient_daily_samples"),
+                        dailyCosts.size(), 7));
+        snapshot.insert(QStringLiteral("anomaliesAvailable"), false);
+        snapshot.insert(QStringLiteral("anomaliesReasonKey"),
+                        dailyCosts.isEmpty() ? costUnavailableReason : QStringLiteral("insufficient_daily_samples"));
+    }
+
+    const QDate comparisonEnd = toUtc.date();
+    bool completeComparison = true;
+    double currentWeek = 0.0;
+    double previousWeek = 0.0;
+    for (int offset = 0; offset < 14; ++offset) {
+        const QString day = comparisonEnd.addDays(-offset).toString(Qt::ISODate);
+        if (!dailyCosts.contains(day)) {
+            completeComparison = false;
+            break;
+        }
+        const DailyCost &row = dailyCosts.value(day);
+        const double value = row.actual + row.estimated;
+        if (offset < 7) {
+            currentWeek += value;
+        } else {
+            previousWeek += value;
+        }
+    }
+    if (completeComparison && !qFuzzyIsNull(previousWeek)) {
+        kpis.insert(QStringLiteral("weekOverWeekChange"),
+                    kpi(true, percentChange(previousWeek, currentWeek), {}, 14, 14));
+    } else {
+        kpis.insert(QStringLiteral("weekOverWeekChange"),
+                    kpi(false, {},
+                        completeComparison ? QStringLiteral("zero_previous_window")
+                                           : QStringLiteral("incomplete_comparison_windows"),
+                        dailyCosts.size(), 14));
+    }
+
+    QMap<QString, QMap<QString, QPair<QString, double>>> activityBySource;
+    QMap<QString, QMap<QString, int>> activitySamplesBySource;
+    QSqlQuery activityQuery(m_db);
+    activityQuery.setForwardOnly(true);
+    activityQuery.prepare(QStringLiteral("SELECT date(observed_at_utc), provider, metric_kind, semantic, value "
+                                         "FROM observations "
+                                         "WHERE metric_kind IN ('input_tokens','output_tokens','requests') "
+                                         "AND value IS NOT NULL AND observed_at_utc >= ? "
+                                         "AND observed_at_utc <= ? "
+                                         "AND lower(source) != 'unknown' "
+                                         "AND lower(source) NOT LIKE '%connectivity%' "
+                                         "AND lower(source) NOT LIKE '%model_discovery%' "
+                                         "ORDER BY observed_at_utc"));
+    activityQuery.addBindValue(toDbDateTimeString(fromUtc));
+    activityQuery.addBindValue(toDbDateTimeString(toUtc));
+    if (activityQuery.exec()) {
+        while (activityQuery.next()) {
+            const QString day = activityQuery.value(0).toString();
+            const QString sourceKey =
+                activityQuery.value(1).toString() + QChar(0x1f) + activityQuery.value(2).toString();
+            const QString semantic = activityQuery.value(3).toString();
+            const double value = activityQuery.value(4).toDouble();
+            QPair<QString, double> &aggregate = activityBySource[day][sourceKey];
+            if (aggregate.first.isEmpty()) {
+                aggregate.first = semantic;
+                aggregate.second = value;
+            } else if (semantic == QLatin1String("interval_total")) {
+                aggregate.second += value;
+            } else {
+                aggregate.second = std::max(aggregate.second, value);
+            }
+            activitySamplesBySource[day][sourceKey]++;
+        }
+    }
+
+    QMap<QString, DailyActivity> dailyActivity;
+    for (auto dayIt = activityBySource.constBegin(); dayIt != activityBySource.constEnd(); ++dayIt) {
+        DailyActivity &day = dailyActivity[dayIt.key()];
+        for (auto sourceIt = dayIt.value().constBegin(); sourceIt != dayIt.value().constEnd(); ++sourceIt) {
+            const QString metricKind = sourceIt.key().section(QChar(0x1f), 1, 1);
+            if (metricKind == QLatin1String("requests")) {
+                day.requests += sourceIt.value().second;
+                day.requestSamples += activitySamplesBySource.value(dayIt.key()).value(sourceIt.key());
+            } else {
+                day.tokens += sourceIt.value().second;
+                day.tokenSamples += activitySamplesBySource.value(dayIt.key()).value(sourceIt.key());
+            }
+        }
+    }
+
+    QSqlQuery toolQuery(m_db);
+    toolQuery.setForwardOnly(true);
+    toolQuery.prepare(QStringLiteral("SELECT date(timestamp), tool_name, MAX(usage_count), COUNT(*) "
+                                     "FROM subscription_tool_usage "
+                                     "WHERE timestamp >= ? AND timestamp <= ? "
+                                     "GROUP BY date(timestamp), tool_name ORDER BY date(timestamp)"));
+    toolQuery.addBindValue(toDbDateTimeString(fromUtc));
+    toolQuery.addBindValue(toDbDateTimeString(toUtc));
+    if (toolQuery.exec()) {
+        while (toolQuery.next()) {
+            DailyActivity &day = dailyActivity[toolQuery.value(0).toString()];
+            day.toolUsage += toolQuery.value(2).toDouble();
+            day.toolSamples += toolQuery.value(3).toInt();
+        }
+    }
+
+    QVariantList activitySeries;
+    for (auto it = dailyActivity.constBegin(); it != dailyActivity.constEnd(); ++it) {
+        const DailyActivity &day = it.value();
+        activitySeries.append(
+            QVariantMap{{QStringLiteral("date"), it.key()},
+                        {QStringLiteral("tokensAvailable"), day.tokenSamples > 0},
+                        {QStringLiteral("tokens"), day.tokenSamples > 0 ? QVariant(day.tokens) : QVariant()},
+                        {QStringLiteral("requestsAvailable"), day.requestSamples > 0},
+                        {QStringLiteral("requests"), day.requestSamples > 0 ? QVariant(day.requests) : QVariant()},
+                        {QStringLiteral("toolUsageAvailable"), day.toolSamples > 0},
+                        {QStringLiteral("toolUsage"), day.toolSamples > 0 ? QVariant(day.toolUsage) : QVariant()},
+                        {QStringLiteral("sampleCount"), day.tokenSamples + day.requestSamples + day.toolSamples}});
+    }
+    snapshot.insert(QStringLiteral("activitySeries"), activitySeries);
+    snapshot.insert(QStringLiteral("activityAvailable"), !activitySeries.isEmpty());
+    snapshot.insert(QStringLiteral("activityReasonKey"),
+                    activitySeries.isEmpty() ? QStringLiteral("no_compatible_activity") : QString());
+
+    QVariantList ratioSeries;
+    QSqlQuery ratioQuery(m_db);
+    ratioQuery.setForwardOnly(true);
+    ratioQuery.prepare(QStringLiteral("SELECT day, SUM(provider_input), SUM(provider_output) FROM ("
+                                      " SELECT date(timestamp) AS day, provider, "
+                                      " MAX(input_tokens) AS provider_input, "
+                                      " MAX(output_tokens) AS provider_output "
+                                      " FROM usage_snapshots "
+                                      " WHERE timestamp >= ? AND timestamp <= ? "
+                                      " AND lower(usage_source) != 'unknown' "
+                                      " AND lower(usage_source) NOT LIKE '%connectivity%' "
+                                      " AND lower(usage_source) NOT LIKE '%model_discovery%' "
+                                      " GROUP BY day, provider"
+                                      ") GROUP BY day HAVING SUM(provider_input) > 0 ORDER BY day"));
+    ratioQuery.addBindValue(toDbDateTimeString(fromUtc));
+    ratioQuery.addBindValue(toDbDateTimeString(toUtc));
+    double ratioTotal = 0.0;
+    if (ratioQuery.exec()) {
+        while (ratioQuery.next()) {
+            const double input = ratioQuery.value(1).toDouble();
+            const double output = ratioQuery.value(2).toDouble();
+            const double ratio = output / input;
+            ratioSeries.append(QVariantMap{{QStringLiteral("date"), ratioQuery.value(0).toString()},
+                                           {QStringLiteral("value"), ratio},
+                                           {QStringLiteral("inputTokens"), input},
+                                           {QStringLiteral("outputTokens"), output}});
+            ratioTotal += ratio;
+        }
+    }
+    snapshot.insert(QStringLiteral("ratioSeries"), ratioSeries);
+    if (ratioSeries.size() >= 3) {
+        kpis.insert(QStringLiteral("outputInputRatio"),
+                    kpi(true, ratioTotal / static_cast<double>(ratioSeries.size()), {}, ratioSeries.size(), 3));
+    } else {
+        kpis.insert(QStringLiteral("outputInputRatio"),
+                    kpi(false, {}, QStringLiteral("insufficient_ratio_samples"), ratioSeries.size(), 3));
+    }
+    snapshot.insert(QStringLiteral("kpis"), kpis);
+
+    QSet<QString> observedDays;
+    for (auto it = dailyCosts.constBegin(); it != dailyCosts.constEnd(); ++it) {
+        observedDays.insert(it.key());
+    }
+    for (auto it = dailyActivity.constBegin(); it != dailyActivity.constEnd(); ++it) {
+        observedDays.insert(it.key());
+    }
+    for (const QVariant &ratioValue : std::as_const(ratioSeries)) {
+        observedDays.insert(ratioValue.toMap().value(QStringLiteral("date")).toString());
+    }
+    const int requestedDays = static_cast<int>(qMax<qint64>(1, fromUtc.date().daysTo(toUtc.date()) + 1));
+    QStringList sortedObservedDays = observedDays.values();
+    sortedObservedDays.sort();
+    snapshot.insert(
+        QStringLiteral("coverage"),
+        QVariantMap{
+            {QStringLiteral("requestedDayCount"), requestedDays},
+            {QStringLiteral("observedDayCount"), observedDays.size()},
+            {QStringLiteral("percent"),
+             (static_cast<double>(observedDays.size()) / static_cast<double>(requestedDays)) * 100.0},
+            {QStringLiteral("firstObservation"),
+             sortedObservedDays.isEmpty() ? QVariant()
+                                          : QVariant(QDate::fromString(sortedObservedDays.constFirst(), Qt::ISODate))},
+            {QStringLiteral("lastObservation"),
+             sortedObservedDays.isEmpty() ? QVariant()
+                                          : QVariant(QDate::fromString(sortedObservedDays.constLast(), Qt::ISODate))},
+        });
+    return snapshot;
+}
+
+void UsageDatabase::requestAnalyst(const QString &requestId, const QDateTime &from, const QDateTime &to,
+                                   const QString &currency)
+{
+    initDatabase();
+    m_latestAnalystRequestId = requestId;
+    auto *watcher = new QFutureWatcher<QVariantMap>(this);
+    connect(watcher, &QFutureWatcher<QVariantMap>::finished, this, [this, watcher, requestId]() {
+        if (m_latestAnalystRequestId == requestId) {
+            QVariantMap snapshot = watcher->result();
+            snapshot.insert(QStringLiteral("requestId"), requestId);
+            Q_EMIT analystReady(requestId, snapshot);
+        }
+        watcher->deleteLater();
+    });
+    watcher->setFuture(QtConcurrent::run([from, to, currency]() {
+        UsageDatabase workerDatabase;
+        workerDatabase.init();
+        return workerDatabase.getAnalystSnapshot(from, to, currency);
+    }));
 }

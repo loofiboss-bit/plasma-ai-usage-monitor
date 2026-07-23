@@ -99,6 +99,21 @@ public:
     Q_INVOKABLE QVariantMap getAnalystOverview(int days = 30) const;
 
     /**
+     * Build one evidence-bound Analyst snapshot for an exact UTC range.
+     *
+     * This synchronous helper is intended for worker instances and contract
+     * tests. QML must use requestAnalyst() so database work never blocks the UI
+     * thread.
+     */
+    Q_INVOKABLE QVariantMap getAnalystSnapshot(const QDateTime &from,
+                                               const QDateTime &to,
+                                               const QString &currency = QString()) const;
+    Q_INVOKABLE void requestAnalyst(const QString &requestId,
+                                    const QDateTime &from,
+                                    const QDateTime &to,
+                                    const QString &currency = QString());
+
+    /**
      * Query usage snapshots for a provider within a time range.
      * Returns a list of QVariantMap with keys: timestamp, inputTokens,
      * outputTokens, requestCount, cost, dailyCost, monthlyCost, rlRequests,
@@ -263,6 +278,7 @@ Q_SIGNALS:
     void comparisonReady(const QString &requestId, const QVariantList &series);
     void historyCatalogReady(const QString &requestId, const QVariantList &sources);
     void historySeriesReady(const QString &requestId, const QVariantMap &payload);
+    void analystReady(const QString &requestId, const QVariantMap &snapshot);
     void exportFinished(const QString &requestId, const QStringList &paths);
 
 private:
@@ -289,6 +305,7 @@ private:
     bool m_initialized = false;
     QString m_latestHistoryCatalogRequestId;
     QString m_latestHistorySeriesRequestId;
+    QString m_latestAnalystRequestId;
 
     static std::atomic<int> s_instanceCounter;
 

@@ -142,6 +142,43 @@ The Analyst output/input query retains the schema-v4 compatibility projection
 and returns only days with positive total input. It does not synthesize ratios
 for missing input and does not interpret the ratio as prompt quality.
 
+## Analyst snapshot contract
+
+`UsageDatabase::requestAnalyst()` is the only QML-facing Analyst query. It runs
+on a worker-owned database connection and returns one internally consistent
+snapshot for the exact requested UTC range. Requests are superseding, so an
+older completion cannot replace the current view or report request. Opening the
+Analyst view does not run synchronous SQL on the UI thread.
+
+The snapshot carries its request range, generation time, currency status,
+coverage, actual and estimated sample counts, daily spend, activity,
+output/input ratio, compatible drivers, anomaly candidates, method metadata,
+and an explicit availability result for every derived KPI. Unavailable KPI
+values remain invalid variants and have a stable reason key plus the observed
+and required sample counts.
+
+Only `interval_total` cost and explicitly identified local estimates contribute
+to spend analysis. A typed daily cost window is persisted as an interval total;
+cumulative, all-time, current, probe-only, unknown, and connectivity values do
+not become daily spend. Actual and estimated costs remain separate. Mixed
+currencies pause cost-derived results unless one currency is explicitly
+selected, while compatible token, request, and local-tool activity remains
+available.
+
+Average daily spend requires three recorded days. Volatility and anomaly
+candidates require seven. Week-over-week change requires two complete
+seven-day windows and a non-zero previous window. Anomaly candidates use the
+period mean and population standard deviation, require two standard deviations
+above the mean, and also require an increase of at least one currency unit or
+50 percent of the baseline. Output/input ratio requires three compatible days
+with positive input and remains descriptive only.
+
+Seven-day and 30-day reports each request their own snapshot. Reports include
+coverage, quality counts, currency status, unavailable explanations, and method
+notes. They never reuse a different period's UI state or include endpoints,
+credentials, cookies, account identifiers, or unrestricted backend errors.
+Endpoint and installation diagnostics remain exclusively in Diagnostics.
+
 Calendar totals include only compatible interval-total observations. Gauges, cumulative counters, and rolling windows are not relabeled as calendar totals. Queries preserve ISO currency and source quality.
 
 Large exports use worker instances, forward-only queries, and atomic output files so memory use does not grow with history size and partial files do not replace complete exports.

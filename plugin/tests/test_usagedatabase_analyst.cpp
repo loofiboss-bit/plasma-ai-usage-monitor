@@ -7,6 +7,7 @@
 #include <QUuid>
 #include <QDateTime>
 #include <QDebug>
+#include <QElapsedTimer>
 
 #include "usagedatabase.h"
 
@@ -50,6 +51,54 @@ bool updateSnapshotData(const QString &provider, double dailyCost, qint64 input,
     QSqlDatabase::removeDatabase(connName);
     return ok;
 }
+
+QVariantMap metric(const QString &kind, const QString &unit, const QVariant &value, const QDateTime &observedAt,
+                   const QString &currency = {}, const QString &quality = QStringLiteral("actual"),
+                   const QString &source = QStringLiteral("billing_api"),
+                   const QString &semantic = QStringLiteral("interval_total"))
+{
+    return {
+        {QStringLiteral("kind"), kind},
+        {QStringLiteral("unit"), unit},
+        {QStringLiteral("value"), value},
+        {QStringLiteral("available"), value.isValid()},
+        {QStringLiteral("currency"), currency},
+        {QStringLiteral("quality"), quality},
+        {QStringLiteral("source"), source},
+        {QStringLiteral("semantic"), semantic},
+        {QStringLiteral("scope"), QStringLiteral("api_key")},
+        {QStringLiteral("window"), QStringLiteral("calendar_day")},
+        {QStringLiteral("observedAt"), observedAt},
+    };
+}
+
+QVariantMap kpi(const QVariantMap &snapshot, const QString &name)
+{
+    return snapshot.value(QStringLiteral("kpis")).toMap().value(name).toMap();
+}
+
+bool updateLatestToolTimestamp(const QString &toolName, const QDateTime &timestamp)
+{
+    const QString connectionName =
+        QStringLiteral("analyst_tool_test_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    bool ok = false;
+    {
+        QSqlDatabase database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        database.setDatabaseName(dbFilePath());
+        if (database.open()) {
+            QSqlQuery query(database);
+            query.prepare(QStringLiteral("UPDATE subscription_tool_usage SET timestamp=? "
+                                         "WHERE id=(SELECT MAX(id) FROM subscription_tool_usage "
+                                         "WHERE tool_name=?)"));
+            query.addBindValue(timestamp.toUTC().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+            query.addBindValue(toolName);
+            ok = query.exec() && query.numRowsAffected() == 1;
+            database.close();
+        }
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    return ok;
+}
 } // namespace
 
 class UsageDatabaseAnalystTest : public QObject
@@ -61,6 +110,15 @@ private Q_SLOTS:
     void testEfficiencySeries();
     void testEmptyEfficiencySeries();
     void testAnalystOverview();
+    void testAnalystSnapshotNoData();
+    void testTypedDailyWindowIsAnalyzable();
+    void testAvailableZeroNeedsEnoughCoverage();
+    void testCompleteComparisonSeparatesActualAndEstimated();
+    void testMixedCurrenciesPreserveActivity();
+    void testToolActivityWithoutProviderCost();
+    void testExactRangeIsolation();
+    void testAsyncRequestSupersession();
+    void testHundredThousandObservations();
 };
 
 void UsageDatabaseAnalystTest::testYearlyActivity()
@@ -295,6 +353,251 @@ void UsageDatabaseAnalystTest::testAnalystOverview()
     const QVariantList models = overview.value(QStringLiteral("topModels")).toList();
     QVERIFY(!models.isEmpty());
     QCOMPARE(models.first().toMap().value(QStringLiteral("model")).toString(), QStringLiteral("gpt-5.4"));
+}
+
+void UsageDatabaseAnalystTest::testAnalystSnapshotNoData()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    const QDateTime to = QDateTime::fromString(QStringLiteral("2026-07-23T23:59:59Z"), Qt::ISODate);
+    QVERIFY(db.recordProviderMetrics(
+        QStringLiteral("Connectivity"),
+        {metric(QStringLiteral("requests"), QStringLiteral("request"), 0, to.addSecs(-3600), {},
+                QStringLiteral("connectivity_only"), QStringLiteral("connectivity_probe"))}));
+    const QVariantMap snapshot = db.getAnalystSnapshot(to.addDays(-6), to);
+
+    QVERIFY(snapshot.value(QStringLiteral("ok")).toBool());
+    QCOMPARE(snapshot.value(QStringLiteral("currencyStatus")).toString(), QStringLiteral("none"));
+    QVERIFY(snapshot.value(QStringLiteral("spendSeries")).toList().isEmpty());
+    QVERIFY(snapshot.value(QStringLiteral("activitySeries")).toList().isEmpty());
+    QVERIFY(!kpi(snapshot, QStringLiteral("averageDailySpend")).value(QStringLiteral("available")).toBool());
+    QCOMPARE(kpi(snapshot, QStringLiteral("averageDailySpend")).value(QStringLiteral("reasonKey")).toString(),
+             QStringLiteral("no_compatible_cost"));
+}
+
+void UsageDatabaseAnalystTest::testTypedDailyWindowIsAnalyzable()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    const QDateTime observedAt = QDateTime::fromString(QStringLiteral("2026-07-23T12:00:00Z"), Qt::ISODate);
+    QVariantMap dailyMetric =
+        metric(QStringLiteral("cost"), QStringLiteral("USD"), 2.5, observedAt, QStringLiteral("USD"));
+    dailyMetric.remove(QStringLiteral("semantic"));
+    dailyMetric.insert(QStringLiteral("window"), QStringLiteral("day"));
+    QVERIFY(db.recordProviderMetrics(QStringLiteral("Daily"), {dailyMetric}));
+
+    const QVariantMap snapshot = db.getAnalystSnapshot(observedAt.addDays(-6), observedAt.addSecs(3600));
+    QCOMPARE(snapshot.value(QStringLiteral("spendSeries")).toList().size(), 1);
+    QCOMPARE(snapshot.value(QStringLiteral("actualSampleCount")).toInt(), 1);
+}
+
+void UsageDatabaseAnalystTest::testAvailableZeroNeedsEnoughCoverage()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    const QDateTime observedAt = QDateTime::fromString(QStringLiteral("2026-07-23T12:00:00Z"), Qt::ISODate);
+    QVERIFY(db.recordProviderMetrics(QStringLiteral("Zero"), {metric(QStringLiteral("cost"), QStringLiteral("USD"), 0.0,
+                                                                     observedAt, QStringLiteral("USD"))}));
+
+    const QVariantMap snapshot = db.getAnalystSnapshot(observedAt.addDays(-6), observedAt.addSecs(3600));
+    const QVariantList spend = snapshot.value(QStringLiteral("spendSeries")).toList();
+    QCOMPARE(spend.size(), 1);
+    const QVariantMap point = spend.constFirst().toMap();
+    QVERIFY(point.value(QStringLiteral("actualAvailable")).toBool());
+    QCOMPARE(point.value(QStringLiteral("actual")).toDouble(), 0.0);
+    const QVariantMap average = kpi(snapshot, QStringLiteral("averageDailySpend"));
+    QVERIFY(!average.value(QStringLiteral("available")).toBool());
+    QCOMPARE(average.value(QStringLiteral("reasonKey")).toString(), QStringLiteral("insufficient_daily_samples"));
+    QVERIFY(!average.value(QStringLiteral("value")).isValid());
+}
+
+void UsageDatabaseAnalystTest::testCompleteComparisonSeparatesActualAndEstimated()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    const QDateTime to = QDateTime::fromString(QStringLiteral("2026-07-23T23:59:59Z"), Qt::ISODate);
+    for (int offset = 0; offset < 14; ++offset) {
+        const QDateTime observedAt = QDateTime(to.date().addDays(-offset), QTime(12, 0), QTimeZone::utc());
+        const double actual = offset == 2 ? 20.0 : (offset < 7 ? 4.0 : 2.0);
+        QVERIFY(db.recordProviderMetrics(
+            QStringLiteral("Actual"),
+            {metric(QStringLiteral("cost"), QStringLiteral("USD"), actual, observedAt, QStringLiteral("USD"))}));
+        QVERIFY(
+            db.recordProviderMetrics(QStringLiteral("Estimated"),
+                                     {metric(QStringLiteral("cost"), QStringLiteral("USD"), 0.5, observedAt,
+                                             QStringLiteral("USD"), QStringLiteral("estimated"),
+                                             QStringLiteral("estimated_pricing"), QStringLiteral("local_estimate"))}));
+        const QString ratioProvider = QStringLiteral("Ratio-%1").arg(offset);
+        db.recordSnapshot(ratioProvider, 100, 200, 2, 0.0, 0.0, 0.0, 0, 0, 0, 0, {}, false, QStringLiteral("unknown"),
+                          QStringLiteral("usage_api"), QStringLiteral("USD"), QStringLiteral("actual"));
+        QVERIFY(updateSnapshotData(ratioProvider, 0.0, 100, 200,
+                                   observedAt.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"))));
+    }
+
+    const QVariantMap snapshot = db.getAnalystSnapshot(to.addDays(-29), to);
+    QCOMPARE(snapshot.value(QStringLiteral("actualSampleCount")).toInt(), 14);
+    QCOMPARE(snapshot.value(QStringLiteral("estimatedSampleCount")).toInt(), 14);
+    QCOMPARE(snapshot.value(QStringLiteral("spendSeries")).toList().size(), 14);
+    QVERIFY(kpi(snapshot, QStringLiteral("averageDailySpend")).value(QStringLiteral("available")).toBool());
+    QVERIFY(kpi(snapshot, QStringLiteral("weekOverWeekChange")).value(QStringLiteral("available")).toBool());
+    QVERIFY(kpi(snapshot, QStringLiteral("weekOverWeekChange")).value(QStringLiteral("value")).toDouble() > 0.0);
+    QVERIFY(kpi(snapshot, QStringLiteral("outputInputRatio")).value(QStringLiteral("available")).toBool());
+    QCOMPARE(kpi(snapshot, QStringLiteral("outputInputRatio")).value(QStringLiteral("value")).toDouble(), 2.0);
+    QVERIFY(snapshot.value(QStringLiteral("anomaliesAvailable")).toBool());
+    QVERIFY(!snapshot.value(QStringLiteral("anomalies")).toList().isEmpty());
+    const QVariantList drivers = snapshot.value(QStringLiteral("topDrivers")).toList();
+    QCOMPARE(drivers.size(), 2);
+    QCOMPARE(drivers.at(0).toMap().value(QStringLiteral("quality")).toString(), QStringLiteral("actual"));
+    QCOMPARE(drivers.at(1).toMap().value(QStringLiteral("quality")).toString(), QStringLiteral("estimated"));
+}
+
+void UsageDatabaseAnalystTest::testMixedCurrenciesPreserveActivity()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    const QDateTime observedAt = QDateTime::fromString(QStringLiteral("2026-07-23T12:00:00Z"), Qt::ISODate);
+    QVERIFY(db.recordProviderMetrics(
+        QStringLiteral("Mixed"),
+        {
+            metric(QStringLiteral("cost"), QStringLiteral("USD"), 1.0, observedAt, QStringLiteral("USD")),
+            metric(QStringLiteral("cost"), QStringLiteral("EUR"), 2.0, observedAt.addSecs(1), QStringLiteral("EUR")),
+            metric(QStringLiteral("input_tokens"), QStringLiteral("token"), 100.0, observedAt, {},
+                   QStringLiteral("actual"), QStringLiteral("usage_api"), QStringLiteral("interval_total")),
+        }));
+
+    const QVariantMap snapshot = db.getAnalystSnapshot(observedAt.addDays(-6), observedAt.addSecs(3600));
+    QVERIFY(snapshot.value(QStringLiteral("mixedCurrencies")).toBool());
+    QVERIFY(snapshot.value(QStringLiteral("spendSeries")).toList().isEmpty());
+    QCOMPARE(kpi(snapshot, QStringLiteral("averageDailySpend")).value(QStringLiteral("reasonKey")).toString(),
+             QStringLiteral("mixed_currencies"));
+    QVERIFY(snapshot.value(QStringLiteral("activityAvailable")).toBool());
+    const QVariantMap activity = snapshot.value(QStringLiteral("activitySeries")).toList().constFirst().toMap();
+    QVERIFY(activity.value(QStringLiteral("tokensAvailable")).toBool());
+    QVERIFY(!activity.value(QStringLiteral("requestsAvailable")).toBool());
+    QVERIFY(!activity.value(QStringLiteral("requests")).isValid());
+}
+
+void UsageDatabaseAnalystTest::testToolActivityWithoutProviderCost()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    const QDateTime observedAt = QDateTime::fromString(QStringLiteral("2026-07-23T12:00:00Z"), Qt::ISODate);
+    db.recordToolSnapshot(QStringLiteral("Codex CLI"), 7, 20, QStringLiteral("daily"), QStringLiteral("Plus"), false);
+    QVERIFY(updateLatestToolTimestamp(QStringLiteral("Codex CLI"), observedAt));
+
+    const QVariantMap snapshot = db.getAnalystSnapshot(observedAt.addDays(-6), observedAt.addSecs(3600));
+    QVERIFY(snapshot.value(QStringLiteral("activityAvailable")).toBool());
+    const QVariantMap activity = snapshot.value(QStringLiteral("activitySeries")).toList().constFirst().toMap();
+    QVERIFY(activity.value(QStringLiteral("toolUsageAvailable")).toBool());
+    QCOMPARE(activity.value(QStringLiteral("toolUsage")).toDouble(), 7.0);
+    QVERIFY(snapshot.value(QStringLiteral("spendSeries")).toList().isEmpty());
+}
+
+void UsageDatabaseAnalystTest::testExactRangeIsolation()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    const QDateTime to = QDateTime::fromString(QStringLiteral("2026-07-23T23:59:59Z"), Qt::ISODate);
+    QVERIFY(db.recordProviderMetrics(QStringLiteral("Range"), {metric(QStringLiteral("cost"), QStringLiteral("USD"),
+                                                                      3.0, to.addDays(-2), QStringLiteral("USD"))}));
+    QVERIFY(db.recordProviderMetrics(QStringLiteral("Range"), {metric(QStringLiteral("cost"), QStringLiteral("USD"),
+                                                                      99.0, to.addDays(-20), QStringLiteral("USD"))}));
+
+    const QVariantMap sevenDay = db.getAnalystSnapshot(to.addDays(-6), to);
+    const QVariantMap thirtyDay = db.getAnalystSnapshot(to.addDays(-29), to);
+    QCOMPARE(sevenDay.value(QStringLiteral("spendSeries")).toList().size(), 1);
+    QCOMPARE(thirtyDay.value(QStringLiteral("spendSeries")).toList().size(), 2);
+}
+
+void UsageDatabaseAnalystTest::testAsyncRequestSupersession()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    QSignalSpy readySpy(&db, &UsageDatabase::analystReady);
+    const QDateTime to = QDateTime::currentDateTimeUtc();
+    db.requestAnalyst(QStringLiteral("older"), to.addDays(-29), to);
+    db.requestAnalyst(QStringLiteral("latest"), to.addDays(-6), to);
+
+    QTRY_COMPARE_WITH_TIMEOUT(readySpy.size(), 1, 10000);
+    QCOMPARE(readySpy.constFirst().at(0).toString(), QStringLiteral("latest"));
+    QCOMPARE(readySpy.constFirst().at(1).toMap().value(QStringLiteral("requestId")).toString(),
+             QStringLiteral("latest"));
+    QTest::qWait(100);
+    QCOMPARE(readySpy.size(), 1);
+}
+
+void UsageDatabaseAnalystTest::testHundredThousandObservations()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    const QString connectionName =
+        QStringLiteral("analyst_bulk_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        database.setDatabaseName(dbFilePath());
+        QVERIFY(database.open());
+        QVERIFY(database.transaction());
+        QSqlQuery query(database);
+        query.prepare(QStringLiteral("INSERT INTO observations("
+                                     "provider,observed_at_utc,metric_kind,unit,value,currency,"
+                                     "semantic,source,data_quality,correlation_id"
+                                     ") VALUES('Bulk',?,'requests','request',1,NULL,"
+                                     "'interval_total','usage_api','actual',?)"));
+        const QDateTime start = QDateTime::fromString(QStringLiteral("2026-07-01T00:00:00Z"), Qt::ISODate);
+        for (int index = 0; index < 100000; ++index) {
+            query.bindValue(0, start.addSecs(index % (23 * 24 * 3600)).toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+            query.bindValue(1, QString::number(index));
+            QVERIFY(query.exec());
+        }
+        QVERIFY(database.commit());
+        database.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+
+    const QDateTime to = QDateTime::fromString(QStringLiteral("2026-07-23T23:59:59Z"), Qt::ISODate);
+    QElapsedTimer timer;
+    timer.start();
+    const QVariantMap snapshot = db.getAnalystSnapshot(to.addDays(-29), to);
+    QVERIFY(snapshot.value(QStringLiteral("ok")).toBool());
+    QVERIFY(snapshot.value(QStringLiteral("activityAvailable")).toBool());
+    QVERIFY(snapshot.value(QStringLiteral("activitySeries")).toList().size() <= 30);
+    QVERIFY2(timer.elapsed() < 10000, qPrintable(QStringLiteral("Analyst query took %1 ms").arg(timer.elapsed())));
 }
 
 QTEST_MAIN(UsageDatabaseAnalystTest)
