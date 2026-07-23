@@ -77,6 +77,23 @@ target_link_libraries(test_usagedatabase_series
 
 add_test(NAME usagedatabase_series COMMAND test_usagedatabase_series)
 
+# --- Unified retained history contract test ---
+add_executable(test_history_contract
+    test_history_contract.cpp
+    ${TEST_USAGE_DB_SRC}
+)
+
+target_include_directories(test_history_contract
+    PRIVATE ${CMAKE_SOURCE_DIR}/plugin
+)
+
+target_link_libraries(test_history_contract
+    PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent
+)
+
+add_test(NAME history_contract COMMAND test_history_contract)
+set_tests_properties(history_contract PROPERTIES TIMEOUT 30)
+
 # --- History mapping regression test ---
 add_executable(test_history_mapping_regression
     test_history_mapping_regression.cpp
@@ -235,6 +252,17 @@ add_test(
     NAME dailycontrol_qml
     COMMAND test_dailycontrol_qml
             -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/dailycontrol"
+            -platform offscreen
+)
+
+add_executable(test_history_qml
+    test_history_qml.cpp
+)
+target_link_libraries(test_history_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME history_qml
+    COMMAND test_history_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/history"
             -platform offscreen
 )
 

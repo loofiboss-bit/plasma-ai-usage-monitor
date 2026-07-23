@@ -117,6 +117,27 @@ separate minimal report for missing or mismatched native plugins.
 
 History stays local and uses WAL mode. Schema v4 stores normalized observations and permits null values. Migration from v3 is transactional, idempotent, and backed up before changes.
 
+Phase 3 history discovery uses the union of configured provider descriptors,
+configured subscription tools, retained provider observations, and retained tool
+snapshots. The UI merges these by `sourceKind` plus database identity, so
+disabling or removing a source does not hide its retained rows. A source is
+shown as enabled, disabled, or history-only. Metric selectors are derived from
+compatible stored values; a capability claim alone cannot create a metric tab.
+
+`UsageDatabase::requestHistoryCatalog()` and
+`UsageDatabase::requestHistorySeries()` are the asynchronous QML boundary.
+Series results include source identity, kind, metric, unit, currency,
+observation semantics, quality classes, sample and plotted-point counts,
+observation bounds, bucket size, gaps, freshness, and history-only state.
+Requests are superseding: a completed older generation cannot replace a newer
+selection.
+
+Unavailable observations are omitted while an available numeric zero remains a
+point. Missing buckets become explicit chart gaps. Source, semantic, scope,
+window, or currency changes start a separate series. Multi-source comparisons
+fail closed when units, semantics, or currencies differ. Rolling tool quota is
+a gauge and is never summed or relabeled as calendar-day usage.
+
 The Analyst output/input query retains the schema-v4 compatibility projection
 and returns only days with positive total input. It does not synthesize ratios
 for missing input and does not interpret the ratio as prompt quality.

@@ -152,17 +152,37 @@ Item {
                         ctx.lineJoin = "round";
                         ctx.lineCap = "round";
 
+                        var drawing = false;
+                        var drawnPoints = 0;
+                        var singlePoint = null;
                         for (var p = 0; p < series.points.length; p++) {
                             var point = series.points[p];
+                            if (point.gap) {
+                                drawing = false;
+                                continue;
+                            }
                             var px = chartRoot.marginLeft + ((point.t - bounds.minTime) / (bounds.maxTime - bounds.minTime || 1)) * chartW;
                             var py = chartRoot.marginTop + chartH - (point.v / maxVal) * chartH;
                             point.x = px;
                             point.y = py;
+                            drawnPoints++;
+                            singlePoint = point;
 
-                            if (p === 0) ctx.moveTo(px, py);
-                            else ctx.lineTo(px, py);
+                            if (!drawing) {
+                                ctx.moveTo(px, py);
+                                drawing = true;
+                            } else {
+                                ctx.lineTo(px, py);
+                            }
                         }
                         ctx.stroke();
+                        if (drawnPoints === 1 && singlePoint) {
+                            ctx.fillStyle = series.color;
+                            ctx.beginPath();
+                            ctx.arc(singlePoint.x, singlePoint.y, 3, 0,
+                                    Math.PI * 2);
+                            ctx.fill();
+                        }
                     }
 
                     if (chartRoot.hovering) {
@@ -328,7 +348,13 @@ Item {
     function hasData() {
         var series = seriesData || [];
         for (var i = 0; i < series.length; i++) {
-            if ((series[i].points || []).length > 0) return true;
+            var points = series[i].points || [];
+            for (var p = 0; p < points.length; p++) {
+                if (points[p].available !== false
+                        && points[p].value !== null
+                        && points[p].value !== undefined
+                        && Number.isFinite(Number(points[p].value))) return true;
+            }
         }
         return false;
     }
@@ -338,7 +364,13 @@ Item {
         var out = [];
         for (var i = 0; i < series.length; i++) {
             var points = series[i].points || [];
-            if (points.length > 0) {
+            var available = points.some(function(point) {
+                return point.available !== false
+                    && point.value !== null
+                    && point.value !== undefined
+                    && Number.isFinite(Number(point.value));
+            });
+            if (available) {
                 out.push({
                     name: series[i].name || i18n("Series %1", i + 1),
                     color: series[i].color || paletteColor(i)
@@ -361,7 +393,17 @@ Item {
                 var ts = input[p].timestamp;
                 var d = (typeof ts === "string") ? new Date(ts) : ts;
                 if (!d || isNaN(d.getTime())) continue;
-                pts.push({ t: d.getTime(), v: input[p].value || 0, x: 0, y: 0 });
+                var available = input[p].available !== false
+                    && input[p].value !== null
+                    && input[p].value !== undefined
+                    && Number.isFinite(Number(input[p].value));
+                pts.push({
+                    t: d.getTime(),
+                    v: available ? Number(input[p].value) : 0,
+                    gap: !available,
+                    x: 0,
+                    y: 0
+                });
             }
 
             pts.sort(function(a, b) { return a.t - b.t; });
@@ -389,6 +431,7 @@ Item {
         for (var i = 0; i < parsed.length; i++) {
             var pts = parsed[i].points;
             for (var p = 0; p < pts.length; p++) {
+                if (pts[p].gap) continue;
                 if (pts[p].t < minTime) minTime = pts[p].t;
                 if (pts[p].t > maxTime) maxTime = pts[p].t;
                 if (pts[p].v > maxValue) maxValue = pts[p].v;
@@ -415,7 +458,9 @@ Item {
         var rows = [];
 
         for (var i = 0; i < parsed.length; i++) {
-            var pts = parsed[i].points;
+            var pts = parsed[i].points.filter(function(point) {
+                return !point.gap;
+            });
             if (pts.length === 0) continue;
 
             var nearest = pts[0];
@@ -491,10 +536,10 @@ Item {
         var d = (typeof ms === "number") ? new Date(ms) : ms;
         if (!d || isNaN(d.getTime())) return "";
 
-        var now = new Date();
-        var diffDays = Math.floor((now.getTime() - d.getTime()) / (24 * 60 * 60 * 1000));
-        if (diffDays === 0) return Qt.formatTime(d, "hh:mm");
-        if (diffDays < 7) return Qt.formatDate(d, "ddd hh:mm");
+        var bounds = computeBounds(parseSeries());
+        var span = bounds.valid ? bounds.maxTime - bounds.minTime : 0;
+        if (span <= 2 * 86400000) return Qt.formatDateTime(d, "MMM d hh:mm");
+        if (span <= 14 * 86400000) return Qt.formatDateTime(d, "ddd MMM d");
         return Qt.formatDate(d, "MMM d");
     }
 }
