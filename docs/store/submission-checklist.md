@@ -33,9 +33,10 @@ Secrets stay in KWallet and history stays in a local SQLite database. There is
 no telemetry or hosted backend. The KDE Store package contains the frontend;
 install the matching native plugin from COPR or a source build first.
 
-## Screenshot inventory
+## Release media inventory
 
-Upload the nine reviewed Breeze Dark captures from the same isolated session:
+Keep the nine reviewed Breeze Dark captures from the same isolated session in
+the release manifest:
 
 - `assets/screenshots/overview-popup.png`
 - `assets/screenshots/attention-state.png`
@@ -49,6 +50,15 @@ Upload the nine reviewed Breeze Dark captures from the same isolated session:
 
 The manifest must identify the capture commit, date, Plasma version, scale,
 fixture digest, scenario for every file, and file hashes.
+
+KDE Store accepts at most five gallery pictures. Upload these representative
+captures there:
+
+- `assets/screenshots/overview-popup.png`
+- `assets/screenshots/attention-state.png`
+- `assets/screenshots/retained-history.png`
+- `assets/screenshots/analyst-sufficient.png`
+- `assets/screenshots/panel-lowest-quota.png`
 
 ## GitHub release pack
 
@@ -70,7 +80,7 @@ frontend/native-plugin packaging boundary.
 3. verify CI and the draft GitHub release assets against that tag
 4. publish the GitHub release
 5. submit the exact stable tag to COPR and verify Fedora 44 installation
-6. upload the listing copy and nine screenshots to KDE Store
+6. upload the listing copy and five representative screenshots to KDE Store
 7. confirm the Store page still states the compiled-plugin requirement before the install action
 8. read back GitHub, COPR, AppStream-facing metadata, and the Store listing independently
 
