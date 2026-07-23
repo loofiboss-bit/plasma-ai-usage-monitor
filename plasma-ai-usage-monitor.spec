@@ -1,7 +1,7 @@
 Name:           plasma-ai-usage-monitor
-Version:        14.1.2
+Version:        15.0.0
 Release:        1%{?dist}
-Summary:        KDE Plasma 6 widget to monitor AI API token usage, rate limits, and costs
+Summary:        KDE Plasma 6 widget for truthful AI usage, quota, resets, and spend
 License:        GPL-3.0-or-later
 URL:            https://github.com/loofiboss-bit/plasma-ai-usage-monitor
 Source0:        %{url}/archive/v%{version}/%{name}-%{version}.tar.gz
@@ -30,16 +30,19 @@ Requires:       kf6-kcmutils
 Requires:       qt6-qtbase
 
 %description
-A native KDE Plasma 6 plasmoid that monitors AI API token usage,
-rate limits, costs, and budgets across multiple providers including
+A native KDE Plasma 6 plasmoid that prioritizes AI usage, synchronized quota,
+reset windows, costs, budgets, balances, and local coding-tool activity across
+multiple providers including
 OpenAI, Azure OpenAI, AWS Bedrock, Anthropic (Claude), Google Gemini,
 Mistral AI, DeepSeek, Groq, xAI (Grok), Ollama Cloud, OpenRouter,
 Together AI, Cohere, Google Veo, LiteLLM Proxy, Cerebras Inference,
 Fireworks AI, and Perplexity API.
 
 Features:
-- Capability-aware rate-limit monitoring where providers expose complete live pairs
-- Usage and cost tracking with historical trends
+- Action-first daily status shared by the panel, Overview, and notifications
+- Capability-aware quota and reset monitoring where sources expose live pairs
+- Usage and cost tracking with retained disabled-source history and real gaps
+- Evidence-bound Analyst snapshots with explicit sample requirements
 - Catalog-backed cost estimation with local JSON metadata
 - Budget management with daily/monthly limits
 - SQLite-based usage history with chart visualization
@@ -49,7 +52,7 @@ Features:
 - Collapsible provider cards with accessibility support
 - Data export (CSV/JSON) and non-secret configuration portability
 - Trust Center diagnostics for catalog review, KWallet, and local readiness
-- Panel icon with status badge indicator
+- Compact panel modes for attention, lowest quota, next reset, spend, and sources
 - HTTPS security warnings for custom base URLs
 
 %prep
@@ -76,6 +79,9 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Thu Jul 23 2026 Loofi <loofi@github.com> - 15.0.0-1
+- Prepare v15.0.0 release
+
 * Wed Jul 22 2026 Loofi <loofi@github.com> - 14.1.2-1
 - Prepare v14.1.2 release
 

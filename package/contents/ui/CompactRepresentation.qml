@@ -14,8 +14,8 @@ MouseArea {
 
     Components.CompactMetricState {
         id: compactState
-        summary: root.dailyState && root.dailyState.summary
-            ? root.dailyState.summary : ({})
+        summary: root.presentationDailyState && root.presentationDailyState.summary
+            ? root.presentationDailyState.summary : ({})
     }
 
     readonly property string displayMode: compactState.normalizeMode(

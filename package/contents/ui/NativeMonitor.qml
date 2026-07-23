@@ -3,6 +3,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import com.github.loofi.aiusagemonitor 1.0
 import "Utils.js" as Utils
+import "components" as Components
 
 Item {
     id: root
@@ -75,6 +76,8 @@ Item {
     property alias refreshScheduler: refreshScheduler
     property alias sourceReadiness: sourceReadinessModel
     property alias dailyState: dailyStateModel
+    readonly property var presentationDailyState: mediaDailyState.active
+        ? mediaDailyState : dailyStateModel
     property alias secretsManager: secrets
 
     property alias claudeCode: claudeCodeMonitor
@@ -525,6 +528,10 @@ Item {
         id: dailyStateModel
         warningThreshold: plasmoid.configuration.warningThreshold
         criticalThreshold: plasmoid.configuration.criticalThreshold
+    }
+
+    Components.MediaDailyState {
+        id: mediaDailyState
     }
 
     BrowserSyncService {

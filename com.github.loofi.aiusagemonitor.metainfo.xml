@@ -8,21 +8,21 @@
     <name>Loofi</name>
   </developer>
   <icon type="stock">utilities-system-monitor</icon>
-  <summary>Verify AI usage, spend, and local coding activity in Plasma</summary>
+  <summary>See AI usage, quota, resets, and spend truthfully in Plasma</summary>
 
   <description>
     <p>
       AI Usage Monitor is a Plasma 6 widget for provider-reported usage and spend,
-      local coding-tool activity, balances, rate limits, and read-only connection checks.
-      Guided setup verifies one useful source with a safe read-only request and states
-      what the result can prove.
+      synchronized coding-tool quota, local activity, balances, rate limits, and
+      read-only connection checks. Daily Control prioritizes the source that needs
+      attention, the lowest live quota, and the next live reset.
     </p>
     <p>
-      The widget stores secrets in KWallet and history on the local computer. Overview
-      keeps reported data, estimates, balances, and connectivity separate. Native
-      diagnostics checks plugin versions, install layers, database health, and source
-      readiness. The KDE Store frontend requires the matching compiled plugin from the
-      Fedora COPR package or a source build.
+      The widget stores secrets in KWallet and history on the local computer. Actual
+      data, estimates, fixed fees, balances, connectivity, unavailable values, and
+      currencies stay separate. Disabled-source history remains selectable and Analyst
+      explains its coverage and sample requirements. The KDE Store frontend requires
+      the matching compiled plugin from the Fedora COPR package or a source build.
     </p>
   </description>
 
@@ -32,34 +32,55 @@
   <url type="bugtracker">https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues</url>
 
   <screenshots>
-    <screenshot>
-      <caption>Guided first success source choice with monitoring levels</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/guided-first-success.png</image>
-    </screenshot>
     <screenshot type="default">
-      <caption>Overview with provider and local-tool status</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/main-window.png</image>
+      <caption>Narrow Overview with separate daily data categories</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/overview-popup.png</image>
     </screenshot>
     <screenshot>
-      <caption>Compact panel value</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/panel-view.png</image>
+      <caption>Critical quota shown as the first recovery action</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/attention-state.png</image>
     </screenshot>
     <screenshot>
-      <caption>Provider settings in Plasma</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/settings-view.png</image>
+      <caption>Lowest synchronized quota and next live reset</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/quota-reset-state.png</image>
     </screenshot>
     <screenshot>
-      <caption>History with one compatible unit and currency</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/history-view.png</image>
+      <caption>Tool-only Overview with live and estimated data kept separate</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/tool-only-overview.png</image>
     </screenshot>
     <screenshot>
-      <caption>Analyst view with current navigation and demo data</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-view.png</image>
+      <caption>Retained history for a disabled source</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/retained-history.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>History chart with a real missing-data gap</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/history-gap.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Analyst snapshot with sufficient compatible history</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-sufficient.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Analyst explaining unavailable results for insufficient history</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-insufficient.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Compact panel showing the lowest synchronized quota</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/panel-lowest-quota.png</image>
     </screenshot>
   </screenshots>
 
   <releases>
 
+    <release version="15.0.0" date="2026-07-23">
+      <description>
+        <ul>
+          <li>Add shared daily status for attention, live quota, next reset, spend quality, and tool-only setups.</li>
+          <li>Keep disabled-source history selectable and render missing intervals as gaps.</li>
+          <li>Add coverage-aware Analyst snapshots with documented sample requirements.</li>
+        </ul>
+      </description>
+    </release>
     <release version="14.1.2" date="2026-07-22"/>
     <release version="14.1.1" date="2026-07-19"/>
     <release version="14.1.0" date="2026-07-18">

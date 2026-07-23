@@ -1,0 +1,35 @@
+{
+  "version": "15.0.0",
+  "sessionId": "d925cf0b-5b59-40e7-bcd2-3d1618258464",
+  "fixtureSha256": "15409bef32c96d823eb5413ef190ceb518408d0c47574191cdb8537af9d0379c",
+  "sourceTreeSha256": "0f861c93fef8e221529cb7730ecbc8480e9f192734e94ef33388818646afbd88",
+  "plasmaSession": "Fedora KDE Plasma",
+  "theme": "Breeze Dark",
+  "environment": "isolated demo user",
+  "captureCommit": "1a4620bf43c9e64407b5d04a373578f561254f63",
+  "capturedAt": "2026-07-23T11:39:50Z",
+  "plasmaVersion": "6.7.3",
+  "scale": "100%",
+  "scenarios": {
+    "overview-popup.png": "media-overview",
+    "attention-state.png": "media-attention",
+    "quota-reset-state.png": "media-quota",
+    "tool-only-overview.png": "media-tool-only",
+    "retained-history.png": "media-history-retained",
+    "history-gap.png": "media-history-gap",
+    "analyst-sufficient.png": "media-analyst-sufficient",
+    "analyst-insufficient.png": "media-analyst-insufficient",
+    "panel-lowest-quota.png": "media-panel"
+  },
+  "assets": {
+    "overview-popup.png": "84349cb6a3e95a1c8db80076a59dbf4dd1d7900fc28fb579465abb54648e9f6e",
+    "attention-state.png": "bb535a155b474eef6debbad4a030de6007a9dd106ad9cbf374167872c3bd0c8e",
+    "quota-reset-state.png": "23eff3178a89e3f26bacec47825fca42c3c769900760cdfbedc9e12eaece4409",
+    "tool-only-overview.png": "9823bbea66480c297011f5b8e8ff37d094420a9b0ef7a233729bde6c3ee45a46",
+    "retained-history.png": "7801ce59a2e8903c03c26936c261783a88dcaaafd1a3606a26feed22e4db01fd",
+    "history-gap.png": "aa06e57629a2e84dc6ed6dc7226f44377de8785f3dcd6074556283905b48667e",
+    "analyst-sufficient.png": "8dc5d2fbd03f5866bff7210e0741bfb99debeb56abda9f37235a1a6ec9587606",
+    "analyst-insufficient.png": "6f06437aa5f22679ee92d544bbd816c78ed926156bed3dd91156ef5b6184df32",
+    "panel-lowest-quota.png": "c01384934b23041a8f59aafe4b189e1ed7158ed94a1ecf206ab562bf4b41ce84"
+  }
+}

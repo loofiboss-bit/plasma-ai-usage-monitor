@@ -27,10 +27,10 @@ Rectangle {
         spacing: Kirigami.Units.mediumSpacing
 
         Kirigami.Icon {
-            source: card.row.sourceKind === "local_tool" ? "utilities-terminal" : "globe"
-            Layout.preferredWidth: Kirigami.Units.iconSizes.smallMedium
+            objectName: "sourceLogo"
+            source: card.logoSource()
+            Layout.preferredWidth: Kirigami.Units.iconSizes.medium
             Layout.preferredHeight: width
-            color: card.accentColor()
         }
 
         ColumnLayout {
@@ -90,6 +90,25 @@ Rectangle {
         if (row.attentionSeverity === "warning") return Kirigami.Theme.neutralTextColor;
         if (row.qualityClass === "connectivity_only") return Kirigami.Theme.disabledTextColor;
         return Kirigami.Theme.highlightColor;
+    }
+
+    function logoSource() {
+        if (row.iconSource) return row.iconSource;
+        if (row.sourceKind !== "local_tool")
+            return Qt.resolvedUrl("../icons/providers/" + row.stableId + ".svg");
+        var toolIcons = {
+            "google-antigravity": "antigravity",
+            "claude-code": "claude-code",
+            "codex-cli": "codex-cli",
+            "github-copilot": "copilot",
+            cursor: "cursor",
+            windsurf: "windsurf",
+            "jetbrains-ai": "jetbrains"
+        };
+        var iconName = toolIcons[row.stableId];
+        return iconName
+            ? Qt.resolvedUrl("../icons/tools/" + iconName + ".svg")
+            : "utilities-terminal";
     }
 
     function stateText() {

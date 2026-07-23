@@ -264,5 +264,19 @@ TestCase {
         compare(source.stateText(), "Local estimate");
         compare(source.metricText(), "75% left");
         compare(findChild(source, "sourceMetricValue").text, "75% left");
+        verify(source.logoSource().toString().indexOf("tools/codex-cli.svg") >= 0);
+    }
+
+    function test_providerCardsUseTheirOwnLogos() {
+        var source = createTemporaryObject(sourceComponent, testCase, {
+            row: row("openrouter", "actual", {
+                displayName: "OpenRouter",
+                primaryMetricAvailable: true,
+                primaryMetricValue: 0
+            })
+        });
+        verify(source);
+        verify(source.logoSource().toString().indexOf("providers/openrouter.svg") >= 0);
+        verify(findChild(source, "sourceLogo"));
     }
 }

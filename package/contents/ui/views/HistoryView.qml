@@ -23,9 +23,39 @@ ColumnLayout {
     Components.HistoryController {
         id: historyController
         usageDb: root.usageDb
-        dailyState: root.dailyState
+        dailyState: root.presentationDailyState
         configuredProviders: root.allProviders || []
         configuredTools: root.allSubscriptionTools || []
+    }
+
+    Timer {
+        id: mediaHistorySelection
+        interval: 500
+        repeat: true
+        running: AppInfo.demoMode
+            && AppInfo.smokeView.indexOf("media-history") === 0
+        property int attempts: 0
+        onTriggered: {
+            attempts++;
+            var rows = historyController.sourceRows || [];
+            for (var i = 0; i < rows.length; ++i) {
+                if (rows[i].dbName !== "OpenAI" || !rows[i].hasHistory)
+                    continue;
+                historyController.selectedSourceId = rows[i].historyId;
+                historyController.selectedMetric = "cost";
+                historyController.rangeIndex = 1;
+                if (!historyController.loading
+                        && historyController.seriesData.length === 0)
+                    historyController.refresh();
+                if (historyController.seriesData.length > 0)
+                    stop();
+                return;
+            }
+            if (attempts % 2 === 0)
+                historyController.refreshCatalog();
+            if (attempts >= 20)
+                stop();
+        }
     }
 
     function openExport(format) {

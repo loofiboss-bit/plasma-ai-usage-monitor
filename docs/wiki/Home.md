@@ -1,7 +1,7 @@
 <!-- Generated from docs/user-guide/README.md by scripts/generate_wiki_docs.py; do not edit. -->
 # User guide
 
-Install both required parts, verify one useful source in **Guided first success**, and learn what the result can prove before adding alerts or integrations.
+Install both required parts, verify one useful source in **Guided first success**, and learn what the result can prove before adding alerts or integrations. Daily Control then keeps attention, live quota, reset, spend quality, retained history, and analysis coverage consistent across the panel and popup.
 
 ## Set up the widget
 

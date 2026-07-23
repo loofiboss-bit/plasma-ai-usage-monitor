@@ -23,7 +23,7 @@ QQC2.ScrollView {
 
     Components.DailyOverviewState {
         id: overviewState
-        dailyState: root.dailyState
+        dailyState: root.presentationDailyState
     }
 
     ColumnLayout {

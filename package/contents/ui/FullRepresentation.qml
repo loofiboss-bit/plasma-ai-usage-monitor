@@ -12,8 +12,10 @@ PlasmaExtras.Representation {
 
     implicitWidth: Kirigami.Units.gridUnit * 28
     implicitHeight: Kirigami.Units.gridUnit * 28
-    property int destination: AppInfo.smokeView === "history" ? 1
-                            : AppInfo.smokeView === "analyst" ? 2 : 0
+    property int destination: AppInfo.smokeView === "history"
+                              || AppInfo.smokeView.indexOf("media-history") === 0 ? 1
+                            : AppInfo.smokeView === "analyst"
+                              || AppInfo.smokeView.indexOf("media-analyst") === 0 ? 2 : 0
 
     readonly property bool hasConfiguration: {
         if (AppInfo.smokeView.indexOf("onboarding") === 0) return false;

@@ -20,7 +20,7 @@ Enabled providers connect directly to their configured API endpoints. Scheduled 
 
 Remote custom base URLs must use HTTPS. Plain HTTP is accepted only for loopback development endpoints.
 
-The optional Prometheus server binds to 127.0.0.1. Slack and Discord webhooks send alert content to the configured webhook service.
+The optional Prometheus server binds to 127.0.0.1. Slack and Discord webhooks send alert content to the configured webhook service. Daily alerts contain the stable source name, severity, reason, recommended action, freshness, and compatible quota context. They do not include endpoint URLs, account or project identifiers, credentials, cookies, unrestricted backend errors, or wallet contents.
 
 ## KWallet
 
@@ -40,7 +40,7 @@ The monitor reads only account status and quota-summary RPCs. It does not read A
 
 ## Support reports
 
-Native Diagnostics builds the support report in the compiled plugin. It redacts endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values. The dependency-recovery screen has a smaller redacted bootstrap report that omits error details and paths. Review either report before posting it publicly.
+Native Diagnostics builds the support report in the compiled plugin. It includes only allowlisted source IDs, readiness states, typed error kinds, next-action keys, and whether verification has succeeded. It excludes endpoint hosts, query strings, account IDs, project IDs, credentials, cookies, webhook URLs, free-form backend errors, and KWallet values. The dependency-recovery screen has a smaller redacted bootstrap report that omits error details and paths. Review either report before posting it publicly.
 
 ## Removing local data
 

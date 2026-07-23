@@ -15,6 +15,10 @@ Subscription cards combine local activity with plan limits. Treat those figures 
 
 Open **Settings → Subscriptions** and enable the tools you use. The detection status checks installed binaries and known local state directories.
 
+A tool-only setup is supported. Synchronized quota windows can drive the
+Overview lowest-quota and next-reset facts; local activity and configured plan
+limits remain estimates and are labeled separately.
+
 ## Google Antigravity
 
 Antigravity monitoring is opt-in and supports the current Antigravity 2.x Linux desktop app. Antigravity must be installed, running, and signed in. The widget detects the plan automatically, shows the shared five-hour and weekly quota buckets returned by Antigravity 2.x, and keeps the per-model rows returned for the account. Models without quota progress remain visible as available, and temporarily disabled models keep their reported reason.

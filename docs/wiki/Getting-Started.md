@@ -34,9 +34,26 @@ The **Advanced** switch shows model overrides, custom base URLs, and provider-sp
 
 ## Read Overview
 
-Overview groups useful provider results under **Reporting providers**. Connectivity-only providers stay under the collapsed **Connection checks** section. Local coding tools have their own section, and sources that need configuration or recovery appear as actions near the top.
+Overview puts the highest-priority recovery action first, followed by the lowest live quota, next live reset, separate spend categories, and compact source groups. Connectivity-only sources stay collapsed by default.
 
-The header counts actual data, estimates, balances, connection checks, and sources that need attention separately. It does not count a connection check as reported usage.
+The header counts actual data, estimates, balances, connection checks, and sources that need attention separately. It does not count a connection check as reported usage. A tool-only setup is valid: synchronized tool quota and clearly labeled local estimates appear without requiring an API provider.
+
+## Choose a panel display
+
+Open **Settings → General → Compact display** and choose:
+
+- **Attention** for the most urgent source
+- **Lowest quota** for the smallest synchronized or provider-reported remaining quota
+- **Next reset** for the nearest live reset
+- **Actual spend** for provider-reported spend, separated by currency
+- **Active sources** for sources with useful data
+- **Icon only** for a severity badge without text
+
+After upgrading from v14, **Provider count** maps to **Active sources**,
+**Critical** maps to **Attention**, and **Cost** maps to **Actual spend**.
+Legacy daily-cost and remaining-request modes remain readable only when a
+compatible metric exists. Published plan limits and local configured caps never
+drive **Lowest quota** or **Next reset**.
 
 ## Check Diagnostics
 

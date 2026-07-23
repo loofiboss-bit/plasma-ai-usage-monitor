@@ -43,6 +43,10 @@ Reports include coverage, currency status, actual and estimated sample counts,
 unavailable explanations, and the analysis method. Provider and installation
 diagnostics remain under **Settings → Diagnostics**.
 
+History and Analyst requests are asynchronous. Changing source, metric, range,
+or report period supersedes the older request; a late result cannot replace the
+newer selection.
+
 The database is stored at:
 
 ~~~text

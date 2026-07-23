@@ -114,6 +114,23 @@ Recovery is emitted only after a real failed readiness state, and webhook text
 is built from the same compact, source-explicit, redacted payload as the desktop
 notification.
 
+## Daily presentation contract
+
+The panel, Overview, notifications, History freshness labels, and release media
+consume the same non-localized Daily State keys. Overview orders recovery before
+quota/reset facts and secondary source detail. A tool-only configuration is a
+complete supported state; it does not require a synthetic provider row.
+
+Compact modes are `icon`, `attention`, `lowest-quota`, `next-reset`,
+`actual-spend`, and `active-sources`. v14 values migrate as follows: `count` to
+`active-sources`, `critical` to `attention`, and `cost` to `actual-spend`.
+Legacy `dailycost` and `requests` values are display-only compatibility modes
+and remain unavailable when no compatible real metric exists.
+
+Release-media fixtures are isolated behind both `PLASMA_AI_MONITOR_DEMO` and a
+`media-*` smoke view. They use a temporary data directory and never open the
+user's KWallet, history database, Plasma configuration, or active panel layout.
+
 ## Diagnostics and recovery
 
 `AppInfo` owns native installation, version, Plasma, distribution, and read-only

@@ -93,7 +93,7 @@ release-check: build-debug
     python3 scripts/check_release_media.py
     bash scripts/test_verify_exact_tag.sh
     PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --strict --build-dir build/debug --expected-version "$(< VERSION)"
-    @if command -v appstreamcli >/dev/null 2>&1; then appstreamcli validate com.github.loofi.aiusagemonitor.metainfo.xml; else echo "Warning: appstreamcli not found, skipping validation. Run 'sudo dnf install appstream' on Fedora."; exit 1; fi
+    @if command -v appstreamcli >/dev/null 2>&1; then appstreamcli validate --no-net com.github.loofi.aiusagemonitor.metainfo.xml; else echo "Warning: appstreamcli not found, skipping validation. Run 'sudo dnf install appstream' on Fedora."; exit 1; fi
     @if command -v rpmlint >/dev/null 2>&1; then rpmlint plasma-ai-usage-monitor.spec; else echo "Warning: rpmlint not found, skipping validation. Run 'sudo dnf install rpmlint' on Fedora."; exit 1; fi
     bash scripts/package_source_tarball.sh --check
     bash scripts/package_plasmoid.sh --check

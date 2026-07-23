@@ -3,7 +3,7 @@
 
 Provider cards answer different questions because provider APIs expose different information. Check the source and quality labels before comparing providers or setting a budget.
 
-Overview puts providers with useful reported metrics under **Reporting providers**. Providers that only prove endpoint access stay under the collapsed **Connection checks** section. Local tools appear separately. The header counts actual data, estimates, balances, connectivity, and sources that need attention without merging them into one success number.
+Overview prioritizes the source that needs action, then shows the lowest live quota, next live reset, separated spend categories, and source-quality groups. Providers that only prove endpoint access stay under the collapsed **Connectivity only** section. The same daily state drives the panel and notifications.
 
 The panel and popup footer use the same source summary. **Active sources** means
 sources with verified actual data, an estimate, or a balance; connectivity-only
@@ -34,6 +34,17 @@ The generated [provider capability matrix](https://github.com/loofiboss-bit/plas
 
 An estimate is useful for trends but is not an invoice. A connectivity check proves that an endpoint answered; it does not prove that usage is zero.
 
+## Lowest quota and next reset
+
+**Lowest live quota** is the smallest remaining percentage among compatible
+provider-reported or synchronized quota windows. **Next live reset** is the
+earliest future reset from those same windows. Ties are deterministic.
+
+Published plan documentation, a locally configured activity limit, and an
+unknown quota can still appear on their source card, but they cannot drive the
+Overview headline or compact quota/reset modes. A stale snapshot remains visible
+as stale but does not generate a fresh threshold-change notification.
+
 ## Unknown and zero
 
 **Unknown** means the source did not provide a compatible value. Zero means the source explicitly reported zero. The widget preserves that distinction in the UI, database, exports, alerts, and Prometheus output.
@@ -53,6 +64,24 @@ tokens; a reported zero output remains a valid ratio of zero.
 The widget does not convert currencies. It keeps observations in their reported ISO currency and does not silently add USD and EUR. USD budgets turn off when the observed data uses another currency.
 
 LiteLLM spend logs may contain several currencies. Each remains separate.
+Analyst pauses cost-derived KPIs for mixed currencies unless one compatible
+currency is explicitly selected. Compatible token, request, and local-tool
+activity remains available.
+
+## Analyst sample requirements
+
+Analyst derives results only from compatible observations in the requested UTC
+period:
+
+- average daily spend requires 3 recorded days
+- volatility and anomaly candidates require 7 recorded days
+- week-over-week change requires two complete 7-day windows and a non-zero previous window
+- output/input ratio requires 3 compatible days with positive input
+
+Unavailable results show the observed and required sample counts. Anomaly
+candidates must exceed the period mean by two population standard deviations
+and by at least one currency unit or 50 percent of the baseline. They are
+candidates for review, not causal conclusions.
 
 ## Time windows
 

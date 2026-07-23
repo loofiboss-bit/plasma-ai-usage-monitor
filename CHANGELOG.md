@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [15.0.0] — 2026-07-23
+
+### Added
+- Add one typed Daily State Model for panel, Overview, History freshness, and notifications, with deterministic source priority and nullable metrics.
+- Add action-first Overview cards for recovery, lowest synchronized quota, next live reset, separated spend categories, and compact source groups.
+- Add retained provider and subscription-tool discovery, explicit chart gaps, compatibility-checked comparisons, and asynchronous History queries.
+- Add one asynchronous Analyst snapshot with coverage, sample requirements, compatible drivers, anomaly methodology, and period-specific reports.
+- Add fixture-driven daily UI, notification, History, Analyst, performance, and accessibility release gates.
+
+### Changed
+- Replace provider connection-count panel semantics with attention, lowest-quota, next-reset, actual-spend, and active-source modes.
+- Show each provider and coding tool with its own logo in the daily source list.
+- Keep actual provider spend, local estimates, fixed subscription fees, balances, connectivity, and mixed currencies visibly separate.
+- Group notification threshold changes per source and suppress stale quota changes while preserving source and action context.
+- Document the Daily Control model, v14 compact-mode migration, retained history, Analyst methodology, and reproducible v15 release media.
+
+### Fixed
+- Preserve unavailable values as unavailable through panel modes, charts, reports, alerts, and exports instead of coercing them to zero.
+- Prevent disabled sources from disappearing from History and prevent missing buckets from rendering as recorded zeroes.
+- Prevent superseded History or Analyst requests from replacing newer UI state.
+
 ## [14.1.2] — 2026-07-22
 
 ### Changed
@@ -816,7 +837,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v15.0.0...HEAD
+[15.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.2...v15.0.0
+[14.1.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v14.1.2
 [14.1.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.0...v14.1.1
 [14.1.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.1...v14.1.0
 [14.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.0.0...v14.0.1
