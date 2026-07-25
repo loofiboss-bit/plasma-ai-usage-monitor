@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import org.kde.ki18n
 import QtQuick.Layouts
+import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
@@ -19,6 +20,12 @@ PlasmaExtras.Representation {
                               || AppInfo.smokeView.indexOf("media-history") === 0 ? 1
                             : AppInfo.smokeView === "analyst"
                               || AppInfo.smokeView.indexOf("media-analyst") === 0 ? 2 : 0
+    property bool sourceDetailVisible: AppInfo.smokeView === "source-detail"
+    property string detailSourceId: AppInfo.smokeView === "source-detail"
+        ? "openrouter" : ""
+    property string returnFocusSourceId: ""
+    property string historySourceId: ""
+    property string historyMetric: ""
 
     readonly property bool hasConfiguration: {
         if (AppInfo.smokeView.indexOf("onboarding") === 0) return false;
@@ -52,55 +59,92 @@ PlasmaExtras.Representation {
                 text: KI18n.i18n("AI Usage Monitor")
                 Layout.fillWidth: true
             }
-            PlasmaComponents.ToolButton {
-                activeFocusOnTab: true
-                icon.name: "view-refresh"
-                Accessible.name: KI18n.i18n("Refresh all configured sources")
-                onClicked: fullRoot.monitor.refreshAll()
-                PlasmaComponents.ToolTip { text: KI18n.i18n("Refresh all configured sources") }
-            }
-            PlasmaComponents.ToolButton {
-                activeFocusOnTab: true
-                icon.name: "tools-wizard"
-                Accessible.name: KI18n.i18n("Run guided setup again")
-                onClicked: onboardingFlow.startAgain()
-                PlasmaComponents.ToolTip { text: KI18n.i18n("Run guided setup again") }
-            }
-            PlasmaComponents.ToolButton {
-                activeFocusOnTab: true
-                icon.name: "configure"
-                Accessible.name: KI18n.i18n("Configure AI Usage Monitor")
-                onClicked: Plasmoid.internalAction("configure").trigger()
-                PlasmaComponents.ToolTip { text: KI18n.i18n("Configure") }
-            }
         }
     }
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
-        RowLayout {
+        Kirigami.NavigationTabBar {
+            id: navigationTabs
             Layout.fillWidth: true
-            Layout.margins: Kirigami.Units.smallSpacing
-            spacing: Kirigami.Units.smallSpacing
             visible: !fullRoot.showGuidedSetup
+            actions: [
+                Kirigami.Action {
+                    text: KI18n.i18n("Overview")
+                    icon.name: "view-dashboard"
+                    checkable: true
+                    checked: !fullRoot.sourceDetailVisible
+                        && fullRoot.destination === 0
+                    onTriggered: {
+                        fullRoot.sourceDetailVisible = false;
+                        fullRoot.destination = 0;
+                    }
+                },
+                Kirigami.Action {
+                    text: KI18n.i18n("History")
+                    icon.name: "view-history"
+                    checkable: true
+                    checked: !fullRoot.sourceDetailVisible
+                        && fullRoot.destination === 1
+                    onTriggered: {
+                        fullRoot.sourceDetailVisible = false;
+                        fullRoot.destination = 1;
+                    }
+                },
+                Kirigami.Action {
+                    text: KI18n.i18n("Analyst")
+                    icon.name: "office-chart-line"
+                    checkable: true
+                    checked: !fullRoot.sourceDetailVisible
+                        && fullRoot.destination === 2
+                    onTriggered: {
+                        fullRoot.sourceDetailVisible = false;
+                        fullRoot.destination = 2;
+                    }
+                }
+            ]
+        }
 
-            Repeater {
-                model: [KI18n.i18n("Overview"), KI18n.i18n("History"), KI18n.i18n("Analyst")]
+        QQC2.ToolBar {
+            Layout.fillWidth: true
+            visible: !fullRoot.showGuidedSetup
+            Accessible.name: KI18n.i18n("Monitor actions")
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Kirigami.Units.smallSpacing
+                anchors.rightMargin: Kirigami.Units.smallSpacing
+                Item { Layout.fillWidth: true }
                 PlasmaComponents.ToolButton {
-                    required property int index
-                    required property var modelData
-                    Layout.fillWidth: true
-                    text: modelData
-                    checked: fullRoot.destination === index
                     activeFocusOnTab: true
-                    Accessible.name: KI18n.i18n("Open %1", modelData)
-                    onClicked: fullRoot.destination = index
+                    icon.name: "view-refresh"
+                    text: KI18n.i18n("Refresh")
+                    display: QQC2.AbstractButton.TextBesideIcon
+                    Accessible.name: KI18n.i18n("Refresh all configured sources")
+                    onClicked: fullRoot.monitor.refreshAll()
+                    PlasmaComponents.ToolTip {
+                        text: KI18n.i18n("Refresh all configured sources")
+                    }
+                }
+                PlasmaComponents.ToolButton {
+                    activeFocusOnTab: true
+                    icon.name: "tools-wizard"
+                    Accessible.name: KI18n.i18n("Run guided setup again")
+                    onClicked: onboardingFlow.startAgain()
+                    PlasmaComponents.ToolTip {
+                        text: KI18n.i18n("Run guided setup again")
+                    }
+                }
+                PlasmaComponents.ToolButton {
+                    activeFocusOnTab: true
+                    icon.name: "configure"
+                    Accessible.name: KI18n.i18n("Configure AI Usage Monitor")
+                    onClicked: Plasmoid.internalAction("configure").trigger()
+                    PlasmaComponents.ToolTip { text: KI18n.i18n("Configure") }
                 }
             }
         }
-
-        Kirigami.Separator { Layout.fillWidth: true; visible: !fullRoot.showGuidedSetup }
 
         Onboarding.OnboardingFlow {
             id: onboardingFlow
@@ -140,12 +184,59 @@ PlasmaExtras.Representation {
             Layout.fillHeight: true
             active: !fullRoot.showGuidedSetup
             asynchronous: fullRoot.destination !== 0
-            source: fullRoot.destination === 0 ? "views/OverviewView.qml"
+            source: fullRoot.sourceDetailVisible ? "views/SourceDetailView.qml"
+                  : fullRoot.destination === 0 ? "views/OverviewView.qml"
                   : fullRoot.destination === 1 ? "views/HistoryView.qml"
                   : "views/AnalystView.qml"
-            onLoaded: item.monitor = fullRoot.monitor
+            onLoaded: {
+                item.monitor = fullRoot.monitor;
+                if (fullRoot.sourceDetailVisible) {
+                    item.sourceId = fullRoot.detailSourceId;
+                } else if (fullRoot.destination === 1) {
+                    item.requestedSourceId = fullRoot.historySourceId;
+                    item.requestedMetric = fullRoot.historyMetric;
+                } else if (fullRoot.destination === 0
+                           && fullRoot.returnFocusSourceId !== "") {
+                    var sourceId = fullRoot.returnFocusSourceId;
+                    fullRoot.returnFocusSourceId = "";
+                    Qt.callLater(function() {
+                        // qmllint disable missing-property
+                        destinationLoader.item.restoreSourceFocus(sourceId);
+                        // qmllint enable missing-property
+                    });
+                }
+            }
         }
 
+        Connections {
+            target: destinationLoader.item
+            enabled: destinationLoader.status === Loader.Ready
+            ignoreUnknownSignals: true
+
+            function onSourceRequested(stableId) {
+                fullRoot.detailSourceId = stableId;
+                fullRoot.returnFocusSourceId = stableId;
+                fullRoot.sourceDetailVisible = true;
+            }
+            function onBackRequested() {
+                fullRoot.sourceDetailVisible = false;
+                fullRoot.destination = 0;
+            }
+            function onActionRequested(stableId, actionKey, sourceKind) {
+                fullRoot.monitor.fixOverviewSource(stableId, actionKey,
+                                                   sourceKind);
+            }
+            function onSettingsRequested(stableId) {
+                fullRoot.monitor.fixOverviewSource(
+                    stableId, "open_source_settings", "");
+            }
+            function onHistoryRequested(historyId, metric) {
+                fullRoot.historySourceId = historyId;
+                fullRoot.historyMetric = metric;
+                fullRoot.sourceDetailVisible = false;
+                fullRoot.destination = 1;
+            }
+        }
     }
 
     Component.onCompleted: {

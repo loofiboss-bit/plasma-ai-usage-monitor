@@ -405,9 +405,13 @@ add_executable(test_dailystatemodel
     ${CMAKE_SOURCE_DIR}/plugin/subscriptiontoolbackend.cpp
     ${CMAKE_SOURCE_DIR}/plugin/sourcereadinessmodel.cpp
     ${CMAKE_SOURCE_DIR}/plugin/dailystatemodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/sourcedetailmodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
 )
 target_include_directories(test_dailystatemodel PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
-target_link_libraries(test_dailystatemodel PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n)
+target_link_libraries(test_dailystatemodel PRIVATE
+    Qt6::Core Qt6::Test Qt6::Network Qt6::Sql Qt6::Concurrent KF6::I18n
+)
 add_test(NAME dailystatemodel COMMAND test_dailystatemodel)
 
 add_executable(test_appinfo

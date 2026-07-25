@@ -213,7 +213,7 @@ TestCase {
         verify(attention);
         compare(attention.row.stableId, "openai");
         compare(findChild(attention, "topActionTitle").text, "openai");
-        compare(findChild(attention, "topActionButton").text, "Fix");
+        compare(findChild(attention, "topActionButton").text, "Add credential");
     }
 
     function test_publishedLimitDoesNotRenderAsLiveQuota() {

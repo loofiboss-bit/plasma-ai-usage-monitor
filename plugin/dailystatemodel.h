@@ -56,7 +56,9 @@ public:
     CostSourceRole,
     BudgetAvailableRole,
     BudgetPercentUsedRole,
-    QuotaWindowsRole
+    QuotaWindowsRole,
+    DetailMetricsRole,
+    HistoryDbNameRole
   };
   Q_ENUM(Role)
 
@@ -76,6 +78,8 @@ public:
   Q_INVOKABLE void registerProviderBackend(const QString &stableId,
                                            QObject *backend);
   Q_INVOKABLE void registerLocalTool(const QString &stableId, QObject *backend);
+  Q_INVOKABLE void setHistoryIdentity(const QString &stableId,
+                                      const QString &dbName);
   Q_INVOKABLE QVariantMap source(const QString &stableId) const;
   Q_INVOKABLE QStringList prioritizedSourceIds() const;
   Q_INVOKABLE void refresh();
@@ -100,6 +104,7 @@ private:
   QPointer<SourceReadinessModel> m_readinessModel;
   QHash<QString, QPointer<ProviderBackend>> m_providerBackends;
   QHash<QString, QPointer<SubscriptionToolBackend>> m_toolBackends;
+  QHash<QString, QString> m_historyDbNames;
   QList<QVariantMap> m_rows;
   QVariantMap m_summary;
   int m_warningThreshold = 80;

@@ -155,6 +155,89 @@ QtObject {
         return facts.slice(0, 3);
     }
 
+    function formatTotals(totals) {
+        var currencies = Object.keys(totals || {}).sort();
+        if (currencies.length === 0) return "";
+        return currencies.map(function(currency) {
+            return KI18n.i18n("%1 %2", currency,
+                Number(totals[currency]).toLocaleString(Qt.locale(), "f", 2));
+        }).join(KI18n.i18n(" · "));
+    }
+
+    function focusFacts() {
+        var facts = [];
+        var quota = summary.lowestActualRemainingQuota || {};
+        var reset = summary.nearestActualReset || {};
+        if (quota.stableId) {
+            facts.push({
+                icon: "speedometer",
+                value: KI18n.i18n("%1% remaining",
+                                 Math.round(Number(quota.percentRemaining))),
+                label: KI18n.i18n("Live quota · %1", quota.displayName)
+            });
+        }
+        if (reset.stableId) {
+            facts.push({
+                icon: "chronometer",
+                value: relativeReset(reset.resetAt),
+                label: KI18n.i18n("Live reset · %1", reset.displayName)
+            });
+        }
+        var actual = formatTotals(summary.actualSpendTotals);
+        var estimated = formatTotals(summary.estimatedSpendTotals);
+        var fixed = formatTotals(summary.fixedSubscriptionFees);
+        if (actual !== "") {
+            facts.push({
+                icon: "view-financial-account",
+                value: actual,
+                label: KI18n.i18n("Actual spend")
+            });
+        }
+        if (estimated !== "") {
+            facts.push({
+                icon: "accessories-calculator",
+                value: estimated,
+                label: KI18n.i18n("Local estimate")
+            });
+        }
+        if (fixed !== "") {
+            facts.push({
+                icon: "wallet-open",
+                value: fixed,
+                label: KI18n.i18n("Fixed fee")
+            });
+        }
+        if (facts.length === 0 && Number(summary.enabledSourceCount || 0) > 0) {
+            facts.push({
+                icon: "network-connect",
+                value: Number(summary.reportingUsefulSourceCount || 0),
+                label: KI18n.i18n("Reporting sources")
+            });
+        }
+        return facts;
+    }
+
+    function actionLabel(row) {
+        var action = row?.nextActionKey || "";
+        var reason = row?.attentionReasonKey || "";
+        if (action === "add_credentials" || action === "replace_credentials")
+            return KI18n.i18n("Add credential");
+        if (action === "refresh_stale_data" || action === "verify_source"
+                || action === "check_network" || action === "retry_later")
+            return KI18n.i18n("Refresh");
+        if (action === "review_quota" || reason.indexOf("quota_") === 0)
+            return KI18n.i18n("Review quota");
+        if (!row?.stableId || action === "none") return "";
+        return KI18n.i18n("Open source settings");
+    }
+
+    function actionIcon(row) {
+        var label = actionLabel(row);
+        if (label === KI18n.i18n("Refresh")) return "view-refresh";
+        if (label === KI18n.i18n("Review quota")) return "speedometer";
+        return "configure";
+    }
+
     function actionText(row) {
         var reason = row?.attentionReasonKey || "none";
         var labels = {

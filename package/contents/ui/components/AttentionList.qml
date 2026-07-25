@@ -68,10 +68,11 @@ Rectangle {
 
         PlasmaComponents.Button {
             objectName: "topActionButton"
-            text: attention.row.nextActionKey === "refresh_stale_data" ? KI18n.i18n("Refresh") : KI18n.i18n("Fix")
+            text: attention.presentation.actionLabel(attention.row)
             icon.name: attention.row.nextActionKey === "refresh_stale_data" ? "view-refresh" : "configure"
             activeFocusOnTab: true
-            Accessible.name: KI18n.i18n("Fix %1: %2", attention.row.displayName,
+            Accessible.name: KI18n.i18n("%1 for %2: %3", text,
+                                  attention.row.displayName,
                                   attention.presentation.actionText(attention.row))
             onClicked: attention.fixRequested(attention.row.stableId,
                                               attention.row.nextActionKey,

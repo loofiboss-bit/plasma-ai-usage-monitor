@@ -22,6 +22,7 @@ QtObject {
     property string errorKey: ""
     property var seriesData: []
     property var querySources: []
+    signal catalogAccepted()
 
     readonly property var sourceState: historyStateObject
     readonly property var sourceRows: historyStateObject.sourceRows
@@ -187,6 +188,7 @@ QtObject {
         if (requestId !== catalogRequestId) return;
         historyStateObject.storedCatalog = sources || [];
         normalizeSelection();
+        catalogAccepted();
         refresh();
     }
 

@@ -18,6 +18,8 @@ ColumnLayout {
     property var monitor: null
     property string pendingExportFormat: "csv"
     property string exportStatus: ""
+    property string requestedSourceId: ""
+    property string requestedMetric: ""
     Accessible.name: historyController.loading
         ? KI18n.i18n("History view loading")
         : KI18n.i18n("History view ready")
@@ -67,6 +69,31 @@ ColumnLayout {
         exportDialog.currentFile = "ai-usage-history." + format;
         exportDialog.open();
     }
+
+    function applyRequestedSelection() {
+        if (!requestedSourceId) return;
+        var source = historyController.sourceState.source(requestedSourceId);
+        if (!source.historyId) return;
+        historyController.compareMode = false;
+        historyController.selectedSourceId = requestedSourceId;
+        var metrics = historyController.sourceState.metricsForSource(
+            requestedSourceId);
+        historyController.selectedMetric =
+            metrics.indexOf(requestedMetric) >= 0
+                ? requestedMetric : (metrics[0] || "");
+        historyController.rangeIndex = 1;
+        historyController.refresh();
+    }
+
+    Connections {
+        target: historyController
+        function onCatalogAccepted() {
+            history.applyRequestedSelection();
+        }
+    }
+
+    onRequestedSourceIdChanged: Qt.callLater(applyRequestedSelection)
+    onRequestedMetricChanged: Qt.callLater(applyRequestedSelection)
 
     RowLayout {
         Layout.fillWidth: true

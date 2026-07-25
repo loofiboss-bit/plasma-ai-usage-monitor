@@ -91,16 +91,17 @@ remaining quota, earlier reset, and finally immutable catalog order. Severity
 keys are `critical`, `warning`, `info`, and `none`; reason keys remain stable and
 non-localized.
 
-Phase 2 daily surfaces consume this model through `DailyOverviewState`. The
-normal Overview and compact representation do not maintain independent provider
-or tool summary loops. Overview renders one top recovery action, then actual
+Daily surfaces consume this model through `DailyOverviewState`. The normal
+Overview and compact representation do not maintain independent provider or tool
+summary loops. The v16 Daily Focus renders at most one concrete recovery action,
+then non-overlapping actual
 quota/reset facts, separated spend categories, and compact source groups.
 Connectivity-only sources stay collapsed by default.
 
 The live-quota aggregates accept only provider-reported or synchronized quota
 windows. A published documentation limit and a locally configured activity
 limit remain available on their source card as estimates, but they cannot drive
-the Overview live-quota section or the `lowest-quota` and `next-reset` panel
+the Overview Daily Focus or the `lowest-quota` and `next-reset` panel
 modes. Compact-mode compatibility maps `count` to `active-sources`, `critical`
 to `attention`, and `cost` to `actual-spend`; legacy `dailycost` and `requests`
 remain readable only when the Daily State Model exposes a compatible available
@@ -116,7 +117,15 @@ notification.
 
 ## Daily presentation contract
 
-The panel, Overview, notifications, History freshness labels, and release media
+`SourceDetailModel` is the typed v16 projection for one selected source. It
+observes `DailyStateModel`, exposes typed metric roles, quota windows, freshness,
+source-specific action, provenance, and coverage, and requests a bounded
+compatible seven-day series through the existing asynchronous schema-v4 History
+boundary. Its canonical History identity comes from the provider `dbName` or
+subscription-tool `name`; internal stable IDs are never substituted for stored
+database identities.
+
+The panel, Overview, Source Detail, notifications, History freshness labels, and release media
 consume the same non-localized Daily State keys. Overview orders recovery before
 quota/reset facts and secondary source detail. A tool-only configuration is a
 complete supported state; it does not require a synthetic provider row.

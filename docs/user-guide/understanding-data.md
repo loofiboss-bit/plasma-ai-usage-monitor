@@ -2,7 +2,13 @@
 
 Provider cards answer different questions because provider APIs expose different information. Check the source and quality labels before comparing providers or setting a budget.
 
-Overview prioritizes the source that needs action, then shows the lowest live quota, next live reset, separated spend categories, and source-quality groups. Providers that only prove endpoint access stay under the collapsed **Connectivity only** section. The same daily state drives the panel and notifications.
+Overview prioritizes the source that needs action in one **Daily focus**, then
+shows non-overlapping live-quota, reset, and spend facts. Source rows are ordered
+by attention, provider-reported data, estimates or balances, connectivity-only
+checks, and unavailable data. Open a row for Source Detail; it keeps metric
+availability, freshness, provenance, coverage, and compatible recent history
+visible without treating a connection check as usage. The same daily state
+drives the panel and notifications.
 
 The panel and popup footer use the same source summary. **Active sources** means
 sources with verified actual data, an estimate, or a balance; connectivity-only

@@ -1,30 +1,36 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
+import QtQuick.Controls as QQC2
+import org.kde.ki18n
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
-Rectangle {
+QQC2.ItemDelegate {
     id: card
 
     required property var row
     signal actionRequested(string stableId, string actionKey, string sourceKind)
+    signal sourceRequested(string stableId)
 
-    implicitHeight: content.implicitHeight + Kirigami.Units.mediumSpacing * 2
-    radius: Kirigami.Units.smallSpacing
-    color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.72)
-    border.width: 1
-    border.color: Qt.alpha(accentColor(), 0.24)
-    Accessible.role: Accessible.StaticText
+    objectName: "sourceCard-" + (row.stableId || "")
+    width: parent ? parent.width : implicitWidth
+    activeFocusOnTab: true
     Accessible.name: row.displayName + ". " + attentionText() + stateText()
-        + ". " + metricText()
+        + ". " + metricText() + ". " + KI18n.i18n("Open source details")
+    onClicked: sourceRequested(row.stableId)
 
-    RowLayout {
-        id: content
-        anchors.fill: parent
-        anchors.margins: Kirigami.Units.mediumSpacing
+    background: Rectangle {
+        radius: Kirigami.Units.smallSpacing
+        color: card.hovered || card.activeFocus
+            ? Qt.alpha(Kirigami.Theme.highlightColor, 0.1)
+            : Qt.alpha(Kirigami.Theme.backgroundColor, 0.72)
+        border.width: 1
+        border.color: Qt.alpha(card.accentColor(), card.activeFocus ? 0.65 : 0.24)
+    }
+
+    contentItem: RowLayout {
         spacing: Kirigami.Units.mediumSpacing
 
         Kirigami.Icon {
@@ -50,8 +56,8 @@ Rectangle {
                 color: card.row.attentionSeverity === "critical"
                     ? Kirigami.Theme.negativeTextColor
                     : card.row.attentionSeverity === "warning"
-                        ? Kirigami.Theme.neutralTextColor
-                        : Kirigami.Theme.disabledTextColor
+                      ? Kirigami.Theme.neutralTextColor
+                      : Kirigami.Theme.disabledTextColor
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 elide: Text.ElideRight
             }
@@ -68,21 +74,20 @@ Rectangle {
                 Layout.alignment: Qt.AlignRight
             }
             PlasmaComponents.Label {
-                text: card.row.freshnessState === "stale" ? KI18n.i18n("Stale") : KI18n.i18n("Current")
+                text: card.row.freshnessState === "stale"
+                    ? KI18n.i18n("Stale") : KI18n.i18n("Current")
                 color: card.row.freshnessState === "stale"
-                    ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.disabledTextColor
+                    ? Kirigami.Theme.neutralTextColor
+                    : Kirigami.Theme.disabledTextColor
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 Layout.alignment: Qt.AlignRight
             }
         }
 
-        PlasmaComponents.ToolButton {
-            visible: card.row.attentionSeverity && card.row.attentionSeverity !== "none"
-            icon.name: card.row.nextActionKey === "refresh_stale_data" ? "view-refresh" : "configure"
-            activeFocusOnTab: true
-            Accessible.name: KI18n.i18n("Review %1", card.row.displayName)
-            onClicked: card.actionRequested(card.row.stableId, card.row.nextActionKey,
-                                            card.row.sourceKind)
+        Kirigami.Icon {
+            source: "go-next-symbolic"
+            Layout.preferredWidth: Kirigami.Units.iconSizes.small
+            Layout.preferredHeight: width
         }
     }
 
@@ -136,7 +141,8 @@ Rectangle {
         if (row.primaryMetricUnit === "percent_remaining")
             return KI18n.i18n("%1% left", Math.round(value));
         if (row.currency && row.currency !== "MIXED")
-            return KI18n.i18n("%1 %2", row.currency, value.toLocaleString(Qt.locale(), "f", 2));
+            return KI18n.i18n("%1 %2", row.currency,
+                              value.toLocaleString(Qt.locale(), "f", 2));
         return value.toLocaleString(Qt.locale());
     }
 }

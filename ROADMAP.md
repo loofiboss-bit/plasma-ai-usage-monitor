@@ -18,7 +18,7 @@ AI Usage Monitor remains a desktop-native, local-first Plasma widget. v15 makes 
 
 The decision-complete implementation plan is
 [`docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md).
-Phases 0 and 1 are implemented; the stable release remains `15.0.0`.
+Phases 0 through 2 are implemented; the stable release remains `15.0.0`.
 
 ## Current priorities
 

@@ -2,6 +2,7 @@
 
 #include "dailystatemodel.h"
 #include "providerbackend.h"
+#include "sourcedetailmodel.h"
 #include "sourcereadinessmodel.h"
 #include "subscriptiontoolbackend.h"
 
@@ -118,6 +119,8 @@ private Q_SLOTS:
   void documentedAndLocalLimitsAreNotLiveQuota();
   void quotaWindowsPreserveSourceAndReset();
   void staleSnapshotsPrioritizeFreshnessOverCachedQuota();
+  void sourceDetailPreservesTypedMetricsAndConcreteAction();
+  void normalSourcesSortByReportingQuality();
 };
 
 void DailyStateModelTest::enabledSourcesAppearExactlyOnce() {
@@ -591,6 +594,85 @@ void DailyStateModelTest::staleSnapshotsPrioritizeFreshnessOverCachedQuota() {
   QCOMPARE(row.value(QStringLiteral("attentionReasonKey")).toString(),
            QStringLiteral("stale_data"));
   QVERIFY(!row.value(QStringLiteral("quotaWindows")).toList().isEmpty());
+}
+
+void DailyStateModelTest::sourceDetailPreservesTypedMetricsAndConcreteAction() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  provider.makeReady();
+  provider.addMetric(ProviderBackend::MetricKind::Cost, 0.0,
+                     QStringLiteral("USD"), QStringLiteral("USD"),
+                     QStringLiteral("day"),
+                     ProviderBackend::MetricSource::BillingApi);
+  provider.addQuota(4.0, QDateTime::currentDateTimeUtc().addSecs(3600));
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+  daily.setHistoryIdentity(QStringLiteral("openai"), QStringLiteral("OpenAI"));
+
+  SourceDetailModel detail;
+  detail.registerDailyState(&daily);
+  detail.setSourceId(QStringLiteral("openai"));
+
+  QCOMPARE(detail.source().value(QStringLiteral("stableId")).toString(),
+           QStringLiteral("openai"));
+  QCOMPARE(detail.actionLabel(), QStringLiteral("Review quota"));
+  QCOMPARE(detail.historyId(), QStringLiteral("provider:OpenAI"));
+  QCOMPARE(detail.historyMetric(), QStringLiteral("cost"));
+  QVERIFY(detail.rowCount() >= 3);
+  QCOMPARE(detail.coverage().value(QStringLiteral("actualMetricCount")).toInt(),
+           3);
+  QCOMPARE(
+      detail.coverage().value(QStringLiteral("estimatedMetricCount")).toInt(),
+      0);
+  bool foundAvailableZero = false;
+  for (int row = 0; row < detail.rowCount(); ++row) {
+    const QModelIndex index = detail.index(row, 0);
+    if (detail.data(index, SourceDetailModel::KindRole).toString() ==
+        QLatin1String("cost")) {
+      QVERIFY(detail.data(index, SourceDetailModel::AvailableRole).toBool());
+      QCOMPARE(detail.data(index, SourceDetailModel::ValueRole).toDouble(),
+               0.0);
+      foundAvailableZero = true;
+    }
+  }
+  QVERIFY(foundAvailableZero);
+}
+
+void DailyStateModelTest::normalSourcesSortByReportingQuality() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider connection;
+  DailyProvider estimate;
+  DailyProvider actual;
+  connection.makeReady();
+  estimate.makeReady();
+  estimate.addMetric(ProviderBackend::MetricKind::Requests, 2,
+                     QStringLiteral("request"), QString(),
+                     QStringLiteral("day"),
+                     ProviderBackend::MetricSource::EstimatedPricing);
+  actual.makeReady();
+  actual.addMetric(ProviderBackend::MetricKind::Requests, 2,
+                   QStringLiteral("request"), QString(), QStringLiteral("day"),
+                   ProviderBackend::MetricSource::UsageApi);
+
+  const QList<QPair<QString, DailyProvider *>> providers{
+      {QStringLiteral("anthropic"), &connection},
+      {QStringLiteral("google"), &estimate},
+      {QStringLiteral("openai"), &actual}};
+  for (const auto &[id, provider] : providers) {
+    readiness.registerProviderBackend(id, provider);
+    readiness.setSourceEnabled(id, true);
+  }
+  daily.registerReadinessModel(&readiness);
+  for (const auto &[id, provider] : providers)
+    daily.registerProviderBackend(id, provider);
+
+  QCOMPARE(daily.prioritizedSourceIds(),
+           QStringList({QStringLiteral("openai"), QStringLiteral("google"),
+                        QStringLiteral("anthropic")}));
 }
 
 QTEST_MAIN(DailyStateModelTest)

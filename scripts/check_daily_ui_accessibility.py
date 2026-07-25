@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the non-visual accessibility contract for v15 daily surfaces."""
+"""Validate the non-visual accessibility contract for daily surfaces."""
 
 from __future__ import annotations
 
@@ -53,10 +53,28 @@ def main() -> None:
     )
     errors += require(
         "package/contents/ui/FullRepresentation.qml",
+        "Kirigami.NavigationTabBar",
+        'Accessible.name: KI18n.i18n("Monitor actions")',
         'Accessible.name: KI18n.i18n("Refresh all configured sources")',
         'Accessible.name: KI18n.i18n("Run guided setup again")',
         'Accessible.name: KI18n.i18n("Configure AI Usage Monitor")',
-        'Accessible.name: KI18n.i18n("Open %1", modelData)',
+        "returnFocusSourceId",
+        "restoreSourceFocus(sourceId)",
+    )
+    errors += require(
+        "package/contents/ui/components/DailyFocus.qml",
+        "Accessible.role: Accessible.Grouping",
+        'objectName: "dailyFocusAction"',
+        "activeFocusOnTab: true",
+    )
+    errors += require(
+        "package/contents/ui/views/SourceDetailView.qml",
+        'Accessible.name: KI18n.i18n("Back to source list")',
+        'objectName: "sourceDetailPrimaryAction"',
+        'objectName: "sourceDetailSettings"',
+        'objectName: "sourceDetailHistory"',
+        "activeFocusOnTab: true",
+        'Accessible.name: KI18n.i18n("Metric provenance: %1", text)',
     )
     errors += require(
         "package/contents/ui/AnalystTab.qml",

@@ -45,7 +45,9 @@ const QStringList kRoleNames{QStringLiteral("stableId"),
                              QStringLiteral("costSource"),
                              QStringLiteral("budgetAvailable"),
                              QStringLiteral("budgetPercentUsed"),
-                             QStringLiteral("quotaWindows")};
+                             QStringLiteral("quotaWindows"),
+                             QStringLiteral("detailMetrics"),
+                             QStringLiteral("historyDbName")};
 
 bool metricAvailable(const QVariantMap &metric) {
   const QVariant value = metric.value(QStringLiteral("value"));
@@ -400,6 +402,17 @@ int severityRank(const QString &severity) {
          : severity == QLatin1String("info")    ? 1
                                                 : 0;
 }
+
+int qualityRank(const QString &quality) {
+  if (quality == QLatin1String("actual"))
+    return 0;
+  if (quality == QLatin1String("estimated") ||
+      quality == QLatin1String("balance"))
+    return 1;
+  if (quality == QLatin1String("connectivity_only"))
+    return 2;
+  return 3;
+}
 } // namespace
 
 DailyStateModel::DailyStateModel(QObject *parent)
@@ -496,6 +509,16 @@ void DailyStateModel::registerLocalTool(const QString &stableId,
   rebuild();
 }
 
+void DailyStateModel::setHistoryIdentity(const QString &stableId,
+                                         const QString &dbName) {
+  if (stableId.isEmpty() || dbName.isEmpty() ||
+      m_historyDbNames.value(stableId) == dbName)
+    return;
+  m_historyDbNames.insert(stableId, dbName);
+  rebuild();
+  Q_EMIT sourceChanged(stableId);
+}
+
 QVariantMap DailyStateModel::source(const QString &stableId) const {
   for (const QVariantMap &row : m_rows) {
     if (row.value(QStringLiteral("stableId")) == stableId)
@@ -557,6 +580,10 @@ QVariantMap DailyStateModel::buildRow(const QVariantMap &readiness,
       {QStringLiteral("budgetAvailable"), false},
       {QStringLiteral("budgetPercentUsed"), QVariant()},
       {QStringLiteral("quotaWindows"), QVariantList()},
+      {QStringLiteral("detailMetrics"), QVariantList()},
+      {QStringLiteral("historyDbName"),
+       m_historyDbNames.value(
+           readiness.value(QStringLiteral("stableId")).toString())},
       {QStringLiteral("_actualCosts"), QVariantMap()},
       {QStringLiteral("_estimatedCosts"), QVariantMap()},
       {QStringLiteral("_fixedFees"), QVariantMap()},
@@ -582,6 +609,7 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
              providerRemainingRequests(backend->metrics()));
   row.insert(QStringLiteral("quotaWindows"),
              providerQuotas(backend->metrics()));
+  row.insert(QStringLiteral("detailMetrics"), backend->metrics());
   row.insert(
       QStringLiteral("_actualQuota"),
       bestQuota(row.value(QStringLiteral("quotaWindows")).toList(), true));
@@ -695,8 +723,8 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
     hasDailyCost = hasDailyCost || metric.value(QStringLiteral("window")) ==
                                        QLatin1String("day");
     hasMonthlyCostMetric =
-        hasMonthlyCostMetric || metric.value(QStringLiteral("window")) ==
-                                    QLatin1String("month");
+        hasMonthlyCostMetric ||
+        metric.value(QStringLiteral("window")) == QLatin1String("month");
   }
   const bool hasMonthlyCost =
       hasMonthlyCostMetric || backend->monthlyCost() > 0.0;
@@ -720,6 +748,27 @@ QVariantMap DailyStateModel::buildToolRow(QVariantMap row,
   if (tool == nullptr)
     return row;
   row.insert(QStringLiteral("quotaWindows"), toolQuotas(tool));
+  QVariantList detailMetrics;
+  for (const QVariant &value :
+       row.value(QStringLiteral("quotaWindows")).toList()) {
+    const QVariantMap quotaWindow = value.toMap();
+    detailMetrics.append(QVariantMap{
+        {QStringLiteral("kind"), quotaWindow.value(QStringLiteral("kind"))},
+        {QStringLiteral("available"), true},
+        {QStringLiteral("value"),
+         quotaWindow.value(QStringLiteral("percentRemaining"))},
+        {QStringLiteral("unit"), QStringLiteral("percent_remaining")},
+        {QStringLiteral("window"), quotaWindow.value(QStringLiteral("window"))},
+        {QStringLiteral("resetAt"),
+         quotaWindow.value(QStringLiteral("resetAt"))},
+        {QStringLiteral("source"),
+         quotaWindow.value(QStringLiteral("sourceKey"))},
+        {QStringLiteral("quality"),
+         quotaWindow.value(QStringLiteral("sourceClass"))},
+        {QStringLiteral("semantic"), QStringLiteral("rolling_gauge")},
+        {QStringLiteral("scope"), QStringLiteral("subscription")}});
+  }
+  row.insert(QStringLiteral("detailMetrics"), detailMetrics);
   row.insert(
       QStringLiteral("_actualQuota"),
       bestQuota(row.value(QStringLiteral("quotaWindows")).toList(), true));
@@ -875,9 +924,15 @@ QVariantMap DailyStateModel::finalizeRow(QVariantMap row,
     priority = 8;
     severity = QStringLiteral("info");
     reason = QStringLiteral("ready_to_verify");
-  } else if (connectivity) {
-    priority = 9;
   }
+  if (reason.startsWith(QLatin1String("quota_")))
+    row.insert(QStringLiteral("nextActionKey"), QStringLiteral("review_quota"));
+  else if (reason.startsWith(QLatin1String("budget_")))
+    row.insert(QStringLiteral("nextActionKey"),
+               QStringLiteral("open_source_settings"));
+  else if (reason == QLatin1String("stale_data"))
+    row.insert(QStringLiteral("nextActionKey"),
+               QStringLiteral("refresh_stale_data"));
   row.insert(QStringLiteral("attentionSeverity"), severity);
   row.insert(QStringLiteral("attentionReasonKey"), reason);
   row.insert(QStringLiteral("_priority"), priority);
@@ -1105,6 +1160,12 @@ void DailyStateModel::rebuild() {
             right.value(QStringLiteral("_priority")).toInt();
         if (leftPriority != rightPriority)
           return leftPriority < rightPriority;
+        const int leftQuality =
+            qualityRank(left.value(QStringLiteral("qualityClass")).toString());
+        const int rightQuality =
+            qualityRank(right.value(QStringLiteral("qualityClass")).toString());
+        if (leftQuality != rightQuality)
+          return leftQuality < rightQuality;
         const double leftRemaining =
             left.value(QStringLiteral("percentRemainingAvailable")).toBool()
                 ? left.value(QStringLiteral("percentRemaining")).toDouble()

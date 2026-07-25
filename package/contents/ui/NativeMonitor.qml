@@ -158,6 +158,8 @@ Item {
             sourceReadinessModel.registerProviderBackend(providers[i].configKey, providers[i].backend);
             sourceReadinessModel.setSourceEnabled(providers[i].configKey, providers[i].enabled);
             dailyStateModel.registerProviderBackend(providers[i].configKey, providers[i].backend);
+            dailyStateModel.setHistoryIdentity(providers[i].configKey,
+                                               providers[i].dbName);
         }
 
         var localTools = [
@@ -172,6 +174,11 @@ Item {
         for (var j = 0; j < localTools.length; j++) {
             sourceReadinessModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
             dailyStateModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
+        }
+        var configuredTools = providerRegistry.allSubscriptionTools || [];
+        for (var k = 0; k < configuredTools.length; ++k) {
+            dailyStateModel.setHistoryIdentity(configuredTools[k].stableId,
+                                               configuredTools[k].name);
         }
     }
 

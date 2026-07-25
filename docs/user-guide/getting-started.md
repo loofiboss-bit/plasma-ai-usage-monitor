@@ -33,7 +33,16 @@ The **Advanced** switch shows model overrides, custom base URLs, and provider-sp
 
 ## Read Overview
 
-Overview puts the highest-priority recovery action first, followed by the lowest live quota, next live reset, separate spend categories, and compact source groups. Connectivity-only sources stay collapsed by default.
+Overview starts with one **Daily focus**. It shows at most one concrete action
+and keeps live quota, live reset, actual spend, local estimates, and fixed fees
+as separate compact facts.
+
+Sources follow in priority order: attention, provider-reported data, local
+estimates or balances, connectivity-only checks, and unavailable sources. Open
+a source row to inspect freshness, quota windows, typed metrics, provenance,
+coverage, and compatible recent history. **Back** returns keyboard focus to the
+source row you opened. Source Detail also links to that source's settings and
+preselected History.
 
 The header counts actual data, estimates, balances, connection checks, and sources that need attention separately. It does not count a connection check as reported usage. A tool-only setup is valid: synchronized tool quota and clearly labeled local estimates appear without requiring an API provider.
 
