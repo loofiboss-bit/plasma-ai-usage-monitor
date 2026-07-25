@@ -1,7 +1,7 @@
 # Plasma AI Usage Monitor v15.0.0 — Daily Control
 
 **Document type:** Codex implementation plan  
-**Status:** Proposed  
+**Status:** Implemented — released 2026-07-23
 **Target repository:** `loofiboss-bit/plasma-ai-usage-monitor`  
 **Planning baseline:** `main` at `43ae7ff7537b052740c2b935449a6f49d2823821`  
 **Current release:** `14.1.1`  
@@ -10,6 +10,10 @@
 **Primary audience:** Individual developers who monitor AI API spend, coding-tool activity, subscription quota, and reset windows from the Plasma panel
 
 ---
+
+> Historical plan: baseline versions, commits, measurements, and proposed
+> sequencing below are retained as implementation evidence. The current release
+> and roadmap are authoritative in `VERSION` and `ROADMAP.md`.
 
 ## 1. Mission
 

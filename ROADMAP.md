@@ -2,9 +2,22 @@
 
 **Current release:** 15.0.0, Daily Control
 
-**Last updated:** 2026-07-23
+**Last updated:** 2026-07-26
 
-AI Usage Monitor remains a desktop-native, local-first Plasma widget. v15 makes daily status actionable while preserving the source and quality boundaries established by v13 and v14.
+AI Usage Monitor remains a desktop-native, local-first Plasma widget. v15 makes daily status actionable while preserving the source and quality boundaries established by v13 and v14. The planned v16 Control Loop release will make the path from status to explanation and action more direct without widening the local-first boundary.
+
+## Planned release
+
+### 16.0.0 Control Loop
+
+- Consolidate repeated Overview facts into one daily focus and source-first drill-down.
+- Correct Analyst UTC range semantics and improve responsive History and Analyst layouts.
+- Add optional Anthropic Admin API usage and cost reporting without weakening secret handling.
+- Make QML lint and release-media evidence trustworthy, reproducible release gates.
+- Preserve v15 configuration, KWallet secrets, schema-v4 history, package identity, and metric truth boundaries.
+
+The decision-complete implementation plan is
+[`docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md).
 
 ## Current priorities
 

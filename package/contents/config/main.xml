@@ -70,15 +70,6 @@
             <default>[]</default>
             <label>Redacted source-readiness snapshot for Diagnostics</label>
         </entry>
-        <entry name="dashboardMode" type="String">
-            <default>operator</default>
-            <label>Popup mode: simple, operator, or analyst</label>
-        </entry>
-        <entry name="showOnlyProblems" type="Bool">
-            <default>false</default>
-            <label>Show only providers and tools that need attention</label>
-        </entry>
-
         <!-- Per-provider refresh intervals (0 = use global default) -->
         <entry name="openaiRefreshInterval" type="Int">
             <default>0</default>

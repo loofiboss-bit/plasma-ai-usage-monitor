@@ -3,6 +3,7 @@
   "sessionId": "df60cb2b-8209-44e4-85b8-29f66e59777c",
   "fixtureSha256": "15409bef32c96d823eb5413ef190ceb518408d0c47574191cdb8537af9d0379c",
   "sourceTreeSha256": "5ad030aee7c9ae22e00b2892153f3421d8548da7e69785b7ce22a07c790dba41",
+  "sourceTreeCommit": "d51f597ebb0d23f7572c8d9d65f4ecf0beb85396",
   "plasmaSession": "Fedora KDE Plasma",
   "theme": "Breeze Dark",
   "environment": "isolated demo user",

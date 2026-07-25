@@ -7,6 +7,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 import com.github.loofi.aiusagemonitor 1.0
 import QtQuick.Dialogs as Dialogs
+import "ConfigPortability.js" as ConfigPortability
 
 KCM.SimpleKCM {
     id: diagnosticsPage
@@ -39,7 +40,7 @@ KCM.SimpleKCM {
         "settingsVerificationRequestId", "settingsVerificationCompletedRequestId", "settingsVerificationSourceId",
         "settingsVerificationState", "settingsVerificationMessage", "settingsVerificationTimestamp",
         "diagnosticsSourceSnapshot",
-        "dashboardMode", "showOnlyProblems", "openaiRefreshInterval", "anthropicRefreshInterval", "googleRefreshInterval",
+        "openaiRefreshInterval", "anthropicRefreshInterval", "googleRefreshInterval",
         "mistralRefreshInterval", "deepseekRefreshInterval", "groqRefreshInterval", "xaiRefreshInterval", "ollamaRefreshInterval",
         "openrouterRefreshInterval", "togetherRefreshInterval", "cohereRefreshInterval", "googleveoRefreshInterval", "azureRefreshInterval",
         "bedrockRefreshInterval", "litellmRefreshInterval", "cerebrasRefreshInterval", "fireworksRefreshInterval", "perplexityRefreshInterval", "openaiEnabled", "openaiModel", "openaiProjectId", "openaiCustomBaseUrl",
@@ -74,6 +75,10 @@ KCM.SimpleKCM {
         "cursorPlanId", "cursorCustomLimit", "cursorNotifications", "windsurfEnabled", "windsurfPlan",
         "windsurfPlanId", "windsurfCustomLimit", "windsurfNotifications", "jetbrainsAiEnabled", "jetbrainsAiPlan",
         "jetbrainsAiPlanId", "jetbrainsAiCustomLimit", "jetbrainsAiNotifications"
+    ]
+
+    readonly property var ignoredLegacyConfigKeys: [
+        "dashboardMode", "showOnlyProblems"
     ]
 
     Dialogs.FileDialog {
@@ -567,11 +572,12 @@ KCM.SimpleKCM {
 
     function importConfigData(configData) {
         if (configData.schemaVersion === 2 && configData.settings) {
-            for (var i = 0; i < portableConfigKeys.length; i++) {
-                var key = portableConfigKeys[i];
-                if (configData.settings[key] !== undefined) {
-                    plasmoid.configuration[key] = configData.settings[key];
-                }
+            var settings = ConfigPortability.schemaV2Settings(
+                configData, portableConfigKeys);
+            var keys = Object.keys(settings);
+            for (var i = 0; i < keys.length; ++i) {
+                var key = keys[i];
+                plasmoid.configuration[key] = settings[key];
             }
             return;
         }

@@ -6,6 +6,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import struct
 from pathlib import Path
@@ -48,42 +49,41 @@ def png_dimensions(path: Path) -> tuple[int, int]:
     return struct.unpack(">II", payload[16:24])
 
 
-def capture_source_paths() -> list[str]:
-    if not os.environ.get("AI_USAGE_MONITOR_MEDIA_FORCE_FILESYSTEM"):
-        result = subprocess.run(
-            [
-                "git",
-                "ls-files",
-                "--cached",
-                "--others",
-                "--exclude-standard",
-                "--",
-                "VERSION",
-                "package",
-                "scripts/demo",
-            ],
+def committed_source_tree_sha256(commit: str) -> str:
+    paths_result = subprocess.run(
+        [
+            "git",
+            "ls-tree",
+            "-r",
+            "--name-only",
+            commit,
+            "--",
+            "VERSION",
+            "package",
+            "scripts/demo",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if paths_result.returncode != 0:
+        fail(f"cannot inspect recorded source-tree commit {commit}")
+
+    inventory = []
+    for relative in sorted(paths_result.stdout.splitlines()):
+        blob = subprocess.run(
+            ["git", "show", f"{commit}:{relative}"],
             cwd=ROOT,
             check=False,
             capture_output=True,
-            text=True,
         )
-        if result.returncode == 0:
-            return [
-                relative
-                for relative in result.stdout.splitlines()
-                if (ROOT / relative).is_file()
-            ]
-
-    paths = [ROOT / "VERSION"]
-    paths.extend((ROOT / "package").rglob("*"))
-    paths.extend((ROOT / "scripts" / "demo").rglob("*"))
-    return [
-        str(path.relative_to(ROOT))
-        for path in paths
-        if path.is_file()
-        and "__pycache__" not in path.parts
-        and path.suffix not in {".pyc", ".pyo"}
-    ]
+        if blob.returncode != 0:
+            fail(f"cannot read {relative} from source-tree commit {commit}")
+        inventory.append(
+            hashlib.sha256(blob.stdout).hexdigest() + "  " + relative + "\n"
+        )
+    return hashlib.sha256("".join(inventory).encode()).hexdigest()
 
 
 version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
@@ -97,8 +97,12 @@ if (
     not manifest.get("sessionId")
     or not manifest.get("fixtureSha256")
     or not manifest.get("sourceTreeSha256")
+    or not manifest.get("sourceTreeCommit")
 ):
-    fail("manifest must identify one capture session, fixture, and source tree")
+    fail(
+        "manifest must identify one capture session, fixture, source tree, "
+        "and source-tree commit"
+    )
 if manifest.get("theme") != "Breeze Dark":
     fail("manifest must record the Breeze Dark capture theme")
 if manifest.get("environment") != "isolated demo user":
@@ -124,18 +128,16 @@ expected_fixture = hashlib.sha256(
 if manifest["fixtureSha256"] != expected_fixture:
     fail("manifest fixture hash does not match the v15 media fixtures")
 
-source_paths = capture_source_paths()
-expected_source_tree = hashlib.sha256(
-    "".join(
-        hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
-        + "  "
-        + relative
-        + "\n"
-        for relative in sorted(source_paths)
-    ).encode()
-).hexdigest()
-if manifest["sourceTreeSha256"] != expected_source_tree:
-    fail("manifest source tree hash does not match the current capture sources")
+source_tree_commit = manifest["sourceTreeCommit"]
+if not re.fullmatch(r"[0-9a-f]{40}", source_tree_commit):
+    fail("manifest sourceTreeCommit must be a full Git object ID")
+if not os.environ.get("AI_USAGE_MONITOR_MEDIA_FORCE_FILESYSTEM"):
+    expected_source_tree = committed_source_tree_sha256(source_tree_commit)
+    if manifest["sourceTreeSha256"] != expected_source_tree:
+        fail(
+            "manifest source tree hash does not match its recorded "
+            "source-tree commit"
+        )
 if manifest.get("scenarios") != SCENARIOS:
     fail("manifest scenarios do not match the v15 capture contract")
 
@@ -168,4 +170,7 @@ for filename in REQUIRED:
     if filename not in metainfo:
         fail(f"AppStream metadata does not reference {filename}")
 
-print(f"Release media OK: {len(REQUIRED)} screenshots from session {manifest['sessionId']}")
+print(
+    f"Release media OK: {len(REQUIRED)} screenshots from session "
+    f"{manifest['sessionId']} at source tree {source_tree_commit[:12]}"
+)

@@ -391,6 +391,7 @@ SOURCE_TREE_SHA="$(
     | sha256sum | cut -d' ' -f1
 )"
 CAPTURE_COMMIT="${CAPTURE_COMMIT:-$(git -C "$ROOT_DIR" rev-parse HEAD)}"
+SOURCE_TREE_COMMIT="${SOURCE_TREE_COMMIT:-$CAPTURE_COMMIT}"
 CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 PLASMA_VERSION="$(plasmashell --version | awk '{print $2}')"
 ASSETS_JSON="$(
@@ -407,6 +408,7 @@ jq -n \
   --arg sessionId "$SESSION_ID" \
   --arg fixtureSha256 "$FIXTURE_SHA" \
   --arg sourceTreeSha256 "$SOURCE_TREE_SHA" \
+  --arg sourceTreeCommit "$SOURCE_TREE_COMMIT" \
   --arg plasmaSession "Fedora KDE Plasma" \
   --arg theme "Breeze Dark" \
   --arg environment "isolated demo user" \
@@ -417,6 +419,7 @@ jq -n \
   --argjson assets "$ASSETS_JSON" \
   '{version: $version, sessionId: $sessionId, fixtureSha256: $fixtureSha256,
     sourceTreeSha256: $sourceTreeSha256,
+    sourceTreeCommit: $sourceTreeCommit,
     plasmaSession: $plasmaSession, theme: $theme, environment: $environment,
     captureCommit: $captureCommit, capturedAt: $capturedAt,
     plasmaVersion: $plasmaVersion, scale: $scale,
