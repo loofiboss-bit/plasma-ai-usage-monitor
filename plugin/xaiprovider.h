@@ -15,6 +15,7 @@
 class XAIProvider : public OpenAICompatibleProvider
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit XAIProvider(QObject *parent = nullptr);

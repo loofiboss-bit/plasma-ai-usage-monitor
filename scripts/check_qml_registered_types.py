@@ -1,76 +1,66 @@
 #!/usr/bin/env python3
-import os
+"""Keep declarative QML registrations aligned with the native module sources."""
+
+from __future__ import annotations
+
 import re
-import sys
+from pathlib import Path
 
-def main():
-    plugin_cpp_path = 'plugin/aiusageplugin.cpp'
-    cmake_path = 'plugin/CMakeLists.txt'
 
-    if not os.path.exists(plugin_cpp_path):
-        print(f"Error: {plugin_cpp_path} not found")
-        sys.exit(1)
+ROOT = Path(__file__).resolve().parents[1]
+PLUGIN = ROOT / "plugin"
+CMAKE = PLUGIN / "CMakeLists.txt"
+REGISTRATION = re.compile(
+    r"\bQML_(?:ELEMENT|NAMED_ELEMENT|ANONYMOUS|UNCREATABLE|SINGLETON)\b"
+)
 
-    if not os.path.exists(cmake_path):
-        print(f"Error: {cmake_path} not found")
-        sys.exit(1)
 
-    with open(plugin_cpp_path, 'r') as f:
-        plugin_cpp_content = f.read()
+def cmake_list(text: str, name: str) -> set[str]:
+    match = re.search(
+        rf"set\s*\(\s*{re.escape(name)}(.*?)\)", text, re.DOTALL | re.IGNORECASE
+    )
+    if match is None:
+        raise SystemExit(f"Error: Could not find {name} in plugin/CMakeLists.txt")
+    return set(match.group(1).split())
 
-    with open(cmake_path, 'r') as f:
-        cmake_content = f.read()
 
-    # Find registered types: qmlRegisterType<Type> or qmlRegisterSingletonType<Type>
-    registered_types = re.findall(r'qmlRegister(?:Singleton)?Type<([A-Za-z0-9_]+)>', plugin_cpp_content)
-    
-    # Base classes registered as uncreatable
-    uncreatable_types = re.findall(r'qmlRegisterUncreatableType<([A-Za-z0-9_]+)>', plugin_cpp_content)
-    
-    all_types = set(registered_types + uncreatable_types)
-    
-    # Extract SRCS from CMakeLists.txt
-    # We look for set(aiusagemonitor_SRCS ...)
-    srcs_match = re.search(r'set\s*\(\s*aiusagemonitor_SRCS(.*?)\)', cmake_content, re.DOTALL | re.IGNORECASE)
-    if not srcs_match:
-        print("Error: Could not find aiusagemonitor_SRCS in plugin/CMakeLists.txt")
-        sys.exit(1)
+def main() -> None:
+    cmake = CMAKE.read_text(encoding="utf-8")
+    headers = cmake_list(cmake, "aiusagemonitor_HDRS")
+    registered_headers = {
+        path.name
+        for path in PLUGIN.glob("*.h")
+        if REGISTRATION.search(path.read_text(encoding="utf-8"))
+    }
 
-    srcs = srcs_match.group(1).split()
-    
-    # Extract HDRS
-    hdrs_match = re.search(r'set\s*\(\s*aiusagemonitor_HDRS(.*?)\)', cmake_content, re.DOTALL | re.IGNORECASE)
-    hdrs = hdrs_match.group(1).split() if hdrs_match else []
+    if not registered_headers:
+        raise SystemExit("Error: No declaratively registered QML types found")
 
-    missing = False
-
-    for t in all_types:
-        expected_cpp = f"{t.lower()}.cpp"
-        expected_h = f"{t.lower()}.h"
-        
-        # Some types might not have a .cpp file (header-only)
-        cpp_exists_on_disk = os.path.exists(os.path.join('plugin', expected_cpp))
-        h_exists_on_disk = os.path.exists(os.path.join('plugin', expected_h))
-        
-        if not cpp_exists_on_disk and not h_exists_on_disk:
-            print(f"Error: Type {t} is registered but neither {expected_cpp} nor {expected_h} exist in plugin/")
-            missing = True
-            continue
-
-        if cpp_exists_on_disk:
-            if expected_cpp not in srcs:
-                print(f"Error: Type {t} has {expected_cpp} but it is NOT in plugin/CMakeLists.txt aiusagemonitor_SRCS")
-                missing = True
-        elif h_exists_on_disk:
-            if expected_h not in hdrs:
-                print(f"Error: Type {t} is header-only but {expected_h} is NOT in plugin/CMakeLists.txt aiusagemonitor_HDRS")
-                missing = True
-
+    missing = sorted(registered_headers - headers)
     if missing:
-        sys.exit(1)
-    else:
-        print("QML registered types consistency OK.")
-        sys.exit(0)
+        raise SystemExit(
+            "Error: Declarative QML headers missing from aiusagemonitor_HDRS: "
+            + ", ".join(missing)
+        )
 
-if __name__ == '__main__':
+    forbidden = (
+        "NO_GENERATE_PLUGIN_SOURCE",
+        "CLASS_NAME AiUsagePlugin",
+        "aiusageplugin.cpp",
+        "aiusageplugin.h",
+    )
+    stale = [token for token in forbidden if token in cmake]
+    if stale:
+        raise SystemExit(
+            "Error: Native QML module still uses manual plugin registration: "
+            + ", ".join(stale)
+        )
+
+    print(
+        "QML registered types consistency OK: "
+        f"{len(registered_headers)} declarative headers"
+    )
+
+
+if __name__ == "__main__":
     main()

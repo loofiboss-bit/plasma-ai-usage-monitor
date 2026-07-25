@@ -4,6 +4,7 @@
 #include <QAbstractListModel>
 #include <QPointer>
 #include <QVariantMap>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 class ProviderBackend;
 class SourceReadinessModel;
@@ -11,6 +12,7 @@ class SubscriptionToolBackend;
 
 class DailyStateModel : public QAbstractListModel {
   Q_OBJECT
+  QML_ELEMENT
   Q_PROPERTY(int count READ rowCount NOTIFY countChanged)
   Q_PROPERTY(QVariantMap summary READ summary NOTIFY summaryChanged)
   Q_PROPERTY(int warningThreshold READ warningThreshold WRITE

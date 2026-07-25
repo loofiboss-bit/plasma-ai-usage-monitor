@@ -1,4 +1,5 @@
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
@@ -25,24 +26,24 @@ PlasmaExtras.Representation {
 
     function titleForState() {
         if (bootstrapState === "plugin-older")
-            return i18n("The native plugin is older than the widget");
+            return KI18n.i18n("The native plugin is older than the widget");
         if (bootstrapState === "plugin-newer")
-            return i18n("The native plugin is newer than the widget");
+            return KI18n.i18n("The native plugin is newer than the widget");
         if (bootstrapState === "runtime-unavailable")
-            return i18n("The native plugin could not start");
+            return KI18n.i18n("The native plugin could not start");
         if (checking)
-            return i18n("Checking the native plugin…");
-        return i18n("Install the native plugin");
+            return KI18n.i18n("Checking the native plugin…");
+        return KI18n.i18n("Install the native plugin");
     }
 
     function descriptionForState() {
         if (mismatch)
-            return i18n("Update the KDE Store widget and the Fedora package so both use the same version.");
+            return KI18n.i18n("Update the KDE Store widget and the Fedora package so both use the same version.");
         if (bootstrapState === "runtime-unavailable")
-            return i18n("The plugin was found, but the monitor could not load. Reinstall the matching package.");
+            return KI18n.i18n("The plugin was found, but the monitor could not load. Reinstall the matching package.");
         if (checking)
-            return i18n("AI Usage Monitor is checking whether its compiled dependency is ready.");
-        return i18n("The KDE Store package contains the widget frontend only. Install the matching compiled plugin from Fedora COPR or build it from source.");
+            return KI18n.i18n("AI Usage Monitor is checking whether its compiled dependency is ready.");
+        return KI18n.i18n("The KDE Store package contains the widget frontend only. Install the matching compiled plugin from Fedora COPR or build it from source.");
     }
 
     ColumnLayout {
@@ -81,19 +82,19 @@ PlasmaExtras.Representation {
             rowSpacing: Kirigami.Units.smallSpacing
 
             PlasmaComponents.Label {
-                text: i18n("Widget frontend:")
+                text: KI18n.i18n("Widget frontend:")
                 opacity: 0.7
             }
             PlasmaComponents.Label { text: bootstrap.frontendVersion }
 
             PlasmaComponents.Label {
-                text: i18n("Native plugin:")
+                text: KI18n.i18n("Native plugin:")
                 opacity: 0.7
             }
             PlasmaComponents.Label {
                 text: bootstrap.installedPluginVersion !== ""
                       ? bootstrap.installedPluginVersion
-                      : i18n("Not detected")
+                      : KI18n.i18n("Not detected")
             }
         }
 
@@ -104,7 +105,7 @@ PlasmaExtras.Representation {
 
             PlasmaComponents.Label {
                 Layout.fillWidth: true
-                text: i18n("Fedora COPR command")
+                text: KI18n.i18n("Fedora COPR command")
                 font.bold: true
             }
 
@@ -118,11 +119,11 @@ PlasmaExtras.Representation {
                     readOnly: true
                     selectByMouse: true
                     text: bootstrap.installCommand
-                    Accessible.name: i18n("Fedora COPR install command")
+                    Accessible.name: KI18n.i18n("Fedora COPR install command")
                 }
 
                 PlasmaComponents.Button {
-                    text: copiedTimer.running ? i18n("Copied") : i18n("Copy")
+                    text: copiedTimer.running ? KI18n.i18n("Copied") : KI18n.i18n("Copy")
                     icon.name: "edit-copy"
                     onClicked: {
                         commandField.selectAll();
@@ -135,14 +136,14 @@ PlasmaExtras.Representation {
 
             PlasmaComponents.Button {
                 Layout.alignment: Qt.AlignHCenter
-                text: i18n("Open source installation guide")
+                text: KI18n.i18n("Open source installation guide")
                 icon.name: "help-contents"
                 onClicked: Qt.openUrlExternally(bootstrap.sourceInstallUrl)
             }
 
             PlasmaComponents.Label {
                 Layout.fillWidth: true
-                text: i18n("Support report")
+                text: KI18n.i18n("Support report")
                 font.bold: true
             }
 
@@ -158,11 +159,11 @@ PlasmaExtras.Representation {
                     selectByMouse: true
                     wrapMode: TextEdit.Wrap
                     text: bootstrap.supportReport
-                    Accessible.name: i18n("Bootstrap support report")
+                    Accessible.name: KI18n.i18n("Bootstrap support report")
                 }
 
                 PlasmaComponents.Button {
-                    text: reportCopiedTimer.running ? i18n("Copied") : i18n("Copy report")
+                    text: reportCopiedTimer.running ? KI18n.i18n("Copied") : KI18n.i18n("Copy report")
                     icon.name: "edit-copy"
                     onClicked: {
                         supportReportField.selectAll();
@@ -178,7 +179,7 @@ PlasmaExtras.Representation {
             Layout.fillWidth: true
             visible: !bootstrap.checking
             type: Kirigami.MessageType.Information
-            text: i18n("After installing or updating, restart Plasma or log out and back in. Your settings, KWallet secrets, and history are kept.")
+            text: KI18n.i18n("After installing or updating, restart Plasma or log out and back in. Your settings, KWallet secrets, and history are kept.")
         }
 
         Item { Layout.fillHeight: true }

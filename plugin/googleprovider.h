@@ -21,6 +21,7 @@
 class GoogleProvider : public ProviderBackend
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY modelChanged)
     Q_PROPERTY(QString tier READ tier WRITE setTier NOTIFY tierChanged)

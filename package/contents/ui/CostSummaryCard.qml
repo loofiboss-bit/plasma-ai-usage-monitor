@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
@@ -20,7 +21,7 @@ Rectangle {
     border.width: 1
     border.color: Qt.alpha(Kirigami.Theme.textColor, 0.15)
     Accessible.role: Accessible.StaticText
-    Accessible.name: i18n("Spend and budgets. %1", accessibleSummary())
+    Accessible.name: KI18n.i18n("Spend and budgets. %1", accessibleSummary())
 
     ColumnLayout {
         id: content
@@ -30,7 +31,7 @@ Rectangle {
 
         PlasmaExtras.Heading {
             level: 4
-            text: i18n("Spend and budgets")
+            text: KI18n.i18n("Spend and budgets")
             Layout.fillWidth: true
         }
 
@@ -38,22 +39,23 @@ Rectangle {
             model: card.spendRows
 
             RowLayout {
+                id: spendRow
                 required property var modelData
                 Layout.fillWidth: true
                 spacing: Kirigami.Units.smallSpacing
 
                 Kirigami.Icon {
-                    source: modelData.icon
+                    source: spendRow.modelData.icon
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: width
                 }
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    text: modelData.label
+                    text: spendRow.modelData.label
                     elide: Text.ElideRight
                 }
                 PlasmaComponents.Label {
-                    text: Utils.formatCurrencyTotals(modelData.totals)
+                    text: Utils.formatCurrencyTotals(spendRow.modelData.totals)
                     font.bold: true
                 }
             }
@@ -61,7 +63,7 @@ Rectangle {
 
         PlasmaComponents.Label {
             Layout.fillWidth: true
-            text: i18n("Actual spend, local estimates, and fixed subscription fees are never combined. Currencies are not converted.")
+            text: KI18n.i18n("Actual spend, local estimates, and fixed subscription fees are never combined. Currencies are not converted.")
             wrapMode: Text.WordWrap
             color: Kirigami.Theme.disabledTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -78,11 +80,11 @@ Rectangle {
         var estimated = summary.estimatedSpendTotals || {};
         var fees = summary.fixedSubscriptionFees || {};
         if (hasTotals(actual))
-            rows.push({ label: i18n("Actual spend"), icon: "wallet-open", totals: actual });
+            rows.push({ label: KI18n.i18n("Actual spend"), icon: "wallet-open", totals: actual });
         if (hasTotals(estimated))
-            rows.push({ label: i18n("Estimated spend"), icon: "view-statistics", totals: estimated });
+            rows.push({ label: KI18n.i18n("Estimated spend"), icon: "view-statistics", totals: estimated });
         if (hasTotals(fees))
-            rows.push({ label: i18n("Fixed subscription fees"), icon: "office-chart-ring", totals: fees });
+            rows.push({ label: KI18n.i18n("Fixed subscription fees"), icon: "office-chart-ring", totals: fees });
         return rows;
     }
 
@@ -90,6 +92,6 @@ Rectangle {
         var parts = [];
         for (var i = 0; i < spendRows.length; i++)
             parts.push(spendRows[i].label + ": " + Utils.formatCurrencyTotals(spendRows[i].totals));
-        return parts.join(i18n(" · "));
+        return parts.join(KI18n.i18n(" · "));
     }
 }

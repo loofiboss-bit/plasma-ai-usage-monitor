@@ -5,10 +5,12 @@
 #include <QObject>
 #include <QStringList>
 #include <QVariantList>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 class CatalogLoader : public QObject
 {
     Q_OBJECT
+    QML_ANONYMOUS
     Q_PROPERTY(bool valid READ isValid NOTIFY statusChanged)
     Q_PROPERTY(bool stale READ stale NOTIFY statusChanged)
     Q_PROPERTY(int schemaVersion READ schemaVersion NOTIFY statusChanged)

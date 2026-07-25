@@ -9,6 +9,7 @@
 #include <QSqlDatabase>
 #include <QHash>
 #include <atomic>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 /**
  * SQLite database for persisting AI usage history.
@@ -19,6 +20,7 @@
 class UsageDatabase : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(int retentionDays READ retentionDays WRITE setRetentionDays NOTIFY retentionDaysChanged)
@@ -108,12 +110,12 @@ public:
      * tests. QML must use requestAnalyst() so database work never blocks the UI
      * thread.
      */
-    Q_INVOKABLE QVariantMap getAnalystSnapshot(const QDateTime &from,
-                                               const QDateTime &to,
+    Q_INVOKABLE QVariantMap getAnalystSnapshot(const QDateTime &fromInclusive,
+                                               const QDateTime &toExclusive,
                                                const QString &currency = QString()) const;
     Q_INVOKABLE void requestAnalyst(const QString &requestId,
-                                    const QDateTime &from,
-                                    const QDateTime &to,
+                                    const QDateTime &fromInclusive,
+                                    const QDateTime &toExclusive,
                                     const QString &currency = QString());
 
     /**

@@ -64,6 +64,14 @@ if(BUILD_TESTING)
         COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_verify_exact_tag.sh"
     )
     add_test(
+        NAME version_policy
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_version_policy.py"
+    )
+    add_test(
+        NAME release_media_evidence
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/test_release_media_evidence.py"
+    )
+    add_test(
         NAME daily_ui_accessibility
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_daily_ui_accessibility.py"
     )

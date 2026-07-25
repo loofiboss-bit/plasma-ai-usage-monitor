@@ -6,6 +6,7 @@
 class BedrockProvider : public ProviderBackend
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(QString region READ region WRITE setRegion NOTIFY regionChanged)
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY modelChanged)

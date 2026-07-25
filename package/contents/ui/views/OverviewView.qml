@@ -1,9 +1,9 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
-import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
@@ -12,18 +12,21 @@ import "../components" as Components
 
 QQC2.ScrollView {
     id: overview
+    property var monitor: null
+    Accessible.role: Accessible.Pane
+    Accessible.name: KI18n.i18n("Overview view ready")
 
     property bool connectionChecksExpanded: false
     readonly property var sourceSections: [
-        { label: i18n("Provider-reported data"), rows: overviewState.actualRows },
-        { label: i18n("Local estimates"), rows: overviewState.estimatedRows },
-        { label: i18n("Balances"), rows: overviewState.balanceRows },
-        { label: i18n("Unavailable"), rows: overviewState.unavailableRows }
+        { label: KI18n.i18n("Provider-reported data"), rows: overviewState.actualRows },
+        { label: KI18n.i18n("Local estimates"), rows: overviewState.estimatedRows },
+        { label: KI18n.i18n("Balances"), rows: overviewState.balanceRows },
+        { label: KI18n.i18n("Unavailable"), rows: overviewState.unavailableRows }
     ]
 
     Components.DailyOverviewState {
         id: overviewState
-        dailyState: root.presentationDailyState
+        dailyState: overview.monitor.presentationDailyState
     }
 
     ColumnLayout {
@@ -42,7 +45,8 @@ QQC2.ScrollView {
             Layout.rightMargin: Kirigami.Units.smallSpacing
             presentation: overviewState
             onFixRequested: function(stableId, actionKey, sourceKind) {
-                root.fixOverviewSource(stableId, actionKey, sourceKind);
+                overview.monitor.fixOverviewSource(stableId, actionKey,
+                                                    sourceKind);
             }
         }
 
@@ -50,8 +54,8 @@ QQC2.ScrollView {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.largeSpacing
             Layout.rightMargin: Kirigami.Units.largeSpacing
-            visible: root.modelMigrationNotice !== ""
-            text: root.modelMigrationNotice
+            visible: overview.monitor.modelMigrationNotice !== ""
+            text: overview.monitor.modelMigrationNotice
             color: Kirigami.Theme.neutralTextColor
             wrapMode: Text.WordWrap
         }
@@ -72,7 +76,7 @@ QQC2.ScrollView {
 
         PlasmaExtras.Heading {
             level: 4
-            text: i18n("Sources")
+            text: KI18n.i18n("Sources")
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
@@ -83,34 +87,36 @@ QQC2.ScrollView {
             model: overview.sourceSections
 
             ColumnLayout {
+                id: sourceSection
                 required property var modelData
                 Layout.fillWidth: true
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
-                visible: modelData.rows.length > 0
+                visible: sourceSection.modelData.rows.length > 0
                 spacing: Kirigami.Units.smallSpacing
 
                 RowLayout {
                     Layout.fillWidth: true
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
-                        text: modelData.label
+                        text: sourceSection.modelData.label
                         font.bold: true
                     }
                     PlasmaComponents.Label {
-                        text: modelData.rows.length
+                        text: sourceSection.modelData.rows.length
                         color: Kirigami.Theme.disabledTextColor
                     }
                 }
 
                 Repeater {
-                    model: modelData.rows
+                    model: sourceSection.modelData.rows
                     Monitor.DailySourceCard {
                         required property var modelData
                         Layout.fillWidth: true
                         row: modelData
                         onActionRequested: function(stableId, actionKey, sourceKind) {
-                            root.fixOverviewSource(stableId, actionKey, sourceKind);
+                            overview.monitor.fixOverviewSource(
+                                stableId, actionKey, sourceKind);
                         }
                     }
                 }
@@ -125,21 +131,21 @@ QQC2.ScrollView {
 
             PlasmaComponents.Label {
                 Layout.fillWidth: true
-                text: i18n("Connectivity only")
+                text: KI18n.i18n("Connectivity only")
                 font.bold: true
                 color: Kirigami.Theme.disabledTextColor
             }
             PlasmaComponents.Button {
-                text: overview.connectionChecksExpanded ? i18n("Hide")
-                    : i18np("Show %1 source", "Show %1 sources",
+                text: overview.connectionChecksExpanded ? KI18n.i18n("Hide")
+                    : KI18n.i18np("Show %1 source", "Show %1 sources",
                              overviewState.connectivityRows.length)
                 icon.name: overview.connectionChecksExpanded ? "arrow-up" : "arrow-down"
                 checkable: true
                 checked: overview.connectionChecksExpanded
                 activeFocusOnTab: true
                 Accessible.name: overview.connectionChecksExpanded
-                    ? i18n("Hide connectivity-only sources")
-                    : i18n("Show connectivity-only sources")
+                    ? KI18n.i18n("Hide connectivity-only sources")
+                    : KI18n.i18n("Show connectivity-only sources")
                 onClicked: overview.connectionChecksExpanded = !overview.connectionChecksExpanded
             }
         }
@@ -150,7 +156,7 @@ QQC2.ScrollView {
             Layout.rightMargin: Kirigami.Units.largeSpacing
             visible: overviewState.connectivityRows.length > 0
                   && !overview.connectionChecksExpanded
-            text: i18n("These sources confirm endpoint access but do not report usage, spend, or live quota.")
+            text: KI18n.i18n("These sources confirm endpoint access but do not report usage, spend, or live quota.")
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
         }

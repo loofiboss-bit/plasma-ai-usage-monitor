@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 /**
  * Helper class to provide clipboard access from QML.
@@ -12,6 +13,7 @@
 class ClipboardHelper : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit ClipboardHelper(QObject *parent = nullptr) : QObject(parent) {}

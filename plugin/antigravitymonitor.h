@@ -20,6 +20,7 @@ class QNetworkReply;
 class AntigravityMonitor : public SubscriptionToolBackend
 {
     Q_OBJECT
+    QML_ELEMENT
     Q_PROPERTY(QString detectedPlanLabel READ detectedPlanLabel NOTIFY antigravityStatusChanged)
     Q_PROPERTY(QString connectionState READ connectionState NOTIFY antigravityStatusChanged)
     Q_PROPERTY(QString readinessCode READ readinessCode NOTIFY antigravityStatusChanged)

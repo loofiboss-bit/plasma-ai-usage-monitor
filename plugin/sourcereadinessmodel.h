@@ -5,6 +5,7 @@
 #include <QDateTime>
 #include <QPointer>
 #include <QVariantMap>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 class ProviderBackend;
 class SubscriptionToolBackend;
@@ -12,6 +13,7 @@ class SubscriptionToolBackend;
 class SourceReadinessModel : public QAbstractListModel
 {
     Q_OBJECT
+    QML_ELEMENT
     Q_PROPERTY(int count READ rowCount CONSTANT)
 
 public:

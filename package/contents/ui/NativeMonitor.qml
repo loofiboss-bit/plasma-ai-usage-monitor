@@ -1,4 +1,7 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
+import org.kde.ki18n
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import com.github.loofi.aiusagemonitor 1.0
@@ -13,10 +16,13 @@ Item {
     property bool diagnosticsSnapshotScheduled: false
     readonly property string pluginVersion: AppInfo.version
     readonly property string smokeView: AppInfo.smokeView
+    // Plasma's KPluginMetaData value type is absent from its installed qmltypes.
+    // qmllint disable unresolved-type
     readonly property bool pluginVersionMismatch: {
-        var required = plasmoid.metaData?.version || "";
+        var required = Plasmoid["metaData"]?.["version"] || "";
         return required !== "" && required !== AppInfo.version;
     }
+    // qmllint enable unresolved-type
 
     readonly property string toolTipSubText: {
         var lines = [];
@@ -33,11 +39,11 @@ Item {
                 } else if ((provider.backend.rateLimitTokensRemaining || 0) > 0) {
                     info += provider.backend.rateLimitTokensRemaining + " tokens left";
                 } else {
-                    info += i18n("Healthy");
+                    info += KI18n.i18n("Healthy");
                 }
                 lines.push(info);
             } else if (provider.enabled && provider.backend && provider.backend.error) {
-                lines.push(provider.name + ": " + i18n("Error"));
+                lines.push(provider.name + ": " + KI18n.i18n("Error"));
             }
         }
         var tools = root.allSubscriptionTools || [];
@@ -46,16 +52,16 @@ Item {
             if (tool.enabled && tool.monitor && tool.monitor.installed) {
                 var toolInfo = tool.name + ": ";
                 if (tool.monitor.limitReached) {
-                    toolInfo += i18n("Limit Reached");
+                    toolInfo += KI18n.i18n("Limit Reached");
                 } else if ((tool.monitor.usageLimit || 0) > 0) {
-                    toolInfo += tool.monitor.usageCount + "/" + tool.monitor.usageLimit + " " + i18n("used");
+                    toolInfo += tool.monitor.usageCount + "/" + tool.monitor.usageLimit + " " + KI18n.i18n("used");
                 } else {
-                    toolInfo += i18n("Active");
+                    toolInfo += KI18n.i18n("Active");
                 }
                 lines.push(toolInfo);
             }
         }
-        return lines.length > 0 ? lines.join("\n") : i18n("Click to configure providers");
+        return lines.length > 0 ? lines.join("\n") : KI18n.i18n("Click to configure providers");
     }
 
     property alias openai: openaiBackend
@@ -172,7 +178,7 @@ Item {
     function setGuidedSourceEnabled(stableId, enabled) {
         var provider = providerRegistry.providerByConfigKey(stableId);
         if (provider) {
-            plasmoid.configuration[provider.enabledKey] = enabled;
+            Plasmoid.configuration[provider.enabledKey] = enabled;
             sourceReadinessModel.setSourceEnabled(stableId, enabled);
             return true;
         }
@@ -188,14 +194,14 @@ Item {
         };
         var key = localConfigKeys[stableId];
         if (!key) return false;
-        plasmoid.configuration[key] = enabled;
+        Plasmoid.configuration[key] = enabled;
         return true;
     }
 
     function setGuidedSourceEndpoint(stableId, endpoint) {
         var provider = providerRegistry.providerByConfigKey(stableId);
         if (!provider || !provider.customBaseUrlKey) return endpoint.length === 0;
-        plasmoid.configuration[provider.customBaseUrlKey] = endpoint.trim();
+        Plasmoid.configuration[provider.customBaseUrlKey] = endpoint.trim();
         if (provider.backend) provider.backend.customBaseUrl = endpoint.trim();
         return true;
     }
@@ -218,8 +224,8 @@ Item {
             if (sourceReadinessModel.verifySource(stableId)) return true;
         }
 
-        plasmoid.configuration.settingsVerificationSourceId = stableId;
-        var configureAction = plasmoid.internalAction("configure");
+        Plasmoid.configuration.settingsVerificationSourceId = stableId;
+        var configureAction = Plasmoid.internalAction("configure");
         if (configureAction) {
             configureAction.trigger();
             return true;
@@ -230,39 +236,39 @@ Item {
     function settingsVerificationMessage(source) {
         var state = source.readinessStateKey || "failed";
         if (state === "reporting_actual")
-            return i18n("Verification succeeded and returned supported usage or spend data.");
+            return KI18n.i18n("Verification succeeded and returned supported usage or spend data.");
         if (state === "reporting_estimate")
-            return i18n("Verification succeeded and returned estimated or local activity data.");
+            return KI18n.i18n("Verification succeeded and returned estimated or local activity data.");
         if (state === "connected_connectivity_only")
-            return i18n("Verification succeeded. This source confirms connectivity only.");
+            return KI18n.i18n("Verification succeeded. This source confirms connectivity only.");
         if (state === "degraded")
-            return source.nextActionText || i18n("Verification completed with degraded data.");
-        return source.nextActionText || i18n("Verification failed. Review the source configuration and retry.");
+            return source.nextActionText || KI18n.i18n("Verification completed with degraded data.");
+        return source.nextActionText || KI18n.i18n("Verification failed. Review the source configuration and retry.");
     }
 
     function finishSettingsVerification(source) {
         if (!source || source.stableId !== pendingSettingsVerificationSourceId) return;
         var state = source.readinessStateKey || "failed";
         if (state === "verifying" || state === "ready_to_verify") return;
-        plasmoid.configuration.settingsVerificationState = state;
-        plasmoid.configuration.settingsVerificationMessage = root.settingsVerificationMessage(source);
-        plasmoid.configuration.settingsVerificationTimestamp = new Date().toISOString();
-        plasmoid.configuration.settingsVerificationCompletedRequestId = pendingSettingsVerificationId;
+        Plasmoid.configuration.settingsVerificationState = state;
+        Plasmoid.configuration.settingsVerificationMessage = root.settingsVerificationMessage(source);
+        Plasmoid.configuration.settingsVerificationTimestamp = new Date().toISOString();
+        Plasmoid.configuration.settingsVerificationCompletedRequestId = pendingSettingsVerificationId;
         pendingSettingsVerificationId = 0;
         pendingSettingsVerificationSourceId = "";
     }
 
     function processSettingsVerificationRequest() {
-        var requestId = Number(plasmoid.configuration.settingsVerificationRequestId || 0);
-        var completedId = Number(plasmoid.configuration.settingsVerificationCompletedRequestId || 0);
-        var sourceId = plasmoid.configuration.settingsVerificationSourceId || "";
+        var requestId = Number(Plasmoid.configuration.settingsVerificationRequestId || 0);
+        var completedId = Number(Plasmoid.configuration.settingsVerificationCompletedRequestId || 0);
+        var sourceId = Plasmoid.configuration.settingsVerificationSourceId || "";
         if (requestId <= completedId || !sourceId) return;
 
         pendingSettingsVerificationId = requestId;
         pendingSettingsVerificationSourceId = sourceId;
-        plasmoid.configuration.settingsVerificationState = "verifying";
-        plasmoid.configuration.settingsVerificationMessage = i18n("Running the safe read-only scheduled check…");
-        plasmoid.configuration.settingsVerificationTimestamp = "";
+        Plasmoid.configuration.settingsVerificationState = "verifying";
+        Plasmoid.configuration.settingsVerificationMessage = KI18n.i18n("Running the safe read-only scheduled check…");
+        Plasmoid.configuration.settingsVerificationTimestamp = "";
 
         Qt.callLater(function() {
             runtimeCoordinator.loadProviderApiKey(
@@ -300,8 +306,8 @@ Item {
             }
 
             var snapshot = JSON.stringify(rows);
-            if (plasmoid.configuration.diagnosticsSourceSnapshot !== snapshot)
-                plasmoid.configuration.diagnosticsSourceSnapshot = snapshot;
+            if (Plasmoid.configuration.diagnosticsSourceSnapshot !== snapshot)
+                Plasmoid.configuration.diagnosticsSourceSnapshot = snapshot;
         });
     }
 
@@ -332,7 +338,7 @@ Item {
             return;
         }
 
-        var activity = usageDatabase.getYearlyActivity(plasmoid.configuration.analystIntensityMode);
+        var activity = usageDatabase.getYearlyActivity(Plasmoid.configuration.analystIntensityMode);
         var efficiency = usageDatabase.getEfficiencySeries(14);
         var overview = usageDatabase.getAnalystOverview(30);
 
@@ -345,139 +351,139 @@ Item {
 
     UsageDatabase {
         id: usageDatabase
-        enabled: plasmoid.configuration.historyEnabled
-        retentionDays: plasmoid.configuration.historyRetentionDays
+        enabled: Plasmoid.configuration.historyEnabled
+        retentionDays: Plasmoid.configuration.historyRetentionDays
     }
 
     OpenAIProvider {
         id: openaiBackend
-        model: plasmoid.configuration.openaiModel
-        projectId: plasmoid.configuration.openaiProjectId
-        customBaseUrl: plasmoid.configuration.openaiCustomBaseUrl
-        dailyBudget: plasmoid.configuration.openaiDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.openaiMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.openaiModel
+        projectId: Plasmoid.configuration.openaiProjectId
+        customBaseUrl: Plasmoid.configuration.openaiCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.openaiDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.openaiMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     AzureOpenAIProvider {
         id: azureBackend
-        model: plasmoid.configuration.azureModel
-        deploymentId: plasmoid.configuration.azureDeploymentId
-        customBaseUrl: plasmoid.configuration.azureCustomBaseUrl
-        dailyBudget: plasmoid.configuration.azureDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.azureMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.azureModel
+        deploymentId: Plasmoid.configuration.azureDeploymentId
+        customBaseUrl: Plasmoid.configuration.azureCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.azureDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.azureMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     BedrockProvider {
         id: bedrockBackend
-        region: plasmoid.configuration.bedrockRegion
-        model: plasmoid.configuration.bedrockModel
-        customBaseUrl: plasmoid.configuration.bedrockCustomBaseUrl
-        dailyBudget: plasmoid.configuration.bedrockDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.bedrockMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        region: Plasmoid.configuration.bedrockRegion
+        model: Plasmoid.configuration.bedrockModel
+        customBaseUrl: Plasmoid.configuration.bedrockCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.bedrockDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.bedrockMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     AnthropicProvider {
         id: anthropicBackend
-        model: plasmoid.configuration.anthropicModel
-        customBaseUrl: plasmoid.configuration.anthropicCustomBaseUrl
-        dailyBudget: plasmoid.configuration.anthropicDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.anthropicMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.anthropicModel
+        customBaseUrl: Plasmoid.configuration.anthropicCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.anthropicDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.anthropicMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     GoogleProvider {
         id: googleBackend
-        model: plasmoid.configuration.googleModel
-        tier: plasmoid.configuration.googleTier
-        customBaseUrl: plasmoid.configuration.googleCustomBaseUrl
-        dailyBudget: plasmoid.configuration.googleDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.googleMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.googleModel
+        tier: Plasmoid.configuration.googleTier
+        customBaseUrl: Plasmoid.configuration.googleCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.googleDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.googleMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     MistralProvider {
         id: mistralBackend
-        model: plasmoid.configuration.mistralModel
-        customBaseUrl: plasmoid.configuration.mistralCustomBaseUrl
-        dailyBudget: plasmoid.configuration.mistralDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.mistralMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.mistralModel
+        customBaseUrl: Plasmoid.configuration.mistralCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.mistralDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.mistralMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     DeepSeekProvider {
         id: deepseekBackend
-        model: plasmoid.configuration.deepseekModel
-        customBaseUrl: plasmoid.configuration.deepseekCustomBaseUrl
-        dailyBudget: plasmoid.configuration.deepseekDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.deepseekMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.deepseekModel
+        customBaseUrl: Plasmoid.configuration.deepseekCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.deepseekDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.deepseekMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     GroqProvider {
         id: groqBackend
-        model: plasmoid.configuration.groqModel
-        customBaseUrl: plasmoid.configuration.groqCustomBaseUrl
-        dailyBudget: plasmoid.configuration.groqDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.groqMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.groqModel
+        customBaseUrl: Plasmoid.configuration.groqCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.groqDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.groqMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     XAIProvider {
         id: xaiBackend
-        model: plasmoid.configuration.xaiModel
-        customBaseUrl: plasmoid.configuration.xaiCustomBaseUrl
-        dailyBudget: plasmoid.configuration.xaiDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.xaiMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.xaiModel
+        customBaseUrl: Plasmoid.configuration.xaiCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.xaiDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.xaiMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     OllamaCloudProvider {
         id: ollamaBackend
-        model: plasmoid.configuration.ollamaModel
-        customBaseUrl: plasmoid.configuration.ollamaCustomBaseUrl
-        dailyBudget: plasmoid.configuration.ollamaDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.ollamaMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.ollamaModel
+        customBaseUrl: Plasmoid.configuration.ollamaCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.ollamaDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.ollamaMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     OpenRouterProvider {
         id: openrouterBackend
-        model: plasmoid.configuration.openrouterModel
-        customBaseUrl: plasmoid.configuration.openrouterCustomBaseUrl
-        dailyBudget: plasmoid.configuration.openrouterDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.openrouterMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.openrouterModel
+        customBaseUrl: Plasmoid.configuration.openrouterCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.openrouterDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.openrouterMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     TogetherProvider {
         id: togetherBackend
-        model: plasmoid.configuration.togetherModel
-        customBaseUrl: plasmoid.configuration.togetherCustomBaseUrl
-        dailyBudget: plasmoid.configuration.togetherDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.togetherMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.togetherModel
+        customBaseUrl: Plasmoid.configuration.togetherCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.togetherDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.togetherMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     CohereProvider {
         id: cohereBackend
-        model: plasmoid.configuration.cohereModel
-        customBaseUrl: plasmoid.configuration.cohereCustomBaseUrl
-        dailyBudget: plasmoid.configuration.cohereDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.cohereMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.cohereModel
+        customBaseUrl: Plasmoid.configuration.cohereCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.cohereDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.cohereMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     GoogleVeoProvider {
         id: googleveoBackend
-        model: plasmoid.configuration.googleveoModel
-        tier: plasmoid.configuration.googleveoTier
-        customBaseUrl: plasmoid.configuration.googleveoCustomBaseUrl
-        dailyBudget: plasmoid.configuration.googleveoDailyBudget / 100.0
-        monthlyBudget: plasmoid.configuration.googleveoMonthlyBudget / 100.0
-        budgetWarningPercent: plasmoid.configuration.budgetWarningPercent
+        model: Plasmoid.configuration.googleveoModel
+        tier: Plasmoid.configuration.googleveoTier
+        customBaseUrl: Plasmoid.configuration.googleveoCustomBaseUrl
+        dailyBudget: Plasmoid.configuration.googleveoDailyBudget / 100.0
+        monthlyBudget: Plasmoid.configuration.googleveoMonthlyBudget / 100.0
+        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     ProviderManager {
@@ -488,11 +494,16 @@ Item {
             if (!backend) return;
             var modelKey = key + "Model";
             var urlKey = key + "CustomBaseUrl";
-            if (backend.model !== undefined) backend.model = plasmoid.configuration[modelKey] || "";
-            backend.customBaseUrl = plasmoid.configuration[urlKey] || "";
-            backend.dailyBudget = (plasmoid.configuration[key + "DailyBudget"] || 0) / 100.0;
-            backend.monthlyBudget = (plasmoid.configuration[key + "MonthlyBudget"] || 0) / 100.0;
-            backend.budgetWarningPercent = plasmoid.configuration.budgetWarningPercent;
+            // The manager intentionally returns heterogeneous provider backends.
+            // qmllint disable missing-property
+            if (backend["model"] !== undefined) {
+                backend["model"] = Plasmoid.configuration[modelKey] || "";
+            }
+            // qmllint enable missing-property
+            backend.customBaseUrl = Plasmoid.configuration[urlKey] || "";
+            backend.dailyBudget = (Plasmoid.configuration[key + "DailyBudget"] || 0) / 100.0;
+            backend.monthlyBudget = (Plasmoid.configuration[key + "MonthlyBudget"] || 0) / 100.0;
+            backend.budgetWarningPercent = Plasmoid.configuration.budgetWarningPercent;
         }
 
         Component.onCompleted: {
@@ -526,8 +537,8 @@ Item {
 
     DailyStateModel {
         id: dailyStateModel
-        warningThreshold: plasmoid.configuration.warningThreshold
-        criticalThreshold: plasmoid.configuration.criticalThreshold
+        warningThreshold: Plasmoid.configuration.warningThreshold
+        criticalThreshold: Plasmoid.configuration.criticalThreshold
     }
 
     Components.MediaDailyState {
@@ -536,93 +547,93 @@ Item {
 
     BrowserSyncService {
         id: browserSyncService
-        browserType: plasmoid.configuration.browserSyncBrowser
-        selectedFirefoxProfile: plasmoid.configuration.browserSyncProfile
+        browserType: Plasmoid.configuration.browserSyncBrowser
+        selectedFirefoxProfile: Plasmoid.configuration.browserSyncProfile
     }
 
     ClaudeCodeMonitor {
         id: claudeCodeMonitor
-        enabled: plasmoid.configuration.claudeCodeEnabled
-        warningThreshold: plasmoid.configuration.warningThreshold
-        criticalThreshold: plasmoid.configuration.criticalThreshold
+        enabled: Plasmoid.configuration.claudeCodeEnabled
+        warningThreshold: Plasmoid.configuration.warningThreshold
+        criticalThreshold: Plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
-            syncEnabled = Qt.binding(function() { return plasmoid.configuration.browserSyncEnabled; });
-            root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit);
+            syncEnabled = Qt.binding(function() { return Plasmoid.configuration.browserSyncEnabled; });
+            root.applySubscriptionPlan(claudeCodeMonitor, Plasmoid.configuration.claudeCodePlanId, Plasmoid.configuration.claudeCodePlan, Plasmoid.configuration.claudeCodeCustomLimit);
         }
     }
 
     CodexCliMonitor {
         id: codexCliMonitor
-        enabled: plasmoid.configuration.codexEnabled
-        warningThreshold: plasmoid.configuration.warningThreshold
-        criticalThreshold: plasmoid.configuration.criticalThreshold
+        enabled: Plasmoid.configuration.codexEnabled
+        warningThreshold: Plasmoid.configuration.warningThreshold
+        criticalThreshold: Plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
-            syncEnabled = Qt.binding(function() { return plasmoid.configuration.browserSyncEnabled; });
-            root.applySubscriptionPlan(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan, plasmoid.configuration.codexCustomLimit);
+            syncEnabled = Qt.binding(function() { return Plasmoid.configuration.browserSyncEnabled; });
+            root.applySubscriptionPlan(codexCliMonitor, Plasmoid.configuration.codexPlanId, Plasmoid.configuration.codexPlan, Plasmoid.configuration.codexCustomLimit);
         }
     }
 
     CopilotMonitor {
         id: copilotMonitor
-        enabled: plasmoid.configuration.copilotEnabled
-        warningThreshold: plasmoid.configuration.warningThreshold
-        criticalThreshold: plasmoid.configuration.criticalThreshold
-        orgName: plasmoid.configuration.copilotOrgName
-        billingMode: plasmoid.configuration.copilotBillingMode || "auto"
-        monthlyResetDay: plasmoid.configuration.copilotResetDay || 1
+        enabled: Plasmoid.configuration.copilotEnabled
+        warningThreshold: Plasmoid.configuration.warningThreshold
+        criticalThreshold: Plasmoid.configuration.criticalThreshold
+        orgName: Plasmoid.configuration.copilotOrgName
+        billingMode: Plasmoid.configuration.copilotBillingMode || "auto"
+        monthlyResetDay: Plasmoid.configuration.copilotResetDay || 1
 
         Component.onCompleted: {
             checkToolInstalled();
-            root.applySubscriptionPlan(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan, plasmoid.configuration.copilotCustomLimit);
+            root.applySubscriptionPlan(copilotMonitor, Plasmoid.configuration.copilotPlanId, Plasmoid.configuration.copilotPlan, Plasmoid.configuration.copilotCustomLimit);
             fetchOrgMetrics();
         }
     }
 
     CursorMonitor {
         id: cursorMonitor
-        enabled: plasmoid.configuration.cursorEnabled
-        warningThreshold: plasmoid.configuration.warningThreshold
-        criticalThreshold: plasmoid.configuration.criticalThreshold
+        enabled: Plasmoid.configuration.cursorEnabled
+        warningThreshold: Plasmoid.configuration.warningThreshold
+        criticalThreshold: Plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
-            root.applySubscriptionPlan(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan, plasmoid.configuration.cursorCustomLimit);
+            root.applySubscriptionPlan(cursorMonitor, Plasmoid.configuration.cursorPlanId, Plasmoid.configuration.cursorPlan, Plasmoid.configuration.cursorCustomLimit);
         }
     }
 
     WindsurfMonitor {
         id: windsurfMonitor
-        enabled: plasmoid.configuration.windsurfEnabled
-        warningThreshold: plasmoid.configuration.warningThreshold
-        criticalThreshold: plasmoid.configuration.criticalThreshold
+        enabled: Plasmoid.configuration.windsurfEnabled
+        warningThreshold: Plasmoid.configuration.warningThreshold
+        criticalThreshold: Plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
-            root.applySubscriptionPlan(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan, plasmoid.configuration.windsurfCustomLimit);
+            root.applySubscriptionPlan(windsurfMonitor, Plasmoid.configuration.windsurfPlanId, Plasmoid.configuration.windsurfPlan, Plasmoid.configuration.windsurfCustomLimit);
         }
     }
 
     JetBrainsAiMonitor {
         id: jetbrainsAiMonitor
-        enabled: plasmoid.configuration.jetbrainsAiEnabled
-        warningThreshold: plasmoid.configuration.warningThreshold
-        criticalThreshold: plasmoid.configuration.criticalThreshold
+        enabled: Plasmoid.configuration.jetbrainsAiEnabled
+        warningThreshold: Plasmoid.configuration.warningThreshold
+        criticalThreshold: Plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
-            root.applySubscriptionPlan(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan, plasmoid.configuration.jetbrainsAiCustomLimit);
+            root.applySubscriptionPlan(jetbrainsAiMonitor, Plasmoid.configuration.jetbrainsAiPlanId, Plasmoid.configuration.jetbrainsAiPlan, Plasmoid.configuration.jetbrainsAiCustomLimit);
         }
     }
 
     AntigravityMonitor {
         id: antigravityMonitor
-        enabled: plasmoid.configuration.antigravityEnabled
-        warningThreshold: plasmoid.configuration.warningThreshold
-        criticalThreshold: plasmoid.configuration.criticalThreshold
+        enabled: Plasmoid.configuration.antigravityEnabled
+        warningThreshold: Plasmoid.configuration.warningThreshold
+        criticalThreshold: Plasmoid.configuration.criticalThreshold
 
         Component.onCompleted: {
             checkToolInstalled();
@@ -631,7 +642,7 @@ Item {
     }
 
     Connections {
-        target: plasmoid.configuration
+        target: Plasmoid.configuration
 
         function onOpenaiEnabledChanged() { root.syncReadinessEnabled("openai"); }
         function onAnthropicEnabledChanged() { root.syncReadinessEnabled("anthropic"); }
@@ -654,50 +665,50 @@ Item {
         function onSettingsVerificationRequestIdChanged() { root.processSettingsVerificationRequest(); }
         function onAntigravityEnabledChanged() {
             root.syncReadinessEnabled("google-antigravity");
-            if (plasmoid.configuration.antigravityEnabled) antigravityMonitor.refreshQuota();
+            if (Plasmoid.configuration.antigravityEnabled) antigravityMonitor.refreshQuota();
         }
 
-        function onClaudeCodePlanIdChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
-        function onClaudeCodePlanChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
-        function onClaudeCodeCustomLimitChanged() { root.applySubscriptionPlan(claudeCodeMonitor, plasmoid.configuration.claudeCodePlanId, plasmoid.configuration.claudeCodePlan, plasmoid.configuration.claudeCodeCustomLimit); }
+        function onClaudeCodePlanIdChanged() { root.applySubscriptionPlan(claudeCodeMonitor, Plasmoid.configuration.claudeCodePlanId, Plasmoid.configuration.claudeCodePlan, Plasmoid.configuration.claudeCodeCustomLimit); }
+        function onClaudeCodePlanChanged() { root.applySubscriptionPlan(claudeCodeMonitor, Plasmoid.configuration.claudeCodePlanId, Plasmoid.configuration.claudeCodePlan, Plasmoid.configuration.claudeCodeCustomLimit); }
+        function onClaudeCodeCustomLimitChanged() { root.applySubscriptionPlan(claudeCodeMonitor, Plasmoid.configuration.claudeCodePlanId, Plasmoid.configuration.claudeCodePlan, Plasmoid.configuration.claudeCodeCustomLimit); }
 
-        function onCodexPlanIdChanged() { root.applySubscriptionPlan(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan, plasmoid.configuration.codexCustomLimit); }
-        function onCodexPlanChanged() { root.applySubscriptionPlan(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan, plasmoid.configuration.codexCustomLimit); }
-        function onCodexCustomLimitChanged() { root.applySubscriptionPlan(codexCliMonitor, plasmoid.configuration.codexPlanId, plasmoid.configuration.codexPlan, plasmoid.configuration.codexCustomLimit); }
+        function onCodexPlanIdChanged() { root.applySubscriptionPlan(codexCliMonitor, Plasmoid.configuration.codexPlanId, Plasmoid.configuration.codexPlan, Plasmoid.configuration.codexCustomLimit); }
+        function onCodexPlanChanged() { root.applySubscriptionPlan(codexCliMonitor, Plasmoid.configuration.codexPlanId, Plasmoid.configuration.codexPlan, Plasmoid.configuration.codexCustomLimit); }
+        function onCodexCustomLimitChanged() { root.applySubscriptionPlan(codexCliMonitor, Plasmoid.configuration.codexPlanId, Plasmoid.configuration.codexPlan, Plasmoid.configuration.codexCustomLimit); }
 
-        function onCopilotPlanIdChanged() { root.applySubscriptionPlan(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan, plasmoid.configuration.copilotCustomLimit); }
-        function onCopilotPlanChanged() { root.applySubscriptionPlan(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan, plasmoid.configuration.copilotCustomLimit); }
-        function onCopilotCustomLimitChanged() { root.applySubscriptionPlan(copilotMonitor, plasmoid.configuration.copilotPlanId, plasmoid.configuration.copilotPlan, plasmoid.configuration.copilotCustomLimit); }
+        function onCopilotPlanIdChanged() { root.applySubscriptionPlan(copilotMonitor, Plasmoid.configuration.copilotPlanId, Plasmoid.configuration.copilotPlan, Plasmoid.configuration.copilotCustomLimit); }
+        function onCopilotPlanChanged() { root.applySubscriptionPlan(copilotMonitor, Plasmoid.configuration.copilotPlanId, Plasmoid.configuration.copilotPlan, Plasmoid.configuration.copilotCustomLimit); }
+        function onCopilotCustomLimitChanged() { root.applySubscriptionPlan(copilotMonitor, Plasmoid.configuration.copilotPlanId, Plasmoid.configuration.copilotPlan, Plasmoid.configuration.copilotCustomLimit); }
 
-        function onCursorPlanIdChanged() { root.applySubscriptionPlan(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan, plasmoid.configuration.cursorCustomLimit); }
-        function onCursorPlanChanged() { root.applySubscriptionPlan(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan, plasmoid.configuration.cursorCustomLimit); }
-        function onCursorCustomLimitChanged() { root.applySubscriptionPlan(cursorMonitor, plasmoid.configuration.cursorPlanId, plasmoid.configuration.cursorPlan, plasmoid.configuration.cursorCustomLimit); }
+        function onCursorPlanIdChanged() { root.applySubscriptionPlan(cursorMonitor, Plasmoid.configuration.cursorPlanId, Plasmoid.configuration.cursorPlan, Plasmoid.configuration.cursorCustomLimit); }
+        function onCursorPlanChanged() { root.applySubscriptionPlan(cursorMonitor, Plasmoid.configuration.cursorPlanId, Plasmoid.configuration.cursorPlan, Plasmoid.configuration.cursorCustomLimit); }
+        function onCursorCustomLimitChanged() { root.applySubscriptionPlan(cursorMonitor, Plasmoid.configuration.cursorPlanId, Plasmoid.configuration.cursorPlan, Plasmoid.configuration.cursorCustomLimit); }
 
-        function onWindsurfPlanIdChanged() { root.applySubscriptionPlan(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan, plasmoid.configuration.windsurfCustomLimit); }
-        function onWindsurfPlanChanged() { root.applySubscriptionPlan(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan, plasmoid.configuration.windsurfCustomLimit); }
-        function onWindsurfCustomLimitChanged() { root.applySubscriptionPlan(windsurfMonitor, plasmoid.configuration.windsurfPlanId, plasmoid.configuration.windsurfPlan, plasmoid.configuration.windsurfCustomLimit); }
+        function onWindsurfPlanIdChanged() { root.applySubscriptionPlan(windsurfMonitor, Plasmoid.configuration.windsurfPlanId, Plasmoid.configuration.windsurfPlan, Plasmoid.configuration.windsurfCustomLimit); }
+        function onWindsurfPlanChanged() { root.applySubscriptionPlan(windsurfMonitor, Plasmoid.configuration.windsurfPlanId, Plasmoid.configuration.windsurfPlan, Plasmoid.configuration.windsurfCustomLimit); }
+        function onWindsurfCustomLimitChanged() { root.applySubscriptionPlan(windsurfMonitor, Plasmoid.configuration.windsurfPlanId, Plasmoid.configuration.windsurfPlan, Plasmoid.configuration.windsurfCustomLimit); }
 
-        function onJetbrainsAiPlanIdChanged() { root.applySubscriptionPlan(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan, plasmoid.configuration.jetbrainsAiCustomLimit); }
-        function onJetbrainsAiPlanChanged() { root.applySubscriptionPlan(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan, plasmoid.configuration.jetbrainsAiCustomLimit); }
-        function onJetbrainsAiCustomLimitChanged() { root.applySubscriptionPlan(jetbrainsAiMonitor, plasmoid.configuration.jetbrainsAiPlanId, plasmoid.configuration.jetbrainsAiPlan, plasmoid.configuration.jetbrainsAiCustomLimit); }
+        function onJetbrainsAiPlanIdChanged() { root.applySubscriptionPlan(jetbrainsAiMonitor, Plasmoid.configuration.jetbrainsAiPlanId, Plasmoid.configuration.jetbrainsAiPlan, Plasmoid.configuration.jetbrainsAiCustomLimit); }
+        function onJetbrainsAiPlanChanged() { root.applySubscriptionPlan(jetbrainsAiMonitor, Plasmoid.configuration.jetbrainsAiPlanId, Plasmoid.configuration.jetbrainsAiPlan, Plasmoid.configuration.jetbrainsAiCustomLimit); }
+        function onJetbrainsAiCustomLimitChanged() { root.applySubscriptionPlan(jetbrainsAiMonitor, Plasmoid.configuration.jetbrainsAiPlanId, Plasmoid.configuration.jetbrainsAiPlan, Plasmoid.configuration.jetbrainsAiCustomLimit); }
     }
 
     LocalMetricsServer {
         id: metricsServer
-        enabled: plasmoid.configuration.prometheusEnabled
-        port: plasmoid.configuration.prometheusPort
+        enabled: Plasmoid.configuration.prometheusEnabled
+        port: Plasmoid.configuration.prometheusPort
     }
 
     WebhookNotifier {
         id: webhookNotifier
-        slackEnabled: plasmoid.configuration.slackWebhookEnabled
-        discordEnabled: plasmoid.configuration.discordWebhookEnabled
-        cooldownMinutes: plasmoid.configuration.webhookCooldownMinutes
+        slackEnabled: Plasmoid.configuration.slackWebhookEnabled
+        discordEnabled: Plasmoid.configuration.discordWebhookEnabled
+        cooldownMinutes: Plasmoid.configuration.webhookCooldownMinutes
     }
 
     ProviderRegistry {
         id: providerRegistry
-        configuration: plasmoid.configuration
+        configuration: Plasmoid.configuration
 
         openaiBackend: openaiBackend
         anthropicBackend: anthropicBackend
@@ -726,7 +737,7 @@ Item {
 
     NotificationController {
         id: notificationController
-        configuration: plasmoid.configuration
+        configuration: Plasmoid.configuration
         registry: providerRegistry
         dailyState: dailyStateModel
         usageDatabase: usageDatabase
@@ -735,7 +746,7 @@ Item {
 
     RefreshScheduler {
         id: refreshScheduler
-        configuration: plasmoid.configuration
+        configuration: Plasmoid.configuration
         registry: providerRegistry
         browserSyncService: browserSyncService
         claudeCodeMonitor: claudeCodeMonitor
@@ -743,12 +754,15 @@ Item {
         copilotMonitor: copilotMonitor
         antigravityMonitor: antigravityMonitor
         usageDatabase: usageDatabase
-        popupOpen: !!plasmoid.expanded
+        // Plasma's attached qmltypes omit the runtime expanded member.
+        // qmllint disable missing-property
+        popupOpen: !!Plasmoid["expanded"]
+        // qmllint enable missing-property
     }
 
     RuntimeCoordinator {
         id: runtimeCoordinator
-        configuration: plasmoid.configuration
+        configuration: Plasmoid.configuration
         registry: providerRegistry
         secrets: secrets
         usageDatabase: usageDatabase
@@ -766,10 +780,14 @@ Item {
 
     UpdateChecker {
         id: updateChecker
-        currentVersion: (plasmoid.metaData && plasmoid.metaData.version)
-                        ? plasmoid.metaData.version
+        // Plasma's KPluginMetaData value type is absent from its installed qmltypes.
+        // qmllint disable unresolved-type
+        currentVersion: (Plasmoid["metaData"]
+                         && Plasmoid["metaData"]["version"])
+                        ? Plasmoid["metaData"]["version"]
                         : AppInfo.version
-        checkIntervalHours: plasmoid.configuration.updateCheckInterval || 12
+        // qmllint enable unresolved-type
+        checkIntervalHours: Plasmoid.configuration.updateCheckInterval || 12
 
         onUpdateAvailable: function(latestVersion, releaseUrl) {
             notificationController.sendUpdateAvailable(latestVersion, releaseUrl);
@@ -780,41 +798,51 @@ Item {
         id: analystIntelligence
     }
 
-    property Component compactRepresentationComponent: CompactRepresentation {}
-    property Component fullRepresentationComponent: FullRepresentation {}
+    property Component compactRepresentationComponent: CompactRepresentation {
+        // Component boundaries intentionally capture their owning monitor.
+        // qmllint disable unqualified
+        monitor: root
+        // qmllint enable unqualified
+    }
+    property Component fullRepresentationComponent: FullRepresentation {
+        // Component boundaries intentionally capture their owning monitor.
+        // qmllint disable unqualified
+        monitor: root
+        // qmllint enable unqualified
+    }
 
     Component.onCompleted: {
         root.configureSourceReadiness();
         root.scheduleDiagnosticsSnapshot();
         root.processSettingsVerificationRequest();
-        var saved = plasmoid.configuration.deepseekModel || "";
+        var saved = Plasmoid.configuration.deepseekModel || "";
         var effective = ProviderPricingCatalog.effectiveModelId("deepseek", saved);
         if (saved && effective !== saved) {
-            plasmoid.configuration.deepseekModel = effective;
-            root.modelMigrationNotice = i18n("DeepSeek model %1 was retired and migrated to %2.", saved, effective);
+            Plasmoid.configuration.deepseekModel = effective;
+            root.modelMigrationNotice = KI18n.i18n("DeepSeek model %1 was retired and migrated to %2.", saved, effective);
         }
     }
 
     Plasmoid.contextualActions: [
         PlasmaCore.Action {
-            text: i18n("Refresh All")
+            text: KI18n.i18n("Refresh All")
             icon.name: "view-refresh"
             onTriggered: root.refreshAll()
         },
         PlasmaCore.Action {
-            text: i18n("Configure Settings")
+            text: KI18n.i18n("Configure Settings")
             icon.name: "configure"
-            onTriggered: plasmoid.internalAction("configure").trigger()
+            onTriggered: Plasmoid.internalAction("configure").trigger()
         },
         PlasmaCore.Action {
-            text: i18n("Open Dashboard")
+            text: KI18n.i18n("Open Dashboard")
             icon.name: "window-new"
-            onTriggered: plasmoid.expanded = true
+            onTriggered: Plasmoid.expanded = true
         },
         PlasmaCore.Action {
-            text: plasmoid.configuration.alertsEnabled ? i18n("Mute Alerts") : i18n("Unmute Alerts")
-            icon.name: plasmoid.configuration.alertsEnabled ? "notifications-disabled" : "notifications"
-            onTriggered: plasmoid.configuration.alertsEnabled = !plasmoid.configuration.alertsEnabled
+            text: Plasmoid.configuration.alertsEnabled ? KI18n.i18n("Mute Alerts") : KI18n.i18n("Unmute Alerts")
+            icon.name: Plasmoid.configuration.alertsEnabled ? "notifications-disabled" : "notifications"
+            onTriggered: Plasmoid.configuration.alertsEnabled = !Plasmoid.configuration.alertsEnabled
         }
     ]
 }

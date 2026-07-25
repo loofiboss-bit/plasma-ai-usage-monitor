@@ -16,6 +16,7 @@
 class GroqProvider : public OpenAICompatibleProvider
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit GroqProvider(QObject *parent = nullptr);

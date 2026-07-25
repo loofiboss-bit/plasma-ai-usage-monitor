@@ -29,6 +29,8 @@ qml-lint:
 # Check release metadata against the canonical VERSION file
 check:
     bash scripts/check_version_consistency.sh
+    python3 scripts/check_version_policy.py
+    python3 scripts/test_version_policy.py
     bash scripts/check_no_hardcoded_versions.sh
     python3 scripts/check_provider_catalog.py
     python3 scripts/check_config_defaults_exist_in_catalog.py
@@ -45,6 +47,7 @@ check:
     python3 scripts/check_demo_contract.py
     python3 scripts/check_release_policy.py
     python3 scripts/check_release_media.py
+    python3 scripts/test_release_media_evidence.py
     bash scripts/test_verify_exact_tag.sh
 
 # Regenerate the provider capability matrix from Catalog v5
@@ -75,6 +78,8 @@ smoke:
 release-check: build-debug
     @echo "=== Running strict release checks ==="
     bash scripts/check_version_consistency.sh
+    python3 scripts/check_version_policy.py
+    python3 scripts/test_version_policy.py
     bash scripts/check_no_hardcoded_versions.sh
     python3 scripts/check_provider_catalog.py
     python3 scripts/check_config_defaults_exist_in_catalog.py
@@ -91,6 +96,7 @@ release-check: build-debug
     python3 scripts/check_demo_contract.py
     python3 scripts/check_release_policy.py
     python3 scripts/check_release_media.py
+    python3 scripts/test_release_media_evidence.py
     bash scripts/test_verify_exact_tag.sh
     PYTHONNOUSERSITE=1 python3 scripts/smoke_test_qml_import.py --strict --build-dir build/debug --expected-version "$(< VERSION)"
     @if command -v appstreamcli >/dev/null 2>&1; then appstreamcli validate --no-net com.github.loofi.aiusagemonitor.metainfo.xml; else echo "Warning: appstreamcli not found, skipping validation. Run 'sudo dnf install appstream' on Fedora."; exit 1; fi

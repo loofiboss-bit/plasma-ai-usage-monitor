@@ -1,4 +1,5 @@
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
@@ -8,18 +9,20 @@ import "components" as Components
 MouseArea {
     id: compactRoot
 
+    required property var monitor
     readonly property url brandedIconSource: Qt.resolvedUrl("../icons/logo.png")
-    readonly property var providers: root.allProviders ?? []
-    readonly property var subscriptionTools: root.allSubscriptionTools ?? []
+    readonly property var providers: compactRoot.monitor.allProviders ?? []
+    readonly property var subscriptionTools: compactRoot.monitor.allSubscriptionTools ?? []
 
     Components.CompactMetricState {
         id: compactState
-        summary: root.presentationDailyState && root.presentationDailyState.summary
-            ? root.presentationDailyState.summary : ({})
+        summary: compactRoot.monitor.presentationDailyState
+                 && compactRoot.monitor.presentationDailyState.summary
+            ? compactRoot.monitor.presentationDailyState.summary : ({})
     }
 
     readonly property string displayMode: compactState.normalizeMode(
-        plasmoid.configuration.compactDisplayMode)
+        Plasmoid.configuration.compactDisplayMode)
     readonly property string statusKey: compactState.statusKey()
     readonly property bool anyLoading: {
         for (var i = 0; i < providers.length; i++) {
@@ -35,9 +38,9 @@ MouseArea {
     }
 
     Accessible.role: Accessible.Button
-    Accessible.name: i18n("AI Usage Monitor: %1", accessibleText())
+    Accessible.name: KI18n.i18n("AI Usage Monitor: %1", accessibleText())
     hoverEnabled: true
-    onClicked: plasmoid.activated()
+    onClicked: Plasmoid.activated()
 
     Kirigami.Icon {
         id: mainIcon

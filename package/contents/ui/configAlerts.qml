@@ -1,6 +1,8 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.plasma.plasmoid
+import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -22,24 +24,24 @@ KCM.SimpleKCM {
     property alias cfg_notifyOnUpdate: updateNotifySwitch.checked
     property alias cfg_updateCheckInterval: updateCheckSpinBox.value
 
-    property bool cfg_openaiNotificationsEnabled: plasmoid.configuration.openaiNotificationsEnabled
-    property bool cfg_anthropicNotificationsEnabled: plasmoid.configuration.anthropicNotificationsEnabled
-    property bool cfg_googleNotificationsEnabled: plasmoid.configuration.googleNotificationsEnabled
-    property bool cfg_mistralNotificationsEnabled: plasmoid.configuration.mistralNotificationsEnabled
-    property bool cfg_deepseekNotificationsEnabled: plasmoid.configuration.deepseekNotificationsEnabled
-    property bool cfg_groqNotificationsEnabled: plasmoid.configuration.groqNotificationsEnabled
-    property bool cfg_xaiNotificationsEnabled: plasmoid.configuration.xaiNotificationsEnabled
-    property bool cfg_ollamaNotificationsEnabled: plasmoid.configuration.ollamaNotificationsEnabled
-    property bool cfg_openrouterNotificationsEnabled: plasmoid.configuration.openrouterNotificationsEnabled
-    property bool cfg_togetherNotificationsEnabled: plasmoid.configuration.togetherNotificationsEnabled
-    property bool cfg_cohereNotificationsEnabled: plasmoid.configuration.cohereNotificationsEnabled
-    property bool cfg_googleveoNotificationsEnabled: plasmoid.configuration.googleveoNotificationsEnabled
-    property bool cfg_azureNotificationsEnabled: plasmoid.configuration.azureNotificationsEnabled
-    property bool cfg_bedrockNotificationsEnabled: plasmoid.configuration.bedrockNotificationsEnabled
-    property bool cfg_litellmNotificationsEnabled: plasmoid.configuration.litellmNotificationsEnabled
-    property bool cfg_cerebrasNotificationsEnabled: plasmoid.configuration.cerebrasNotificationsEnabled
-    property bool cfg_fireworksNotificationsEnabled: plasmoid.configuration.fireworksNotificationsEnabled
-    property bool cfg_perplexityNotificationsEnabled: plasmoid.configuration.perplexityNotificationsEnabled
+    property bool cfg_openaiNotificationsEnabled: Plasmoid.configuration.openaiNotificationsEnabled
+    property bool cfg_anthropicNotificationsEnabled: Plasmoid.configuration.anthropicNotificationsEnabled
+    property bool cfg_googleNotificationsEnabled: Plasmoid.configuration.googleNotificationsEnabled
+    property bool cfg_mistralNotificationsEnabled: Plasmoid.configuration.mistralNotificationsEnabled
+    property bool cfg_deepseekNotificationsEnabled: Plasmoid.configuration.deepseekNotificationsEnabled
+    property bool cfg_groqNotificationsEnabled: Plasmoid.configuration.groqNotificationsEnabled
+    property bool cfg_xaiNotificationsEnabled: Plasmoid.configuration.xaiNotificationsEnabled
+    property bool cfg_ollamaNotificationsEnabled: Plasmoid.configuration.ollamaNotificationsEnabled
+    property bool cfg_openrouterNotificationsEnabled: Plasmoid.configuration.openrouterNotificationsEnabled
+    property bool cfg_togetherNotificationsEnabled: Plasmoid.configuration.togetherNotificationsEnabled
+    property bool cfg_cohereNotificationsEnabled: Plasmoid.configuration.cohereNotificationsEnabled
+    property bool cfg_googleveoNotificationsEnabled: Plasmoid.configuration.googleveoNotificationsEnabled
+    property bool cfg_azureNotificationsEnabled: Plasmoid.configuration.azureNotificationsEnabled
+    property bool cfg_bedrockNotificationsEnabled: Plasmoid.configuration.bedrockNotificationsEnabled
+    property bool cfg_litellmNotificationsEnabled: Plasmoid.configuration.litellmNotificationsEnabled
+    property bool cfg_cerebrasNotificationsEnabled: Plasmoid.configuration.cerebrasNotificationsEnabled
+    property bool cfg_fireworksNotificationsEnabled: Plasmoid.configuration.fireworksNotificationsEnabled
+    property bool cfg_perplexityNotificationsEnabled: Plasmoid.configuration.perplexityNotificationsEnabled
     property alias cfg_slackWebhookEnabled: slackWebhookSwitch.checked
     property alias cfg_discordWebhookEnabled: discordWebhookSwitch.checked
     property alias cfg_webhookCooldownMinutes: webhookCooldownSlider.value
@@ -50,8 +52,8 @@ KCM.SimpleKCM {
 
     // DND hours: config stores -1 (disabled) or 0-23 (hour).
     // ComboBox index: 0 = "Disabled", 1-24 = hours 0-23.
-    property int cfg_dndStartHour: plasmoid.configuration.dndStartHour
-    property int cfg_dndEndHour: plasmoid.configuration.dndEndHour
+    property int cfg_dndStartHour: Plasmoid.configuration.dndStartHour
+    property int cfg_dndEndHour: Plasmoid.configuration.dndEndHour
 
     property ProviderCatalog providerCatalog: ProviderCatalog {}
 
@@ -95,12 +97,12 @@ KCM.SimpleKCM {
         secretStatusError = !result.ok;
         if (result.ok) {
             secretStatusMessage = result.appliedKeys.length > 0
-                ? i18n("Webhook credentials saved securely in KDE Wallet.") : "";
+                ? KI18n.i18n("Webhook credentials saved securely in KDE Wallet.") : "";
             if (result.appliedKeys.length > 0) loadWebhookSecrets();
         } else if (result.message === "wallet-not-open") {
-            secretStatusMessage = i18n("KDE Wallet is not open. Unlock it and retry Apply.");
+            secretStatusMessage = KI18n.i18n("KDE Wallet is not open. Unlock it and retry Apply.");
         } else {
-            secretStatusMessage = i18n("Some webhook credentials could not be saved. Retry Apply.");
+            secretStatusMessage = KI18n.i18n("Some webhook credentials could not be saved. Retry Apply.");
             if (result.appliedKeys.indexOf("slack_webhook_url") >= 0) {
                 refreshWebhookSecret("slack_webhook_url", slackWebhookField);
             }
@@ -122,7 +124,7 @@ KCM.SimpleKCM {
     }
 
     function buildHourModel() {
-        var items = [i18n("Disabled")];
+        var items = [KI18n.i18n("Disabled")];
         for (var h = 0; h < 24; h++) {
             items.push(h.toString().padStart(2, "0") + ":00");
         }
@@ -147,17 +149,17 @@ KCM.SimpleKCM {
 
         QQC2.Switch {
             id: alertsSwitch
-            Kirigami.FormData.label: i18n("Enable alerts:")
-            checked: plasmoid.configuration.alertsEnabled
+            Kirigami.FormData.label: KI18n.i18n("Enable alerts:")
+            checked: Plasmoid.configuration.alertsEnabled
         }
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Rate Limit Thresholds")
+            Kirigami.FormData.label: KI18n.i18n("Rate Limit Thresholds")
         }
 
         ColumnLayout {
-            Kirigami.FormData.label: i18n("Warning threshold:")
+            Kirigami.FormData.label: KI18n.i18n("Warning threshold:")
             enabled: alertsSwitch.checked
             spacing: Kirigami.Units.smallSpacing
 
@@ -167,7 +169,7 @@ KCM.SimpleKCM {
                 from: 50
                 to: 95
                 stepSize: 5
-                value: plasmoid.configuration.warningThreshold
+                value: Plasmoid.configuration.warningThreshold
 
                 onValueChanged: {
                     if (value >= criticalSlider.value) {
@@ -177,13 +179,13 @@ KCM.SimpleKCM {
             }
 
             QQC2.Label {
-                text: i18n("%1% of rate limit used", warningSlider.value)
+                text: KI18n.i18n("%1% of rate limit used", warningSlider.value)
                 color: Kirigami.Theme.disabledTextColor
                 Layout.alignment: Qt.AlignHCenter
             }
 
             QQC2.Label {
-                text: i18n("Shows yellow warning indicator and optional notification")
+                text: KI18n.i18n("Shows yellow warning indicator and optional notification")
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 color: Kirigami.Theme.disabledTextColor
                 wrapMode: Text.WordWrap
@@ -192,7 +194,7 @@ KCM.SimpleKCM {
         }
 
         ColumnLayout {
-            Kirigami.FormData.label: i18n("Critical threshold:")
+            Kirigami.FormData.label: KI18n.i18n("Critical threshold:")
             enabled: alertsSwitch.checked
             spacing: Kirigami.Units.smallSpacing
 
@@ -202,7 +204,7 @@ KCM.SimpleKCM {
                 from: 60
                 to: 100
                 stepSize: 5
-                value: plasmoid.configuration.criticalThreshold
+                value: Plasmoid.configuration.criticalThreshold
 
                 onValueChanged: {
                     if (value <= warningSlider.value) {
@@ -212,13 +214,13 @@ KCM.SimpleKCM {
             }
 
             QQC2.Label {
-                text: i18n("%1% of rate limit used", criticalSlider.value)
+                text: KI18n.i18n("%1% of rate limit used", criticalSlider.value)
                 color: Kirigami.Theme.disabledTextColor
                 Layout.alignment: Qt.AlignHCenter
             }
 
             QQC2.Label {
-                text: i18n("Shows red critical indicator and urgent notification")
+                text: KI18n.i18n("Shows red critical indicator and urgent notification")
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 color: Kirigami.Theme.disabledTextColor
                 wrapMode: Text.WordWrap
@@ -228,44 +230,44 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Notification Types")
+            Kirigami.FormData.label: KI18n.i18n("Notification Types")
         }
 
         QQC2.Switch {
             id: errorNotifySwitch
-            Kirigami.FormData.label: i18n("API errors:")
+            Kirigami.FormData.label: KI18n.i18n("API errors:")
             enabled: alertsSwitch.checked
-            checked: plasmoid.configuration.notifyOnError
+            checked: Plasmoid.configuration.notifyOnError
         }
 
         QQC2.Switch {
             id: budgetNotifySwitch
-            Kirigami.FormData.label: i18n("Budget warnings:")
+            Kirigami.FormData.label: KI18n.i18n("Budget warnings:")
             enabled: alertsSwitch.checked
-            checked: plasmoid.configuration.notifyOnBudgetWarning
+            checked: Plasmoid.configuration.notifyOnBudgetWarning
         }
 
         QQC2.Switch {
             id: disconnectNotifySwitch
-            Kirigami.FormData.label: i18n("Provider disconnected:")
+            Kirigami.FormData.label: KI18n.i18n("Provider disconnected:")
             enabled: alertsSwitch.checked
-            checked: plasmoid.configuration.notifyOnDisconnect
+            checked: Plasmoid.configuration.notifyOnDisconnect
         }
 
         QQC2.Switch {
             id: reconnectNotifySwitch
-            Kirigami.FormData.label: i18n("Provider reconnected:")
+            Kirigami.FormData.label: KI18n.i18n("Provider reconnected:")
             enabled: alertsSwitch.checked
-            checked: plasmoid.configuration.notifyOnReconnect
+            checked: Plasmoid.configuration.notifyOnReconnect
         }
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Per-Provider Notifications")
+            Kirigami.FormData.label: KI18n.i18n("Per-Provider Notifications")
         }
 
         QQC2.Label {
-            text: i18n("Disable notifications for specific providers. Global types above still apply.")
+            text: KI18n.i18n("Disable notifications for specific providers. Global types above still apply.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -273,9 +275,10 @@ KCM.SimpleKCM {
         }
 
         Repeater {
-            model: providerCatalog.providers
+            model: alertsPage.providerCatalog.providers
 
             QQC2.Switch {
+                required property var modelData
                 checked: alertsPage.notificationEnabled(modelData.notificationsConfigKey)
                 Kirigami.FormData.label: modelData.label + ":"
                 enabled: alertsSwitch.checked
@@ -285,18 +288,18 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Update Notifications")
+            Kirigami.FormData.label: KI18n.i18n("Update Notifications")
         }
 
         QQC2.Switch {
             id: updateNotifySwitch
-            Kirigami.FormData.label: i18n("Notify on new version:")
+            Kirigami.FormData.label: KI18n.i18n("Notify on new version:")
             enabled: alertsSwitch.checked
-            checked: plasmoid.configuration.notifyOnUpdate
+            checked: Plasmoid.configuration.notifyOnUpdate
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Check every:")
+            Kirigami.FormData.label: KI18n.i18n("Check every:")
             enabled: alertsSwitch.checked && updateNotifySwitch.checked
             spacing: Kirigami.Units.smallSpacing
 
@@ -305,17 +308,17 @@ KCM.SimpleKCM {
                 from: 1
                 to: 168
                 stepSize: 1
-                value: plasmoid.configuration.updateCheckInterval
+                value: Plasmoid.configuration.updateCheckInterval
             }
 
             QQC2.Label {
-                text: i18n("hours")
+                text: KI18n.i18n("hours")
                 color: Kirigami.Theme.disabledTextColor
             }
         }
 
         QQC2.Label {
-            text: i18n("Checks GitHub for new releases and shows a KDE notification when an update is available.")
+            text: KI18n.i18n("Checks GitHub for new releases and shows a KDE notification when an update is available.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -325,45 +328,45 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Webhooks")
+            Kirigami.FormData.label: KI18n.i18n("Webhooks")
         }
 
         QQC2.Switch {
             id: slackWebhookSwitch
-            Kirigami.FormData.label: i18n("Slack:")
+            Kirigami.FormData.label: KI18n.i18n("Slack:")
             enabled: alertsSwitch.checked
-            checked: plasmoid.configuration.slackWebhookEnabled
+            checked: Plasmoid.configuration.slackWebhookEnabled
         }
 
         QQC2.TextField {
             id: slackWebhookField
-            Kirigami.FormData.label: i18n("Slack URL:")
+            Kirigami.FormData.label: KI18n.i18n("Slack URL:")
             enabled: alertsSwitch.checked && slackWebhookSwitch.checked && alertSecrets.walletOpen
             echoMode: TextInput.Password
-            placeholderText: i18n("Stored in KWallet")
+            placeholderText: KI18n.i18n("Stored in KWallet")
             Layout.fillWidth: true
             onTextEdited: alertsPage.stageSecret("slack_webhook_url", text)
         }
 
         QQC2.Switch {
             id: discordWebhookSwitch
-            Kirigami.FormData.label: i18n("Discord:")
+            Kirigami.FormData.label: KI18n.i18n("Discord:")
             enabled: alertsSwitch.checked
-            checked: plasmoid.configuration.discordWebhookEnabled
+            checked: Plasmoid.configuration.discordWebhookEnabled
         }
 
         QQC2.TextField {
             id: discordWebhookField
-            Kirigami.FormData.label: i18n("Discord URL:")
+            Kirigami.FormData.label: KI18n.i18n("Discord URL:")
             enabled: alertsSwitch.checked && discordWebhookSwitch.checked && alertSecrets.walletOpen
             echoMode: TextInput.Password
-            placeholderText: i18n("Stored in KWallet")
+            placeholderText: KI18n.i18n("Stored in KWallet")
             Layout.fillWidth: true
             onTextEdited: alertsPage.stageSecret("discord_webhook_url", text)
         }
 
         ColumnLayout {
-            Kirigami.FormData.label: i18n("Webhook cooldown:")
+            Kirigami.FormData.label: KI18n.i18n("Webhook cooldown:")
             enabled: alertsSwitch.checked && (slackWebhookSwitch.checked || discordWebhookSwitch.checked)
             spacing: Kirigami.Units.smallSpacing
 
@@ -373,11 +376,11 @@ KCM.SimpleKCM {
                 from: 1
                 to: 60
                 stepSize: 1
-                value: plasmoid.configuration.webhookCooldownMinutes
+                value: Plasmoid.configuration.webhookCooldownMinutes
             }
 
             QQC2.Label {
-                text: i18n("%1 minutes", webhookCooldownSlider.value)
+                text: KI18n.i18n("%1 minutes", webhookCooldownSlider.value)
                 color: Kirigami.Theme.disabledTextColor
                 Layout.alignment: Qt.AlignHCenter
             }
@@ -385,11 +388,11 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Cooldown & Do Not Disturb")
+            Kirigami.FormData.label: KI18n.i18n("Cooldown & Do Not Disturb")
         }
 
         ColumnLayout {
-            Kirigami.FormData.label: i18n("Notification cooldown:")
+            Kirigami.FormData.label: KI18n.i18n("Notification cooldown:")
             enabled: alertsSwitch.checked
             spacing: Kirigami.Units.smallSpacing
 
@@ -399,11 +402,11 @@ KCM.SimpleKCM {
                 from: 1
                 to: 60
                 stepSize: 1
-                value: plasmoid.configuration.notificationCooldownMinutes
+                value: Plasmoid.configuration.notificationCooldownMinutes
             }
 
             QQC2.Label {
-                text: i18np("%1 minute between repeated notifications",
+                text: KI18n.i18np("%1 minute between repeated notifications",
                             "%1 minutes between repeated notifications",
                             cooldownSlider.value)
                 color: Kirigami.Theme.disabledTextColor
@@ -413,33 +416,33 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Do Not Disturb:")
+            Kirigami.FormData.label: KI18n.i18n("Do Not Disturb:")
             enabled: alertsSwitch.checked
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.ComboBox {
                 id: dndStartCombo
                 model: alertsPage.buildHourModel()
-                currentIndex: cfg_dndStartHour >= 0 ? cfg_dndStartHour + 1 : 0
-                onCurrentIndexChanged: cfg_dndStartHour = currentIndex === 0 ? -1 : currentIndex - 1
+                currentIndex: alertsPage.cfg_dndStartHour >= 0 ? alertsPage.cfg_dndStartHour + 1 : 0
+                onCurrentIndexChanged: alertsPage.cfg_dndStartHour = currentIndex === 0 ? -1 : currentIndex - 1
             }
 
             QQC2.Label {
-                text: i18n("to")
+                text: KI18n.i18n("to")
             }
 
             QQC2.ComboBox {
                 id: dndEndCombo
                 enabled: dndStartCombo.currentIndex > 0
                 model: alertsPage.buildHourModel()
-                currentIndex: cfg_dndEndHour >= 0 ? cfg_dndEndHour + 1 : 0
-                onCurrentIndexChanged: cfg_dndEndHour = currentIndex === 0 ? -1 : currentIndex - 1
+                currentIndex: alertsPage.cfg_dndEndHour >= 0 ? alertsPage.cfg_dndEndHour + 1 : 0
+                onCurrentIndexChanged: alertsPage.cfg_dndEndHour = currentIndex === 0 ? -1 : currentIndex - 1
             }
         }
 
         QQC2.Label {
             enabled: alertsSwitch.checked
-            text: i18n("Suppress all notifications during this time window. Set start to 'Disabled' to turn off DND.")
+            text: KI18n.i18n("Suppress all notifications during this time window. Set start to 'Disabled' to turn off DND.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -448,29 +451,29 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Preview")
+            Kirigami.FormData.label: KI18n.i18n("Preview")
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Status colors:")
+            Kirigami.FormData.label: KI18n.i18n("Status colors:")
             spacing: Kirigami.Units.largeSpacing
 
             RowLayout {
                 spacing: Kirigami.Units.smallSpacing
                 Rectangle { implicitWidth: 12; implicitHeight: 12; radius: 6; color: Kirigami.Theme.positiveTextColor }
-                QQC2.Label { text: i18n("OK"); font.pointSize: Kirigami.Theme.smallFont.pointSize }
+                QQC2.Label { text: KI18n.i18n("OK"); font.pointSize: Kirigami.Theme.smallFont.pointSize }
             }
 
             RowLayout {
                 spacing: Kirigami.Units.smallSpacing
                 Rectangle { implicitWidth: 12; implicitHeight: 12; radius: 6; color: Kirigami.Theme.neutralTextColor }
-                QQC2.Label { text: i18n("Warning"); font.pointSize: Kirigami.Theme.smallFont.pointSize }
+                QQC2.Label { text: KI18n.i18n("Warning"); font.pointSize: Kirigami.Theme.smallFont.pointSize }
             }
 
             RowLayout {
                 spacing: Kirigami.Units.smallSpacing
                 Rectangle { implicitWidth: 12; implicitHeight: 12; radius: 6; color: Kirigami.Theme.negativeTextColor }
-                QQC2.Label { text: i18n("Critical"); font.pointSize: Kirigami.Theme.smallFont.pointSize }
+                QQC2.Label { text: KI18n.i18n("Critical"); font.pointSize: Kirigami.Theme.smallFont.pointSize }
             }
         }
     }

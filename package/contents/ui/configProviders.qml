@@ -1,4 +1,6 @@
 import QtQuick
+import org.kde.plasma.plasmoid
+import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -10,83 +12,83 @@ KCM.SimpleKCM {
 
     signal configurationChanged()
 
-    property bool cfg_advancedSettingsMode: plasmoid.configuration.advancedSettingsMode
+    property bool cfg_advancedSettingsMode: Plasmoid.configuration.advancedSettingsMode
 
-    property bool cfg_openaiEnabled: plasmoid.configuration.openaiEnabled
-    property string cfg_openaiModel: plasmoid.configuration.openaiModel
-    property string cfg_openaiProjectId: plasmoid.configuration.openaiProjectId
-    property string cfg_openaiCustomBaseUrl: plasmoid.configuration.openaiCustomBaseUrl
-    property bool cfg_anthropicEnabled: plasmoid.configuration.anthropicEnabled
-    property string cfg_anthropicModel: plasmoid.configuration.anthropicModel
-    property string cfg_anthropicCustomBaseUrl: plasmoid.configuration.anthropicCustomBaseUrl
-    property bool cfg_googleEnabled: plasmoid.configuration.googleEnabled
-    property string cfg_googleModel: plasmoid.configuration.googleModel
-    property string cfg_googleTier: plasmoid.configuration.googleTier
-    property string cfg_googleCustomBaseUrl: plasmoid.configuration.googleCustomBaseUrl
-    property bool cfg_mistralEnabled: plasmoid.configuration.mistralEnabled
-    property string cfg_mistralModel: plasmoid.configuration.mistralModel
-    property string cfg_mistralCustomBaseUrl: plasmoid.configuration.mistralCustomBaseUrl
-    property bool cfg_deepseekEnabled: plasmoid.configuration.deepseekEnabled
-    property string cfg_deepseekModel: plasmoid.configuration.deepseekModel
-    property string cfg_deepseekCustomBaseUrl: plasmoid.configuration.deepseekCustomBaseUrl
-    property bool cfg_groqEnabled: plasmoid.configuration.groqEnabled
-    property string cfg_groqModel: plasmoid.configuration.groqModel
-    property string cfg_groqCustomBaseUrl: plasmoid.configuration.groqCustomBaseUrl
-    property bool cfg_xaiEnabled: plasmoid.configuration.xaiEnabled
-    property string cfg_xaiModel: plasmoid.configuration.xaiModel
-    property string cfg_xaiCustomBaseUrl: plasmoid.configuration.xaiCustomBaseUrl
-    property bool cfg_ollamaEnabled: plasmoid.configuration.ollamaEnabled
-    property string cfg_ollamaModel: plasmoid.configuration.ollamaModel
-    property string cfg_ollamaCustomBaseUrl: plasmoid.configuration.ollamaCustomBaseUrl
-    property bool cfg_openrouterEnabled: plasmoid.configuration.openrouterEnabled
-    property string cfg_openrouterModel: plasmoid.configuration.openrouterModel
-    property string cfg_openrouterCustomBaseUrl: plasmoid.configuration.openrouterCustomBaseUrl
-    property bool cfg_togetherEnabled: plasmoid.configuration.togetherEnabled
-    property string cfg_togetherModel: plasmoid.configuration.togetherModel
-    property string cfg_togetherCustomBaseUrl: plasmoid.configuration.togetherCustomBaseUrl
-    property bool cfg_cohereEnabled: plasmoid.configuration.cohereEnabled
-    property string cfg_cohereModel: plasmoid.configuration.cohereModel
-    property string cfg_cohereCustomBaseUrl: plasmoid.configuration.cohereCustomBaseUrl
-    property bool cfg_googleveoEnabled: plasmoid.configuration.googleveoEnabled
-    property string cfg_googleveoModel: plasmoid.configuration.googleveoModel
-    property string cfg_googleveoTier: plasmoid.configuration.googleveoTier
-    property string cfg_googleveoCustomBaseUrl: plasmoid.configuration.googleveoCustomBaseUrl
-    property bool cfg_azureEnabled: plasmoid.configuration.azureEnabled
-    property string cfg_azureModel: plasmoid.configuration.azureModel
-    property string cfg_azureDeploymentId: plasmoid.configuration.azureDeploymentId
-    property string cfg_azureCustomBaseUrl: plasmoid.configuration.azureCustomBaseUrl
-    property bool cfg_bedrockEnabled: plasmoid.configuration.bedrockEnabled
-    property string cfg_bedrockRegion: plasmoid.configuration.bedrockRegion
-    property string cfg_bedrockModel: plasmoid.configuration.bedrockModel
-    property string cfg_bedrockCustomBaseUrl: plasmoid.configuration.bedrockCustomBaseUrl
-    property bool cfg_litellmEnabled: plasmoid.configuration.litellmEnabled
-    property string cfg_litellmModel: plasmoid.configuration.litellmModel
-    property string cfg_litellmCustomBaseUrl: plasmoid.configuration.litellmCustomBaseUrl
-    property bool cfg_cerebrasEnabled: plasmoid.configuration.cerebrasEnabled
-    property string cfg_cerebrasModel: plasmoid.configuration.cerebrasModel
-    property string cfg_cerebrasCustomBaseUrl: plasmoid.configuration.cerebrasCustomBaseUrl
-    property bool cfg_fireworksEnabled: plasmoid.configuration.fireworksEnabled
-    property string cfg_fireworksModel: plasmoid.configuration.fireworksModel
-    property string cfg_fireworksCustomBaseUrl: plasmoid.configuration.fireworksCustomBaseUrl
-    property bool cfg_perplexityEnabled: plasmoid.configuration.perplexityEnabled
-    property string cfg_perplexityModel: plasmoid.configuration.perplexityModel
-    property string cfg_perplexityCustomBaseUrl: plasmoid.configuration.perplexityCustomBaseUrl
-    property bool cfg_claudeCodeEnabled: plasmoid.configuration.claudeCodeEnabled
-    property bool cfg_codexEnabled: plasmoid.configuration.codexEnabled
-    property bool cfg_copilotEnabled: plasmoid.configuration.copilotEnabled
-    property bool cfg_cursorEnabled: plasmoid.configuration.cursorEnabled
-    property bool cfg_windsurfEnabled: plasmoid.configuration.windsurfEnabled
-    property bool cfg_jetbrainsAiEnabled: plasmoid.configuration.jetbrainsAiEnabled
-    property bool cfg_antigravityEnabled: plasmoid.configuration.antigravityEnabled
+    property bool cfg_openaiEnabled: Plasmoid.configuration.openaiEnabled
+    property string cfg_openaiModel: Plasmoid.configuration.openaiModel
+    property string cfg_openaiProjectId: Plasmoid.configuration.openaiProjectId
+    property string cfg_openaiCustomBaseUrl: Plasmoid.configuration.openaiCustomBaseUrl
+    property bool cfg_anthropicEnabled: Plasmoid.configuration.anthropicEnabled
+    property string cfg_anthropicModel: Plasmoid.configuration.anthropicModel
+    property string cfg_anthropicCustomBaseUrl: Plasmoid.configuration.anthropicCustomBaseUrl
+    property bool cfg_googleEnabled: Plasmoid.configuration.googleEnabled
+    property string cfg_googleModel: Plasmoid.configuration.googleModel
+    property string cfg_googleTier: Plasmoid.configuration.googleTier
+    property string cfg_googleCustomBaseUrl: Plasmoid.configuration.googleCustomBaseUrl
+    property bool cfg_mistralEnabled: Plasmoid.configuration.mistralEnabled
+    property string cfg_mistralModel: Plasmoid.configuration.mistralModel
+    property string cfg_mistralCustomBaseUrl: Plasmoid.configuration.mistralCustomBaseUrl
+    property bool cfg_deepseekEnabled: Plasmoid.configuration.deepseekEnabled
+    property string cfg_deepseekModel: Plasmoid.configuration.deepseekModel
+    property string cfg_deepseekCustomBaseUrl: Plasmoid.configuration.deepseekCustomBaseUrl
+    property bool cfg_groqEnabled: Plasmoid.configuration.groqEnabled
+    property string cfg_groqModel: Plasmoid.configuration.groqModel
+    property string cfg_groqCustomBaseUrl: Plasmoid.configuration.groqCustomBaseUrl
+    property bool cfg_xaiEnabled: Plasmoid.configuration.xaiEnabled
+    property string cfg_xaiModel: Plasmoid.configuration.xaiModel
+    property string cfg_xaiCustomBaseUrl: Plasmoid.configuration.xaiCustomBaseUrl
+    property bool cfg_ollamaEnabled: Plasmoid.configuration.ollamaEnabled
+    property string cfg_ollamaModel: Plasmoid.configuration.ollamaModel
+    property string cfg_ollamaCustomBaseUrl: Plasmoid.configuration.ollamaCustomBaseUrl
+    property bool cfg_openrouterEnabled: Plasmoid.configuration.openrouterEnabled
+    property string cfg_openrouterModel: Plasmoid.configuration.openrouterModel
+    property string cfg_openrouterCustomBaseUrl: Plasmoid.configuration.openrouterCustomBaseUrl
+    property bool cfg_togetherEnabled: Plasmoid.configuration.togetherEnabled
+    property string cfg_togetherModel: Plasmoid.configuration.togetherModel
+    property string cfg_togetherCustomBaseUrl: Plasmoid.configuration.togetherCustomBaseUrl
+    property bool cfg_cohereEnabled: Plasmoid.configuration.cohereEnabled
+    property string cfg_cohereModel: Plasmoid.configuration.cohereModel
+    property string cfg_cohereCustomBaseUrl: Plasmoid.configuration.cohereCustomBaseUrl
+    property bool cfg_googleveoEnabled: Plasmoid.configuration.googleveoEnabled
+    property string cfg_googleveoModel: Plasmoid.configuration.googleveoModel
+    property string cfg_googleveoTier: Plasmoid.configuration.googleveoTier
+    property string cfg_googleveoCustomBaseUrl: Plasmoid.configuration.googleveoCustomBaseUrl
+    property bool cfg_azureEnabled: Plasmoid.configuration.azureEnabled
+    property string cfg_azureModel: Plasmoid.configuration.azureModel
+    property string cfg_azureDeploymentId: Plasmoid.configuration.azureDeploymentId
+    property string cfg_azureCustomBaseUrl: Plasmoid.configuration.azureCustomBaseUrl
+    property bool cfg_bedrockEnabled: Plasmoid.configuration.bedrockEnabled
+    property string cfg_bedrockRegion: Plasmoid.configuration.bedrockRegion
+    property string cfg_bedrockModel: Plasmoid.configuration.bedrockModel
+    property string cfg_bedrockCustomBaseUrl: Plasmoid.configuration.bedrockCustomBaseUrl
+    property bool cfg_litellmEnabled: Plasmoid.configuration.litellmEnabled
+    property string cfg_litellmModel: Plasmoid.configuration.litellmModel
+    property string cfg_litellmCustomBaseUrl: Plasmoid.configuration.litellmCustomBaseUrl
+    property bool cfg_cerebrasEnabled: Plasmoid.configuration.cerebrasEnabled
+    property string cfg_cerebrasModel: Plasmoid.configuration.cerebrasModel
+    property string cfg_cerebrasCustomBaseUrl: Plasmoid.configuration.cerebrasCustomBaseUrl
+    property bool cfg_fireworksEnabled: Plasmoid.configuration.fireworksEnabled
+    property string cfg_fireworksModel: Plasmoid.configuration.fireworksModel
+    property string cfg_fireworksCustomBaseUrl: Plasmoid.configuration.fireworksCustomBaseUrl
+    property bool cfg_perplexityEnabled: Plasmoid.configuration.perplexityEnabled
+    property string cfg_perplexityModel: Plasmoid.configuration.perplexityModel
+    property string cfg_perplexityCustomBaseUrl: Plasmoid.configuration.perplexityCustomBaseUrl
+    property bool cfg_claudeCodeEnabled: Plasmoid.configuration.claudeCodeEnabled
+    property bool cfg_codexEnabled: Plasmoid.configuration.codexEnabled
+    property bool cfg_copilotEnabled: Plasmoid.configuration.copilotEnabled
+    property bool cfg_cursorEnabled: Plasmoid.configuration.cursorEnabled
+    property bool cfg_windsurfEnabled: Plasmoid.configuration.windsurfEnabled
+    property bool cfg_jetbrainsAiEnabled: Plasmoid.configuration.jetbrainsAiEnabled
+    property bool cfg_antigravityEnabled: Plasmoid.configuration.antigravityEnabled
 
     readonly property bool advancedMode: cfg_advancedSettingsMode
     readonly property bool walletOpen: secrets.walletOpen
     readonly property bool hasUnsavedChanges: settingsController.dirty || secretChanges.dirty
     readonly property bool unsavedChanges: secretChanges.dirty
-    readonly property string verificationSourceId: plasmoid.configuration.settingsVerificationSourceId || ""
-    readonly property string verificationState: plasmoid.configuration.settingsVerificationState || ""
-    readonly property string verificationMessage: plasmoid.configuration.settingsVerificationMessage || ""
-    readonly property string verificationTimestamp: plasmoid.configuration.settingsVerificationTimestamp || ""
+    readonly property string verificationSourceId: Plasmoid.configuration.settingsVerificationSourceId || ""
+    readonly property string verificationState: Plasmoid.configuration.settingsVerificationState || ""
+    readonly property string verificationMessage: Plasmoid.configuration.settingsVerificationMessage || ""
+    readonly property string verificationTimestamp: Plasmoid.configuration.settingsVerificationTimestamp || ""
 
     property string secretStatusMessage: ""
     property bool secretStatusError: false
@@ -137,7 +139,7 @@ KCM.SimpleKCM {
         id: settingsController
         descriptors: providersPage.settingsSources
         configuration: providersPage
-        selectedSourceId: plasmoid.configuration.settingsVerificationSourceId || ""
+        selectedSourceId: Plasmoid.configuration.settingsVerificationSourceId || ""
         onConfigurationEdited: providersPage.configurationChanged()
     }
 
@@ -189,9 +191,9 @@ KCM.SimpleKCM {
     function secretPlaceholder(key) {
         var pending = secretChanges.pendingChanges[key];
         if (pending !== undefined)
-            return pending.action === "remove" ? i18n("Removal pending") : i18n("Replacement pending");
+            return pending.action === "remove" ? KI18n.i18n("Removal pending") : KI18n.i18n("Replacement pending");
         return secrets.walletOpen && secrets.hasKey(key)
-            ? i18n("Saved in KDE Wallet — leave blank to keep") : i18n("Required");
+            ? KI18n.i18n("Saved in KDE Wallet — leave blank to keep") : KI18n.i18n("Required");
     }
 
     function saveConfig() {
@@ -199,24 +201,24 @@ KCM.SimpleKCM {
         secretStatusError = !result.ok;
         if (result.ok) {
             secretStatusMessage = result.appliedKeys.length > 0
-                ? i18n("Credentials saved securely in KDE Wallet.") : "";
+                ? KI18n.i18n("Credentials saved securely in KDE Wallet.") : "";
             settingsController.acceptChanges();
         } else if (result.message === "wallet-not-open") {
-            secretStatusMessage = i18n("KDE Wallet is not open. Unlock it and retry Apply.");
+            secretStatusMessage = KI18n.i18n("KDE Wallet is not open. Unlock it and retry Apply.");
         } else {
-            secretStatusMessage = i18n("Some credentials could not be saved. Retry Apply.");
+            secretStatusMessage = KI18n.i18n("Some credentials could not be saved. Retry Apply.");
         }
         if (!result.ok) Qt.callLater(function() { providersPage.configurationChanged(); });
     }
 
     function requestVerification(sourceId) {
         if (hasUnsavedChanges || !sourceId) return;
-        plasmoid.configuration.settingsVerificationSourceId = sourceId;
-        plasmoid.configuration.settingsVerificationState = "verifying";
-        plasmoid.configuration.settingsVerificationMessage = i18n("Verification requested from the running widget.");
-        plasmoid.configuration.settingsVerificationTimestamp = "";
-        plasmoid.configuration.settingsVerificationRequestId =
-            Number(plasmoid.configuration.settingsVerificationRequestId || 0) + 1;
+        Plasmoid.configuration.settingsVerificationSourceId = sourceId;
+        Plasmoid.configuration.settingsVerificationState = "verifying";
+        Plasmoid.configuration.settingsVerificationMessage = KI18n.i18n("Verification requested from the running widget.");
+        Plasmoid.configuration.settingsVerificationTimestamp = "";
+        Plasmoid.configuration.settingsVerificationRequestId =
+            Number(Plasmoid.configuration.settingsVerificationRequestId || 0) + 1;
     }
 
     Component.onDestruction: secretChanges.discard()
@@ -239,20 +241,20 @@ KCM.SimpleKCM {
             Kirigami.Heading {
                 Layout.fillWidth: true
                 level: 2
-                text: i18n("Provider sources")
+                text: KI18n.i18n("Provider sources")
             }
 
             QQC2.Switch {
-                text: i18n("Advanced")
+                text: KI18n.i18n("Advanced")
                 checked: providersPage.advancedMode
-                Accessible.name: i18n("Show advanced provider settings")
+                Accessible.name: KI18n.i18n("Show advanced provider settings")
                 onToggled: settingsController.setValue("advancedSettingsMode", checked)
             }
         }
 
         QQC2.Label {
             Layout.fillWidth: true
-            text: i18n("Choose one source to configure. Usage and spend sources are listed before connectivity-only checks.")
+            text: KI18n.i18n("Choose one source to configure. Usage and spend sources are listed before connectivity-only checks.")
             wrapMode: Text.WordWrap
             color: Kirigami.Theme.disabledTextColor
         }

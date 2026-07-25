@@ -1,4 +1,5 @@
 import QtQuick
+import org.kde.ki18n
 import org.kde.notification
 
 Item {
@@ -30,7 +31,7 @@ Item {
         id: quotaNotification
         componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
         eventId: "quotaWarning"
-        title: i18n("AI Usage Monitor")
+        title: KI18n.i18n("AI Usage Monitor")
         iconName: notifications.warningNotificationIcon
     }
 
@@ -38,7 +39,7 @@ Item {
         id: budgetNotification
         componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
         eventId: "budgetWarning"
-        title: i18n("AI Usage Monitor")
+        title: KI18n.i18n("AI Usage Monitor")
         iconName: notifications.brandedNotificationIcon
     }
 
@@ -46,7 +47,7 @@ Item {
         id: stateNotification
         componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
         eventId: "apiError"
-        title: i18n("AI Usage Monitor")
+        title: KI18n.i18n("AI Usage Monitor")
         iconName: notifications.errorNotificationIcon
     }
 
@@ -54,7 +55,7 @@ Item {
         id: recoveryNotification
         componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
         eventId: "providerReconnected"
-        title: i18n("AI Usage Monitor")
+        title: KI18n.i18n("AI Usage Monitor")
         iconName: notifications.brandedNotificationIcon
     }
 
@@ -62,7 +63,7 @@ Item {
         id: updateNotification
         componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
         eventId: "updateAvailable"
-        title: i18n("AI Usage Monitor - Update Available")
+        title: KI18n.i18n("AI Usage Monitor - Update Available")
         iconName: notifications.brandedNotificationIcon
     }
 
@@ -141,11 +142,11 @@ Item {
     function quotaSourceLabel(sourceClass) {
         switch (sourceClass) {
         case "actual":
-            return i18n("Live quota");
+            return KI18n.i18n("Live quota");
         case "local_estimate":
-            return i18n("Local estimate");
+            return KI18n.i18n("Local estimate");
         case "configured_limit":
-            return i18n("Configured limit");
+            return KI18n.i18n("Configured limit");
         default:
             return "";
         }
@@ -174,34 +175,34 @@ Item {
         var lines = [];
         for (var i = 0; i < windows.length; i++) {
             var window = windows[i];
-            var name = window.window || window.kind || i18n("Quota window");
+            var name = window.window || window.kind || KI18n.i18n("Quota window");
             var remaining = Math.round(Number(window.percentRemaining));
             var source = quotaSourceLabel(window.sourceClass);
             var reset = resetLabel(window.resetAt);
             lines.push(reset !== ""
-                ? i18n("%1: %2% remaining (%3), resets %4",
+                ? KI18n.i18n("%1: %2% remaining (%3), resets %4",
                        name, remaining, source, reset)
-                : i18n("%1: %2% remaining (%3)",
+                : KI18n.i18n("%1: %2% remaining (%3)",
                        name, remaining, source));
         }
-        return i18n("%1 quota status:", row.displayName) + "\n" + lines.join("\n");
+        return KI18n.i18n("%1 quota status:", row.displayName) + "\n" + lines.join("\n");
     }
 
     function safeFailureMessage(row) {
         var reason = row.attentionReasonKey || row.lastErrorKind || "failed";
         switch (reason) {
         case "authentication":
-            return i18n("%1 needs updated credentials.", row.displayName);
+            return KI18n.i18n("%1 needs updated credentials.", row.displayName);
         case "permission":
-            return i18n("%1 needs additional permission.", row.displayName);
+            return KI18n.i18n("%1 needs additional permission.", row.displayName);
         case "needs_configuration":
         case "configuration":
-            return i18n("%1 needs configuration.", row.displayName);
+            return KI18n.i18n("%1 needs configuration.", row.displayName);
         case "schema":
         case "format_changed":
-            return i18n("%1 returned an unsupported data format.", row.displayName);
+            return KI18n.i18n("%1 returned an unsupported data format.", row.displayName);
         default:
-            return i18n("%1 could not refresh. Open the monitor for recovery steps.",
+            return KI18n.i18n("%1 could not refresh. Open the monitor for recovery steps.",
                         row.displayName);
         }
     }
@@ -258,8 +259,8 @@ Item {
             actionKey: row.nextActionKey || "",
             severity: critical ? "critical" : "warning",
             title: critical
-                ? i18n("%1 quota critical", row.displayName)
-                : i18n("%1 quota warning", row.displayName),
+                ? KI18n.i18n("%1 quota critical", row.displayName)
+                : KI18n.i18n("%1 quota warning", row.displayName),
             message: quotaMessage(row, windows),
             critical: critical,
             quotaWindowCount: windows.length
@@ -279,9 +280,9 @@ Item {
             actionKey: row.nextActionKey || "",
             severity: row.attentionSeverity,
             title: critical
-                ? i18n("%1 budget critical", row.displayName)
-                : i18n("%1 budget warning", row.displayName),
-            message: i18n("%1 budget usage is %2%.",
+                ? KI18n.i18n("%1 budget critical", row.displayName)
+                : KI18n.i18n("%1 budget warning", row.displayName),
+            message: KI18n.i18n("%1 budget usage is %2%.",
                           row.displayName,
                           Math.round(Number(row.budgetPercentUsed))),
             critical: critical
@@ -295,7 +296,7 @@ Item {
             sourceId: row.stableId,
             actionKey: row.nextActionKey || "",
             severity: row.attentionSeverity,
-            title: i18n("%1 needs attention", row.displayName),
+            title: KI18n.i18n("%1 needs attention", row.displayName),
             message: safeFailureMessage(row),
             critical: row.attentionSeverity === "critical"
         };
@@ -308,8 +309,8 @@ Item {
             sourceId: row.stableId,
             actionKey: row.nextActionKey || "",
             severity: row.attentionSeverity,
-            title: i18n("%1 data is stale", row.displayName),
-            message: i18n("%1 kept its last useful snapshot, but it could not be refreshed.",
+            title: KI18n.i18n("%1 data is stale", row.displayName),
+            message: KI18n.i18n("%1 kept its last useful snapshot, but it could not be refreshed.",
                           row.displayName),
             critical: false
         };
@@ -322,8 +323,8 @@ Item {
             sourceId: row.stableId,
             actionKey: row.nextActionKey || "",
             severity: "none",
-            title: i18n("%1 recovered", row.displayName),
-            message: i18n("%1 is reporting again.", row.displayName),
+            title: KI18n.i18n("%1 recovered", row.displayName),
+            message: KI18n.i18n("%1 is reporting again.", row.displayName),
             critical: false
         };
     }
@@ -426,7 +427,7 @@ Item {
             return;
         }
 
-        updateNotification.text = i18n("Version %1 is available! Visit %2 to update.",
+        updateNotification.text = KI18n.i18n("Version %1 is available! Visit %2 to update.",
                                        latestVersion, releaseUrl);
         updateNotification.sendEvent();
     }

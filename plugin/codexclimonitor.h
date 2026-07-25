@@ -28,6 +28,7 @@
 class CodexCliMonitor : public LocalActivityMonitorBase
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit CodexCliMonitor(QObject *parent = nullptr);

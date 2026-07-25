@@ -10,6 +10,8 @@
 class ProviderPricingCatalog : public CatalogLoader
 {
     Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
 
 public:
     explicit ProviderPricingCatalog(QObject *parent = nullptr);

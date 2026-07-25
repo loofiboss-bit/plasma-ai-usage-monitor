@@ -6,6 +6,7 @@
 class WindsurfMonitor : public LocalActivityMonitorBase
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit WindsurfMonitor(QObject *parent = nullptr);

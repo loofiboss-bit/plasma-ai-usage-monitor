@@ -6,6 +6,7 @@
 class CursorMonitor : public LocalActivityMonitorBase
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit CursorMonitor(QObject *parent = nullptr);

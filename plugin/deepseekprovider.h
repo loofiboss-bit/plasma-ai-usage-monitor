@@ -16,6 +16,7 @@
 class DeepSeekProvider : public OpenAICompatibleProvider
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(double balance READ balance NOTIFY balanceChanged)
     Q_PROPERTY(bool balanceAvailable READ balanceAvailable NOTIFY balanceChanged)

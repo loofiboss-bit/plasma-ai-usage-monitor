@@ -5,10 +5,12 @@
 
 #include <QObject>
 #include <QPointer>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 class BrowserSyncService : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
     Q_PROPERTY(int browserType READ browserType WRITE setBrowserType NOTIFY configurationChanged)
     Q_PROPERTY(QString selectedFirefoxProfile READ selectedFirefoxProfile WRITE setSelectedFirefoxProfile NOTIFY configurationChanged)
     Q_PROPERTY(bool hasFirefoxProfile READ hasFirefoxProfile NOTIFY readinessChanged)

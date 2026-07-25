@@ -19,6 +19,7 @@
 class OpenAIProvider : public ProviderBackend
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(QString projectId READ projectId WRITE setProjectId NOTIFY projectIdChanged)
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY modelChanged)

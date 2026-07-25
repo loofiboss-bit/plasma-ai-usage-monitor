@@ -1,6 +1,8 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.plasma.plasmoid
+import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -17,8 +19,12 @@ KCM.SimpleKCM {
     readonly property string providerGuideUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/providers.md"
     readonly property string providerCatalogUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/package/contents/catalog/providers-v4.json"
     readonly property string subscriptionGuideUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/subscriptions.md"
-    readonly property string frontendVersion: (plasmoid.metaData && plasmoid.metaData.version)
-                                                ? plasmoid.metaData.version : "unknown"
+    // Plasma's KPluginMetaData value type is absent from its installed qmltypes.
+    // qmllint disable unresolved-type
+    readonly property string frontendVersion:
+        (Plasmoid["metaData"] && Plasmoid["metaData"]["version"])
+        ? Plasmoid["metaData"]["version"] : "unknown"
+    // qmllint enable unresolved-type
     readonly property var systemInfo: AppInfo.systemDiagnostics(frontendVersion)
     readonly property var databaseInfo: AppInfo.databaseDiagnostics()
     readonly property var sourceSnapshot: parseSourceSnapshot()
@@ -83,18 +89,18 @@ KCM.SimpleKCM {
 
     Dialogs.FileDialog {
         id: exportDialog
-        title: i18n("Export Configuration")
+        title: KI18n.i18n("Export Configuration")
         fileMode: Dialogs.FileDialog.SaveFile
         nameFilters: ["JSON Files (*.json)"]
         currentFile: "ai-usage-monitor-config.json"
         onAccepted: {
-            AppInfo.exportConfig(JSON.stringify(exportConfigData(), null, 2), selectedFile.toString());
+            AppInfo.exportConfig(JSON.stringify(diagnosticsPage.exportConfigData(), null, 2), selectedFile.toString());
         }
     }
 
     Dialogs.FileDialog {
         id: importDialog
-        title: i18n("Import Configuration")
+        title: KI18n.i18n("Import Configuration")
         fileMode: Dialogs.FileDialog.OpenFile
         nameFilters: ["JSON Files (*.json)"]
         onAccepted: {
@@ -102,7 +108,7 @@ KCM.SimpleKCM {
             if (jsonStr.length > 0) {
                 try {
                     var configData = JSON.parse(jsonStr);
-                    importConfigData(configData);
+                    diagnosticsPage.importConfigData(configData);
                 } catch (e) {
                     console.error("Failed to parse imported config:", e);
                 }
@@ -115,39 +121,39 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Trust Center")
+            Kirigami.FormData.label: KI18n.i18n("Trust Center")
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Actual API Usage:")
-            text: i18n("Provider-reported usage or billing endpoints when available.")
+            Kirigami.FormData.label: KI18n.i18n("Actual API Usage:")
+            text: KI18n.i18n("Provider-reported usage or billing endpoints when available.")
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Estimated Cost:")
-            text: i18n("Calculated locally from token counts and the shipped Provider Catalog.")
+            Kirigami.FormData.label: KI18n.i18n("Estimated Cost:")
+            text: KI18n.i18n("Calculated locally from token counts and the shipped Provider Catalog.")
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Rate Limit Only:")
-            text: i18n("Connectivity and quota headers without exact provider billing data.")
+            Kirigami.FormData.label: KI18n.i18n("Rate Limit Only:")
+            text: KI18n.i18n("Connectivity and quota headers without exact provider billing data.")
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Background Traffic:")
-            text: i18n("Scheduled provider monitoring uses read-only GET endpoints only. Inference tests are manual and may consume quota or money.")
+            Kirigami.FormData.label: KI18n.i18n("Background Traffic:")
+            text: KI18n.i18n("Scheduled provider monitoring uses read-only GET endpoints only. Inference tests are manual and may consume quota or money.")
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
 
         ColumnLayout {
-            Kirigami.FormData.label: i18n("Scheduled calls:")
+            Kirigami.FormData.label: KI18n.i18n("Scheduled calls:")
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
             Repeater {
@@ -164,53 +170,53 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Local Tool Data:")
-            text: i18n("Filesystem-derived activity for subscription tools; self-tracked, not vendor billing truth.")
+            Kirigami.FormData.label: KI18n.i18n("Local Tool Data:")
+            text: KI18n.i18n("Filesystem-derived activity for subscription tools; self-tracked, not vendor billing truth.")
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Browser Sync Labs:")
-            text: i18n("Experimental browser-session probes. Cookies and tokens are not logged; local estimation remains the fallback.")
+            Kirigami.FormData.label: KI18n.i18n("Browser Sync Labs:")
+            text: KI18n.i18n("Experimental browser-session probes. Cookies and tokens are not logged; local estimation remains the fallback.")
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
 
         CatalogTrustPanel {
-            Kirigami.FormData.label: i18n("Catalogs:")
+            Kirigami.FormData.label: KI18n.i18n("Catalogs:")
             Layout.fillWidth: true
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Catalog Actions:")
+            Kirigami.FormData.label: KI18n.i18n("Catalog Actions:")
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
-                text: i18n("Open provider guide")
+                text: KI18n.i18n("Open provider guide")
                 icon.name: "help-contents"
                 onClicked: Qt.openUrlExternally(diagnosticsPage.providerGuideUrl)
             }
 
             QQC2.Button {
-                text: i18n("Review provider catalog")
+                text: KI18n.i18n("Review provider catalog")
                 icon.name: "document-open"
                 onClicked: Qt.openUrlExternally(diagnosticsPage.providerCatalogUrl)
             }
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Provider Health:")
-            text: i18n("%1 providers enabled", enabledProviderCount())
+            Kirigami.FormData.label: KI18n.i18n("Provider Health:")
+            text: KI18n.i18n("%1 providers enabled", diagnosticsPage.enabledProviderCount())
         }
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Wallet & Secrets")
+            Kirigami.FormData.label: KI18n.i18n("Wallet & Secrets")
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("KWallet Status:")
+            Kirigami.FormData.label: KI18n.i18n("KWallet Status:")
             spacing: Kirigami.Units.smallSpacing
 
             Kirigami.Icon {
@@ -222,20 +228,20 @@ KCM.SimpleKCM {
 
             QQC2.Label {
                 Layout.fillWidth: true
-                text: secrets.walletOpen ? i18n("Wallet is open and accessible") : i18n("Wallet is closed or inaccessible. API keys cannot be saved or loaded.")
+                text: secrets.walletOpen ? KI18n.i18n("Wallet is open and accessible") : KI18n.i18n("Wallet is closed or inaccessible. API keys cannot be saved or loaded.")
                 color: secrets.walletOpen ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
                 wrapMode: Text.WordWrap
             }
 
             QQC2.Button {
-                text: secrets.walletOpen ? i18n("Reload") : i18n("Open Wallet")
+                text: secrets.walletOpen ? KI18n.i18n("Reload") : KI18n.i18n("Open Wallet")
                 icon.name: "wallet-open"
                 onClicked: secrets.retryOpenWallet()
             }
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Copilot Token:")
+            Kirigami.FormData.label: KI18n.i18n("Copilot Token:")
             spacing: Kirigami.Units.smallSpacing
 
             Kirigami.Icon {
@@ -248,19 +254,19 @@ KCM.SimpleKCM {
             QQC2.Label {
                 Layout.fillWidth: true
                 text: secrets.walletOpen && secrets.hasKey("copilot_github")
-                    ? i18n("GitHub token is available for organization metrics")
-                    : i18n("No GitHub token loaded for Copilot organization metrics")
+                    ? KI18n.i18n("GitHub token is available for organization metrics")
+                    : KI18n.i18n("No GitHub token loaded for Copilot organization metrics")
                 wrapMode: Text.WordWrap
             }
         }
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Browser Sync Readiness")
+            Kirigami.FormData.label: KI18n.i18n("Browser Sync Readiness")
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Browser Profiles:")
+            Kirigami.FormData.label: KI18n.i18n("Browser Profiles:")
             spacing: Kirigami.Units.smallSpacing
 
             Kirigami.Icon {
@@ -272,20 +278,20 @@ KCM.SimpleKCM {
 
             QQC2.Label {
                 Layout.fillWidth: true
-                text: syncDetector.hasCurrentBrowserProfile ? i18n("Found browser profiles for sync") : i18n("No supported browser profile found")
+                text: syncDetector.hasCurrentBrowserProfile ? KI18n.i18n("Found browser profiles for sync") : KI18n.i18n("No supported browser profile found")
                 color: syncDetector.hasCurrentBrowserProfile ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
                 wrapMode: Text.WordWrap
             }
 
             QQC2.Button {
-                text: i18n("Choose profile")
+                text: KI18n.i18n("Choose profile")
                 icon.name: "folder-open"
-                onClicked: plasmoid.internalAction("configure").trigger()
+                onClicked: Plasmoid.internalAction("configure").trigger()
             }
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Cookie DB:")
+            Kirigami.FormData.label: KI18n.i18n("Cookie DB:")
             spacing: Kirigami.Units.smallSpacing
 
             Kirigami.Icon {
@@ -297,13 +303,13 @@ KCM.SimpleKCM {
 
             QQC2.Label {
                 Layout.fillWidth: true
-                text: syncDetector.readinessReport("").cookieDatabaseReadable ? i18n("Readable") : syncDetector.readinessReport("").nextStep
+                text: syncDetector.readinessReport("").cookieDatabaseReadable ? KI18n.i18n("Readable") : syncDetector.readinessReport("").nextStep
                 wrapMode: Text.WordWrap
             }
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("KWallet/libsecret:")
+            Kirigami.FormData.label: KI18n.i18n("KWallet/libsecret:")
             spacing: Kirigami.Units.smallSpacing
 
             Kirigami.Icon {
@@ -315,68 +321,68 @@ KCM.SimpleKCM {
 
             QQC2.Label {
                 Layout.fillWidth: true
-                text: syncDetector.hasSafeStorageAccess ? i18n("Ready for selected browser") : i18n("Safe storage is locked or unavailable; use local estimation.")
+                text: syncDetector.hasSafeStorageAccess ? KI18n.i18n("Ready for selected browser") : KI18n.i18n("Safe storage is locked or unavailable; use local estimation.")
                 wrapMode: Text.WordWrap
             }
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Custom URLs:")
+            Kirigami.FormData.label: KI18n.i18n("Custom URLs:")
             spacing: Kirigami.Units.smallSpacing
 
             Kirigami.Icon {
-                source: insecureCustomUrlCount() === 0 ? "dialog-ok" : "dialog-warning"
+                source: diagnosticsPage.insecureCustomUrlCount() === 0 ? "dialog-ok" : "dialog-warning"
                 Layout.preferredWidth: Kirigami.Units.iconSizes.small
                 Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                color: insecureCustomUrlCount() === 0 ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
+                color: diagnosticsPage.insecureCustomUrlCount() === 0 ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
             }
 
             QQC2.Label {
                 Layout.fillWidth: true
-                text: insecureCustomUrlCount() === 0
-                    ? i18n("No insecure remote custom API URLs configured")
-                    : i18n("%1 insecure remote custom API URLs need review", insecureCustomUrlCount())
+                text: diagnosticsPage.insecureCustomUrlCount() === 0
+                    ? KI18n.i18n("No insecure remote custom API URLs configured")
+                    : KI18n.i18n("%1 insecure remote custom API URLs need review", diagnosticsPage.insecureCustomUrlCount())
                 wrapMode: Text.WordWrap
             }
 
             QQC2.Button {
-                text: i18n("Review URLs")
+                text: KI18n.i18n("Review URLs")
                 icon.name: "configure"
-                enabled: insecureCustomUrlCount() > 0
-                onClicked: plasmoid.internalAction("configure").trigger()
+                enabled: diagnosticsPage.insecureCustomUrlCount() > 0
+                onClicked: Plasmoid.internalAction("configure").trigger()
             }
         }
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Local Dependencies")
+            Kirigami.FormData.label: KI18n.i18n("Local Dependencies")
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Claude Code:")
+            Kirigami.FormData.label: KI18n.i18n("Claude Code:")
             spacing: Kirigami.Units.smallSpacing
-            QQC2.Label { text: claudeDetector.installed ? "✓ " + i18n("Installed") : "✗ " + i18n("Not found") }
+            QQC2.Label { text: claudeDetector.installed ? "✓ " + KI18n.i18n("Installed") : "✗ " + KI18n.i18n("Not found") }
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Codex CLI:")
+            Kirigami.FormData.label: KI18n.i18n("Codex CLI:")
             spacing: Kirigami.Units.smallSpacing
-            QQC2.Label { text: codexDetector.installed ? "✓ " + i18n("Installed") : "✗ " + i18n("Not found") }
+            QQC2.Label { text: codexDetector.installed ? "✓ " + KI18n.i18n("Installed") : "✗ " + KI18n.i18n("Not found") }
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("GitHub Copilot:")
+            Kirigami.FormData.label: KI18n.i18n("GitHub Copilot:")
             spacing: Kirigami.Units.smallSpacing
-            QQC2.Label { text: copilotDetector.installed ? "✓ " + i18n("Installed") : "✗ " + i18n("Not found") }
+            QQC2.Label { text: copilotDetector.installed ? "✓ " + KI18n.i18n("Installed") : "✗ " + KI18n.i18n("Not found") }
         }
         
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Config Portability")
+            Kirigami.FormData.label: KI18n.i18n("Config Portability")
         }
 
         QQC2.Label {
-            text: i18n("Exports schema v2 non-secret settings only. API keys, tokens, cookies, PATs, and webhook URLs remain in KWallet and are never written to the file.")
+            text: KI18n.i18n("Exports schema v2 non-secret settings only. API keys, tokens, cookies, PATs, and webhook URLs remain in KWallet and are never written to the file.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             opacity: 0.6
             wrapMode: Text.WordWrap
@@ -384,11 +390,11 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Configuration:")
+            Kirigami.FormData.label: KI18n.i18n("Configuration:")
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
-                text: i18n("Export...")
+                text: KI18n.i18n("Export...")
                 icon.name: "document-export"
                 onClicked: {
                     exportDialog.open();
@@ -396,7 +402,7 @@ KCM.SimpleKCM {
             }
 
             QQC2.Button {
-                text: i18n("Import...")
+                text: KI18n.i18n("Import...")
                 icon.name: "document-import"
                 onClicked: {
                     importDialog.open();
@@ -406,12 +412,12 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Diagnostics")
+            Kirigami.FormData.label: KI18n.i18n("Diagnostics")
         }
         
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Version:")
-            text: i18n("Frontend %1 · native plugin %2", diagnosticsPage.frontendVersion, AppInfo.version)
+            Kirigami.FormData.label: KI18n.i18n("Version:")
+            text: KI18n.i18n("Frontend %1 · native plugin %2", diagnosticsPage.frontendVersion, AppInfo.version)
             color: diagnosticsPage.systemInfo.nativeStatus === "ready"
                    ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
             wrapMode: Text.WordWrap
@@ -419,17 +425,17 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Loaded plugin:")
+            Kirigami.FormData.label: KI18n.i18n("Loaded plugin:")
             text: diagnosticsPage.systemInfo.nativePluginPath
             wrapMode: Text.WrapAnywhere
             Layout.fillWidth: true
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Install layers:")
-            text: i18n("Frontend: %1 · plugin: %2", diagnosticsPage.systemInfo.frontendLayer,
+            Kirigami.FormData.label: KI18n.i18n("Install layers:")
+            text: KI18n.i18n("Frontend: %1 · plugin: %2", diagnosticsPage.systemInfo.frontendLayer,
                        diagnosticsPage.systemInfo.pluginLayer)
-                  + (diagnosticsPage.systemInfo.shadowing ? i18n(" · user-local package shadows system package") : "")
+                  + (diagnosticsPage.systemInfo.shadowing ? KI18n.i18n(" · user-local package shadows system package") : "")
             color: diagnosticsPage.systemInfo.shadowing
                    ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.textColor
             wrapMode: Text.WordWrap
@@ -437,14 +443,14 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("System:")
+            Kirigami.FormData.label: KI18n.i18n("System:")
             text: diagnosticsPage.systemInfo.plasmaVersion + " · " + diagnosticsPage.systemInfo.distribution
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("History database:")
+            Kirigami.FormData.label: KI18n.i18n("History database:")
             text: diagnosticsPage.databaseStatusText()
             color: ["ok", "not_created"].indexOf(diagnosticsPage.databaseInfo.status) >= 0
                    ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
@@ -453,7 +459,7 @@ KCM.SimpleKCM {
         }
 
         Kirigami.InlineMessage {
-            Kirigami.FormData.label: i18n("Recovery:")
+            Kirigami.FormData.label: KI18n.i18n("Recovery:")
             Layout.fillWidth: true
             visible: diagnosticsPage.systemInfo.nativeStatus !== "ready"
                      || diagnosticsPage.systemInfo.shadowing
@@ -461,7 +467,7 @@ KCM.SimpleKCM {
             type: Kirigami.MessageType.Warning
             actions: [
                 Kirigami.Action {
-                    text: i18n("Copy repair command")
+                    text: KI18n.i18n("Copy repair command")
                     icon.name: "edit-copy"
                     visible: diagnosticsPage.systemInfo.repairCommand.length > 0
                     onTriggered: clipboard.setText(diagnosticsPage.systemInfo.repairCommand)
@@ -470,7 +476,7 @@ KCM.SimpleKCM {
         }
 
         ColumnLayout {
-            Kirigami.FormData.label: i18n("Source readiness:")
+            Kirigami.FormData.label: KI18n.i18n("Source readiness:")
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
 
@@ -491,7 +497,7 @@ KCM.SimpleKCM {
 
                     QQC2.Button {
                         text: sourceRow.modelData.sourceKindKey === "local_tool"
-                              ? i18n("Open tool guide") : i18n("Select in Providers")
+                              ? KI18n.i18n("Open tool guide") : KI18n.i18n("Select in Providers")
                         icon.name: "configure"
                         visible: sourceRow.modelData.nextActionKey !== "none"
                         onClicked: {
@@ -499,8 +505,8 @@ KCM.SimpleKCM {
                                 Qt.openUrlExternally(diagnosticsPage.subscriptionGuideUrl);
                                 return;
                             }
-                            plasmoid.configuration.settingsVerificationSourceId = sourceRow.modelData.stableId;
-                            diagnosticsPage.recoverySelectionMessage = i18n("%1 is selected. Open Providers in the sidebar to continue.", diagnosticsPage.sourceDisplayName(sourceRow.modelData.stableId));
+                            Plasmoid.configuration.settingsVerificationSourceId = sourceRow.modelData.stableId;
+                            diagnosticsPage.recoverySelectionMessage = KI18n.i18n("%1 is selected. Open Providers in the sidebar to continue.", diagnosticsPage.sourceDisplayName(sourceRow.modelData.stableId));
                         }
                     }
                 }
@@ -509,7 +515,7 @@ KCM.SimpleKCM {
             QQC2.Label {
                 Layout.fillWidth: true
                 visible: diagnosticsPage.actionableSources().length === 0
-                text: i18n("No enabled source currently needs recovery.")
+                text: KI18n.i18n("No enabled source currently needs recovery.")
                 color: Kirigami.Theme.positiveTextColor
                 wrapMode: Text.WordWrap
             }
@@ -524,17 +530,17 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Actions:")
+            Kirigami.FormData.label: KI18n.i18n("Actions:")
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
-                text: i18n("Open troubleshooting")
+                text: KI18n.i18n("Open troubleshooting")
                 icon.name: "help-contents"
                 onClicked: Qt.openUrlExternally(diagnosticsPage.troubleshootingUrl)
             }
 
             QQC2.Button {
-                text: i18n("Copy version check")
+                text: KI18n.i18n("Copy version check")
                 icon.name: "edit-copy"
                 onClicked: {
                     clipboard.setText(diagnosticsPage.versionCheckCommand);
@@ -542,15 +548,15 @@ KCM.SimpleKCM {
             }
 
             QQC2.Button {
-                text: i18n("Copy support report")
+                text: KI18n.i18n("Copy support report")
                 icon.name: "edit-copy"
-                onClicked: clipboard.setText(buildSupportReport())
+                onClicked: clipboard.setText(diagnosticsPage.buildSupportReport())
             }
 
             QQC2.Button {
-                text: i18n("Copy capability report")
+                text: KI18n.i18n("Copy capability report")
                 icon.name: "documentinfo"
-                onClicked: clipboard.setText(buildCapabilityReport())
+                onClicked: clipboard.setText(diagnosticsPage.buildCapabilityReport())
             }
         }
     }
@@ -559,7 +565,7 @@ KCM.SimpleKCM {
         var settings = {};
         for (var i = 0; i < portableConfigKeys.length; i++) {
             var key = portableConfigKeys[i];
-            settings[key] = plasmoid.configuration[key];
+            settings[key] = Plasmoid.configuration[key];
         }
         return {
             schemaVersion: 2,
@@ -577,14 +583,14 @@ KCM.SimpleKCM {
             var keys = Object.keys(settings);
             for (var i = 0; i < keys.length; ++i) {
                 var key = keys[i];
-                plasmoid.configuration[key] = settings[key];
+                Plasmoid.configuration[key] = settings[key];
             }
             return;
         }
 
         if (configData.general) {
-            if (configData.general.refreshInterval !== undefined) plasmoid.configuration.refreshInterval = configData.general.refreshInterval;
-            if (configData.general.compactDisplayMode !== undefined) plasmoid.configuration.compactDisplayMode = configData.general.compactDisplayMode;
+            if (configData.general.refreshInterval !== undefined) Plasmoid.configuration.refreshInterval = configData.general.refreshInterval;
+            if (configData.general.compactDisplayMode !== undefined) Plasmoid.configuration.compactDisplayMode = configData.general.compactDisplayMode;
         }
         var legacyKeys = [
             "openaiEnabled", "openaiModel", "anthropicEnabled", "anthropicModel",
@@ -593,7 +599,7 @@ KCM.SimpleKCM {
         for (var j = 0; j < legacyKeys.length; j++) {
             var legacyKey = legacyKeys[j];
             if (configData[legacyKey] !== undefined) {
-                plasmoid.configuration[legacyKey] = configData[legacyKey];
+                Plasmoid.configuration[legacyKey] = configData[legacyKey];
             }
         }
     }
@@ -602,7 +608,7 @@ KCM.SimpleKCM {
         var count = 0;
         var rows = providerCatalog.providers || [];
         for (var i = 0; i < rows.length; i++) {
-            if (plasmoid.configuration[rows[i].enabledConfigKey]) {
+            if (Plasmoid.configuration[rows[i].enabledConfigKey]) {
                 count++;
             }
         }
@@ -610,7 +616,7 @@ KCM.SimpleKCM {
     }
 
     function parseSourceSnapshot() {
-        var raw = plasmoid.configuration.diagnosticsSourceSnapshot || "[]";
+        var raw = Plasmoid.configuration.diagnosticsSourceSnapshot || "[]";
         try {
             var parsed = JSON.parse(raw);
             return Array.isArray(parsed) ? parsed : [];
@@ -647,61 +653,61 @@ KCM.SimpleKCM {
 
     function sourceSummary(source) {
         var states = {
-            "disabled": i18n("Disabled"),
-            "unavailable_locally": i18n("Not installed locally"),
-            "needs_configuration": i18n("Needs configuration"),
-            "ready_to_verify": i18n("Ready to verify"),
-            "verifying": i18n("Verifying"),
-            "connected_connectivity_only": i18n("Connectivity confirmed"),
-            "reporting_estimate": i18n("Reporting an estimate"),
-            "reporting_actual": i18n("Reporting provider data"),
-            "degraded": i18n("Needs attention"),
-            "failed": i18n("Verification failed")
+            "disabled": KI18n.i18n("Disabled"),
+            "unavailable_locally": KI18n.i18n("Not installed locally"),
+            "needs_configuration": KI18n.i18n("Needs configuration"),
+            "ready_to_verify": KI18n.i18n("Ready to verify"),
+            "verifying": KI18n.i18n("Verifying"),
+            "connected_connectivity_only": KI18n.i18n("Connectivity confirmed"),
+            "reporting_estimate": KI18n.i18n("Reporting an estimate"),
+            "reporting_actual": KI18n.i18n("Reporting provider data"),
+            "degraded": KI18n.i18n("Needs attention"),
+            "failed": KI18n.i18n("Verification failed")
         };
         var errors = {
-            "backend_unavailable": i18n("native backend unavailable"),
-            "configuration": i18n("configuration incomplete"),
-            "authentication": i18n("authentication failed"),
-            "not_logged_in": i18n("not signed in"),
-            "not_signed_in": i18n("not signed in"),
-            "daemon_not_running": i18n("local daemon is not running"),
-            "unsupported_version": i18n("installed version is not supported"),
-            "tls_error": i18n("local TLS verification failed"),
-            "timeout": i18n("local daemon timed out"),
-            "permission": i18n("permission denied"),
-            "permission_denied": i18n("permission denied"),
-            "unsupported_metric": i18n("metric unsupported"),
-            "not_supported": i18n("metric unsupported"),
-            "schema": i18n("provider response changed"),
-            "stale": i18n("data is stale"),
-            "network": i18n("network error"),
-            "network_error": i18n("network error"),
-            "timeout": i18n("request timed out"),
-            "rate_limit": i18n("rate limited"),
-            "server": i18n("provider server error")
+            "backend_unavailable": KI18n.i18n("native backend unavailable"),
+            "configuration": KI18n.i18n("configuration incomplete"),
+            "authentication": KI18n.i18n("authentication failed"),
+            "not_logged_in": KI18n.i18n("not signed in"),
+            "not_signed_in": KI18n.i18n("not signed in"),
+            "daemon_not_running": KI18n.i18n("local daemon is not running"),
+            "unsupported_version": KI18n.i18n("installed version is not supported"),
+            "tls_error": KI18n.i18n("local TLS verification failed"),
+            "timeout": KI18n.i18n("local daemon timed out"),
+            "permission": KI18n.i18n("permission denied"),
+            "permission_denied": KI18n.i18n("permission denied"),
+            "unsupported_metric": KI18n.i18n("metric unsupported"),
+            "not_supported": KI18n.i18n("metric unsupported"),
+            "schema": KI18n.i18n("provider response changed"),
+            "stale": KI18n.i18n("data is stale"),
+            "network": KI18n.i18n("network error"),
+            "network_error": KI18n.i18n("network error"),
+            "timeout": KI18n.i18n("request timed out"),
+            "rate_limit": KI18n.i18n("rate limited"),
+            "server": KI18n.i18n("provider server error")
         };
         var error = source.errorCode
-            ? " · " + (errors[source.errorCode] || i18n("error: %1", source.errorCode)) : "";
+            ? " · " + (errors[source.errorCode] || KI18n.i18n("error: %1", source.errorCode)) : "";
         return sourceDisplayName(source.stableId) + ": "
-            + (states[source.readinessStateKey] || i18n("Unknown")) + error;
+            + (states[source.readinessStateKey] || KI18n.i18n("Unknown")) + error;
     }
 
     function formatBytes(bytes) {
         var value = Number(bytes || 0);
-        if (value < 1024) return i18n("%1 B", value);
-        if (value < 1024 * 1024) return i18n("%1 KiB", (value / 1024).toFixed(1));
-        return i18n("%1 MiB", (value / (1024 * 1024)).toFixed(1));
+        if (value < 1024) return KI18n.i18n("%1 B", value);
+        if (value < 1024 * 1024) return KI18n.i18n("%1 KiB", (value / 1024).toFixed(1));
+        return KI18n.i18n("%1 MiB", (value / (1024 * 1024)).toFixed(1));
     }
 
     function databaseStatusText() {
         var labels = {
-            "ok": i18n("Healthy"),
-            "not_created": i18n("Not created yet"),
-            "unreadable": i18n("Unreadable"),
-            "open_failed": i18n("Could not be opened read-only"),
-            "integrity_failed": i18n("Integrity check failed")
+            "ok": KI18n.i18n("Healthy"),
+            "not_created": KI18n.i18n("Not created yet"),
+            "unreadable": KI18n.i18n("Unreadable"),
+            "open_failed": KI18n.i18n("Could not be opened read-only"),
+            "integrity_failed": KI18n.i18n("Integrity check failed")
         };
-        return (labels[databaseInfo.status] || i18n("Unknown")) + " · " + formatBytes(databaseInfo.sizeBytes);
+        return (labels[databaseInfo.status] || KI18n.i18n("Unknown")) + " · " + formatBytes(databaseInfo.sizeBytes);
     }
 
     function insecureCustomUrlCount() {
@@ -715,7 +721,7 @@ KCM.SimpleKCM {
         ];
         var count = 0;
         for (var i = 0; i < keys.length; i++) {
-            var url = (plasmoid.configuration[keys[i]] || "").toString().trim();
+            var url = (Plasmoid.configuration[keys[i]] || "").toString().trim();
             if (url.indexOf("http://") === 0
                 && url.indexOf("http://localhost") !== 0
                 && url.indexOf("http://127.0.0.1") !== 0
@@ -741,7 +747,7 @@ KCM.SimpleKCM {
         for (var i = 0; i < rows.length; i++) {
             var row = rows[i];
             lines.push(row.configKey
-                       + " enabled=" + (!!plasmoid.configuration[row.enabledConfigKey] ? "yes" : "no")
+                       + " enabled=" + (!!Plasmoid.configuration[row.enabledConfigKey] ? "yes" : "no")
                        + " level=" + row.monitoringLevel
                        + " scheduled=\"" + scheduledCalls(row.safeRefresh) + "\""
                        + " min_interval=" + row.minimumRefreshSeconds

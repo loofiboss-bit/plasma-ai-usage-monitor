@@ -2843,11 +2843,12 @@ QVariantMap UsageDatabase::getAnalystOverview(int days) const
     return result;
 }
 
-QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDateTime &to,
+QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &fromInclusive,
+                                              const QDateTime &toExclusive,
                                               const QString &requestedCurrency) const
 {
-    const QDateTime fromUtc = from.toUTC();
-    const QDateTime toUtc = to.toUTC();
+    const QDateTime fromUtc = fromInclusive.toUTC();
+    const QDateTime toUtc = toExclusive.toUTC();
     const auto kpi = [](bool available, const QVariant &value, const QString &reasonKey, int sampleCount,
                         int minimumSamples) {
         QVariantMap result;
@@ -2863,7 +2864,9 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
     snapshot.insert(QStringLiteral("from"), fromUtc);
     snapshot.insert(QStringLiteral("to"), toUtc);
     snapshot.insert(QStringLiteral("generatedAt"), QDateTime::currentDateTimeUtc());
-    snapshot.insert(QStringLiteral("ok"), m_initialized && fromUtc.isValid() && toUtc.isValid() && fromUtc <= toUtc);
+    snapshot.insert(QStringLiteral("ok"),
+                    m_initialized && fromUtc.isValid() && toUtc.isValid()
+                        && fromUtc < toUtc);
     snapshot.insert(QStringLiteral("errorKey"),
                     snapshot.value(QStringLiteral("ok")).toBool() ? QString() : QStringLiteral("invalid_request"));
 
@@ -2950,7 +2953,7 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
                                      "source, data_quality, semantic, value, scope, window "
                                      "FROM observations "
                                      "WHERE metric_kind='cost' AND value IS NOT NULL "
-                                     "AND observed_at_utc >= ? AND observed_at_utc <= ? "
+                                     "AND observed_at_utc >= ? AND observed_at_utc < ? "
                                      "AND lower(source) != 'unknown' "
                                      "AND lower(source) NOT LIKE '%connectivity%' "
                                      "AND lower(source) NOT LIKE '%model_discovery%' "
@@ -3160,7 +3163,7 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
                         dailyCosts.isEmpty() ? costUnavailableReason : QStringLiteral("insufficient_daily_samples"));
     }
 
-    const QDate comparisonEnd = toUtc.date();
+    const QDate comparisonEnd = toUtc.addMSecs(-1).date();
     bool completeComparison = true;
     double currentWeek = 0.0;
     double previousWeek = 0.0;
@@ -3197,7 +3200,7 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
                                          "FROM observations "
                                          "WHERE metric_kind IN ('input_tokens','output_tokens','requests') "
                                          "AND value IS NOT NULL AND observed_at_utc >= ? "
-                                         "AND observed_at_utc <= ? "
+                                         "AND observed_at_utc < ? "
                                          "AND lower(source) != 'unknown' "
                                          "AND lower(source) NOT LIKE '%connectivity%' "
                                          "AND lower(source) NOT LIKE '%model_discovery%' "
@@ -3243,7 +3246,7 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
     toolQuery.setForwardOnly(true);
     toolQuery.prepare(QStringLiteral("SELECT date(timestamp), tool_name, MAX(usage_count), COUNT(*) "
                                      "FROM subscription_tool_usage "
-                                     "WHERE timestamp >= ? AND timestamp <= ? "
+                                     "WHERE timestamp >= ? AND timestamp < ? "
                                      "GROUP BY date(timestamp), tool_name ORDER BY date(timestamp)"));
     toolQuery.addBindValue(toDbDateTimeString(fromUtc));
     toolQuery.addBindValue(toDbDateTimeString(toUtc));
@@ -3281,7 +3284,7 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
                                       " MAX(input_tokens) AS provider_input, "
                                       " MAX(output_tokens) AS provider_output "
                                       " FROM usage_snapshots "
-                                      " WHERE timestamp >= ? AND timestamp <= ? "
+                                      " WHERE timestamp >= ? AND timestamp < ? "
                                       " AND lower(usage_source) != 'unknown' "
                                       " AND lower(usage_source) NOT LIKE '%connectivity%' "
                                       " AND lower(usage_source) NOT LIKE '%model_discovery%' "
@@ -3322,7 +3325,8 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
     for (const QVariant &ratioValue : std::as_const(ratioSeries)) {
         observedDays.insert(ratioValue.toMap().value(QStringLiteral("date")).toString());
     }
-    const int requestedDays = static_cast<int>(qMax<qint64>(1, fromUtc.date().daysTo(toUtc.date()) + 1));
+    const int requestedDays =
+        static_cast<int>(fromUtc.date().daysTo(toUtc.date()));
     QStringList sortedObservedDays = observedDays.values();
     sortedObservedDays.sort();
     snapshot.insert(
@@ -3342,7 +3346,9 @@ QVariantMap UsageDatabase::getAnalystSnapshot(const QDateTime &from, const QDate
     return snapshot;
 }
 
-void UsageDatabase::requestAnalyst(const QString &requestId, const QDateTime &from, const QDateTime &to,
+void UsageDatabase::requestAnalyst(const QString &requestId,
+                                   const QDateTime &fromInclusive,
+                                   const QDateTime &toExclusive,
                                    const QString &currency)
 {
     initDatabase();
@@ -3358,9 +3364,10 @@ void UsageDatabase::requestAnalyst(const QString &requestId, const QDateTime &fr
         finishWorker();
         watcher->deleteLater();
     });
-    watcher->setFuture(QtConcurrent::run([from, to, currency]() {
+    watcher->setFuture(QtConcurrent::run([fromInclusive, toExclusive, currency]() {
         UsageDatabase workerDatabase;
         workerDatabase.init();
-        return workerDatabase.getAnalystSnapshot(from, to, currency);
+        return workerDatabase.getAnalystSnapshot(fromInclusive, toExclusive,
+                                                 currency);
     }));
 }

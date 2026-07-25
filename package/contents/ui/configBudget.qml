@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -60,7 +61,7 @@ KCM.SimpleKCM {
         anchors.fill: parent
 
         QQC2.Label {
-            text: i18n("Budgets are stored in USD. Set a value to zero to disable it. A budget is automatically disabled when observed data uses another currency.")
+            text: KI18n.i18n("Budgets are stored in USD. Set a value to zero to disable it. A budget is automatically disabled when observed data uses another currency.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -69,11 +70,11 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Warning Threshold")
+            Kirigami.FormData.label: KI18n.i18n("Warning Threshold")
         }
 
         ColumnLayout {
-            Kirigami.FormData.label: i18n("Warn at:")
+            Kirigami.FormData.label: KI18n.i18n("Warn at:")
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Slider {
@@ -82,13 +83,13 @@ KCM.SimpleKCM {
                 from: 50
                 to: 100
                 stepSize: 5
-                QQC2.ToolTip.text: i18n("Trigger a desktop notification when spending reaches this percentage of the budget")
+                QQC2.ToolTip.text: KI18n.i18n("Trigger a desktop notification when spending reaches this percentage of the budget")
                 QQC2.ToolTip.visible: hovered
                 QQC2.ToolTip.delay: 500
             }
 
             QQC2.Label {
-                text: i18n("%1% of budget", warningPercentSlider.value)
+                text: KI18n.i18n("%1% of budget", warningPercentSlider.value)
                 color: Kirigami.Theme.disabledTextColor
                 Layout.alignment: Qt.AlignHCenter
             }
@@ -96,23 +97,25 @@ KCM.SimpleKCM {
 
         // ── Per-provider budget sections (data-driven) ──
         Repeater {
-            model: providerCatalog.budgetProviders
+            model: budgetPage.providerCatalog.budgetProviders
 
             ColumnLayout {
+                id: budgetRow
+                required property var modelData
                 spacing: 0
                 Layout.fillWidth: true
 
                 Kirigami.Separator {
                     Kirigami.FormData.isSection: true
-                    Kirigami.FormData.label: modelData.label
+                    Kirigami.FormData.label: budgetRow.modelData.label
                     Layout.fillWidth: true
                 }
 
                 QQC2.SpinBox {
                     id: dailyField
-                    Kirigami.FormData.label: i18n("Daily budget (USD):")
+                    Kirigami.FormData.label: KI18n.i18n("Daily budget (USD):")
                     from: 0; to: 100000; stepSize: 100
-                    value: budgetPage["cfg_" + modelData.dailyBudgetConfigKey]
+                    value: budgetPage["cfg_" + budgetRow.modelData.dailyBudgetConfigKey]
 
                     textFromValue: function(value, locale) {
                         return budgetPage.centsToText(value);
@@ -122,19 +125,19 @@ KCM.SimpleKCM {
                     }
 
                     onValueModified: {
-                        budgetPage["cfg_" + modelData.dailyBudgetConfigKey] = value;
+                        budgetPage["cfg_" + budgetRow.modelData.dailyBudgetConfigKey] = value;
                     }
 
                     Component.onCompleted: {
-                        value = budgetPage["cfg_" + modelData.dailyBudgetConfigKey];
+                        value = budgetPage["cfg_" + budgetRow.modelData.dailyBudgetConfigKey];
                     }
                 }
 
                 QQC2.SpinBox {
                     id: monthlyField
-                    Kirigami.FormData.label: i18n("Monthly budget (USD):")
+                    Kirigami.FormData.label: KI18n.i18n("Monthly budget (USD):")
                     from: 0; to: 1000000; stepSize: 500
-                    value: budgetPage["cfg_" + modelData.monthlyBudgetConfigKey]
+                    value: budgetPage["cfg_" + budgetRow.modelData.monthlyBudgetConfigKey]
 
                     textFromValue: function(value, locale) {
                         return budgetPage.centsToText(value);
@@ -144,11 +147,11 @@ KCM.SimpleKCM {
                     }
 
                     onValueModified: {
-                        budgetPage["cfg_" + modelData.monthlyBudgetConfigKey] = value;
+                        budgetPage["cfg_" + budgetRow.modelData.monthlyBudgetConfigKey] = value;
                     }
 
                     Component.onCompleted: {
-                        value = budgetPage["cfg_" + modelData.monthlyBudgetConfigKey];
+                        value = budgetPage["cfg_" + budgetRow.modelData.monthlyBudgetConfigKey];
                     }
                 }
             }

@@ -1,4 +1,5 @@
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.plasma.components as PlasmaComponents
@@ -18,7 +19,7 @@ ColumnLayout {
     readonly property bool narrowCard: toolCard.width < Kirigami.Units.gridUnit * 14
     readonly property string syncSourceText: toolCard.monitor?.syncSourceLabel
                                                 || ((toolCard.monitor?.syncEnabled ?? false)
-                                                    ? i18n("Browser sync") : i18n("Self-tracked"))
+                                                    ? KI18n.i18n("Browser sync") : KI18n.i18n("Self-tracked"))
     readonly property bool stale: toolCard.monitor?.connectionState === "stale"
 
     spacing: 0
@@ -84,11 +85,11 @@ ColumnLayout {
 
                     PlasmaComponents.Label {
                         text: {
-                            if (!toolCard.monitor) return i18n("N/A");
-                            if (!toolCard.monitor.installed) return i18n("Not Installed");
+                            if (!toolCard.monitor) return KI18n.i18n("N/A");
+                            if (!toolCard.monitor.installed) return KI18n.i18n("Not Installed");
                             let parts = [];
-                            if (toolCard.monitor.limitReached) parts.push(i18n("Limit Reached"));
-                            else parts.push(i18n("Active"));
+                            if (toolCard.monitor.limitReached) parts.push(KI18n.i18n("Limit Reached"));
+                            else parts.push(KI18n.i18n("Active"));
                             if (toolCard.monitor.planTier) parts.push(toolCard.displayPlanTier());
                             return parts.join(" • ");
                         }
@@ -107,7 +108,7 @@ ColumnLayout {
 
                         SourceBadge {
                             visible: toolCard.monitor?.hasSubscriptionCost ?? false
-                            text: i18n("Subscription fee")
+                            text: KI18n.i18n("Subscription fee")
                         }
                     }
                 }
@@ -129,7 +130,7 @@ ColumnLayout {
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: Kirigami.Units.iconSizes.small
                     onClicked: toolCard.collapsed = !toolCard.collapsed
-                    PlasmaComponents.ToolTip { text: toolCard.collapsed ? i18n("Expand") : i18n("Collapse") }
+                    PlasmaComponents.ToolTip { text: toolCard.collapsed ? KI18n.i18n("Expand") : KI18n.i18n("Collapse") }
                 }
             }
 
@@ -156,7 +157,7 @@ ColumnLayout {
                 RowLayout {
                     Layout.fillWidth: true
                     PlasmaComponents.Label {
-                        text: i18n("Org Seats")
+                        text: KI18n.i18n("Org Seats")
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.7
                     }
@@ -169,13 +170,15 @@ ColumnLayout {
                 }
 
                 QQC2.ProgressBar {
+                    id: organizationProgress
                     Layout.fillWidth: true
                     Layout.preferredHeight: 4
                     from: 0; to: Math.max(toolCard.monitor?.orgTotalSeats ?? 1, 1)
                     value: toolCard.monitor?.orgActiveUsers ?? 0
                     background: Rectangle { implicitHeight: 4; radius: 2; color: Qt.alpha(Kirigami.Theme.textColor, 0.1) }
                     contentItem: Rectangle {
-                        width: parent.visualPosition * parent.width
+                        width: organizationProgress.visualPosition
+                               * organizationProgress.width
                         height: 4; radius: 2
                         color: toolCard.toolColor
                     }
@@ -190,7 +193,7 @@ ColumnLayout {
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    text: (toolCard.monitor?.syncStatus && toolCard.monitor.syncStatus !== "idle") ? toolCard.monitor.syncStatus : i18n("Ready")
+                    text: (toolCard.monitor?.syncStatus && toolCard.monitor.syncStatus !== "idle") ? toolCard.monitor.syncStatus : KI18n.i18n("Ready")
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     opacity: 0.6
                     elide: Text.ElideRight
@@ -199,7 +202,7 @@ ColumnLayout {
                 PlasmaComponents.ToolButton {
                     activeFocusOnTab: true
                     icon.name: "view-refresh"
-                    text: toolCard.monitor?.syncing ? i18n("Syncing...") : i18n("Sync")
+                    text: toolCard.monitor?.syncing ? KI18n.i18n("Syncing...") : KI18n.i18n("Sync")
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     enabled: !(toolCard.monitor?.syncing ?? false) && toolCard.monitor?.syncEnabled
                     visible: toolCard.monitor?.syncEnabled ?? false

@@ -17,6 +17,7 @@
 class CohereProvider : public OpenAICompatibleProvider
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit CohereProvider(QObject *parent = nullptr);

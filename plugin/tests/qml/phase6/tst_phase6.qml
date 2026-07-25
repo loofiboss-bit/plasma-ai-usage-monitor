@@ -200,6 +200,48 @@ TestCase {
         verify(analystState.seriesHasValues("tokens"));
     }
 
+    function test_analystRangeUsesExactUtcHalfOpenDays_data() {
+        return [
+            {
+                tag: "stockholm-spring-dst-30",
+                days: 30,
+                now: "2026-03-29T12:30:00+02:00",
+                from: "2026-02-28T00:00:00.000Z",
+                to: "2026-03-30T00:00:00.000Z"
+            },
+            {
+                tag: "stockholm-autumn-dst-7",
+                days: 7,
+                now: "2026-10-25T12:30:00+01:00",
+                from: "2026-10-19T00:00:00.000Z",
+                to: "2026-10-26T00:00:00.000Z"
+            },
+            {
+                tag: "new-york-spring-dst-7",
+                days: 7,
+                now: "2026-03-08T12:30:00-04:00",
+                from: "2026-03-02T00:00:00.000Z",
+                to: "2026-03-09T00:00:00.000Z"
+            },
+            {
+                tag: "utc-90",
+                days: 90,
+                now: "2026-07-26T12:30:00Z",
+                from: "2026-04-28T00:00:00.000Z",
+                to: "2026-07-27T00:00:00.000Z"
+            }
+        ];
+    }
+
+    function test_analystRangeUsesExactUtcHalfOpenDays(data) {
+        var range = analystState.exactRange(data.days, new Date(data.now));
+
+        compare(range.fromInclusive.toISOString(), data.from);
+        compare(range.toExclusive.toISOString(), data.to);
+        compare((range.toExclusive.getTime()
+                 - range.fromInclusive.getTime()) / 86400000, data.days);
+    }
+
     function test_analystReportUsesItsRequestedPeriodFixture() {
         analystState.requestReport(7);
         var requestId = fakeDb.analystRequestId;
@@ -209,7 +251,7 @@ TestCase {
             ok: true,
             generatedAt: "2026-07-07T12:00:00Z",
             from: "2026-07-01T00:00:00Z",
-            to: "2026-07-07T23:59:59Z",
+            to: "2026-07-08T00:00:00Z",
             coverage: {
                 observedDayCount: 7,
                 requestedDayCount: 7,

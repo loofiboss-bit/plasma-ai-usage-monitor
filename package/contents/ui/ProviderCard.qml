@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.plasma.components as PlasmaComponents
@@ -89,18 +90,18 @@ ColumnLayout {
 
                     PlasmaComponents.Label {
                         text: {
-                            if (!card.backend) return i18n("Not Available");
-                            if (card.backend.loading) return i18n("Loading...");
+                            if (!card.backend) return KI18n.i18n("Not Available");
+                            if (card.backend.loading) return KI18n.i18n("Loading...");
                             if (card.readiness.readinessStateKey === "reporting_actual")
                                 return card.readiness.qualityClass === "balance"
-                                    ? i18n("Reporting provider balance") : i18n("Reporting actual data");
+                                    ? KI18n.i18n("Reporting provider balance") : KI18n.i18n("Reporting actual data");
                             if (card.readiness.readinessStateKey === "reporting_estimate")
-                                return i18n("Reporting estimated or local data");
+                                return KI18n.i18n("Reporting estimated or local data");
                             if (card.readiness.readinessStateKey === "connected_connectivity_only")
-                                return i18n("Connectivity verified only");
-                            if (card.backend.error) return i18n("Needs attention");
-                            if (card.backend.connected) return i18n("Connected");
-                            return i18n("Disconnected");
+                                return KI18n.i18n("Connectivity verified only");
+                            if (card.backend.error) return KI18n.i18n("Needs attention");
+                            if (card.backend.connected) return KI18n.i18n("Connected");
+                            return KI18n.i18n("Disconnected");
                         }
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         color: card.backend?.error ? Kirigami.Theme.negativeTextColor : Qt.alpha(Kirigami.Theme.textColor, 0.7)
@@ -113,7 +114,7 @@ ColumnLayout {
                         visible: card.backend
 
                         Repeater {
-                            model: outcomeBadges()
+                            model: card.outcomeBadges()
                             SourceBadge {
                                 required property string modelData
                                 text: card.badgeLabel(modelData)
@@ -121,18 +122,18 @@ ColumnLayout {
                         }
 
                         SourceBadge {
-                            visible: modelNeedsReview()
-                            text: i18n("Review needed")
+                            visible: card.modelNeedsReview()
+                            text: KI18n.i18n("Review needed")
                         }
 
                         SourceBadge {
-                            visible: modelSourceConflict()
-                            text: i18n("Source conflict")
+                            visible: card.modelSourceConflict()
+                            text: KI18n.i18n("Source conflict")
                         }
 
                         SourceBadge {
-                            visible: modelUnknownPricing()
-                            text: i18n("Unknown pricing")
+                            visible: card.modelUnknownPricing()
+                            text: KI18n.i18n("Unknown pricing")
                         }
                     }
                 }
@@ -144,7 +145,7 @@ ColumnLayout {
                     spacing: Kirigami.Units.smallSpacing
 
                     PlasmaComponents.Label {
-                        text: currentCostText()
+                        text: card.currentCostText()
                         font.bold: true
                         color: Kirigami.Theme.textColor
                     }
@@ -157,10 +158,10 @@ ColumnLayout {
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: Kirigami.Units.iconSizes.small
                     Accessible.name: card.collapsed
-                        ? i18n("Expand %1 details", card.providerName)
-                        : i18n("Collapse %1 details", card.providerName)
+                        ? KI18n.i18n("Expand %1 details", card.providerName)
+                        : KI18n.i18n("Collapse %1 details", card.providerName)
                     onClicked: card.collapsed = !card.collapsed
-                    PlasmaComponents.ToolTip { text: card.collapsed ? i18n("Expand") : i18n("Collapse") }
+                    PlasmaComponents.ToolTip { text: card.collapsed ? KI18n.i18n("Expand") : KI18n.i18n("Collapse") }
                 }
             }
 
@@ -186,7 +187,7 @@ ColumnLayout {
 
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
-                            text: humanizeError(card.backend?.error ?? "")
+                            text: card.humanizeError(card.backend?.error ?? "")
                             color: Kirigami.Theme.negativeTextColor
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             wrapMode: Text.WordWrap
@@ -196,8 +197,8 @@ ColumnLayout {
                             activeFocusOnTab: true
                             icon.name: "view-refresh"
                             display: PlasmaComponents.AbstractButton.IconOnly
-                            Accessible.name: i18n("Retry %1", card.providerName)
-                            PlasmaComponents.ToolTip { text: i18n("Retry") }
+                            Accessible.name: KI18n.i18n("Retry %1", card.providerName)
+                            PlasmaComponents.ToolTip { text: KI18n.i18n("Retry") }
                             onClicked: if (card.backend) card.backend.requestRefresh(3)
                         }
                     }
@@ -222,12 +223,12 @@ ColumnLayout {
                     visible: card.metricAvailable("input_tokens")
                     spacing: 0
                     PlasmaComponents.Label {
-                        text: i18n("Input Tokens")
+                        text: KI18n.i18n("Input Tokens")
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.7
                     }
                     PlasmaComponents.Label {
-                        text: metricText("input_tokens", card.backend?.inputTokens ?? 0)
+                        text: card.metricText("input_tokens", card.backend?.inputTokens ?? 0)
                         font.bold: true
                     }
                 }
@@ -236,12 +237,12 @@ ColumnLayout {
                     visible: card.metricAvailable("output_tokens")
                     spacing: 0
                     PlasmaComponents.Label {
-                        text: i18n("Output Tokens")
+                        text: KI18n.i18n("Output Tokens")
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.7
                     }
                     PlasmaComponents.Label {
-                        text: metricText("output_tokens", card.backend?.outputTokens ?? 0)
+                        text: card.metricText("output_tokens", card.backend?.outputTokens ?? 0)
                         font.bold: true
                     }
                 }
@@ -250,12 +251,12 @@ ColumnLayout {
                     visible: card.metricAvailable("requests")
                     spacing: 0
                     PlasmaComponents.Label {
-                        text: i18n("Requests")
+                        text: KI18n.i18n("Requests")
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.7
                     }
                     PlasmaComponents.Label {
-                        text: metricText("requests", card.backend?.requestCount ?? 0)
+                        text: card.metricText("requests", card.backend?.requestCount ?? 0)
                         font.bold: true
                     }
                 }
@@ -271,7 +272,7 @@ ColumnLayout {
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     visible: card.backend?.budgetCurrencyMismatch ?? false
-                    text: i18n("Budget disabled: configured currency %1 does not match observed %2.",
+                    text: KI18n.i18n("Budget disabled: configured currency %1 does not match observed %2.",
                                card.backend?.budgetCurrency || "USD", card.backend?.currency || "")
                     color: Kirigami.Theme.neutralTextColor
                     wrapMode: Text.WordWrap
@@ -281,18 +282,18 @@ ColumnLayout {
                     Layout.fillWidth: true
                     visible: card.hasAvailableCostData()
                     PlasmaComponents.Label {
-                        text: costHeading()
+                        text: card.costHeading()
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.7
                     }
                     Item { Layout.fillWidth: true }
                     PlasmaComponents.Label {
-                        text: currentCostText()
+                        text: card.currentCostText()
                         font.bold: true
                         font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.2
                         color: {
-                            if (!currentCostAvailable()) return Kirigami.Theme.disabledTextColor;
-                            var c = currentCostValue();
+                            if (!card.currentCostAvailable()) return Kirigami.Theme.disabledTextColor;
+                            var c = card.currentCostValue();
                             if (c > 10) return Kirigami.Theme.negativeTextColor;
                             if (c > 5) return Kirigami.Theme.neutralTextColor;
                             return Kirigami.Theme.textColor;
@@ -306,13 +307,13 @@ ColumnLayout {
                         required property var modelData
                         Layout.fillWidth: true
                         PlasmaComponents.Label {
-                            text: i18n("Available balance")
+                            text: KI18n.i18n("Available balance")
                             font.pointSize: Kirigami.Theme.smallFont.pointSize
                             opacity: 0.7
                         }
                         Item { Layout.fillWidth: true }
                         PlasmaComponents.Label {
-                            text: Utils.formatMoney(modelData.value, modelData.currency)
+                            text: Utils.formatMoney(card.modelData.value, card.modelData.currency)
                             font.bold: true
                             color: Kirigami.Theme.textColor
                         }
@@ -322,38 +323,40 @@ ColumnLayout {
                 // Budgets
                 Repeater {
                     model: [
-                        { label: i18n("Daily Budget"), cost: card.backend?.dailyCost ?? 0, budget: card.backend?.dailyBudget ?? 0 },
-                        { label: i18n("Monthly Budget"), cost: card.backend?.monthlyCost ?? 0, budget: card.backend?.monthlyBudget ?? 0 }
+                        { label: KI18n.i18n("Daily Budget"), cost: card.backend?.dailyCost ?? 0, budget: card.backend?.dailyBudget ?? 0 },
+                        { label: KI18n.i18n("Monthly Budget"), cost: card.backend?.monthlyCost ?? 0, budget: card.backend?.monthlyBudget ?? 0 }
                     ]
                     ColumnLayout {
                         Layout.fillWidth: true
-                        visible: card.hasAvailableCostData() && modelData.budget > 0
+                        visible: card.hasAvailableCostData() && card.modelData.budget > 0
                                  && !(card.backend?.budgetCurrencyMismatch ?? false)
                         spacing: 2
                         RowLayout {
                             Layout.fillWidth: true
                             PlasmaComponents.Label {
-                                text: modelData.label
+                                text: card.modelData.label
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                                 opacity: 0.7
                             }
                             Item { Layout.fillWidth: true }
                             PlasmaComponents.Label {
-                                text: Utils.formatMoney(modelData.cost, card.backend?.currency || "USD")
-                                      + " / " + Utils.formatMoney(modelData.budget, card.backend?.currency || "USD")
+                                text: Utils.formatMoney(card.modelData.cost, card.backend?.currency || "USD")
+                                      + " / " + Utils.formatMoney(card.modelData.budget, card.backend?.currency || "USD")
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                             }
                         }
                         QQC2.ProgressBar {
+                            id: budgetProgress
                             Layout.fillWidth: true
                             Layout.preferredHeight: 4
-                            from: 0; to: modelData.budget
-                            value: Math.min(modelData.cost, modelData.budget)
+                            from: 0; to: card.modelData.budget
+                            value: Math.min(card.modelData.cost, card.modelData.budget)
                             background: Rectangle { implicitHeight: 4; radius: 2; color: Qt.alpha(Kirigami.Theme.textColor, 0.1) }
                             contentItem: Rectangle {
-                                width: parent.visualPosition * parent.width
+                                width: budgetProgress.visualPosition
+                                       * budgetProgress.width
                                 height: 4; radius: 2
-                                color: budgetColor(modelData.cost, modelData.budget)
+                                color: card.budgetColor(card.modelData.cost, card.modelData.budget)
                                 Behavior on width { NumberAnimation { duration: 300 } }
                             }
                         }
@@ -368,8 +371,8 @@ ColumnLayout {
                          && !card.hasAvailableCostData()
                          && card.balanceRows().length === 0
                 text: card.readiness.readinessStateKey === "connected_connectivity_only"
-                    ? i18n("Connection verified. This source does not expose compatible token, spend, or balance metrics.")
-                    : i18n("No compatible usage or spend metric is available yet. Refresh the source or review its permissions.")
+                    ? KI18n.i18n("Connection verified. This source does not expose compatible token, spend, or balance metrics.")
+                    : KI18n.i18n("No compatible usage or spend metric is available yet. Refresh the source or review its permissions.")
                 color: Kirigami.Theme.disabledTextColor
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 wrapMode: Text.WordWrap
@@ -378,13 +381,13 @@ ColumnLayout {
             // Rate Limits
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: !card.collapsed && (card.backend?.connected ?? false) && liveRateRows().length > 0
+                visible: !card.collapsed && (card.backend?.connected ?? false) && card.liveRateRows().length > 0
                 spacing: Kirigami.Units.smallSpacing
 
                 RowLayout {
                     Layout.fillWidth: true
                     PlasmaComponents.Label {
-                        text: i18n("Rate Limits")
+                        text: KI18n.i18n("Rate Limits")
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         font.bold: true
                         opacity: 0.8
@@ -392,43 +395,45 @@ ColumnLayout {
                     Item { Layout.fillWidth: true }
                     PlasmaComponents.Label {
                         visible: (card.backend?.rateLimitResetTime ?? "") !== ""
-                        text: i18n("Resets: %1", card.backend?.rateLimitResetTime)
+                        text: KI18n.i18n("Resets: %1", card.backend?.rateLimitResetTime)
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.5
                     }
                 }
 
                 Repeater {
-                    model: liveRateRows()
+                    model: card.liveRateRows()
                     ColumnLayout {
                         id: rateRow
                         Layout.fillWidth: true
-                        visible: modelData.total > 0
+                        visible: card.modelData.total > 0
                         spacing: 2
-                        readonly property int used: modelData.total - modelData.remaining
+                        readonly property int used: card.modelData.total - card.modelData.remaining
                         RowLayout {
                             Layout.fillWidth: true
                             PlasmaComponents.Label {
-                                text: modelData.label
+                                text: card.modelData.label
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                                 opacity: 0.7
                             }
                             Item { Layout.fillWidth: true }
                             PlasmaComponents.Label {
-                                text: formatNumber(rateRow.used) + " / " + formatNumber(modelData.total)
+                                text: card.formatNumber(rateRow.used) + " / " + card.formatNumber(card.modelData.total)
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                             }
                         }
                         QQC2.ProgressBar {
+                            id: rateProgress
                             Layout.fillWidth: true
                             Layout.preferredHeight: 4
-                            from: 0; to: modelData.total
+                            from: 0; to: card.modelData.total
                             value: parent.used
                             background: Rectangle { implicitHeight: 4; radius: 2; color: Qt.alpha(Kirigami.Theme.textColor, 0.1) }
                             contentItem: Rectangle {
-                                width: parent.visualPosition * parent.width
+                                width: rateProgress.visualPosition
+                                       * rateProgress.width
                                 height: 4; radius: 2
-                                color: rateLimitColor(modelData.remaining, modelData.total)
+                                color: card.rateLimitColor(card.modelData.remaining, card.modelData.total)
                                 Behavior on width { NumberAnimation { duration: 300 } }
                             }
                         }
@@ -438,21 +443,21 @@ ColumnLayout {
 
             ColumnLayout {
                 Layout.fillWidth: true
-                visible: !card.collapsed && publishedLimitRows().length > 0
+                visible: !card.collapsed && card.publishedLimitRows().length > 0
                 spacing: Kirigami.Units.smallSpacing
 
                 PlasmaComponents.Label {
-                    text: i18n("Published caps — not live remaining quota")
+                    text: KI18n.i18n("Published caps — not live remaining quota")
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     font.bold: true
                     opacity: 0.8
                 }
                 Repeater {
-                    model: publishedLimitRows()
+                    model: card.publishedLimitRows()
                     PlasmaComponents.Label {
                         required property var modelData
                         Layout.fillWidth: true
-                        text: modelData.label + ": " + formatNumber(modelData.value)
+                        text: modelData.label + ": " + card.formatNumber(modelData.value)
                               + " / " + modelData.window
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         wrapMode: Text.WordWrap
@@ -469,19 +474,19 @@ ColumnLayout {
 
                 PlasmaComponents.Button {
                     visible: typeof card.backend?.refreshModelsNow === "function"
-                    text: i18n("Refresh models")
+                    text: KI18n.i18n("Refresh models")
                     icon.name: "view-refresh"
                     onClicked: card.backend.refreshModelsNow()
                 }
                 PlasmaComponents.Button {
                     visible: typeof card.backend?.testConnectionNow === "function"
-                    text: i18n("Test connection now — may consume quota or money")
+                    text: KI18n.i18n("Test connection now — may consume quota or money")
                     icon.name: "network-connect"
                     onClicked: card.backend.testConnectionNow()
                 }
                 PlasmaComponents.Button {
                     visible: typeof card.backend?.countTokensDiagnostic === "function"
-                    text: i18n("Run token diagnostic — may consume quota")
+                    text: KI18n.i18n("Run token diagnostic — may consume quota")
                     icon.name: "tools-check-spelling"
                     onClicked: card.backend.countTokensDiagnostic()
                 }
@@ -501,16 +506,16 @@ ColumnLayout {
                         text: {
                             var success = card.backend?.lastSuccess;
                             var attempt = card.backend?.lastAttempt;
-                            return i18n("Last success: %1 · last attempt: %2",
-                                        success ? formatRelativeTime(success) : i18n("never"),
-                                        attempt ? formatRelativeTime(attempt) : i18n("never"));
+                            return KI18n.i18n("Last success: %1 · last attempt: %2",
+                                        success ? card.formatRelativeTime(success) : KI18n.i18n("never"),
+                                        attempt ? card.formatRelativeTime(attempt) : KI18n.i18n("never"));
                         }
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         opacity: 0.5
                     }
 
                     PlasmaComponents.Label {
-                        text: i18n("Failures: %1/%2", card.backend?.consecutiveErrors ?? 0, card.backend?.errorCount ?? 0)
+                        text: KI18n.i18n("Failures: %1/%2", card.backend?.consecutiveErrors ?? 0, card.backend?.errorCount ?? 0)
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         color: (card.backend?.consecutiveErrors ?? 0) > 0
                             ? Kirigami.Theme.neutralTextColor
@@ -521,9 +526,9 @@ ColumnLayout {
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     visible: (card.backend?.probeRequestCount ?? 0) > 0
-                    text: i18n("Connection checks: %1, probe tokens: %2",
+                    text: KI18n.i18n("Connection checks: %1, probe tokens: %2",
                                card.backend?.probeRequestCount ?? 0,
-                               formatNumber((card.backend?.probeInputTokens ?? 0) + (card.backend?.probeOutputTokens ?? 0)))
+                               card.formatNumber((card.backend?.probeInputTokens ?? 0) + (card.backend?.probeOutputTokens ?? 0)))
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     color: Kirigami.Theme.disabledTextColor
                     wrapMode: Text.WordWrap
@@ -532,7 +537,7 @@ ColumnLayout {
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     visible: !!card.backend?.modelsLastDiscovered
-                    text: i18n("Live models discovered: %1", formatRelativeTime(card.backend.modelsLastDiscovered))
+                    text: KI18n.i18n("Live models discovered: %1", card.formatRelativeTime(card.backend.modelsLastDiscovered))
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     color: Kirigami.Theme.disabledTextColor
                     wrapMode: Text.WordWrap
@@ -549,8 +554,8 @@ ColumnLayout {
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    visible: partialCapabilityText() !== ""
-                    text: partialCapabilityText()
+                    visible: card.partialCapabilityText() !== ""
+                    text: card.partialCapabilityText()
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     color: Kirigami.Theme.neutralTextColor
                     wrapMode: Text.WordWrap
@@ -559,9 +564,9 @@ ColumnLayout {
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     visible: card.scheduler !== null && card.backend
-                    text: i18n("Next refresh: %1%2",
-                               nextRefreshText(),
-                               refreshModeSuffix())
+                    text: KI18n.i18n("Next refresh: %1%2",
+                               card.nextRefreshText(),
+                               card.refreshModeSuffix())
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     color: (card.backend?.consecutiveErrors ?? 0) > 0
                         ? Kirigami.Theme.neutralTextColor
@@ -582,7 +587,7 @@ ColumnLayout {
         if (requestLimit.available && requestRemaining.available
                 && Number.isFinite(requestLimitValue) && requestLimitValue > 0
                 && Number.isFinite(requestRemainingValue))
-            rows.push({ label: i18n("Requests/min"), total: requestLimitValue, remaining: requestRemainingValue });
+            rows.push({ label: KI18n.i18n("Requests/min"), total: requestLimitValue, remaining: requestRemainingValue });
         var tokenLimit = card.backend.metric("token_limit");
         var tokenRemaining = card.backend.metric("token_remaining");
         var tokenLimitValue = Number(tokenLimit.value);
@@ -590,7 +595,7 @@ ColumnLayout {
         if (tokenLimit.available && tokenRemaining.available
                 && Number.isFinite(tokenLimitValue) && tokenLimitValue > 0
                 && Number.isFinite(tokenRemainingValue))
-            rows.push({ label: i18n("Tokens/min"), total: tokenLimitValue, remaining: tokenRemainingValue });
+            rows.push({ label: KI18n.i18n("Tokens/min"), total: tokenLimitValue, remaining: tokenRemainingValue });
         return rows;
     }
 
@@ -601,9 +606,9 @@ ColumnLayout {
             var metric = metrics[i];
             if (!metric.available || metric.quality !== "published_cap") continue;
             if (metric.kind === "request_limit")
-                rows.push({ label: i18n("Published request cap"), value: Number(metric.value), window: metric.window || i18n("documented window") });
+                rows.push({ label: KI18n.i18n("Published request cap"), value: Number(metric.value), window: metric.window || KI18n.i18n("documented window") });
             else if (metric.kind === "token_limit")
-                rows.push({ label: i18n("Published token cap"), value: Number(metric.value), window: metric.window || i18n("documented window") });
+                rows.push({ label: KI18n.i18n("Published token cap"), value: Number(metric.value), window: metric.window || KI18n.i18n("documented window") });
         }
         return rows;
     }
@@ -619,7 +624,7 @@ ColumnLayout {
             else if (row.status === "failed" || row.status === "unavailable") failed.push(keys[i]);
         }
         if (available.length === 0 || failed.length === 0) return "";
-        return i18n("Partial data: %1 available; %2 unavailable",
+        return KI18n.i18n("Partial data: %1 available; %2 unavailable",
                     available.join(", "), failed.join(", "));
     }
 
@@ -632,17 +637,17 @@ ColumnLayout {
     }
 
     function badgeLabel(key) {
-        if (key === "gateway_usage") return i18n("Gateway usage");
-        if (key === "key_usage") return i18n("API key usage");
-        if (key === "provider_usage") return i18n("Provider usage");
-        if (key === "gateway_spend") return i18n("Gateway-reported spend");
-        if (key === "provider_spend") return i18n("Provider-reported spend");
-        if (key === "estimated_usage") return i18n("Estimated usage");
-        if (key === "estimated_cost") return i18n("Estimated cost");
-        if (key === "self_tracked") return i18n("Self-tracked");
-        if (key === "browser_sync") return i18n("Browser sync");
-        if (key === "provider_balance") return i18n("Provider balance");
-        return i18n("Connectivity only");
+        if (key === "gateway_usage") return KI18n.i18n("Gateway usage");
+        if (key === "key_usage") return KI18n.i18n("API key usage");
+        if (key === "provider_usage") return KI18n.i18n("Provider usage");
+        if (key === "gateway_spend") return KI18n.i18n("Gateway-reported spend");
+        if (key === "provider_spend") return KI18n.i18n("Provider-reported spend");
+        if (key === "estimated_usage") return KI18n.i18n("Estimated usage");
+        if (key === "estimated_cost") return KI18n.i18n("Estimated cost");
+        if (key === "self_tracked") return KI18n.i18n("Self-tracked");
+        if (key === "browser_sync") return KI18n.i18n("Browser sync");
+        if (key === "provider_balance") return KI18n.i18n("Provider balance");
+        return KI18n.i18n("Connectivity only");
     }
 
     function metricRow(kind) {
@@ -686,22 +691,22 @@ ColumnLayout {
 
     function metricText(kind, legacyValue) {
         var row = metricRow(kind);
-        if (row.kind !== undefined) return row.available ? formatNumber(row.value) : "";
+        if (row.kind !== undefined) return row.available ? card.formatNumber(row.value) : "";
         if ((card.backend?.metrics || []).length > 0) return "";
         var source = card.backend?.usageSource || "unknown";
         if (source === "unknown" || source === "connectivity_probe"
                 || source === "model_discovery_api" || source === "connectivity_read_only") {
             return "";
         }
-        return formatNumber(legacyValue);
+        return card.formatNumber(legacyValue);
     }
 
     function costHeading() {
         var source = card.backend?.costSource ?? "unknown";
-        if (source === "billing_api" || source === "usage_api" || source === "actual_api") return i18n("API Spend");
-        if (source === "estimated_from_usage") return i18n("Estimated Burn");
-        if (source === "connectivity_probe") return i18n("Probe Cost");
-        return (card.backend?.isEstimatedCost ?? false) ? i18n("Estimated Cost") : i18n("Cost");
+        if (source === "billing_api" || source === "usage_api" || source === "actual_api") return KI18n.i18n("API Spend");
+        if (source === "estimated_from_usage") return KI18n.i18n("Estimated Burn");
+        if (source === "connectivity_probe") return KI18n.i18n("Probe Cost");
+        return (card.backend?.isEstimatedCost ?? false) ? KI18n.i18n("Estimated Cost") : KI18n.i18n("Cost");
     }
 
     function currentCostMetric() {
@@ -728,9 +733,9 @@ ColumnLayout {
     }
 
     function currentCostText() {
-        if (!currentCostAvailable()) return "";
+        if (!card.currentCostAvailable()) return "";
         var metric = currentCostMetric();
-        return Utils.formatMoney(currentCostValue(), metric["currency"] || card.backend?.currency || "USD");
+        return Utils.formatMoney(card.currentCostValue(), metric["currency"] || card.backend?.currency || "USD");
     }
 
     function currentCatalogModel() {
@@ -773,31 +778,31 @@ ColumnLayout {
         return s;
     }
 
-    function rateLimitColor(remaining, total) { return Utils.rateLimitColor(remaining, total, Kirigami.Theme); }
-    function budgetColor(spent, budget) { return Utils.budgetColor(spent, budget, Kirigami.Theme); }
-    function formatNumber(n) { return Utils.formatNumber(n); }
-    function formatRelativeTime(dateTime) { return Utils.formatRelativeTime(dateTime, Qt, i18n); }
+    function rateLimitColor(remaining, total) { return Utils.card.rateLimitColor(remaining, total, Kirigami.Theme); }
+    function budgetColor(spent, budget) { return Utils.card.budgetColor(spent, budget, Kirigami.Theme); }
+    function formatNumber(n) { return Utils.card.formatNumber(n); }
+    function formatRelativeTime(dateTime) { return Utils.card.formatRelativeTime(dateTime, Qt, KI18n.i18n); }
 
     function nextRefreshText() {
-        if (!card.scheduler || !card.modelData || !card.backend) return i18n("unknown");
+        if (!card.scheduler || !card.modelData || !card.backend) return KI18n.i18n("unknown");
         var last = card.backend.lastRefreshed;
-        if (!last) return i18n("on next timer");
+        if (!last) return KI18n.i18n("on next timer");
         var lastDate = new Date(last);
         var interval = card.scheduler.scheduledInterval(card.modelData) || 0;
         var ms = lastDate.getTime() + interval - Date.now();
-        if (ms <= 0) return i18n("due now");
+        if (ms <= 0) return KI18n.i18n("due now");
         var seconds = Math.ceil(ms / 1000);
-        if (seconds < 60) return i18n("in %1 sec", seconds);
+        if (seconds < 60) return KI18n.i18n("in %1 sec", seconds);
         var minutes = Math.ceil(seconds / 60);
-        if (minutes < 60) return i18n("in %1 min", minutes);
-        return i18n("in %1 h", Math.ceil(minutes / 60));
+        if (minutes < 60) return KI18n.i18n("in %1 min", minutes);
+        return KI18n.i18n("in %1 h", Math.ceil(minutes / 60));
     }
 
     function refreshModeSuffix() {
         if (!card.scheduler || !card.modelData) return "";
         var parts = [];
-        if (card.scheduler.popupOpen) parts.push(i18n("popup fast-refresh"));
-        if (card.scheduler.backoffMultiplier(card.modelData) > 1) parts.push(i18n("backoff active"));
+        if (card.scheduler.popupOpen) parts.push(KI18n.i18n("popup fast-refresh"));
+        if (card.scheduler.backoffMultiplier(card.modelData) > 1) parts.push(KI18n.i18n("backoff active"));
         return parts.length > 0 ? " (" + parts.join(", ") + ")" : "";
     }
 }

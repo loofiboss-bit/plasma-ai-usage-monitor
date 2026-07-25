@@ -21,6 +21,7 @@
 class OpenRouterProvider : public OpenAICompatibleProvider
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(double credits READ credits NOTIFY creditsChanged)
     Q_PROPERTY(bool creditsAvailable READ creditsAvailable NOTIFY creditsChanged)

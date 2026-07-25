@@ -1,4 +1,7 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -12,7 +15,7 @@ ColumnLayout {
     Repeater {
         model: [
             {
-                label: i18n("Providers"),
+                label: KI18n.i18n("Providers"),
                 schemaVersion: ProviderPricingCatalog.schemaVersion,
                 catalogVersion: ProviderPricingCatalog.catalogVersion,
                 lastReviewed: ProviderPricingCatalog.lastReviewed,
@@ -24,7 +27,7 @@ ColumnLayout {
                 reviewItems: ProviderPricingCatalog.reviewItems
             },
             {
-                label: i18n("Subscriptions"),
+                label: KI18n.i18n("Subscriptions"),
                 schemaVersion: SubscriptionPlanCatalog.schemaVersion,
                 catalogVersion: SubscriptionPlanCatalog.catalogVersion,
                 lastReviewed: SubscriptionPlanCatalog.lastReviewed,
@@ -38,6 +41,7 @@ ColumnLayout {
         ]
 
         delegate: ColumnLayout {
+            id: catalogRow
             required property var modelData
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
@@ -47,51 +51,65 @@ ColumnLayout {
                 spacing: Kirigami.Units.smallSpacing
 
                 Kirigami.Icon {
-                    source: modelData.valid && !modelData.stale && !modelData.runtimeScraping ? "dialog-ok" : "dialog-warning"
+                    source: catalogRow.modelData.valid
+                            && !catalogRow.modelData.stale
+                            && !catalogRow.modelData.runtimeScraping
+                        ? "dialog-ok" : "dialog-warning"
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                    color: modelData.valid && !modelData.stale && !modelData.runtimeScraping ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.neutralTextColor
+                    color: catalogRow.modelData.valid
+                           && !catalogRow.modelData.stale
+                           && !catalogRow.modelData.runtimeScraping
+                        ? Kirigami.Theme.positiveTextColor
+                        : Kirigami.Theme.neutralTextColor
                 }
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    text: i18n("%1: schema %2, catalog %3, reviewed %4, runtime scraping %5, review items %6, conflicts %7",
-                               modelData.label,
-                               modelData.schemaVersion,
-                               modelData.catalogVersion,
-                               modelData.lastReviewed,
-                               modelData.runtimeScraping ? i18n("enabled") : i18n("disabled"),
-                               modelData.manualReviewCount,
-                               modelData.sourceConflictCount)
+                    text: KI18n.i18n("%1: schema %2, catalog %3, reviewed %4, runtime scraping %5, review items %6, conflicts %7",
+                               catalogRow.modelData.label,
+                               catalogRow.modelData.schemaVersion,
+                               catalogRow.modelData.catalogVersion,
+                               catalogRow.modelData.lastReviewed,
+                               catalogRow.modelData.runtimeScraping ? KI18n.i18n("enabled") : KI18n.i18n("disabled"),
+                               catalogRow.modelData.manualReviewCount,
+                               catalogRow.modelData.sourceConflictCount)
                     wrapMode: Text.WordWrap
                 }
             }
 
             Repeater {
-                model: modelData.reviewItems
+                model: catalogRow.modelData.reviewItems
 
                 delegate: RowLayout {
+                    id: reviewRow
                     required property var modelData
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
 
                     Kirigami.Icon {
-                        source: modelData.sourceConflict ? "dialog-error" : "dialog-warning"
+                        source: reviewRow.modelData.sourceConflict
+                            ? "dialog-error" : "dialog-warning"
                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
                         Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                        color: modelData.sourceConflict ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.neutralTextColor
+                        color: reviewRow.modelData.sourceConflict
+                            ? Kirigami.Theme.negativeTextColor
+                            : Kirigami.Theme.neutralTextColor
                     }
 
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
                         text: {
-                            var reason = modelData.sourceConflict
-                                ? (modelData.sourceConflictReason || modelData.reviewReason)
-                                : modelData.reviewReason;
+                            var reason = reviewRow.modelData.sourceConflict
+                                ? (reviewRow.modelData.sourceConflictReason
+                                   || reviewRow.modelData.reviewReason)
+                                : reviewRow.modelData.reviewReason;
                             if (!reason || reason.length === 0) {
-                                reason = modelData.source || i18n("Needs maintainer review before it can be shown as exact.");
+                                reason = reviewRow.modelData.source
+                                    || KI18n.i18n("Needs maintainer review before it can be shown as exact.");
                             }
-                            return i18n("%1: %2", modelData.label, reason);
+                            return KI18n.i18n(
+                                "%1: %2", reviewRow.modelData.label, reason);
                         }
                         wrapMode: Text.WordWrap
                         font.pointSize: Kirigami.Theme.smallFont.pointSize

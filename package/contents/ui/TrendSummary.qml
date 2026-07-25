@@ -1,4 +1,5 @@
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -29,7 +30,7 @@ Item {
         id: emptyStateLabel
         anchors.centerIn: parent
         visible: trendRoot.showEmptyState && !trendRoot.hasSummaryData
-        text: i18n("No historical data available")
+        text: KI18n.i18n("No historical data available")
         color: Kirigami.Theme.disabledTextColor
         font.pointSize: Kirigami.Theme.smallFont.pointSize
     }
@@ -44,15 +45,15 @@ Item {
 
         // ── Total Cost ──
         PlasmaComponents.Label {
-            text: i18n("Total Cost:")
+            text: KI18n.i18n("Total Cost:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
         }
         PlasmaComponents.Label {
-            text: summaryData.mixedCurrencies
-                ? Utils.formatCurrencyTotals(summaryData.currencyTotals || {})
-                : Utils.formatCurrencyTotals(summaryData.currencyTotals || ({ USD: summaryData.totalCost || 0 }))
+            text: trendRoot.summaryData.mixedCurrencies
+                ? Utils.formatCurrencyTotals(trendRoot.summaryData.currencyTotals || {})
+                : Utils.formatCurrencyTotals(trendRoot.summaryData.currencyTotals || ({ USD: trendRoot.summaryData.totalCost || 0 }))
             font.bold: true
             elide: Text.ElideRight
             Layout.fillWidth: true
@@ -60,89 +61,89 @@ Item {
 
         // ── Average Daily Cost ──
         PlasmaComponents.Label {
-            text: i18n("Avg Daily Cost:")
+            text: KI18n.i18n("Avg Daily Cost:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
         }
         PlasmaComponents.Label {
-            text: dailyCosts.length > 0
-                ? Utils.formatMoney(summaryData.avgDailyCost || 0, dailyCosts[0].currency || "USD")
-                : i18n("Not derivable")
+            text: trendRoot.dailyCosts.length > 0
+                ? Utils.formatMoney(trendRoot.summaryData.avgDailyCost || 0, trendRoot.dailyCosts[0].currency || "USD")
+                : KI18n.i18n("Not derivable")
             elide: Text.ElideRight
             Layout.fillWidth: true
         }
 
         // ── Max Daily Cost ──
         PlasmaComponents.Label {
-            text: i18n("Peak Daily Cost:")
+            text: KI18n.i18n("Peak Daily Cost:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
         }
         PlasmaComponents.Label {
-            text: dailyCosts.length > 0
-                ? Utils.formatMoney(summaryData.maxDailyCost || 0, dailyCosts[0].currency || "USD")
-                : i18n("Not derivable")
-            color: (summaryData.maxDailyCost || 0) > (summaryData.avgDailyCost || 0) * 2
+            text: trendRoot.dailyCosts.length > 0
+                ? Utils.formatMoney(trendRoot.summaryData.maxDailyCost || 0, trendRoot.dailyCosts[0].currency || "USD")
+                : KI18n.i18n("Not derivable")
+            color: (trendRoot.summaryData.maxDailyCost || 0) > (trendRoot.summaryData.avgDailyCost || 0) * 2
                    ? Kirigami.Theme.negativeTextColor
                    : Kirigami.Theme.textColor
         }
 
         // ── Total Requests ──
         PlasmaComponents.Label {
-            text: i18n("Total Requests:")
+            text: KI18n.i18n("Total Requests:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
         }
         PlasmaComponents.Label {
-            text: formatNumber(summaryData.totalRequests || 0)
+            text: trendRoot.formatNumber(trendRoot.summaryData.totalRequests || 0)
         }
 
         // ── Peak Token Usage ──
         PlasmaComponents.Label {
-            text: i18n("Peak Tokens:")
+            text: KI18n.i18n("Peak Tokens:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
         }
         PlasmaComponents.Label {
-            text: formatNumber(summaryData.peakTokenUsage || 0)
+            text: trendRoot.formatNumber(trendRoot.summaryData.peakTokenUsage || 0)
         }
 
         // ── Data Points ──
         PlasmaComponents.Label {
-            text: i18n("Data Points:")
+            text: KI18n.i18n("Data Points:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
         }
         PlasmaComponents.Label {
-            text: (summaryData.snapshotCount || 0).toString()
+            text: (trendRoot.summaryData.snapshotCount || 0).toString()
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
         }
 
         // ── Trend indicator ──
         PlasmaComponents.Label {
-            text: i18n("Trend:")
+            text: KI18n.i18n("Trend:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
-            visible: dailyCosts && dailyCosts.length >= 3
+            visible: trendRoot.dailyCosts && trendRoot.dailyCosts.length >= 3
         }
         RowLayout {
-            visible: dailyCosts && dailyCosts.length >= 3
+            visible: trendRoot.dailyCosts && trendRoot.dailyCosts.length >= 3
             spacing: Kirigami.Units.smallSpacing
 
             // Arrow indicating direction
             Kirigami.Icon {
-                source: trendDirection() > 0 ? "arrow-up" : (trendDirection() < 0 ? "arrow-down" : "arrow-right")
+                source: trendRoot.trendDirection() > 0 ? "arrow-up" : (trendRoot.trendDirection() < 0 ? "arrow-down" : "arrow-right")
                 Layout.preferredWidth: Kirigami.Units.iconSizes.small
                 Layout.preferredHeight: Kirigami.Units.iconSizes.small
-                color: trendDirection() > 0 ? Kirigami.Theme.negativeTextColor
-                     : (trendDirection() < 0 ? Kirigami.Theme.positiveTextColor
+                color: trendRoot.trendDirection() > 0 ? Kirigami.Theme.negativeTextColor
+                     : (trendRoot.trendDirection() < 0 ? Kirigami.Theme.positiveTextColor
                      : Kirigami.Theme.textColor)
             }
 
@@ -150,14 +151,14 @@ Item {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
                 text: {
-                    var dir = trendDirection();
-                    if (dir > 0) return i18n("Costs increasing");
-                    if (dir < 0) return i18n("Costs decreasing");
-                    return i18n("Costs stable");
+                    var dir = trendRoot.trendDirection();
+                    if (dir > 0) return KI18n.i18n("Costs increasing");
+                    if (dir < 0) return KI18n.i18n("Costs decreasing");
+                    return KI18n.i18n("Costs stable");
                 }
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
-                color: trendDirection() > 0 ? Kirigami.Theme.negativeTextColor
-                     : (trendDirection() < 0 ? Kirigami.Theme.positiveTextColor
+                color: trendRoot.trendDirection() > 0 ? Kirigami.Theme.negativeTextColor
+                     : (trendRoot.trendDirection() < 0 ? Kirigami.Theme.positiveTextColor
                      : Kirigami.Theme.textColor)
             }
         }
@@ -166,7 +167,7 @@ Item {
     // ── Helper functions (delegated to Utils.js) ──
 
     function formatNumber(val) {
-        return Utils.formatNumber(val);
+        return Utils.trendRoot.formatNumber(val);
     }
 
     /**

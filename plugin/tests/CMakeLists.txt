@@ -332,6 +332,8 @@ set(QML_TEST_TARGETS
 )
 foreach(qml_test_target IN LISTS QML_TEST_TARGETS)
     add_dependencies(${qml_test_target} aiusagemonitorplugin)
+    target_sources(${qml_test_target} PRIVATE qmltestsetup.h)
+    target_link_libraries(${qml_test_target} PRIVATE Qt6::Qml KF6::I18nQml)
 endforeach()
 
 add_executable(test_refreshscheduler

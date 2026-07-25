@@ -5,10 +5,13 @@
 #include <QString>
 #include <QStringList>
 #include <QVariantMap>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 class AppInfo : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
     Q_PROPERTY(QString version READ version CONSTANT)
     Q_PROPERTY(QString pluginPath READ pluginPath CONSTANT)
     Q_PROPERTY(bool demoMode READ demoMode CONSTANT)

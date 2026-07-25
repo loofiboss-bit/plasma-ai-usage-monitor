@@ -1,11 +1,12 @@
 import QtQuick
+import org.kde.ki18n
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
 Rectangle {
     id: badge
 
-    property string text: i18n("Unknown")
+    property string text: KI18n.i18n("Unknown")
 
     radius: 4
     implicitWidth: badgeLabel.implicitWidth + Kirigami.Units.smallSpacing * 2
@@ -17,7 +18,7 @@ Rectangle {
     PlasmaComponents.Label {
         id: badgeLabel
         anchors.centerIn: parent
-        text: badge.text || i18n("Unknown")
+        text: badge.text || KI18n.i18n("Unknown")
         font.pointSize: Kirigami.Theme.smallFont.pointSize
         font.bold: true
         color: badge.badgeColor()

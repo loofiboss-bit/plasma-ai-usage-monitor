@@ -20,6 +20,7 @@
 class TogetherProvider : public OpenAICompatibleProvider
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit TogetherProvider(QObject *parent = nullptr);

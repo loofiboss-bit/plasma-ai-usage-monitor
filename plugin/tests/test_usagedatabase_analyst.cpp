@@ -117,6 +117,7 @@ private Q_SLOTS:
     void testMixedCurrenciesPreserveActivity();
     void testToolActivityWithoutProviderCost();
     void testExactRangeIsolation();
+    void testUtcHalfOpenRangeExcludesUpperBound();
     void testAsyncRequestSupersession();
     void testHundredThousandObservations();
 };
@@ -544,6 +545,40 @@ void UsageDatabaseAnalystTest::testExactRangeIsolation()
     const QVariantMap thirtyDay = db.getAnalystSnapshot(to.addDays(-29), to);
     QCOMPARE(sevenDay.value(QStringLiteral("spendSeries")).toList().size(), 1);
     QCOMPARE(thirtyDay.value(QStringLiteral("spendSeries")).toList().size(), 2);
+}
+
+void UsageDatabaseAnalystTest::testUtcHalfOpenRangeExcludesUpperBound()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+    const QDateTime fromInclusive =
+        QDateTime::fromString(QStringLiteral("2026-03-01T00:00:00Z"),
+                              Qt::ISODate);
+    const QDateTime toExclusive =
+        QDateTime::fromString(QStringLiteral("2026-03-31T00:00:00Z"),
+                              Qt::ISODate);
+    QVERIFY(db.recordProviderMetrics(
+        QStringLiteral("Range"),
+        {metric(QStringLiteral("cost"), QStringLiteral("USD"), 3.0,
+                toExclusive.addMSecs(-1), QStringLiteral("USD"))}));
+    QVERIFY(db.recordProviderMetrics(
+        QStringLiteral("Range"),
+        {metric(QStringLiteral("cost"), QStringLiteral("USD"), 99.0,
+                toExclusive, QStringLiteral("USD"))}));
+
+    const QVariantMap snapshot =
+        db.getAnalystSnapshot(fromInclusive, toExclusive);
+    QCOMPARE(snapshot.value(QStringLiteral("coverage"))
+                 .toMap()
+                 .value(QStringLiteral("requestedDayCount"))
+                 .toInt(),
+             30);
+    QCOMPARE(snapshot.value(QStringLiteral("actualSampleCount")).toInt(), 1);
+    QCOMPARE(snapshot.value(QStringLiteral("spendSeries")).toList().size(), 1);
 }
 
 void UsageDatabaseAnalystTest::testAsyncRequestSupersession()

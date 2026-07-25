@@ -1,5 +1,4 @@
 set(aiusagemonitor_SRCS
-    aiusageplugin.cpp
     appinfo.cpp
     catalogloader.cpp
     providerpricingcatalog.cpp
@@ -45,7 +44,6 @@ set(aiusagemonitor_SRCS
 )
 
 set(aiusagemonitor_HDRS
-    aiusageplugin.h
     appinfo.h
     catalogloader.h
     providerpricingcatalog.h
@@ -106,9 +104,7 @@ target_link_libraries(antigravityprotocol PUBLIC protobuf::libprotobuf)
 qt_add_qml_module(aiusagemonitorplugin
     URI com.github.loofi.aiusagemonitor
     VERSION 1.0
-    CLASS_NAME AiUsagePlugin
     PLUGIN_TARGET aiusagemonitorplugin
-    NO_GENERATE_PLUGIN_SOURCE
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/com/github/loofi/aiusagemonitor
     SOURCES ${aiusagemonitor_SRCS} ${aiusagemonitor_HDRS}
 )

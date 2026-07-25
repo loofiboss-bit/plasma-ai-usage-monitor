@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
@@ -20,7 +21,7 @@ Rectangle {
     border.width: 1
     border.color: Qt.alpha(Kirigami.Theme.textColor, 0.15)
     Accessible.role: Accessible.StaticText
-    Accessible.name: i18n("Quota and resets. %1", detailText())
+    Accessible.name: KI18n.i18n("Quota and resets. %1", detailText())
 
     ColumnLayout {
         id: content
@@ -30,7 +31,7 @@ Rectangle {
 
         PlasmaExtras.Heading {
             level: 4
-            text: i18n("Quota and resets")
+            text: KI18n.i18n("Quota and resets")
             Layout.fillWidth: true
         }
 
@@ -45,13 +46,13 @@ Rectangle {
                 visible: !!card.quota.stableId
                 spacing: 0
                 PlasmaComponents.Label {
-                    text: i18n("Lowest live quota")
+                    text: KI18n.i18n("Lowest live quota")
                     color: Kirigami.Theme.disabledTextColor
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                 }
                 PlasmaComponents.Label {
                     objectName: "lowestQuotaValue"
-                    text: i18n("%1% remaining", Math.round(Number(card.quota.percentRemaining)))
+                    text: KI18n.i18n("%1% remaining", Math.round(Number(card.quota.percentRemaining)))
                     font.bold: true
                 }
                 PlasmaComponents.Label {
@@ -66,7 +67,7 @@ Rectangle {
                 visible: !!card.reset.stableId
                 spacing: 0
                 PlasmaComponents.Label {
-                    text: i18n("Next live reset")
+                    text: KI18n.i18n("Next live reset")
                     color: Kirigami.Theme.disabledTextColor
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                 }
@@ -85,7 +86,7 @@ Rectangle {
 
         PlasmaComponents.Label {
             Layout.fillWidth: true
-            text: i18n("Only synced or provider-reported quota windows appear here; published limits are excluded.")
+            text: KI18n.i18n("Only synced or provider-reported quota windows appear here; published limits are excluded.")
             wrapMode: Text.WordWrap
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
@@ -95,11 +96,11 @@ Rectangle {
     function detailText() {
         var parts = [];
         if (quota.stableId)
-            parts.push(i18n("%1 has %2% remaining", quota.displayName,
+            parts.push(KI18n.i18n("%1 has %2% remaining", quota.displayName,
                             Math.round(Number(quota.percentRemaining))));
         if (reset.stableId)
-            parts.push(i18n("%1 resets in %2", reset.displayName,
+            parts.push(KI18n.i18n("%1 resets in %2", reset.displayName,
                             presentation.relativeReset(reset.resetAt)));
-        return parts.join(i18n(" · "));
+        return parts.join(KI18n.i18n(" · "));
     }
 }

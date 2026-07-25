@@ -20,6 +20,7 @@
 class CopilotMonitor : public LocalActivityMonitorBase
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(QString githubToken READ githubToken WRITE setGithubToken NOTIFY githubTokenChanged)
     Q_PROPERTY(QString orgName READ orgName WRITE setOrgName NOTIFY orgNameChanged)

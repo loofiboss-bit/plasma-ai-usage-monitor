@@ -6,6 +6,7 @@
 class JetBrainsAiMonitor : public LocalActivityMonitorBase
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit JetBrainsAiMonitor(QObject *parent = nullptr);

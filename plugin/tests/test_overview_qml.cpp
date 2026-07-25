@@ -1,3 +1,4 @@
 #include <QtQuickTest>
+#include "qmltestsetup.h"
 
-QUICK_TEST_MAIN(overview)
+QUICK_TEST_MAIN_WITH_SETUP(overview, QmlTestSetup)

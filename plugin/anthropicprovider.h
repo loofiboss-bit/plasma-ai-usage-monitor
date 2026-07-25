@@ -23,6 +23,7 @@
 class AnthropicProvider : public ProviderBackend
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY modelChanged)
 

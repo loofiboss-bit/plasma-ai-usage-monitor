@@ -26,22 +26,22 @@ def main() -> None:
     errors += require(
         "package/contents/ui/CompactRepresentation.qml",
         "Accessible.role: Accessible.Button",
-        "Accessible.name: i18n(\"AI Usage Monitor: %1\", accessibleText())",
+        "Accessible.name: KI18n.i18n(\"AI Usage Monitor: %1\", accessibleText())",
         'objectName: "compactSeveritySymbol"',
         'text: "!"',
     )
     errors += require(
         "package/contents/ui/components/CompactMetricState.qml",
-        'i18n("Critical: %1", urgent.displayName)',
-        'i18n("Warning: %1", urgent.displayName)',
+        'KI18n.i18n("Critical: %1", urgent.displayName)',
+        'KI18n.i18n("Warning: %1", urgent.displayName)',
         "summary.mostUrgentSource",
     )
     errors += require(
         "package/contents/ui/DailySourceCard.qml",
         "Accessible.name:",
         "attentionText()",
-        'i18n("Critical · ")',
-        'i18n("Warning · ")',
+        'KI18n.i18n("Critical · ")',
+        'KI18n.i18n("Warning · ")',
         "activeFocusOnTab: true",
     )
     errors += require(
@@ -53,15 +53,15 @@ def main() -> None:
     )
     errors += require(
         "package/contents/ui/FullRepresentation.qml",
-        'Accessible.name: i18n("Refresh all configured sources")',
-        'Accessible.name: i18n("Run guided setup again")',
-        'Accessible.name: i18n("Configure AI Usage Monitor")',
-        'Accessible.name: i18n("Open %1", modelData)',
+        'Accessible.name: KI18n.i18n("Refresh all configured sources")',
+        'Accessible.name: KI18n.i18n("Run guided setup again")',
+        'Accessible.name: KI18n.i18n("Configure AI Usage Monitor")',
+        'Accessible.name: KI18n.i18n("Open %1", modelData)',
     )
     errors += require(
         "package/contents/ui/AnalystTab.qml",
-        'i18n("Analyst view loading")',
-        'i18n("Analyst view ready")',
+        'KI18n.i18n("Analyst view loading")',
+        'KI18n.i18n("Analyst view ready")',
     )
     errors += require(
         "package/contents/ui/RuntimeCoordinator.qml",

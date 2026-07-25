@@ -6,6 +6,7 @@
 #include <QMap>
 #include <QHash>
 #include <KWallet>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 /**
  * SecretsManager wraps KWallet to securely store and retrieve API keys.
@@ -14,6 +15,7 @@
 class SecretsManager : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
     Q_PROPERTY(bool walletOpen READ isWalletOpen NOTIFY walletOpenChanged)
     Q_PROPERTY(int secretReadCount READ secretReadCount NOTIFY diagnosticsChanged)
     Q_PROPERTY(bool demoIsolated READ isDemoIsolated CONSTANT)

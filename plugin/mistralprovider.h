@@ -15,6 +15,7 @@
 class MistralProvider : public OpenAICompatibleProvider
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit MistralProvider(QObject *parent = nullptr);

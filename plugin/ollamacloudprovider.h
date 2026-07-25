@@ -17,6 +17,7 @@
 class OllamaCloudProvider : public OpenAICompatibleProvider
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit OllamaCloudProvider(QObject *parent = nullptr);

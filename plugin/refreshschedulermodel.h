@@ -3,10 +3,12 @@
 
 #include <QObject>
 #include <QDateTime>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 class RefreshSchedulerModel : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
 public:
     explicit RefreshSchedulerModel(QObject *parent = nullptr);
 

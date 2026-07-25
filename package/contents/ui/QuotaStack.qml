@@ -1,4 +1,6 @@
+pragma ComponentBehavior: Bound
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -27,7 +29,7 @@ ColumnLayout {
     PlasmaComponents.Label {
         Layout.fillWidth: true
         visible: !quotaStack.collapsed && quotaStack.visibleRows.length === 0
-        text: i18n("No quota data")
+        text: KI18n.i18n("No quota data")
         font.pointSize: Kirigami.Theme.smallFont.pointSize
         opacity: 0.6
         elide: Text.ElideRight

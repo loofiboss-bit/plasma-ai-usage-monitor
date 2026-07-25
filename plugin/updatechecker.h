@@ -6,6 +6,7 @@
 #include <QNetworkReply>
 #include <QTimer>
 #include <QVersionNumber>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 /**
  * Periodically checks GitHub releases for newer versions and emits
@@ -21,6 +22,7 @@
 class UpdateChecker : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
     Q_PROPERTY(QString currentVersion READ currentVersion WRITE setCurrentVersion NOTIFY currentVersionChanged)
     Q_PROPERTY(int checkIntervalHours READ checkIntervalHours WRITE setCheckIntervalHours NOTIFY checkIntervalHoursChanged)
     Q_PROPERTY(QString releaseApiUrl READ releaseApiUrl WRITE setReleaseApiUrl NOTIFY releaseApiUrlChanged)

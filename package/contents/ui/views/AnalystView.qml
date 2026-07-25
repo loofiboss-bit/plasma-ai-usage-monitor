@@ -1,7 +1,10 @@
 import QtQuick
-import QtQuick.Layouts
 import ".." as Monitor
 
 Item {
-    Monitor.AnalystTab { anchors.fill: parent }
+    property var monitor: null
+    Monitor.AnalystTab {
+        anchors.fill: parent
+        monitor: parent.monitor
+    }
 }

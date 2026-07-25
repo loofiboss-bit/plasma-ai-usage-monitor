@@ -1,6 +1,8 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.plasma.plasmoid
+import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as Controls
 import org.kde.kirigami as Kirigami
@@ -9,14 +11,15 @@ import "components" as Components
 
 Kirigami.ScrollablePage {
     id: analystPage
+    required property var monitor
 
-    title: i18n("The Analyst")
+    title: KI18n.i18n("The Analyst")
     Accessible.name: analystState.loading
-        ? i18n("Analyst view loading")
-        : i18n("Analyst view ready")
+        ? KI18n.i18n("Analyst view loading")
+        : KI18n.i18n("Analyst view ready")
 
-    readonly property var db: plasmoid.configuration.historyEnabled
-        ? root.usageDb
+    readonly property var db: Plasmoid.configuration.historyEnabled
+        ? analystPage.monitor.usageDb
         : null
     Components.AnalystState {
         id: analystState
@@ -33,13 +36,13 @@ Kirigami.ScrollablePage {
     actions: [
         Kirigami.Action {
             icon.name: "view-refresh"
-            text: i18n("Refresh")
+            text: KI18n.i18n("Refresh")
             enabled: analystState.reportRequestId === ""
             onTriggered: analystState.refreshData()
         },
         Kirigami.Action {
             icon.name: "edit-copy"
-            text: i18n("Copy 7-day report")
+            text: KI18n.i18n("Copy 7-day report")
             enabled: analystPage.db !== null
                 && !analystState.loading
                 && analystState.reportRequestId === ""
@@ -47,7 +50,7 @@ Kirigami.ScrollablePage {
         },
         Kirigami.Action {
             icon.name: "edit-copy"
-            text: i18n("Copy 30-day report")
+            text: KI18n.i18n("Copy 30-day report")
             enabled: analystPage.db !== null
                 && !analystState.loading
                 && analystState.reportRequestId === ""
@@ -81,7 +84,7 @@ Kirigami.ScrollablePage {
             visible: analystState.hasSnapshot
 
             header: Kirigami.Heading {
-                text: i18n("Data coverage")
+                text: KI18n.i18n("Data coverage")
                 level: 3
             }
 
@@ -90,7 +93,7 @@ Kirigami.ScrollablePage {
 
                 Controls.Label {
                     objectName: "coverageLabel"
-                    text: i18n("%1 of %2 days contain compatible observations (%3%)",
+                    text: KI18n.i18n("%1 of %2 days contain compatible observations (%3%)",
                                analystState.coverage.observedDayCount || 0,
                                analystState.coverage.requestedDayCount || 30,
                                Number(analystState.coverage.percent || 0).toFixed(0))
@@ -98,14 +101,14 @@ Kirigami.ScrollablePage {
                 }
 
                 Controls.Label {
-                    text: i18n("Period: %1 – %2",
+                    text: KI18n.i18n("Period: %1 – %2",
                                analystState.formatDate(analystState.snapshot.from),
                                analystState.formatDate(analystState.snapshot.to))
                     color: Kirigami.Theme.disabledTextColor
                 }
 
                 Controls.Label {
-                    text: i18n("%1 actual and %2 estimated compatible cost samples",
+                    text: KI18n.i18n("%1 actual and %2 estimated compatible cost samples",
                                analystState.snapshot.actualSampleCount || 0,
                                analystState.snapshot.estimatedSampleCount || 0)
                     color: Kirigami.Theme.disabledTextColor
@@ -132,7 +135,7 @@ Kirigami.ScrollablePage {
                 && analystState.kpi("averageDailySpend").available
 
             header: Kirigami.Heading {
-                text: i18n("Spend trend")
+                text: KI18n.i18n("Spend trend")
                 level: 3
             }
 
@@ -163,13 +166,13 @@ Kirigami.ScrollablePage {
 
                     ColumnLayout {
                         Controls.Label {
-                            text: i18n("Week over week")
+                            text: KI18n.i18n("Week over week")
                             color: Kirigami.Theme.disabledTextColor
                         }
                         Controls.Label {
                             text: analystState.kpi("weekOverWeekChange").available
                                 ? analystState.formatPercent(analystState.kpi("weekOverWeekChange").value)
-                                : i18n("Unavailable")
+                                : KI18n.i18n("Unavailable")
                             font.pointSize: 20
                             font.weight: Font.Bold
                         }
@@ -186,13 +189,13 @@ Kirigami.ScrollablePage {
 
                     ColumnLayout {
                         Controls.Label {
-                            text: i18n("Volatility")
+                            text: KI18n.i18n("Volatility")
                             color: Kirigami.Theme.disabledTextColor
                         }
                         Controls.Label {
                             text: analystState.kpi("volatility").available
                                 ? analystState.formatPercent(analystState.kpi("volatility").value)
-                                : i18n("Unavailable")
+                                : KI18n.i18n("Unavailable")
                             font.pointSize: 20
                             font.weight: Font.Bold
                         }
@@ -223,7 +226,7 @@ Kirigami.ScrollablePage {
                 && analystState.snapshot.activityAvailable === true
 
             header: Kirigami.Heading {
-                text: i18n("Activity trend")
+                text: KI18n.i18n("Activity trend")
                 level: 3
             }
 
@@ -251,7 +254,7 @@ Kirigami.ScrollablePage {
                     spacing: Kirigami.Units.smallSpacing
 
                     Kirigami.Heading {
-                        text: i18n("Local tool activity")
+                        text: KI18n.i18n("Local tool activity")
                         level: 4
                     }
 
@@ -288,7 +291,7 @@ Kirigami.ScrollablePage {
                 && (analystState.snapshot.topDrivers || []).length > 0
 
             header: Kirigami.Heading {
-                text: i18n("Top compatible spend drivers")
+                text: KI18n.i18n("Top compatible spend drivers")
                 level: 3
             }
 
@@ -299,11 +302,14 @@ Kirigami.ScrollablePage {
                     model: analystState.snapshot.topDrivers || []
 
                     RowLayout {
+                        id: driverRow
+                        required property int index
+                        required property var modelData
                         Layout.fillWidth: true
                         spacing: Kirigami.Units.smallSpacing
 
                         Controls.Label {
-                            text: (index + 1) + "."
+                            text: (driverRow.index + 1) + "."
                             color: Kirigami.Theme.disabledTextColor
                         }
 
@@ -313,20 +319,22 @@ Kirigami.ScrollablePage {
 
                             Controls.Label {
                                 Layout.fillWidth: true
-                                text: modelData.provider + "  [" + modelData.model + "]"
+                                text: driverRow.modelData.provider + "  ["
+                                      + driverRow.modelData.model + "]"
                                 elide: Text.ElideRight
                             }
                             Controls.Label {
-                                text: modelData.quality === "estimated"
-                                    ? i18n("Estimated")
-                                    : i18n("Actual")
+                                text: driverRow.modelData.quality === "estimated"
+                                    ? KI18n.i18n("Estimated")
+                                    : KI18n.i18n("Actual")
                                 color: Kirigami.Theme.disabledTextColor
                             }
                         }
 
                         Controls.Label {
-                            text: analystState.formatMoney(modelData.value,
-                                              modelData.currency)
+                            text: analystState.formatMoney(
+                                driverRow.modelData.value,
+                                driverRow.modelData.currency)
                             font.weight: Font.DemiBold
                         }
                     }
@@ -340,7 +348,7 @@ Kirigami.ScrollablePage {
                 && analystState.snapshot.anomaliesAvailable === true
 
             header: Kirigami.Heading {
-                text: i18n("Anomaly candidates")
+                text: KI18n.i18n("Anomaly candidates")
                 level: 3
             }
 
@@ -349,7 +357,7 @@ Kirigami.ScrollablePage {
 
                 Controls.Label {
                     visible: (analystState.snapshot.anomalies || []).length === 0
-                    text: i18n("No day crossed the documented threshold.")
+                    text: KI18n.i18n("No day crossed the documented threshold.")
                     color: Kirigami.Theme.disabledTextColor
                 }
 
@@ -357,8 +365,9 @@ Kirigami.ScrollablePage {
                     model: analystState.snapshot.anomalies || []
 
                     Controls.Label {
+                        required property var modelData
                         Layout.fillWidth: true
-                        text: i18n("%1: %2, compared with a %3 period baseline",
+                        text: KI18n.i18n("%1: %2, compared with a %3 period baseline",
                                    modelData.date,
                                    analystState.formatMoney(modelData.value,
                                                modelData.currency),
@@ -369,7 +378,7 @@ Kirigami.ScrollablePage {
                 }
 
                 Controls.Label {
-                    text: i18n("Candidates require at least seven recorded days, two standard deviations above the period mean, and a material absolute increase.")
+                    text: KI18n.i18n("Candidates require at least seven recorded days, two standard deviations above the period mean, and a material absolute increase.")
                     wrapMode: Text.WordWrap
                     color: Kirigami.Theme.disabledTextColor
                 }
@@ -381,7 +390,7 @@ Kirigami.ScrollablePage {
             visible: analystState.hasSnapshot
 
             header: Kirigami.Heading {
-                text: i18n("Period summary")
+                text: KI18n.i18n("Period summary")
                 level: 3
             }
 

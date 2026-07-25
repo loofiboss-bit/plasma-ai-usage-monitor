@@ -13,6 +13,7 @@
 #include <QJsonObject>
 #include <QVariantList>
 #include <functional>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 /**
  * Abstract base class for AI provider backends.
@@ -25,6 +26,8 @@
 class ProviderBackend : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("ProviderBackend is abstract; use a specific provider type.")
 
     // Identity
     Q_PROPERTY(QString name READ name CONSTANT)

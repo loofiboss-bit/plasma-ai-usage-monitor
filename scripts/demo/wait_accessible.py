@@ -16,7 +16,7 @@ def descendants(node, inside_window: bool, window_prefix: str):
     try:
         name = node.get_name() or ""
         role = node.get_role_name() or ""
-        inside_window = inside_window or (
+        inside_window = inside_window or not window_prefix or (
             role == "frame" and name.startswith(window_prefix)
         )
         if inside_window:
@@ -31,7 +31,8 @@ def descendants(node, inside_window: bool, window_prefix: str):
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--window", required=True)
+    parser.add_argument("--window", default="")
+    parser.add_argument("--pid", type=int)
     parser.add_argument("--target", required=True)
     parser.add_argument("--timeout", type=float, default=15.0)
     args = parser.parse_args()
@@ -40,11 +41,23 @@ def main() -> None:
     deadline = started + args.timeout
     while time.monotonic() < deadline:
         desktop = Atspi.get_desktop(0)
-        for node in descendants(desktop, False, args.window):
-            if (node.get_name() or "").startswith(args.target):
-                elapsed_ms = round((time.monotonic() - started) * 1000)
-                print(f"accessible_ready_ms={elapsed_ms}")
-                return
+        for index in range(desktop.get_child_count()):
+            application = desktop.get_child_at_index(index)
+            if args.pid is not None:
+                try:
+                    if application.get_process_id() != args.pid:
+                        continue
+                except Exception:
+                    continue
+            for node in descendants(application, False, args.window):
+                if (node.get_name() or "").startswith(args.target):
+                    elapsed_ms = round((time.monotonic() - started) * 1000)
+                    print(
+                        f"accessible_ready_ms={elapsed_ms} "
+                        f"pid={args.pid!r} window={args.window!r} "
+                        f"marker={args.target!r}"
+                    )
+                    return
         time.sleep(0.025)
     raise SystemExit(
         f"Timed out waiting for {args.target!r} in window {args.window!r}"

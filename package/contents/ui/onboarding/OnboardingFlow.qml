@@ -1,4 +1,6 @@
+pragma ComponentBehavior: Bound
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
@@ -45,13 +47,13 @@ Item {
                 Layout.fillWidth: true
                 PlasmaExtras.Heading {
                     level: 3
-                    text: i18n("Guided first success")
+                    text: KI18n.i18n("Guided first success")
                     Layout.fillWidth: true
                 }
                 PlasmaComponents.Label {
                     visible: controller.step <= controller.resultStep
                     opacity: 0.7
-                    text: i18n("Step %1 of 5", controller.step + 1)
+                    text: KI18n.i18n("Step %1 of 5", controller.step + 1)
                 }
             }
 
@@ -75,7 +77,7 @@ Item {
                 visible: controller.step < controller.resultStep
                 Layout.alignment: Qt.AlignHCenter
                 flat: true
-                text: i18n("Skip for now")
+                text: KI18n.i18n("Skip for now")
                 onClicked: controller.skip()
             }
         }
@@ -105,21 +107,21 @@ Item {
         id: pausedComponent
         ColumnLayout {
             spacing: Kirigami.Units.mediumSpacing
-            PlasmaExtras.Heading { level: 4; text: i18n("Setup is paused") }
+            PlasmaExtras.Heading { level: 4; text: KI18n.i18n("Setup is paused") }
             PlasmaComponents.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: i18n("No source was marked as successfully configured. Resume here at any time, or use Settings for full control.")
+                text: KI18n.i18n("No source was marked as successfully configured. Resume here at any time, or use Settings for full control.")
             }
             RowLayout {
                 PlasmaComponents.Button {
-                    text: i18n("Resume setup")
+                    text: KI18n.i18n("Resume setup")
                     icon.name: "media-playback-start"
                     onClicked: controller.resume()
                 }
                 PlasmaComponents.Button {
-                    text: i18n("Open Settings")
-                    onClicked: plasmoid.internalAction("configure").trigger()
+                    text: KI18n.i18n("Open Settings")
+                    onClicked: Plasmoid.internalAction("configure").trigger()
                 }
             }
         }

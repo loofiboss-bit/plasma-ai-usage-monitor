@@ -18,6 +18,7 @@
 class AzureOpenAIProvider : public ProviderBackend
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY modelChanged)
     Q_PROPERTY(QString deploymentId READ deploymentId WRITE setDeploymentId NOTIFY deploymentIdChanged)

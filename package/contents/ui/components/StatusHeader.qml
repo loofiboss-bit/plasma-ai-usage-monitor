@@ -54,22 +54,23 @@ Rectangle {
                 model: header.facts
 
                 RowLayout {
+                    id: factRow
                     required property var modelData
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
 
                     Kirigami.Icon {
-                        source: modelData.icon
+                        source: factRow.modelData.icon
                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
                         Layout.preferredHeight: width
                     }
                     PlasmaComponents.Label {
-                        text: modelData.value
+                        text: factRow.modelData.value
                         font.bold: true
                     }
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
-                        text: modelData.label
+                        text: factRow.modelData.label
                         elide: Text.ElideRight
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         color: Kirigami.Theme.disabledTextColor

@@ -11,6 +11,7 @@ import subprocess
 import struct
 from pathlib import Path
 
+from release_media_evidence import EvidenceError, validate_capture_evidence
 
 ROOT = Path(__file__).resolve().parents[1]
 SCREENSHOTS = ROOT / "assets" / "screenshots"
@@ -140,6 +141,11 @@ if not os.environ.get("AI_USAGE_MONITOR_MEDIA_FORCE_FILESYSTEM"):
         )
 if manifest.get("scenarios") != SCENARIOS:
     fail("manifest scenarios do not match the v15 capture contract")
+if int(version.split(".", 1)[0]) >= 16:
+    try:
+        validate_capture_evidence(manifest.get("captureEvidence"), REQUIRED)
+    except EvidenceError as error:
+        fail(str(error))
 
 asset_hashes: dict[str, str] = {}
 for filename in REQUIRED:

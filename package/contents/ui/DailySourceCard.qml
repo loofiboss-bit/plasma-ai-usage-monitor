@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -67,7 +68,7 @@ Rectangle {
                 Layout.alignment: Qt.AlignRight
             }
             PlasmaComponents.Label {
-                text: card.row.freshnessState === "stale" ? i18n("Stale") : i18n("Current")
+                text: card.row.freshnessState === "stale" ? KI18n.i18n("Stale") : KI18n.i18n("Current")
                 color: card.row.freshnessState === "stale"
                     ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.disabledTextColor
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -79,7 +80,7 @@ Rectangle {
             visible: card.row.attentionSeverity && card.row.attentionSeverity !== "none"
             icon.name: card.row.nextActionKey === "refresh_stale_data" ? "view-refresh" : "configure"
             activeFocusOnTab: true
-            Accessible.name: i18n("Review %1", card.row.displayName)
+            Accessible.name: KI18n.i18n("Review %1", card.row.displayName)
             onClicked: card.actionRequested(card.row.stableId, card.row.nextActionKey,
                                             card.row.sourceKind)
         }
@@ -113,18 +114,18 @@ Rectangle {
 
     function stateText() {
         var labels = {
-            actual: i18n("Provider-reported data"),
-            estimated: i18n("Local estimate"),
-            balance: i18n("Account balance"),
-            connectivity_only: i18n("Connectivity only"),
-            unavailable: i18n("Data unavailable")
+            actual: KI18n.i18n("Provider-reported data"),
+            estimated: KI18n.i18n("Local estimate"),
+            balance: KI18n.i18n("Account balance"),
+            connectivity_only: KI18n.i18n("Connectivity only"),
+            unavailable: KI18n.i18n("Data unavailable")
         };
-        return labels[row.qualityClass] || i18n("Data unavailable");
+        return labels[row.qualityClass] || KI18n.i18n("Data unavailable");
     }
 
     function attentionText() {
-        if (row.attentionSeverity === "critical") return i18n("Critical · ");
-        if (row.attentionSeverity === "warning") return i18n("Warning · ");
+        if (row.attentionSeverity === "critical") return KI18n.i18n("Critical · ");
+        if (row.attentionSeverity === "warning") return KI18n.i18n("Warning · ");
         return "";
     }
 
@@ -133,9 +134,9 @@ Rectangle {
         var value = Number(row.primaryMetricValue);
         if (!Number.isFinite(value)) return "\u2014";
         if (row.primaryMetricUnit === "percent_remaining")
-            return i18n("%1% left", Math.round(value));
+            return KI18n.i18n("%1% left", Math.round(value));
         if (row.currency && row.currency !== "MIXED")
-            return i18n("%1 %2", row.currency, value.toLocaleString(Qt.locale(), "f", 2));
+            return KI18n.i18n("%1 %2", row.currency, value.toLocaleString(Qt.locale(), "f", 2));
         return value.toLocaleString(Qt.locale());
     }
 }

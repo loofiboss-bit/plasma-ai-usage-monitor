@@ -114,10 +114,10 @@ Canvas {
         hoverEnabled: true
         
         onPositionChanged: (mouse) => {
-            var col = Math.floor((mouse.x - spacing) / (cellSize + spacing));
-            var row = Math.floor((mouse.y - spacing) / (cellSize + spacing));
+            var col = Math.floor((mouse.x - heatmap.spacing) / (heatmap.cellSize + heatmap.spacing));
+            var row = Math.floor((mouse.y - heatmap.spacing) / (heatmap.cellSize + heatmap.spacing));
             
-            if (col >= 0 && col < columns && row >= 0 && row < rows) {
+            if (col >= 0 && col < heatmap.columns && row >= 0 && row < heatmap.rows) {
                 var today = new Date();
                 var startDate = new Date(today);
                 startDate.setDate(today.getDate() - 364);
@@ -137,10 +137,10 @@ Canvas {
         }
         
         onClicked: (mouse) => {
-            var col = Math.floor((mouse.x - spacing) / (cellSize + spacing));
-            var row = Math.floor((mouse.y - spacing) / (cellSize + spacing));
+            var col = Math.floor((mouse.x - heatmap.spacing) / (heatmap.cellSize + heatmap.spacing));
+            var row = Math.floor((mouse.y - heatmap.spacing) / (heatmap.cellSize + heatmap.spacing));
             
-            if (col >= 0 && col < columns && row >= 0 && row < rows) {
+            if (col >= 0 && col < heatmap.columns && row >= 0 && row < heatmap.rows) {
                 var today = new Date();
                 var startDate = new Date(today);
                 startDate.setDate(today.getDate() - 364);

@@ -2,12 +2,14 @@
 #define LOCALMETRICSSERVER_H
 
 #include <QObject>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 class QTcpServer;
 
 class LocalMetricsServer : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(int port READ port WRITE setPort NOTIFY portChanged)

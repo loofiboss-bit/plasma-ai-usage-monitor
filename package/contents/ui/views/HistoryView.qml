@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import QtQuick.Dialogs as Dialogs
@@ -14,18 +15,19 @@ import "../components" as Components
 ColumnLayout {
     id: history
 
+    property var monitor: null
     property string pendingExportFormat: "csv"
     property string exportStatus: ""
     Accessible.name: historyController.loading
-        ? i18n("History view loading")
-        : i18n("History view ready")
+        ? KI18n.i18n("History view loading")
+        : KI18n.i18n("History view ready")
 
     Components.HistoryController {
         id: historyController
-        usageDb: root.usageDb
-        dailyState: root.presentationDailyState
-        configuredProviders: root.allProviders || []
-        configuredTools: root.allSubscriptionTools || []
+        usageDb: history.monitor.usageDb
+        dailyState: history.monitor.presentationDailyState
+        configuredProviders: history.monitor.allProviders || []
+        configuredTools: history.monitor.allSubscriptionTools || []
     }
 
     Timer {
@@ -61,7 +63,7 @@ ColumnLayout {
     function openExport(format) {
         pendingExportFormat = format;
         exportDialog.nameFilters = format === "json"
-            ? [i18n("JSON files (*.json)")] : [i18n("CSV files (*.csv)")];
+            ? [KI18n.i18n("JSON files (*.json)")] : [KI18n.i18n("CSV files (*.csv)")];
         exportDialog.currentFile = "ai-usage-history." + format;
         exportDialog.open();
     }
@@ -73,17 +75,17 @@ ColumnLayout {
 
         PlasmaExtras.Heading {
             level: 4
-            text: i18n("History")
+            text: KI18n.i18n("History")
             Layout.fillWidth: true
         }
         PlasmaComponents.ToolButton {
-            text: historyController.compareMode ? i18n("Compare") : i18n("Detail")
+            text: historyController.compareMode ? KI18n.i18n("Compare") : KI18n.i18n("Detail")
             checkable: true
             checked: historyController.compareMode
             activeFocusOnTab: true
             Accessible.name: historyController.compareMode
-                ? i18n("Show comparison history")
-                : i18n("Show one source history")
+                ? KI18n.i18n("Show comparison history")
+                : KI18n.i18n("Show one source history")
             onClicked: {
                 historyController.compareMode = !historyController.compareMode;
                 historyController.normalizeSelection();
@@ -94,7 +96,7 @@ ColumnLayout {
             icon.name: "view-refresh"
             enabled: !historyController.loading
             activeFocusOnTab: true
-            Accessible.name: i18n("Refresh history")
+            Accessible.name: KI18n.i18n("Refresh history")
             onClicked: historyController.refreshCatalog()
         }
     }
@@ -107,10 +109,10 @@ ColumnLayout {
 
         QQC2.ComboBox {
             id: rangeCombo
-            model: [i18n("24 hours"), i18n("7 days"), i18n("30 days"), i18n("90 days")]
+            model: [KI18n.i18n("24 hours"), KI18n.i18n("7 days"), KI18n.i18n("30 days"), KI18n.i18n("90 days")]
             currentIndex: historyController.rangeIndex
             activeFocusOnTab: true
-            Accessible.name: i18n("History range")
+            Accessible.name: KI18n.i18n("History range")
             onActivated: {
                 historyController.rangeIndex = currentIndex;
                 historyController.refresh();
@@ -125,7 +127,7 @@ ColumnLayout {
             valueRole: "value"
             currentIndex: historyController.sourceIndex()
             activeFocusOnTab: true
-            Accessible.name: i18n("History source")
+            Accessible.name: KI18n.i18n("History source")
             onActivated: {
                 historyController.selectedSourceId = currentValue || "";
                 historyController.normalizeSelection();
@@ -140,17 +142,17 @@ ColumnLayout {
             valueRole: "value"
             currentIndex: historyController.metricIndex()
             activeFocusOnTab: true
-            Accessible.name: i18n("History metric")
+            Accessible.name: KI18n.i18n("History metric")
             onActivated: {
                 historyController.selectedMetric = currentValue || "";
                 historyController.refresh();
             }
         }
         PlasmaComponents.Button {
-            text: i18n("Export file")
+            text: KI18n.i18n("Export file")
             icon.name: "document-export"
             activeFocusOnTab: true
-            Accessible.name: i18n("Export history to a file")
+            Accessible.name: KI18n.i18n("Export history to a file")
             enabled: !historyController.loading
                 && historyController.seriesData.length > 0
             onClicked: exportMenu.open()
@@ -159,11 +161,11 @@ ColumnLayout {
                 id: exportMenu
                 y: parent.height
                 QQC2.MenuItem {
-                    text: i18n("Export CSV file")
+                    text: KI18n.i18n("Export CSV file")
                     onTriggered: history.openExport("csv")
                 }
                 QQC2.MenuItem {
-                    text: i18n("Export JSON file")
+                    text: KI18n.i18n("Export JSON file")
                     onTriggered: history.openExport("json")
                 }
             }
@@ -173,7 +175,7 @@ ColumnLayout {
             enabled: !historyController.loading
                 && historyController.seriesData.length > 0
             activeFocusOnTab: true
-            Accessible.name: i18n("Copy history as CSV")
+            Accessible.name: KI18n.i18n("Copy history as CSV")
             onClicked: clipboard.setText(historyController.exportPayload("csv"))
         }
     }
@@ -202,11 +204,11 @@ ColumnLayout {
             && (historyController.errorKey !== ""
                 || historyController.seriesData.length === 0)
         title: historyController.errorKey !== ""
-            ? i18n("This comparison is not compatible")
-            : i18n("No compatible history data")
+            ? KI18n.i18n("This comparison is not compatible")
+            : KI18n.i18n("No compatible history data")
         details: historyController.errorKey !== ""
             ? historyController.errorText()
-            : i18n("Choose a source, metric, and time range with retained compatible observations.")
+            : KI18n.i18n("Choose a source, metric, and time range with retained compatible observations.")
     }
 
     Monitor.MultiSeriesChart {
@@ -231,7 +233,7 @@ ColumnLayout {
             PlasmaComponents.Label {
                 required property var modelData
                 Layout.fillWidth: true
-                text: i18nc("History coverage metadata", "%1: %2",
+                text: KI18n.i18nc("History coverage metadata", "%1: %2",
                             modelData.name,
                             historyController.coverageText(modelData))
                 color: Kirigami.Theme.disabledTextColor
@@ -244,14 +246,14 @@ ColumnLayout {
 
     Dialogs.FileDialog {
         id: exportDialog
-        title: i18n("Export History")
+        title: KI18n.i18n("Export History")
         fileMode: Dialogs.FileDialog.SaveFile
         onAccepted: {
             history.exportStatus = AppInfo.exportConfig(
                 historyController.exportPayload(history.pendingExportFormat),
                 selectedFile.toString())
-                ? i18n("History export saved.")
-                : i18n("The history export could not be written.");
+                ? KI18n.i18n("History export saved.")
+                : KI18n.i18n("The history export could not be written.");
         }
     }
 

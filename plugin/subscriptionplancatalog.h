@@ -9,6 +9,8 @@
 class SubscriptionPlanCatalog : public CatalogLoader
 {
     Q_OBJECT
+    QML_ELEMENT
+    QML_SINGLETON
 
 public:
     explicit SubscriptionPlanCatalog(QObject *parent = nullptr);

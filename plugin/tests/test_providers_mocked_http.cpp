@@ -139,6 +139,16 @@ public:
         });
     }
 
+    ~HttpStubServer() override
+    {
+        m_server.close();
+        const auto sockets = m_server.findChildren<QTcpSocket *>();
+        for (QTcpSocket *socket : sockets) {
+            disconnect(socket, nullptr, this, nullptr);
+            socket->abort();
+        }
+    }
+
     bool listen()
     {
         return m_server.listen(QHostAddress::LocalHost, 0);

@@ -15,6 +15,7 @@
 class LocalActivityMonitorBase : public SubscriptionToolBackend
 {
     Q_OBJECT
+    QML_ANONYMOUS
 
 public:
     explicit LocalActivityMonitorBase(QObject *parent = nullptr);

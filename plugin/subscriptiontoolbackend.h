@@ -8,6 +8,7 @@
 #include <QTimer>
 #include <QJsonObject>
 #include <QVariantList>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 class QNetworkAccessManager;
 class QNetworkReply;
@@ -29,6 +30,8 @@ class QNetworkReply;
 class SubscriptionToolBackend : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
+    QML_UNCREATABLE("SubscriptionToolBackend is abstract; use a specific monitor type.")
 
     // Identity
     Q_PROPERTY(QString toolName READ toolName CONSTANT)

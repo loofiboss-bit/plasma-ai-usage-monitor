@@ -19,6 +19,7 @@
 class OpenAICompatibleProvider : public ProviderBackend
 {
     Q_OBJECT
+    QML_ANONYMOUS
 
     Q_PROPERTY(QString model READ model WRITE setModel NOTIFY modelChanged)
 

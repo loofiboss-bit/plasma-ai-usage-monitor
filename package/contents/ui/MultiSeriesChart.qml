@@ -1,4 +1,6 @@
+pragma ComponentBehavior: Bound
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -43,22 +45,24 @@ Item {
                 spacing: Kirigami.Units.smallSpacing
 
                 Repeater {
-                    model: visibleSeries()
+                    model: chartRoot.visibleSeries()
 
                     Rectangle {
+                        id: legendChip
+                        required property var modelData
                         radius: Kirigami.Units.cornerRadius
                         height: Kirigami.Units.gridUnit * 1.5
                         width: Math.min(chipLabel.implicitWidth + Kirigami.Units.smallSpacing * 4 + 16,
                                         chartRoot.legendChipMaxWidth)
-                        color: Qt.alpha(modelData.color, 0.10)
+                        color: Qt.alpha(legendChip.modelData.color, 0.10)
                         border.width: 1
-                        border.color: Qt.alpha(modelData.color, 0.3)
+                        border.color: Qt.alpha(legendChip.modelData.color, 0.3)
 
                         Rectangle {
                             width: 8
                             height: 8
                             radius: 4
-                            color: modelData.color
+                            color: legendChip.modelData.color
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
                             anchors.leftMargin: Kirigami.Units.smallSpacing
@@ -66,7 +70,7 @@ Item {
 
                         PlasmaComponents.Label {
                             id: chipLabel
-                            text: modelData.name
+                            text: legendChip.modelData.name
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.left: parent.left
                             anchors.leftMargin: Kirigami.Units.smallSpacing * 2 + 8
@@ -87,16 +91,16 @@ Item {
             Canvas {
                 id: canvas
                 anchors.fill: parent
-                visible: hasData()
+                visible: chartRoot.hasData()
 
                 onPaint: {
                     var ctx = getContext("2d");
                     ctx.reset();
 
-                    var parsed = parseSeries();
+                    var parsed = chartRoot.parseSeries();
                     if (parsed.length === 0) return;
 
-                    var bounds = computeBounds(parsed);
+                    var bounds = chartRoot.computeBounds(parsed);
                     if (!bounds.valid) return;
 
                     var w = width;
@@ -130,7 +134,7 @@ Item {
                         ctx.lineTo(chartRoot.marginLeft + chartW, gy);
                         ctx.stroke();
 
-                        ctx.fillText(formatMetricValue(val), chartRoot.marginLeft - 6, gy + 3);
+                        ctx.fillText(chartRoot.formatMetricValue(val), chartRoot.marginLeft - 6, gy + 3);
                     }
 
                     // X labels
@@ -140,7 +144,7 @@ Item {
                         var tr = t / xTicks;
                         var tx = chartRoot.marginLeft + tr * chartW;
                         var tm = bounds.minTime + tr * (bounds.maxTime - bounds.minTime);
-                        ctx.fillText(formatAxisTime(tm), tx, h - 5);
+                        ctx.fillText(chartRoot.formatAxisTime(tm), tx, h - 5);
                     }
 
                     // Draw series
@@ -202,7 +206,7 @@ Item {
                         ctx.setLineDash([]);
 
                         // Highlight nearest points
-                        var rows = nearestRows(parsed, chartRoot.hoverTimeMs);
+                        var rows = chartRoot.nearestRows(parsed, chartRoot.hoverTimeMs);
                         for (var r = 0; r < rows.length; r++) {
                             var row = rows[r];
                             if (!row.point) continue;
@@ -223,20 +227,20 @@ Item {
 
             PlasmaComponents.Label {
                 anchors.centerIn: parent
-                visible: chartRoot.showEmptyState && !hasData()
-                text: i18n("No comparison data available for this range")
+                visible: chartRoot.showEmptyState && !chartRoot.hasData()
+                text: KI18n.i18n("No comparison data available for this range")
                 opacity: 0.55
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
             }
 
             MouseArea {
                 anchors.fill: canvas
-                visible: hasData()
+                visible: chartRoot.hasData()
                 hoverEnabled: true
                 acceptedButtons: Qt.NoButton
 
                 onPositionChanged: function(mouse) {
-                    var bounds = computeBounds(parseSeries());
+                    var bounds = chartRoot.computeBounds(chartRoot.parseSeries());
                     if (!bounds.valid) return;
 
                     var chartW = canvas.width - chartRoot.marginLeft - chartRoot.marginRight;
@@ -257,7 +261,7 @@ Item {
                     chartRoot.hoverY = mouse.y;
                     var ratio = (mouse.x - chartRoot.marginLeft) / chartW;
                     chartRoot.hoverTimeMs = bounds.minTime + ratio * (bounds.maxTime - bounds.minTime);
-                    chartRoot.hoverRows = nearestRows(parseSeries(), chartRoot.hoverTimeMs);
+                    chartRoot.hoverRows = chartRoot.nearestRows(chartRoot.parseSeries(), chartRoot.hoverTimeMs);
                     canvas.requestPaint();
                 }
 
@@ -299,13 +303,13 @@ Item {
                     spacing: 4
 
                     PlasmaComponents.Label {
-                        text: formatAxisTime(chartRoot.hoverTimeMs)
+                        text: chartRoot.formatAxisTime(chartRoot.hoverTimeMs)
                         font.bold: true
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                     }
 
                     PlasmaComponents.Label {
-                        text: metricLabel()
+                        text: chartRoot.metricLabel()
                         opacity: 0.65
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                     }
@@ -314,25 +318,28 @@ Item {
                         model: chartRoot.hoverRows
 
                         RowLayout {
+                            id: hoverRow
+                            required property var modelData
                             Layout.fillWidth: true
                             spacing: Kirigami.Units.smallSpacing
 
                             Rectangle {
-                                width: 8
-                                height: 8
+                                Layout.preferredWidth: 8
+                                Layout.preferredHeight: 8
                                 radius: 4
-                                color: modelData.color
+                                color: hoverRow.modelData.color
                             }
 
                             PlasmaComponents.Label {
-                                text: modelData.name
+                                text: hoverRow.modelData.name
                                 Layout.fillWidth: true
                                 elide: Text.ElideRight
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                             }
 
                             PlasmaComponents.Label {
-                                text: formatMetricValue(modelData.value)
+                                text: chartRoot.formatMetricValue(
+                                    hoverRow.modelData.value)
                                 font.bold: true
                                 horizontalAlignment: Text.AlignRight
                                 font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -362,9 +369,9 @@ Item {
     }
 
     function accessibleSummary() {
-        var visible = visibleSeries();
+        var visible = chartRoot.visibleSeries();
         if (visible.length === 0)
-            return i18n("%1 chart. No compatible data.", metricLabel());
+            return KI18n.i18n("%1 chart. No compatible data.", chartRoot.metricLabel());
         var descriptions = [];
         for (var i = 0; i < visible.length; ++i) {
             var points = visible[i].points || [];
@@ -379,10 +386,10 @@ Item {
                     available++;
                 }
             }
-            descriptions.push(i18n("%1: %2 recorded points, %3 gaps",
+            descriptions.push(KI18n.i18n("%1: %2 recorded points, %3 gaps",
                                    visible[i].name, available, gaps));
         }
-        return i18n("%1 chart. %2", metricLabel(), descriptions.join(i18n(" · ")));
+        return KI18n.i18n("%1 chart. %2", chartRoot.metricLabel(), descriptions.join(KI18n.i18n(" · ")));
     }
 
     function visibleSeries() {
@@ -398,7 +405,7 @@ Item {
             });
             if (available) {
                 out.push({
-                    name: series[i].name || i18n("Series %1", i + 1),
+                    name: series[i].name || KI18n.i18n("Series %1", i + 1),
                     color: series[i].color || paletteColor(i),
                     points: points
                 });
@@ -436,7 +443,7 @@ Item {
             pts.sort(function(a, b) { return a.t - b.t; });
             if (pts.length > 0) {
                 parsed.push({
-                    name: s.name || i18n("Series %1", i + 1),
+                    name: s.name || KI18n.i18n("Series %1", i + 1),
                     color: s.color || paletteColor(i),
                     points: pts
                 });
@@ -532,7 +539,7 @@ Item {
             var keys = Object.keys(currencies).filter(function(key) { return key !== "__mixed"; });
             return keys.length === 1 && !currencies.__mixed
                 ? Utils.formatMoney(value, keys[0])
-                : value.toFixed(value < 1 ? 4 : 2) + " " + i18n("mixed currencies");
+                : value.toFixed(value < 1 ? 4 : 2) + " " + KI18n.i18n("mixed currencies");
         }
         if (metric === "tokens") {
             if (value >= 1000000) return (value / 1000000).toFixed(1) + "M";
@@ -548,14 +555,14 @@ Item {
 
     function metricLabel() {
         switch (metric) {
-            case "cost": return i18n("Cost");
-            case "tokens": return i18n("Tokens");
-            case "requests": return i18n("Requests");
-            case "rateLimitUsed": return i18n("Rate Limit Used");
-            case "percentUsed": return i18n("Percent Used");
-            case "usageCount": return i18n("Usage Count");
-            case "remaining": return i18n("Remaining");
-            default: return i18n("Value");
+            case "cost": return KI18n.i18n("Cost");
+            case "tokens": return KI18n.i18n("Tokens");
+            case "requests": return KI18n.i18n("Requests");
+            case "rateLimitUsed": return KI18n.i18n("Rate Limit Used");
+            case "percentUsed": return KI18n.i18n("Percent Used");
+            case "usageCount": return KI18n.i18n("Usage Count");
+            case "remaining": return KI18n.i18n("Remaining");
+            default: return KI18n.i18n("Value");
         }
     }
 
@@ -563,7 +570,7 @@ Item {
         var d = (typeof ms === "number") ? new Date(ms) : ms;
         if (!d || isNaN(d.getTime())) return "";
 
-        var bounds = computeBounds(parseSeries());
+        var bounds = chartRoot.computeBounds(chartRoot.parseSeries());
         var span = bounds.valid ? bounds.maxTime - bounds.minTime : 0;
         if (span <= 2 * 86400000) return Qt.formatDateTime(d, "MMM d hh:mm");
         if (span <= 14 * 86400000) return Qt.formatDateTime(d, "ddd MMM d");

@@ -1,4 +1,6 @@
+pragma ComponentBehavior: Bound
 import QtQuick
+import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -51,13 +53,14 @@ Item {
 
                 Repeater {
                     model: [
-                        { label: i18n("Cost"), value: "cost" },
-                        { label: i18n("Tokens"), value: "tokens" },
-                        { label: i18n("Requests"), value: "requests" },
-                        { label: i18n("Rate Limit"), value: "rateLimit" }
+                        { label: KI18n.i18n("Cost"), value: "cost" },
+                        { label: KI18n.i18n("Tokens"), value: "tokens" },
+                        { label: KI18n.i18n("Requests"), value: "requests" },
+                        { label: KI18n.i18n("Rate Limit"), value: "rateLimit" }
                     ]
 
                     PlasmaComponents.ToolButton {
+                        required property var modelData
                         text: modelData.label
                         checked: chartRoot.metric === modelData.value
                         down: checked
@@ -79,7 +82,7 @@ Item {
     PlasmaComponents.Label {
         anchors.centerIn: parent
         visible: chartRoot.showEmptyState && !chartRoot.hasEnoughData
-        text: i18n("Not enough data to display chart")
+        text: KI18n.i18n("Not enough data to display chart")
         opacity: 0.5
         font.pointSize: Kirigami.Theme.smallFont.pointSize
     }
@@ -123,7 +126,7 @@ Item {
             if (chartW <= 0 || chartH <= 0) return;
 
             // Extract values based on selected metric
-            var values = extractValues(data);
+            var values = chartRoot.extractValues(data);
             if (values.length === 0) return;
 
             // Compute min/max — always start Y-axis at 0
@@ -160,7 +163,7 @@ Item {
                 ctx.lineTo(marginLeft + chartW, gy);
                 ctx.stroke();
 
-                ctx.fillText(formatValue(gVal), marginLeft - 5, gy + 4);
+                ctx.fillText(chartRoot.formatValue(gVal), marginLeft - 5, gy + 4);
             }
 
             // ── Draw time labels on X axis ──
@@ -170,7 +173,7 @@ Item {
                 var idx = Math.floor(lbl * (values.length - 1) / (labelCount - 1));
                 var lx = marginLeft + (idx / (values.length - 1)) * chartW;
                 var ts = data[idx].timestamp;
-                ctx.fillText(formatTimestamp(ts), lx, h - 5);
+                ctx.fillText(chartRoot.formatTimestamp(ts), lx, h - 5);
             }
 
             // ── Compute points for Bézier and area ──
@@ -187,7 +190,7 @@ Item {
             ctx.moveTo(points[0].x, marginTop + chartH);
             ctx.lineTo(points[0].x, points[0].y);
             for (var a = 1; a < points.length; a++) {
-                var cp = bezierControlPoints(points, a - 1, 0.3);
+                var cp = chartRoot.bezierControlPoints(points, a - 1, 0.3);
                 ctx.bezierCurveTo(cp.cp1x, cp.cp1y, cp.cp2x, cp.cp2y, points[a].x, points[a].y);
             }
             ctx.lineTo(points[points.length - 1].x, marginTop + chartH);
@@ -204,7 +207,7 @@ Item {
 
             ctx.moveTo(points[0].x, points[0].y);
             for (var p = 1; p < points.length; p++) {
-                var cp2 = bezierControlPoints(points, p - 1, 0.3);
+                var cp2 = chartRoot.bezierControlPoints(points, p - 1, 0.3);
                 ctx.bezierCurveTo(cp2.cp1x, cp2.cp1y, cp2.cp2x, cp2.cp2y, points[p].x, points[p].y);
             }
             ctx.stroke();
@@ -318,7 +321,7 @@ Item {
                         if (chartRoot.hoveredIndex < 0 || !chartRoot.chartData) return "";
                         var item = chartRoot.chartData[chartRoot.hoveredIndex];
                         if (!item) return "";
-                        return formatTimestamp(item.timestamp);
+                        return chartRoot.formatTimestamp(item.timestamp);
                     }
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     font.bold: true
@@ -329,8 +332,8 @@ Item {
                         if (chartRoot.hoveredIndex < 0 || !chartRoot.chartData) return "";
                         var item = chartRoot.chartData[chartRoot.hoveredIndex];
                         if (!item) return "";
-                        var vals = extractValues([item]);
-                        return formatValue(vals[0] || 0);
+                        var vals = chartRoot.extractValues([item]);
+                        return chartRoot.formatValue(vals[0] || 0);
                     }
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     color: chartRoot.lineColor

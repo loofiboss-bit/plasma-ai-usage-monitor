@@ -4,12 +4,14 @@
 #include <QObject>
 #include <QDateTime>
 #include <QHash>
+#include <QtQmlIntegration/qqmlintegration.h>
 
 class QNetworkAccessManager;
 
 class WebhookNotifier : public QObject
 {
     Q_OBJECT
+    QML_ELEMENT
 
     Q_PROPERTY(bool slackEnabled READ slackEnabled WRITE setSlackEnabled NOTIFY configChanged)
     Q_PROPERTY(bool discordEnabled READ discordEnabled WRITE setDiscordEnabled NOTIFY configChanged)

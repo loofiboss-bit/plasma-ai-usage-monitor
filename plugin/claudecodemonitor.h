@@ -21,6 +21,7 @@
 class ClaudeCodeMonitor : public LocalActivityMonitorBase
 {
     Q_OBJECT
+    QML_ELEMENT
 
 public:
     explicit ClaudeCodeMonitor(QObject *parent = nullptr);
