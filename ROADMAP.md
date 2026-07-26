@@ -1,15 +1,14 @@
 # Roadmap
 
-**Current release:** 16.0.0, Control Loop local release candidate
+**Current release:** 16.0.0, Control Loop
 
 **Last updated:** 2026-07-26
 
 AI Usage Monitor remains a desktop-native, local-first Plasma widget. v16 makes
 the path from status to explanation and action direct without widening the
-local-first boundary. The implementation is complete locally; public release
-surfaces remain unchanged until explicit release authorization.
+local-first boundary.
 
-## Release candidate
+## Current release
 
 ### 16.0.0 Control Loop
 
@@ -19,10 +18,9 @@ surfaces remain unchanged until explicit release authorization.
 - Make QML lint and release-media evidence trustworthy, reproducible release gates.
 - Preserve v15 configuration, KWallet secrets, schema-v4 history, package identity, and metric truth boundaries.
 
-The decision-complete implementation plan is
+The implementation plan is
 [`docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md).
-Phases 0 through 5 are implemented. Publication and public readback remain
-separate release work.
+Phases 0 through 5 and the public release readback are complete.
 
 ## Current priorities
 
