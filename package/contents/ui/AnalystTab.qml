@@ -92,19 +92,21 @@ Kirigami.ScrollablePage {
                 spacing: Kirigami.Units.smallSpacing
 
                 Controls.Label {
+                    text: KI18n.i18n("Period: %1 – %2",
+                               analystState.formatDate(analystState.snapshot.from),
+                               analystState.formatDate(new Date(
+                                   new Date(analystState.snapshot.to).getTime()
+                                   - 1)))
+                    color: Kirigami.Theme.disabledTextColor
+                }
+
+                Controls.Label {
                     objectName: "coverageLabel"
                     text: KI18n.i18n("%1 of %2 days contain compatible observations (%3%)",
                                analystState.coverage.observedDayCount || 0,
                                analystState.coverage.requestedDayCount || 30,
                                Number(analystState.coverage.percent || 0).toFixed(0))
                     wrapMode: Text.WordWrap
-                }
-
-                Controls.Label {
-                    text: KI18n.i18n("Period: %1 – %2",
-                               analystState.formatDate(analystState.snapshot.from),
-                               analystState.formatDate(analystState.snapshot.to))
-                    color: Kirigami.Theme.disabledTextColor
                 }
 
                 Controls.Label {
@@ -142,71 +144,82 @@ Kirigami.ScrollablePage {
             contentItem: ColumnLayout {
                 spacing: Kirigami.Units.mediumSpacing
 
-                GridLayout {
+                Kirigami.CardsLayout {
+                    id: kpiCards
                     Layout.fillWidth: true
-                    columns: width >= Kirigami.Units.gridUnit * 36 ? 3 : 1
-                    columnSpacing: Kirigami.Units.largeSpacing
-                    rowSpacing: Kirigami.Units.smallSpacing
+                    maximumColumns: 3
+                    minimumColumnWidth: Kirigami.Units.gridUnit * 11
+                    maximumColumnWidth: Kirigami.Units.gridUnit * 18
 
-                    ColumnLayout {
-                        Controls.Label {
-                            text: analystState.averageSpendLabel(
-                                analystState.snapshot)
-                            color: Kirigami.Theme.disabledTextColor
-                        }
-                        Controls.Label {
-                            objectName: "averageSpendValue"
-                            text: analystState.formatMoney(
-                                analystState.kpi("averageDailySpend").value,
-                                analystState.snapshot.currency)
-                            font.pointSize: 20
-                            font.weight: Font.Bold
+                    Kirigami.AbstractCard {
+                        contentItem: ColumnLayout {
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                text: analystState.averageSpendLabel(
+                                    analystState.snapshot)
+                                color: Kirigami.Theme.disabledTextColor
+                                wrapMode: Text.WordWrap
+                            }
+                            Controls.Label {
+                                objectName: "averageSpendValue"
+                                text: analystState.formatMoney(
+                                    analystState.kpi("averageDailySpend").value,
+                                    analystState.snapshot.currency)
+                                font.pointSize: 20
+                                font.weight: Font.Bold
+                            }
                         }
                     }
 
-                    ColumnLayout {
-                        Controls.Label {
-                            text: KI18n.i18n("Week over week")
-                            color: Kirigami.Theme.disabledTextColor
-                        }
-                        Controls.Label {
-                            text: analystState.kpi("weekOverWeekChange").available
-                                ? analystState.formatPercent(analystState.kpi("weekOverWeekChange").value)
-                                : KI18n.i18n("Unavailable")
-                            font.pointSize: 20
-                            font.weight: Font.Bold
-                        }
-                        Controls.Label {
-                            visible: !analystState.kpi("weekOverWeekChange").available
-                            text: analystState.reasonText(
-                                analystState.kpi("weekOverWeekChange").reasonKey,
-                                analystState.kpi("weekOverWeekChange").sampleCount,
-                                analystState.kpi("weekOverWeekChange").minimumSamples)
-                            wrapMode: Text.WordWrap
-                            color: Kirigami.Theme.disabledTextColor
+                    Kirigami.AbstractCard {
+                        contentItem: ColumnLayout {
+                            Controls.Label {
+                                text: KI18n.i18n("Week over week")
+                                color: Kirigami.Theme.disabledTextColor
+                            }
+                            Controls.Label {
+                                text: analystState.kpi("weekOverWeekChange").available
+                                    ? analystState.formatPercent(analystState.kpi("weekOverWeekChange").value)
+                                    : KI18n.i18n("Unavailable")
+                                font.pointSize: 20
+                                font.weight: Font.Bold
+                            }
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                visible: !analystState.kpi("weekOverWeekChange").available
+                                text: analystState.reasonText(
+                                    analystState.kpi("weekOverWeekChange").reasonKey,
+                                    analystState.kpi("weekOverWeekChange").sampleCount,
+                                    analystState.kpi("weekOverWeekChange").minimumSamples)
+                                wrapMode: Text.WordWrap
+                                color: Kirigami.Theme.disabledTextColor
+                            }
                         }
                     }
 
-                    ColumnLayout {
-                        Controls.Label {
-                            text: KI18n.i18n("Volatility")
-                            color: Kirigami.Theme.disabledTextColor
-                        }
-                        Controls.Label {
-                            text: analystState.kpi("volatility").available
-                                ? analystState.formatPercent(analystState.kpi("volatility").value)
-                                : KI18n.i18n("Unavailable")
-                            font.pointSize: 20
-                            font.weight: Font.Bold
-                        }
-                        Controls.Label {
-                            visible: !analystState.kpi("volatility").available
-                            text: analystState.reasonText(
-                                analystState.kpi("volatility").reasonKey,
-                                analystState.kpi("volatility").sampleCount,
-                                analystState.kpi("volatility").minimumSamples)
-                            wrapMode: Text.WordWrap
-                            color: Kirigami.Theme.disabledTextColor
+                    Kirigami.AbstractCard {
+                        contentItem: ColumnLayout {
+                            Controls.Label {
+                                text: KI18n.i18n("Volatility")
+                                color: Kirigami.Theme.disabledTextColor
+                            }
+                            Controls.Label {
+                                text: analystState.kpi("volatility").available
+                                    ? analystState.formatPercent(analystState.kpi("volatility").value)
+                                    : KI18n.i18n("Unavailable")
+                                font.pointSize: 20
+                                font.weight: Font.Bold
+                            }
+                            Controls.Label {
+                                Layout.fillWidth: true
+                                visible: !analystState.kpi("volatility").available
+                                text: analystState.reasonText(
+                                    analystState.kpi("volatility").reasonKey,
+                                    analystState.kpi("volatility").sampleCount,
+                                    analystState.kpi("volatility").minimumSamples)
+                                wrapMode: Text.WordWrap
+                                color: Kirigami.Theme.disabledTextColor
+                            }
                         }
                     }
                 }

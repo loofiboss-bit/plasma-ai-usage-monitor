@@ -1,4 +1,5 @@
 set(TEST_USAGE_DB_SRC
+    ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
 )
 
@@ -53,6 +54,7 @@ set(TEST_SUBTOOL_ONLY_SRC
 set(TEST_INTEGRATION_SRC
     ${CMAKE_SOURCE_DIR}/plugin/localmetricsserver.cpp
     ${CMAKE_SOURCE_DIR}/plugin/webhooknotifier.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
     ${CMAKE_SOURCE_DIR}/plugin/awssigv4signer.cpp
 )
@@ -406,6 +408,7 @@ add_executable(test_dailystatemodel
     ${CMAKE_SOURCE_DIR}/plugin/sourcereadinessmodel.cpp
     ${CMAKE_SOURCE_DIR}/plugin/dailystatemodel.cpp
     ${CMAKE_SOURCE_DIR}/plugin/sourcedetailmodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
 )
 target_include_directories(test_dailystatemodel PRIVATE ${CMAKE_SOURCE_DIR}/plugin)

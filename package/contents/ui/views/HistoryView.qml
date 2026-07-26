@@ -20,6 +20,7 @@ ColumnLayout {
     property string exportStatus: ""
     property string requestedSourceId: ""
     property string requestedMetric: ""
+    property int requestedRangeDays: 7
     Accessible.name: historyController.loading
         ? KI18n.i18n("History view loading")
         : KI18n.i18n("History view ready")
@@ -72,17 +73,8 @@ ColumnLayout {
 
     function applyRequestedSelection() {
         if (!requestedSourceId) return;
-        var source = historyController.sourceState.source(requestedSourceId);
-        if (!source.historyId) return;
-        historyController.compareMode = false;
-        historyController.selectedSourceId = requestedSourceId;
-        var metrics = historyController.sourceState.metricsForSource(
-            requestedSourceId);
-        historyController.selectedMetric =
-            metrics.indexOf(requestedMetric) >= 0
-                ? requestedMetric : (metrics[0] || "");
-        historyController.rangeIndex = 1;
-        historyController.refresh();
+        historyController.applyDeepLink(requestedSourceId, requestedMetric,
+                                        requestedRangeDays);
     }
 
     Connections {
@@ -94,6 +86,7 @@ ColumnLayout {
 
     onRequestedSourceIdChanged: Qt.callLater(applyRequestedSelection)
     onRequestedMetricChanged: Qt.callLater(applyRequestedSelection)
+    onRequestedRangeDaysChanged: Qt.callLater(applyRequestedSelection)
 
     RowLayout {
         Layout.fillWidth: true
@@ -106,15 +99,27 @@ ColumnLayout {
             Layout.fillWidth: true
         }
         PlasmaComponents.ToolButton {
-            text: historyController.compareMode ? KI18n.i18n("Compare") : KI18n.i18n("Detail")
+            objectName: "historySingleSourceMode"
+            text: KI18n.i18n("Single source")
+            checkable: true
+            checked: !historyController.compareMode
+            activeFocusOnTab: true
+            Accessible.name: KI18n.i18n("Show one source history")
+            onClicked: {
+                historyController.compareMode = false;
+                historyController.normalizeSelection();
+                Qt.callLater(historyController.refresh);
+            }
+        }
+        PlasmaComponents.ToolButton {
+            objectName: "historyCompareMode"
+            text: KI18n.i18n("Compare")
             checkable: true
             checked: historyController.compareMode
             activeFocusOnTab: true
-            Accessible.name: historyController.compareMode
-                ? KI18n.i18n("Show comparison history")
-                : KI18n.i18n("Show one source history")
+            Accessible.name: KI18n.i18n("Show comparison history")
             onClicked: {
-                historyController.compareMode = !historyController.compareMode;
+                historyController.compareMode = true;
                 historyController.normalizeSelection();
                 Qt.callLater(historyController.refresh);
             }
@@ -128,14 +133,18 @@ ColumnLayout {
         }
     }
 
-    RowLayout {
+    GridLayout {
+        id: historyControls
         Layout.fillWidth: true
         Layout.leftMargin: Kirigami.Units.smallSpacing
         Layout.rightMargin: Kirigami.Units.smallSpacing
-        spacing: Kirigami.Units.smallSpacing
+        columns: history.width < Kirigami.Units.gridUnit * 30 ? 3 : 5
+        columnSpacing: Kirigami.Units.smallSpacing
+        rowSpacing: Kirigami.Units.smallSpacing
 
         QQC2.ComboBox {
             id: rangeCombo
+            Layout.fillWidth: true
             model: [KI18n.i18n("24 hours"), KI18n.i18n("7 days"), KI18n.i18n("30 days"), KI18n.i18n("90 days")]
             currentIndex: historyController.rangeIndex
             activeFocusOnTab: true
@@ -149,6 +158,7 @@ ColumnLayout {
             id: sourceCombo
             visible: !historyController.compareMode
             Layout.fillWidth: true
+            Layout.columnSpan: historyControls.columns === 3 ? 2 : 1
             model: historyController.sourceOptions()
             textRole: "text"
             valueRole: "value"
@@ -163,7 +173,9 @@ ColumnLayout {
         }
         QQC2.ComboBox {
             id: metricCombo
-            Layout.fillWidth: historyController.compareMode
+            Layout.fillWidth: true
+            Layout.columnSpan: historyControls.columns === 3
+                && historyController.compareMode ? 2 : 1
             model: historyController.metricRows()
             textRole: "text"
             valueRole: "value"
@@ -176,6 +188,7 @@ ColumnLayout {
             }
         }
         PlasmaComponents.Button {
+            Layout.fillWidth: true
             text: KI18n.i18n("Export file")
             icon.name: "document-export"
             activeFocusOnTab: true
@@ -198,6 +211,9 @@ ColumnLayout {
             }
         }
         PlasmaComponents.ToolButton {
+            Layout.fillWidth: true
+            text: KI18n.i18n("Copy CSV")
+            display: QQC2.AbstractButton.TextBesideIcon
             icon.name: "edit-copy"
             enabled: !historyController.loading
                 && historyController.seriesData.length > 0

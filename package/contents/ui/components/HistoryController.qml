@@ -90,6 +90,25 @@ QtObject {
         return [1, 7, 30, 90][rangeIndex] || 7;
     }
 
+    function rangeIndexForDays(days) {
+        var ranges = [1, 7, 30, 90];
+        var index = ranges.indexOf(Number(days));
+        return index >= 0 ? index : 1;
+    }
+
+    function applyDeepLink(sourceId, metric, days) {
+        var source = historyStateObject.source(sourceId);
+        if (!source.historyId) return false;
+        compareMode = false;
+        selectedSourceId = source.historyId;
+        var metrics = historyStateObject.metricsForSource(source.historyId);
+        selectedMetric = metrics.indexOf(metric) >= 0
+            ? metric : (metrics[0] || "");
+        rangeIndex = rangeIndexForDays(days);
+        refresh();
+        return true;
+    }
+
     function bucketMinutes() {
         return [15, 60, 180, 720][rangeIndex] || 60;
     }

@@ -2,6 +2,7 @@ import QtQuick
 import QtTest
 import "../../../../package/contents/ui" as Monitor
 import "../../../../package/contents/ui/components" as Components
+import "../../../../package/contents/ui/Utils.js" as Utils
 
 TestCase {
     id: testCase
@@ -142,5 +143,43 @@ TestCase {
         verify(chart);
         verify(chart.hasData());
         compare(chart.parseSeries()[0].points.length, 1);
+        verify(!chart.showLegend);
+    }
+
+    function test_chartMeasuresAxisMarginsAndShowsComparisonLegend() {
+        var chart = createTemporaryObject(chartComponent, testCase, {
+            seriesData: [{
+                name: "Actual",
+                currency: "USD",
+                points: [
+                    { timestamp: "2026-01-01T00:00:00Z",
+                      value: 12345.67, available: true },
+                    { timestamp: "2026-01-08T00:00:00Z",
+                      value: 15000, available: true }
+                ]
+            }, {
+                name: "Estimated",
+                currency: "USD",
+                points: [
+                    { timestamp: "2026-01-01T00:00:00Z",
+                      value: 8000, available: true },
+                    { timestamp: "2026-01-08T00:00:00Z",
+                      value: null, available: false }
+                ]
+            }]
+        });
+        verify(chart);
+        verify(chart.showLegend);
+        verify(chart.marginLeft > 50);
+        verify(chart.marginRight > 12);
+        verify(chart.firstXAxisLabel().length > 0);
+        verify(chart.lastXAxisLabel().length > 0);
+    }
+
+    function test_moneyUsesCurrencyCodeAndLocaleDecimalSeparator() {
+        compare(Utils.formatMoney(2.07, "usd", Qt.locale("en_US")),
+                "USD\u00a02.07");
+        compare(Utils.formatMoney(2.07, "usd", Qt.locale("sv_SE")),
+                "USD\u00a02,07");
     }
 }

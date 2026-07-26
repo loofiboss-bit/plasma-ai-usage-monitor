@@ -13,6 +13,7 @@ Item {
     property string metric: "cost"
     property bool showEmptyState: true
     readonly property real legendChipMaxWidth: Kirigami.Units.gridUnit * 9
+    readonly property bool showLegend: visibleSeries().length > 1
 
     // Hover state
     property bool hovering: false
@@ -22,10 +23,57 @@ Item {
     property var hoverRows: []
 
     // Chart geometry
-    property real marginLeft: 50
-    property real marginRight: 12
+    property real marginLeft: Math.ceil(Math.max(
+        Math.max(yAxisLabel0.width, yAxisLabel1.width, yAxisLabel2.width,
+                 yAxisLabel3.width, yAxisLabel4.width)
+            + Kirigami.Units.smallSpacing * 2,
+        firstXAxisLabelMetrics.width / 2 + Kirigami.Units.smallSpacing))
+    property real marginRight: Math.ceil(
+        lastXAxisLabelMetrics.width / 2 + Kirigami.Units.smallSpacing)
     property real marginTop: 10
-    property real marginBottom: 28
+    property real marginBottom: Math.ceil(
+        xAxisLabelMetrics.height + Kirigami.Units.smallSpacing * 2)
+
+    TextMetrics {
+        id: yAxisLabel0
+        font.pixelSize: 10
+        text: chartRoot.yAxisLabel(0)
+    }
+    TextMetrics {
+        id: yAxisLabel1
+        font.pixelSize: 10
+        text: chartRoot.yAxisLabel(1)
+    }
+    TextMetrics {
+        id: yAxisLabel2
+        font.pixelSize: 10
+        text: chartRoot.yAxisLabel(2)
+    }
+    TextMetrics {
+        id: yAxisLabel3
+        font.pixelSize: 10
+        text: chartRoot.yAxisLabel(3)
+    }
+    TextMetrics {
+        id: yAxisLabel4
+        font.pixelSize: 10
+        text: chartRoot.yAxisLabel(4)
+    }
+    TextMetrics {
+        id: firstXAxisLabelMetrics
+        font.pixelSize: 10
+        text: chartRoot.firstXAxisLabel()
+    }
+    TextMetrics {
+        id: lastXAxisLabelMetrics
+        font.pixelSize: 10
+        text: chartRoot.lastXAxisLabel()
+    }
+    TextMetrics {
+        id: xAxisLabelMetrics
+        font.pixelSize: 10
+        text: chartRoot.firstXAxisLabel()
+    }
 
     implicitHeight: Kirigami.Units.gridUnit * 11
     Accessible.role: Accessible.Graphic
@@ -37,7 +85,9 @@ Item {
 
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: legendFlow.implicitHeight
+            Layout.preferredHeight: chartRoot.showLegend
+                ? legendFlow.implicitHeight : 0
+            visible: chartRoot.showLegend
 
             Flow {
                 id: legendFlow
@@ -486,6 +536,27 @@ Item {
             maxTime: maxTime,
             maxValue: maxValue
         };
+    }
+
+    function axisMaximum() {
+        var bounds = computeBounds(parseSeries());
+        if (!bounds.valid) return 1;
+        var maximum = bounds.maxValue > 0 ? bounds.maxValue : 1;
+        return maximum * 1.1;
+    }
+
+    function yAxisLabel(tick) {
+        return formatMetricValue(axisMaximum() * tick / 4);
+    }
+
+    function firstXAxisLabel() {
+        var bounds = computeBounds(parseSeries());
+        return bounds.valid ? formatAxisTime(bounds.minTime) : "";
+    }
+
+    function lastXAxisLabel() {
+        var bounds = computeBounds(parseSeries());
+        return bounds.valid ? formatAxisTime(bounds.maxTime) : "";
     }
 
     function nearestRows(parsed, hoverTime) {

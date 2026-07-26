@@ -25,6 +25,7 @@ set(aiusagemonitor_SRCS
     togetherprovider.cpp
     cohereprovider.cpp
     googleveoprovider.cpp
+    analystquery.cpp
     usagedatabase.cpp
     updatechecker.cpp
     subscriptiontoolbackend.cpp
@@ -71,6 +72,7 @@ set(aiusagemonitor_HDRS
     togetherprovider.h
     cohereprovider.h
     googleveoprovider.h
+    analystquery.h
     usagedatabase.h
     clipboardhelper.h
     updatechecker.h

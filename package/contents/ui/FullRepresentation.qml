@@ -26,6 +26,7 @@ PlasmaExtras.Representation {
     property string returnFocusSourceId: ""
     property string historySourceId: ""
     property string historyMetric: ""
+    property int historyRangeDays: 7
 
     readonly property bool hasConfiguration: {
         if (AppInfo.smokeView.indexOf("onboarding") === 0) return false;
@@ -195,6 +196,7 @@ PlasmaExtras.Representation {
                 } else if (fullRoot.destination === 1) {
                     item.requestedSourceId = fullRoot.historySourceId;
                     item.requestedMetric = fullRoot.historyMetric;
+                    item.requestedRangeDays = fullRoot.historyRangeDays;
                 } else if (fullRoot.destination === 0
                            && fullRoot.returnFocusSourceId !== "") {
                     var sourceId = fullRoot.returnFocusSourceId;
@@ -230,9 +232,10 @@ PlasmaExtras.Representation {
                 fullRoot.monitor.fixOverviewSource(
                     stableId, "open_source_settings", "");
             }
-            function onHistoryRequested(historyId, metric) {
+            function onHistoryRequested(historyId, metric, rangeDays) {
                 fullRoot.historySourceId = historyId;
                 fullRoot.historyMetric = metric;
+                fullRoot.historyRangeDays = rangeDays;
                 fullRoot.sourceDetailVisible = false;
                 fullRoot.destination = 1;
             }

@@ -17,7 +17,7 @@ QQC2.ScrollView {
     signal backRequested()
     signal actionRequested(string stableId, string actionKey, string sourceKind)
     signal settingsRequested(string stableId)
-    signal historyRequested(string historyId, string metric)
+    signal historyRequested(string historyId, string metric, int rangeDays)
     Accessible.role: Accessible.Pane
     Accessible.name: detailModel.source.displayName
         ? KI18n.i18n("%1 source details", detailModel.source.displayName)
@@ -322,7 +322,7 @@ QQC2.ScrollView {
                 activeFocusOnTab: true
                 enabled: detailModel.historyMetric !== ""
                 onClicked: detail.historyRequested(
-                    detailModel.historyId, detailModel.historyMetric)
+                    detailModel.historyId, detailModel.historyMetric, 7)
             }
             Item { Layout.fillWidth: true }
         }

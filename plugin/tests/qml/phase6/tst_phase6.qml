@@ -398,4 +398,30 @@ TestCase {
         verify(historyController.errorText().indexOf("different currencies") >= 0);
         compare(historyController.seriesData.length, 0);
     }
+
+    function test_historyDeepLinkSelectsSourceMetricAndRange() {
+        historyController.configuredProviders = [{
+            configKey: "openai",
+            dbName: "OpenAI",
+            name: "OpenAI",
+            enabled: true
+        }];
+        historyController.sourceState.storedCatalog = [{
+            historyId: "provider:OpenAI",
+            dbName: "OpenAI",
+            displayName: "OpenAI",
+            sourceKind: "provider",
+            metricKinds: ["cost", "tokens"],
+            sampleCount: 3
+        }];
+
+        verify(historyController.applyDeepLink(
+            "provider:OpenAI", "tokens", 30));
+        verify(!historyController.compareMode);
+        compare(historyController.selectedSourceId, "provider:OpenAI");
+        compare(historyController.selectedMetric, "tokens");
+        compare(historyController.rangeIndex, 2);
+        compare(fakeDb.historyMetric, "tokens");
+        compare(fakeDb.historyBucketMinutes, 180);
+    }
 }

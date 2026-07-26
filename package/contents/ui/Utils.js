@@ -23,8 +23,8 @@ function formatMoney(value, currency, locale) {
     var code = (currency || "USD").toUpperCase();
     var amount = Number(value);
     if (!Number.isFinite(amount)) return "";
-    var formatted = amount.toLocaleCurrencyString(locale || Qt.locale(), code);
-    return formatted.replace(/ (?!$)/g, "\u00a0");
+    var formatted = amount.toLocaleString(locale || Qt.locale(), "f", 2);
+    return code + "\u00a0" + formatted;
 }
 
 function addCurrencyTotal(totals, currency, value) {
