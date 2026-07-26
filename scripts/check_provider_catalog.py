@@ -14,7 +14,13 @@ EXPECTED_KEYS = {
 }
 TOKEN_UNITS = {"1M_tokens"}
 NON_TOKEN_UNITS = {"generation", "image", "video_second", "credit", "request", "unknown", "not_applicable"}
-ADAPTER_TYPES = {"account_usage", "account_balance", "model_discovery", "gateway_usage"}
+ADAPTER_TYPES = {
+    "account_usage",
+    "account_balance",
+    "anthropic_usage_cost",
+    "model_discovery",
+    "gateway_usage",
+}
 MONITORING_LEVELS = {"actual_usage_spend", "actual_key_usage", "balance_connectivity", "gateway_aggregate", "connectivity_only"}
 METRIC_SOURCES = {
     "billing_api", "usage_api", "metrics_api", "response_headers",
@@ -121,8 +127,12 @@ def main() -> None:
             fail(f"{key} must declare a read-only GET safeRefresh")
         if not safe.get("path") and not safe.get("paths"):
             fail(f"{key} safeRefresh must declare path or paths")
-        if not isinstance(safe.get("requestBudget"), int) or not 1 <= safe["requestBudget"] <= 20:
-            fail(f"{key} safeRefresh requestBudget must be 1..20")
+        maximum_request_budget = 64 if provider["adapterType"] == "anthropic_usage_cost" else 20
+        if (
+            not isinstance(safe.get("requestBudget"), int)
+            or not 1 <= safe["requestBudget"] <= maximum_request_budget
+        ):
+            fail(f"{key} safeRefresh requestBudget must be 1..{maximum_request_budget}")
         if not isinstance(safe.get("minimumIntervalSeconds"), int) or safe["minimumIntervalSeconds"] < 60:
             fail(f"{key} safeRefresh minimumIntervalSeconds must be at least 60")
         expiry = require_iso_date(str(provider["reviewExpiresAt"]), f"{key} reviewExpiresAt")

@@ -113,6 +113,21 @@ void CatalogsTest::providerCatalogLoads()
     QCOMPARE(openAi.value(QStringLiteral("stableId")).toString(), QStringLiteral("openai"));
     QVERIFY(openAi.value(QStringLiteral("capabilities")).toList().contains(QStringLiteral("cost")));
 
+    const QVariantMap anthropic = catalog.provider(QStringLiteral("anthropic"));
+    const QVariantMap anthropicAuth = anthropic.value(QStringLiteral("auth")).toMap();
+    QCOMPARE(anthropic.value(QStringLiteral("monitoringLevel")).toString(),
+             QStringLiteral("actual_usage_spend"));
+    QCOMPARE(anthropicAuth.value(QStringLiteral("credentialSlots")).toStringList(),
+             QStringList({QStringLiteral("anthropic"), QStringLiteral("anthropic_admin")}));
+    QCOMPARE(anthropicAuth.value(QStringLiteral("acceptAnyCredentialSet")).toList().size(), 2);
+    const QVariantMap capabilityCredentials =
+        anthropicAuth.value(QStringLiteral("capabilityCredentialSets")).toMap();
+    QVERIFY(capabilityCredentials.contains(QStringLiteral("connectivity")));
+    QVERIFY(capabilityCredentials.contains(QStringLiteral("usage")));
+    QVERIFY(capabilityCredentials.contains(QStringLiteral("cost")));
+    QCOMPARE(anthropic.value(QStringLiteral("safeRefresh")).toMap()
+                 .value(QStringLiteral("minimumIntervalSeconds")).toInt(), 300);
+
     QVERIFY(qAbs(catalog.amountForModelUnit(QStringLiteral("googleveo"), QStringLiteral("veo-3.1-generate-preview"), QStringLiteral("video_second")) - 0.4) < 0.000001);
 }
 

@@ -76,7 +76,8 @@ Item {
     }
 
     function canRefreshBackend(backend, requiresApiKey) {
-        return backend && (!requiresApiKey || backend.hasApiKey());
+        return backend && (!requiresApiKey || backend.hasApiKey()
+                           || backend.adminApiKeyConfigured === true);
     }
 
     function isFresh(provider) {

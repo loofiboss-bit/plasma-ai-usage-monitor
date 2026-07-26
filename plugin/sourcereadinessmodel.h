@@ -59,6 +59,8 @@ public:
         SourceKindKeyRole,
         MonitoringLevelRole,
         RequiredCredentialSlotsRole,
+        AcceptAnyCredentialSetRole,
+        CredentialAlternativesRole,
         InstalledRole,
         EnabledRole,
         LastVerifiedRole,
@@ -101,6 +103,8 @@ private:
         SourceKind kind = SourceKind::Provider;
         QString monitoringLevel;
         QStringList requiredCredentialSlots;
+        bool acceptAnyCredentialSet = false;
+        QVariantList credentialAlternatives;
         bool safeVerification = false;
         bool customEndpointRequired = false;
         bool enabled = false;

@@ -57,6 +57,8 @@ Item {
         if (!provider.enabled) {
             provider.backend.cancelRefresh();
             provider.backend.setApiKey("");
+            if (provider.configKey === "anthropic")
+                provider.backend.setAdminApiKey("");
             return;
         }
         if (provider.requiresApiKey !== false) {
@@ -64,6 +66,10 @@ Item {
             // Demo mode is deterministic and must never read a real wallet
             // credential. The mock server accepts this non-secret sentinel.
             provider.backend.setApiKey(registry.demoMode ? "demo-key" : secrets.getKey(keySlot));
+            if (provider.configKey === "anthropic") {
+                provider.backend.setAdminApiKey(registry.demoMode
+                    ? "demo-admin-key" : secrets.getKey("anthropic_admin"));
+            }
         }
         if (shouldRefresh) {
             scheduler.refreshProvider(provider, reason, true);
@@ -189,7 +195,9 @@ Item {
                     + "\",source=\"" + labelValue(metric.source)
                     + "\",quality=\"" + labelValue(metric.quality)
                     + "\",scope=\"" + labelValue(metric.scope)
-                    + "\",window=\"" + labelValue(metric.window) + "\"";
+                    + "\",window=\"" + labelValue(metric.window)
+                    + "\",model_scope=\"" + labelValue(metric.modelScope)
+                    + "\",project_scope=\"" + labelValue(metric.projectScope) + "\"";
                 lines.push("ai_usage_provider_metric_available{" + metricLabels + "} "
                            + (metric.available ? "1" : "0"));
                 if (metric.available) {
@@ -343,7 +351,8 @@ Item {
             var providers = runtime.registry.allProviders || [];
             for (var i = 0; i < providers.length; i++) {
                 var descriptor = providers[i];
-                if ((descriptor.secretKey || descriptor.configKey) === provider) {
+                if ((descriptor.credentialSlots || [descriptor.secretKey || descriptor.configKey])
+                        .indexOf(provider) >= 0) {
                     runtime.loadProviderApiKey(descriptor.configKey,
                                                runtime.scheduler.refreshCredentialChanged,
                                                true);
@@ -356,9 +365,13 @@ Item {
             var providers = runtime.registry.allProviders || [];
             for (var i = 0; i < providers.length; i++) {
                 var descriptor = providers[i];
-                if ((descriptor.secretKey || descriptor.configKey) === provider) {
+                if ((descriptor.credentialSlots || [descriptor.secretKey || descriptor.configKey])
+                        .indexOf(provider) >= 0) {
                     descriptor.backend.cancelRefresh();
-                    descriptor.backend.setApiKey("");
+                    if (provider === "anthropic_admin")
+                        descriptor.backend.setAdminApiKey("");
+                    else
+                        descriptor.backend.setApiKey("");
                     return;
                 }
             }

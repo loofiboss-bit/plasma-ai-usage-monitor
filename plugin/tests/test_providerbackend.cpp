@@ -99,12 +99,32 @@ void ProviderBackendTest::testMetricSourcePeriodAndCapabilityContract()
     p.setProviderMetric(ProviderBackend::MetricKind::Cost, 1.25, QStringLiteral("USD"),
                         QStringLiteral("USD"), QStringLiteral("project"), QStringLiteral("day"),
                         ProviderBackend::MetricSource::BillingApi, QStringLiteral("actual"),
-                        end, start, end);
+                        end, start, end, QStringLiteral("claude-opus-4-8"),
+                        QStringLiteral("workspace-a"));
     const QVariantMap metric = p.metric(QStringLiteral("cost"), QStringLiteral("project"), QStringLiteral("day"));
     QCOMPARE(metric.value(QStringLiteral("source")).toString(), QStringLiteral("billing_api"));
     QCOMPARE(metric.value(QStringLiteral("periodStart")).toDateTime(), start);
     QCOMPARE(metric.value(QStringLiteral("periodEnd")).toDateTime(), end);
     QCOMPARE(metric.value(QStringLiteral("resetAt")).toDateTime(), end);
+    QCOMPARE(metric.value(QStringLiteral("modelScope")).toString(), QStringLiteral("claude-opus-4-8"));
+    QCOMPARE(metric.value(QStringLiteral("projectScope")).toString(), QStringLiteral("workspace-a"));
+
+    p.setProviderMetric(ProviderBackend::MetricKind::CacheReadInputTokens, 42,
+                        QStringLiteral("token"), QString(), QStringLiteral("organization"),
+                        QStringLiteral("day"), ProviderBackend::MetricSource::UsageApi,
+                        QStringLiteral("actual"), {}, start, end,
+                        QStringLiteral("claude-opus-4-8"), QStringLiteral("workspace-a"));
+    p.setProviderMetric(ProviderBackend::MetricKind::CacheCreationInputTokens, 7,
+                        QStringLiteral("token"), QString(), QStringLiteral("organization"),
+                        QStringLiteral("day"), ProviderBackend::MetricSource::UsageApi,
+                        QStringLiteral("actual"), {}, start, end,
+                        QStringLiteral("claude-opus-4-8"), QStringLiteral("workspace-a"));
+    QCOMPARE(p.metric(QStringLiteral("cache_read_input_tokens"),
+                      QStringLiteral("organization"), QStringLiteral("day"))
+                 .value(QStringLiteral("value")).toInt(), 42);
+    QCOMPARE(p.metric(QStringLiteral("cache_creation_input_tokens"),
+                      QStringLiteral("organization"), QStringLiteral("day"))
+                 .value(QStringLiteral("value")).toInt(), 7);
 
     p.setProviderMetric(ProviderBackend::MetricKind::RequestLimit, 1000,
                         QStringLiteral("request"), QString(), QStringLiteral("project"),

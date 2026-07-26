@@ -140,6 +140,8 @@ public:
 
     enum class MetricKind {
         InputTokens,
+        CacheReadInputTokens,
+        CacheCreationInputTokens,
         OutputTokens,
         Requests,
         Cost,
@@ -418,8 +420,12 @@ protected:
                            const QString &quality,
                            const QDateTime &resetAt = QDateTime(),
                            const QDateTime &periodStart = QDateTime(),
-                           const QDateTime &periodEnd = QDateTime());
+                           const QDateTime &periodEnd = QDateTime(),
+                           const QString &modelScope = QString(),
+                           const QString &projectScope = QString());
     void clearProviderMetric(MetricKind kind, const QString &scope = QString(), const QString &window = QString());
+    void markProviderMetricsStale(MetricSource source,
+                                  const QString &diagnostic = QString());
     void setCapabilityStatus(const QString &capability,
                              const QString &status,
                              const QString &diagnostic = QString());

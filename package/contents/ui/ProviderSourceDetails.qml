@@ -26,6 +26,8 @@ Kirigami.FormLayout {
     function credentialLabel(slot) {
         var labels = {
             "openai": KI18n.i18n("Admin API key"),
+            "anthropic": KI18n.i18n("Standard API key (connectivity only)"),
+            "anthropic_admin": KI18n.i18n("Admin API key (usage and cost)"),
             "azure_openai_api_key": KI18n.i18n("API key"),
             "bedrock_access_key_id": KI18n.i18n("Access key ID"),
             "bedrock_secret_access_key": KI18n.i18n("Secret access key"),
@@ -37,6 +39,8 @@ Kirigami.FormLayout {
     function permissionLabel(auth) {
         if (details.localTool)
             return KI18n.i18n("Read local activity metadata; no provider credential or inference request");
+        if (descriptor.configKey === "anthropic")
+            return KI18n.i18n("A standard key checks connectivity. An optional organization Admin key reads actual usage and cost reports.");
         var scheme = auth.scheme || "none";
         if (scheme === "none") return KI18n.i18n("No credential required");
         if (descriptor.monitoringLevel === "actual_usage_spend")
@@ -112,7 +116,11 @@ Kirigami.FormLayout {
             clearEnabled: details.configPage.hasStoredOrPendingSecret(modelData)
             placeholderText: modelData === "bedrock_session_token"
                 && !details.configPage.hasStoredOrPendingSecret(modelData)
-                ? KI18n.i18n("Optional") : details.configPage.secretPlaceholder(modelData)
+                ? KI18n.i18n("Optional")
+                : details.descriptor.configKey === "anthropic"
+                    && !details.configPage.hasStoredOrPendingSecret(modelData)
+                    ? KI18n.i18n("Configure either key")
+                    : details.configPage.secretPlaceholder(modelData)
             onCredentialEdited: function(value) {
                 details.configPage.stageSecret(modelData, value);
             }

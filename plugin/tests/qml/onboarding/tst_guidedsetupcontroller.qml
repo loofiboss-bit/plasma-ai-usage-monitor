@@ -15,6 +15,7 @@ TestCase {
         property string setupWizardGoal: ""
         property string setupWizardSourceId: ""
         property bool openaiEnabled: false
+        property bool anthropicEnabled: false
         property bool codexEnabled: false
         property string openaiCustomBaseUrl: ""
     }
@@ -51,7 +52,7 @@ TestCase {
         signal sourceChanged(string stableId)
 
         function source(stableId) { return sources[stableId] || ({}); }
-        function rankedSourceIds() { return ["codex-cli", "openai", "litellm"]; }
+        function rankedSourceIds() { return ["codex-cli", "openai", "anthropic", "litellm"]; }
         function update(stableId, values) {
             var nextSources = Object.assign({}, sources);
             nextSources[stableId] = Object.assign({}, nextSources[stableId], values);
@@ -77,6 +78,7 @@ TestCase {
         function setGuidedSourceEnabled(stableId, enabled) {
             enableCalls++;
             if (stableId === "openai") fakeConfiguration.openaiEnabled = enabled;
+            if (stableId === "anthropic") fakeConfiguration.anthropicEnabled = enabled;
             if (stableId === "codex-cli") fakeConfiguration.codexEnabled = enabled;
             fakeReadiness.update(stableId, { enabled: enabled, readinessStateKey: "ready_to_verify" });
             return true;
@@ -112,6 +114,15 @@ TestCase {
                 monitoringLevel: "actual_usage_spend", requiredCredentialSlots: ["openai"], installed: true,
                 safeVerification: true, customEndpointRequired: false, readinessStateKey: "disabled"
             },
+            "anthropic": {
+                stableId: "anthropic", displayName: "Anthropic", sourceKindKey: "provider",
+                monitoringLevel: "actual_usage_spend",
+                requiredCredentialSlots: ["anthropic", "anthropic_admin"],
+                acceptAnyCredentialSet: true,
+                credentialAlternatives: [["anthropic"], ["anthropic_admin"]],
+                installed: true, safeVerification: true,
+                customEndpointRequired: false, readinessStateKey: "disabled"
+            },
             "litellm": {
                 stableId: "litellm", displayName: "LiteLLM Proxy", sourceKindKey: "provider",
                 monitoringLevel: "gateway_aggregate", requiredCredentialSlots: ["litellm"], installed: true,
@@ -129,6 +140,7 @@ TestCase {
         fakeConfiguration.setupWizardGoal = "";
         fakeConfiguration.setupWizardSourceId = "";
         fakeConfiguration.openaiEnabled = false;
+        fakeConfiguration.anthropicEnabled = false;
         fakeConfiguration.codexEnabled = false;
         fakeConfiguration.openaiCustomBaseUrl = "";
         fakeStore.walletOpen = true;
@@ -183,6 +195,21 @@ TestCase {
         compare(fakeStore.storeCalls[0].key, "openai");
         verify(fakeConfiguration.openaiEnabled);
         compare(controller.resultQuality, "Actual usage and spend");
+    }
+
+    function test_anthropicAcceptsEitherCredentialWithoutOverwritingTheOther() {
+        fakeStore.values = ({ "anthropic": "saved-standard-key" });
+        controller.chooseGoal("usage");
+        controller.selectSource("anthropic", true);
+        controller.setCredential("anthropic_admin", "new-admin-key");
+        verify(controller.saveAndVerify());
+
+        tryCompare(controller, "step", controller.resultStep);
+        compare(fakeStore.storeCalls.length, 1);
+        compare(fakeStore.storeCalls[0].key, "anthropic_admin");
+        compare(fakeStore.values.anthropic, "saved-standard-key");
+        compare(fakeStore.values.anthropic_admin, "new-admin-key");
+        verify(fakeConfiguration.anthropicEnabled);
     }
 
     function test_authFailureStaysInContext() {

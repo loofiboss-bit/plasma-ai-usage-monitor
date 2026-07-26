@@ -638,11 +638,15 @@ void ProviderBackend::setProviderMetric(MetricKind kind,
                                         const QString &quality,
                                         const QDateTime &resetAt,
                                         const QDateTime &periodStart,
-                                        const QDateTime &periodEnd)
+                                        const QDateTime &periodEnd,
+                                        const QString &modelScope,
+                                        const QString &projectScope)
 {
     const QString kindName = [kind]() {
         switch (kind) {
         case MetricKind::InputTokens: return QStringLiteral("input_tokens");
+        case MetricKind::CacheReadInputTokens: return QStringLiteral("cache_read_input_tokens");
+        case MetricKind::CacheCreationInputTokens: return QStringLiteral("cache_creation_input_tokens");
         case MetricKind::OutputTokens: return QStringLiteral("output_tokens");
         case MetricKind::Requests: return QStringLiteral("requests");
         case MetricKind::Cost: return QStringLiteral("cost");
@@ -676,6 +680,10 @@ void ProviderBackend::setProviderMetric(MetricKind kind,
         if (current.value(QStringLiteral("kind")).toString() == kindName
             && current.value(QStringLiteral("scope")).toString() == scope
             && current.value(QStringLiteral("window")).toString() == window
+            && current.value(QStringLiteral("modelScope")).toString() == modelScope
+            && current.value(QStringLiteral("projectScope")).toString() == projectScope
+            && current.value(QStringLiteral("periodStart")).toDateTime() == periodStart
+            && current.value(QStringLiteral("periodEnd")).toDateTime() == periodEnd
             && (currency.isEmpty()
                 || current.value(QStringLiteral("currency")).toString() == currency)) {
             m_metrics.removeAt(i);
@@ -696,8 +704,40 @@ void ProviderBackend::setProviderMetric(MetricKind kind,
     metric.insert(QStringLiteral("resetAt"), resetAt);
     metric.insert(QStringLiteral("periodStart"), periodStart);
     metric.insert(QStringLiteral("periodEnd"), periodEnd);
+    if (!modelScope.isEmpty()) metric.insert(QStringLiteral("modelScope"), modelScope);
+    if (!projectScope.isEmpty()) metric.insert(QStringLiteral("projectScope"), projectScope);
     m_metrics.append(metric);
     Q_EMIT metricsChanged();
+}
+
+void ProviderBackend::markProviderMetricsStale(MetricSource source,
+                                               const QString &diagnostic)
+{
+    const QString sourceName = [source]() {
+        switch (source) {
+        case MetricSource::BillingApi: return QStringLiteral("billing_api");
+        case MetricSource::UsageApi: return QStringLiteral("usage_api");
+        case MetricSource::MetricsApi: return QStringLiteral("metrics_api");
+        case MetricSource::ResponseHeaders: return QStringLiteral("response_headers");
+        case MetricSource::PublishedDocumentation: return QStringLiteral("published_documentation");
+        case MetricSource::LocalObservation: return QStringLiteral("local_observation");
+        case MetricSource::EstimatedPricing: return QStringLiteral("estimated_pricing");
+        case MetricSource::ConnectivityProbe: return QStringLiteral("connectivity_probe");
+        case MetricSource::SelfTracked: return QStringLiteral("self_tracked");
+        case MetricSource::BrowserSync: return QStringLiteral("browser_sync");
+        }
+        return QStringLiteral("unknown");
+    }();
+    bool changed = false;
+    for (QVariant &entry : m_metrics) {
+        QVariantMap metric = entry.toMap();
+        if (metric.value(QStringLiteral("source")).toString() != sourceName) continue;
+        metric.insert(QStringLiteral("quality"), QStringLiteral("stale"));
+        if (!diagnostic.isEmpty()) metric.insert(QStringLiteral("diagnostic"), diagnostic);
+        entry = metric;
+        changed = true;
+    }
+    if (changed) Q_EMIT metricsChanged();
 }
 
 void ProviderBackend::setCapabilityStatus(const QString &capability,

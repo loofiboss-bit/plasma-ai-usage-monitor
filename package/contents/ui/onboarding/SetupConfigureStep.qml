@@ -33,6 +33,8 @@ ColumnLayout {
         wrapMode: Text.WordWrap
         text: step.controller.selectedSource.sourceKindKey === "local_tool"
             ? KI18n.i18n("No credential is needed. The verification reads local activity metadata and never sends an inference request.")
+            : step.controller.selectedSource.stableId === "anthropic"
+                ? KI18n.i18n("Choose either a standard key for a connection check or an organization Admin key for actual usage and spend. Both remain separate in KDE Wallet.")
             : KI18n.i18n("Only fields required for this source are shown. Credentials are saved explicitly in KDE Wallet.")
     }
 
@@ -51,7 +53,9 @@ ColumnLayout {
             placeholderText: step.controller.hasStoredCredential(
                                  credentialEditor.modelData)
                 ? KI18n.i18n("Saved in KDE Wallet — leave blank to keep")
-                : KI18n.i18n("Required")
+                : step.controller.acceptsAnyCredentialSet
+                    ? KI18n.i18n("Configure either key")
+                    : KI18n.i18n("Required")
             onCredentialEdited: function(value) {
                 step.controller.setCredential(credentialEditor.modelData, value);
             }

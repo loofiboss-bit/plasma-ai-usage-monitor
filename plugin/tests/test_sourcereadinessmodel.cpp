@@ -9,6 +9,7 @@ class ReadinessProvider final : public ProviderBackend
 {
     Q_OBJECT
     Q_PROPERTY(QString secretAccessKey READ secretAccessKey WRITE setSecretAccessKey NOTIFY credentialsChanged)
+    Q_PROPERTY(bool adminApiKeyConfigured READ adminApiKeyConfigured WRITE setAdminApiKeyConfigured NOTIFY credentialsChanged)
 
 public:
     QString name() const override { return QStringLiteral("Readiness provider"); }
@@ -19,6 +20,13 @@ public:
     {
         if (m_secretAccessKey == secret) return;
         m_secretAccessKey = secret;
+        Q_EMIT credentialsChanged();
+    }
+    bool adminApiKeyConfigured() const { return m_adminApiKeyConfigured; }
+    void setAdminApiKeyConfigured(bool configured)
+    {
+        if (m_adminApiKeyConfigured == configured) return;
+        m_adminApiKeyConfigured = configured;
         Q_EMIT credentialsChanged();
     }
 
@@ -34,6 +42,7 @@ Q_SIGNALS:
 
 private:
     QString m_secretAccessKey;
+    bool m_adminApiKeyConfigured = false;
 };
 
 class ReadinessTool final : public SubscriptionToolBackend
@@ -71,6 +80,7 @@ private Q_SLOTS:
     void typedErrorsHaveDistinctActions();
     void staleDataHasSpecificAction();
     void credentialPropertyChangesInvalidateSource();
+    void anthropicAdminCredentialIsAValidAlternative();
     void localToolStateTransitions();
     void explicitVerificationUsesSafeReadOnlyContract();
     void demoModeUsesIsolatedEndpoint();
@@ -104,6 +114,11 @@ void SourceReadinessModelTest::catalogContainsEverySourceExactlyOnce()
     const QVariantMap openAi = model.source(QStringLiteral("openai"));
     QCOMPARE(openAi.value(QStringLiteral("requiredCredentialSlots")).toStringList(),
              QStringList{QStringLiteral("openai")});
+    const QVariantMap anthropic = model.source(QStringLiteral("anthropic"));
+    QCOMPARE(anthropic.value(QStringLiteral("requiredCredentialSlots")).toStringList(),
+             QStringList({QStringLiteral("anthropic"), QStringLiteral("anthropic_admin")}));
+    QVERIFY(anthropic.value(QStringLiteral("acceptAnyCredentialSet")).toBool());
+    QCOMPARE(anthropic.value(QStringLiteral("credentialAlternatives")).toList().size(), 2);
     QVERIFY(!openAi.contains(QStringLiteral("backend")));
 }
 
@@ -222,6 +237,23 @@ void SourceReadinessModelTest::staleDataHasSpecificAction()
     QCOMPARE(source.value(QStringLiteral("readinessStateKey")).toString(), QStringLiteral("degraded"));
     QCOMPARE(source.value(QStringLiteral("errorCode")).toString(), QStringLiteral("stale"));
     QCOMPARE(source.value(QStringLiteral("nextActionKey")).toString(), QStringLiteral("refresh_stale_data"));
+}
+
+void SourceReadinessModelTest::anthropicAdminCredentialIsAValidAlternative()
+{
+    SourceReadinessModel model;
+    ReadinessProvider provider;
+    model.registerProviderBackend(QStringLiteral("anthropic"), &provider);
+    model.setSourceEnabled(QStringLiteral("anthropic"), true);
+    QCOMPARE(model.source(QStringLiteral("anthropic"))
+                 .value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("needs_configuration"));
+
+    provider.setAdminApiKeyConfigured(true);
+    QCOMPARE(model.source(QStringLiteral("anthropic"))
+                 .value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("ready_to_verify"));
+    QVERIFY(model.verifySource(QStringLiteral("anthropic")));
 }
 
 void SourceReadinessModelTest::credentialPropertyChangesInvalidateSource()

@@ -913,8 +913,8 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider,
         "INSERT INTO "
         "observations(provider,observed_at_utc,interval_start_utc,interval_end_"
         "utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,"
-        "window,reset_at_utc,correlation_id) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
+        "window,model_scope,project_scope,reset_at_utc,correlation_id) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
     for (const QVariant &entry : metrics) {
         const QVariantMap metric = entry.toMap();
         const QString requestedSemantic =
@@ -961,8 +961,10 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider,
             11, metric.value(QStringLiteral("scope"), QStringLiteral("api_key")));
         query.bindValue(
             12, metric.value(QStringLiteral("window"), QStringLiteral("current")));
-        query.bindValue(13, metric.value(QStringLiteral("resetAt")));
-        query.bindValue(14, correlationId);
+        query.bindValue(13, metric.value(QStringLiteral("modelScope")));
+        query.bindValue(14, metric.value(QStringLiteral("projectScope")));
+        query.bindValue(15, metric.value(QStringLiteral("resetAt")));
+        query.bindValue(16, correlationId);
         if (!query.exec()) {
             m_db.rollback();
             return false;

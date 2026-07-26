@@ -30,7 +30,7 @@ TestCase {
     }
 
     property var descriptors: [
-        descriptor("anthropic", "Anthropic", "connectivity_only"),
+        descriptor("anthropic", "Anthropic", "actual_usage_spend"),
         descriptor("deepseek", "DeepSeek", "balance_connectivity"),
         descriptor("litellm", "LiteLLM Proxy", "gateway_aggregate"),
         descriptor("openai", "OpenAI", "actual_usage_spend"),
@@ -60,7 +60,7 @@ TestCase {
 
     function init() {
         testCase.descriptors = [
-            descriptor("anthropic", "Anthropic", "connectivity_only"),
+            descriptor("anthropic", "Anthropic", "actual_usage_spend"),
             descriptor("deepseek", "DeepSeek", "balance_connectivity"),
             descriptor("litellm", "LiteLLM Proxy", "gateway_aggregate"),
             descriptor("openai", "OpenAI", "actual_usage_spend"),
@@ -92,11 +92,11 @@ TestCase {
 
     function test_sourcesAreGroupedByUsefulDataFirst() {
         compare(controller.visibleSources.length, 5);
-        compare(controller.visibleSources[0].configKey, "openai");
-        compare(controller.visibleSources[1].configKey, "codex-cli");
-        compare(controller.visibleSources[2].configKey, "litellm");
-        compare(controller.visibleSources[3].configKey, "deepseek");
-        compare(controller.visibleSources[4].configKey, "anthropic");
+        compare(controller.visibleSources[0].configKey, "anthropic");
+        compare(controller.visibleSources[1].configKey, "openai");
+        compare(controller.visibleSources[2].configKey, "codex-cli");
+        compare(controller.visibleSources[3].configKey, "litellm");
+        compare(controller.visibleSources[4].configKey, "deepseek");
         compare(controller.visibleSources[0].categoryLabel, "Usage & spend");
     }
 
@@ -107,8 +107,8 @@ TestCase {
         compare(controller.selectedSourceId, "litellm");
 
         controller.searchText = "";
-        controller.filterKey = "connectivity";
-        compare(controller.visibleSources.length, 1);
+        controller.filterKey = "usage";
+        compare(controller.visibleSources.length, 2);
         compare(controller.selectedSourceId, "litellm");
 
         controller.filterKey = "all";

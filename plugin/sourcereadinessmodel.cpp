@@ -59,6 +59,9 @@ SourceReadinessModel::SourceReadinessModel(QObject *parent)
             // AWS session tokens are optional for long-lived credentials.
             if (!slot.endsWith(QLatin1String("_session_token"))) entry.requiredCredentialSlots.append(slot);
         }
+        entry.credentialAlternatives =
+            auth.value(QStringLiteral("acceptAnyCredentialSet")).toList();
+        entry.acceptAnyCredentialSet = !entry.credentialAlternatives.isEmpty();
 
         const QVariantMap safeRefresh = descriptor.value(QStringLiteral("safeRefresh")).toMap();
         const QString method = safeRefresh.value(QStringLiteral("method")).toString().toUpper();
@@ -101,6 +104,8 @@ QVariant SourceReadinessModel::data(const QModelIndex &index, int role) const
     case SourceKindKeyRole: return sourceKindKey(entry.kind);
     case MonitoringLevelRole: return entry.monitoringLevel;
     case RequiredCredentialSlotsRole: return entry.requiredCredentialSlots;
+    case AcceptAnyCredentialSetRole: return entry.acceptAnyCredentialSet;
+    case CredentialAlternativesRole: return entry.credentialAlternatives;
     case InstalledRole: return snapshot.installed;
     case EnabledRole: return snapshot.enabled;
     case LastVerifiedRole: return snapshot.lastVerified;
@@ -127,6 +132,8 @@ QHash<int, QByteArray> SourceReadinessModel::roleNames() const
         {SourceKindKeyRole, "sourceKindKey"},
         {MonitoringLevelRole, "monitoringLevel"},
         {RequiredCredentialSlotsRole, "requiredCredentialSlots"},
+        {AcceptAnyCredentialSetRole, "acceptAnyCredentialSet"},
+        {CredentialAlternativesRole, "credentialAlternatives"},
         {InstalledRole, "installed"},
         {EnabledRole, "enabled"},
         {LastVerifiedRole, "lastVerified"},
@@ -452,6 +459,10 @@ bool SourceReadinessModel::providerCredentialsConfigured(const SourceEntry &entr
                                                          const ProviderBackend *backend) const
 {
     if (entry.requiredCredentialSlots.isEmpty()) return true;
+    if (entry.acceptAnyCredentialSet) {
+        return backend->hasApiKey()
+            || backend->property("adminApiKeyConfigured").toBool();
+    }
     if (!backend->hasApiKey()) return false;
     if (entry.stableId == QLatin1String("bedrock"))
         return !backend->property("secretAccessKey").toString().isEmpty();

@@ -333,6 +333,8 @@ void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
                             {QStringLiteral("quality"), QStringLiteral("unknown")},
                             {QStringLiteral("scope"), QStringLiteral("project")},
                             {QStringLiteral("window"), QStringLiteral("day")},
+                            {QStringLiteral("modelScope"), QStringLiteral("gemini-2.5-pro")},
+                            {QStringLiteral("projectScope"), QStringLiteral("workspace-a")},
                             {QStringLiteral("periodStart"), start},
                             {QStringLiteral("periodEnd"), end}};
     QVariantMap actualZero = unavailable;
@@ -351,7 +353,8 @@ void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
         QVERIFY(check.open());
         QSqlQuery query(check);
         QVERIFY(query.exec(QStringLiteral(
-            "SELECT metric_kind,value,interval_start_utc,interval_end_utc,scope,window,source "
+            "SELECT metric_kind,value,interval_start_utc,interval_end_utc,scope,window,source,"
+            "model_scope,project_scope "
             "FROM observations WHERE provider='Gemini' ORDER BY id")));
         QVERIFY(query.next());
         QCOMPARE(query.value(0).toString(), QStringLiteral("token_remaining"));
@@ -361,6 +364,8 @@ void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
         QCOMPARE(query.value(4).toString(), QStringLiteral("project"));
         QCOMPARE(query.value(5).toString(), QStringLiteral("day"));
         QCOMPARE(query.value(6).toString(), QStringLiteral("published_documentation"));
+        QCOMPARE(query.value(7).toString(), QStringLiteral("gemini-2.5-pro"));
+        QCOMPARE(query.value(8).toString(), QStringLiteral("workspace-a"));
         QVERIFY(query.next());
         QCOMPARE(query.value(0).toString(), QStringLiteral("requests"));
         QCOMPARE(query.value(1).toDouble(), 0.0);

@@ -262,7 +262,7 @@
     {
       "key": "anthropic",
       "label": "Anthropic",
-      "dataQuality": "rate-limit-only",
+      "dataQuality": "actual-usage-cost-with-admin",
       "pricingFreshness": "provider-catalog",
       "needsManualReview": true,
       "sourceConflict": false,
@@ -371,8 +371,8 @@
       ],
       "reviewReason": "Reviewed official Anthropic model IDs and pricing on 2026-07-13; kept manual review because Sonnet 5 introductory pricing expires on 2026-08-31 and data-residency/fast-mode modifiers are not represented in the local flat token table.",
       "stableId": "anthropic",
-      "adapterType": "model_discovery",
-      "monitoringLevel": "connectivity_only",
+      "adapterType": "anthropic_usage_cost",
+      "monitoringLevel": "actual_usage_spend",
       "displayName": "Anthropic",
       "dbName": "Anthropic",
       "icon": "anthropic",
@@ -380,22 +380,47 @@
       "auth": {
         "scheme": "x-api-key",
         "credentialSlots": [
-          "anthropic"
-        ]
+          "anthropic",
+          "anthropic_admin"
+        ],
+        "acceptAnyCredentialSet": [
+          ["anthropic"],
+          ["anthropic_admin"]
+        ],
+        "capabilityCredentialSets": {
+          "connectivity": [["anthropic"]],
+          "usage": [["anthropic_admin"]],
+          "cost": [["anthropic_admin"]]
+        }
       },
       "endpoint": {
         "default": "https://api.anthropic.com/v1",
         "customPolicy": "allowed"
       },
-      "safeRefresh": {"method": "GET", "path": "/models", "readOnly": true, "requestBudget": 1, "minimumIntervalSeconds": 300},
+      "safeRefresh": {
+        "method": "GET",
+        "paths": [
+          "/models",
+          "/organizations/usage_report/messages",
+          "/organizations/cost_report"
+        ],
+        "readOnly": true,
+        "requestBudget": 64,
+        "minimumIntervalSeconds": 300,
+        "backfillBucketLimit": 31
+      },
       "capabilities": [
         "connectivity",
         "modelDiscovery",
-        "manualRateLimits"
+        "manualRateLimits",
+        "usage",
+        "cost"
       ],
       "expectedSources": [
         "response_headers",
-        "connectivity_probe"
+        "connectivity_probe",
+        "usage_api",
+        "billing_api"
       ],
       "probePolicy": "read_only_model_api",
       "reviewExpiresAt": "2026-08-27",

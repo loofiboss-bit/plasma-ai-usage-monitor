@@ -91,6 +91,8 @@ public:
                     const QString method = QString::fromUtf8(firstLine.at(0));
                     const QString rawTarget = QString::fromUtf8(firstLine.at(1));
                     const QString path = QUrl(rawTarget).path();
+                    m_targets.append(rawTarget);
+                    m_requests.append(buffer.left(headerEnd + 4));
 
                     m_hitCount[path] = m_hitCount.value(path) + 1;
 
@@ -180,6 +182,9 @@ public:
         return m_hitCount.value(path, 0);
     }
 
+    QStringList targets() const { return m_targets; }
+    QList<QByteArray> requests() const { return m_requests; }
+
 private:
     QTcpServer m_server;
     QHash<QTcpSocket *, QByteArray> m_buffers;
@@ -187,6 +192,8 @@ private:
     QHash<QString, Response> m_routes;
     QHash<QString, QList<Response>> m_routeSequences;
     QHash<QString, int> m_hitCount;
+    QStringList m_targets;
+    QList<QByteArray> m_requests;
 };
 
 class ProvidersMockedHttpTest : public QObject
@@ -202,6 +209,10 @@ private Q_SLOTS:
     void openAiAuthError();
     void openAiPartialCapabilitySuccess();
     void anthropicRateLimitHeaders();
+    void anthropicAdminUsageCostPaginationAndDimensions();
+    void anthropicAdminPartialCostAndPriorityRemainTruthful();
+    void anthropicAdminTypedFailures();
+    void anthropicAdminCancellationDiscardsOldGeneration();
     void deepSeekUsageAndBalance();
     void openAiCompatibleProbeRefreshesDoNotAffectActualUsage();
     void googleKnownLimitsByTier();
@@ -569,6 +580,210 @@ void ProvidersMockedHttpTest::anthropicRateLimitHeaders()
     QCOMPARE(provider.rateLimitTokensRemaining(), 1300);
     QVERIFY(provider.isConnected());
     QVERIFY(!provider.rateLimitResetTime().isEmpty());
+}
+
+void ProvidersMockedHttpTest::anthropicAdminUsageCostPaginationAndDimensions()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponse(QStringLiteral("GET"), QStringLiteral("/v1/models"), 200,
+                       QByteArrayLiteral(R"JSON({"data":[]})JSON"));
+    server.setResponseSequence(
+        QStringLiteral("GET"), QStringLiteral("/v1/organizations/usage_report/messages"),
+        {
+            {200, R"JSON({"data":[{"starting_at":"2026-07-25T00:00:00Z","ending_at":"2026-07-26T00:00:00Z","results":[{"uncached_input_tokens":100,"cache_read_input_tokens":20,"cache_creation":{"ephemeral_5m_input_tokens":30},"output_tokens":40,"workspace_id":"workspace-a","model":"claude-sonnet-4-20250514","service_tier":"standard"}]}],"has_more":true,"next_page":"usage-next"})JSON", {}, 0},
+            {200, R"JSON({"data":[{"starting_at":"2026-07-26T00:00:00Z","ending_at":"2026-07-27T00:00:00Z","results":[{"uncached_input_tokens":10,"cache_read_input_tokens":2,"cache_creation":{"ephemeral_1h_input_tokens":3},"output_tokens":4,"workspace_id":"workspace-a","model":"claude-sonnet-4-20250514","service_tier":"standard"}]}],"has_more":false,"next_page":null})JSON", {}, 0},
+        });
+    server.setResponse(
+        QStringLiteral("GET"), QStringLiteral("/v1/organizations/cost_report"), 200,
+        R"JSON({"data":[{"starting_at":"2026-07-26T00:00:00Z","ending_at":"2026-07-27T00:00:00Z","results":[{"amount":"123.45","currency":"USD","workspace_id":"workspace-a","model":"claude-sonnet-4-20250514","service_tier":"standard"}]}],"has_more":false,"next_page":null})JSON");
+
+    AnthropicProvider provider;
+    provider.setApiKey(QStringLiteral("standard-secret"));
+    provider.setAdminApiKey(QStringLiteral("admin-secret"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!provider.isLoading(), 3000);
+
+    QCOMPARE(provider.inputTokens(), 165);
+    QCOMPARE(provider.outputTokens(), 44);
+    QCOMPARE(provider.cost(), 1.2345);
+    QCOMPARE(provider.dataQuality(), QStringLiteral("actual"));
+    QCOMPARE(provider.capabilityStatus().value(QStringLiteral("usage")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("available"));
+    QCOMPARE(provider.capabilityStatus().value(QStringLiteral("cost")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("available"));
+    const QVariantMap cacheRead = provider.metric(
+        QStringLiteral("cache_read_input_tokens"),
+        QStringLiteral("organization:standard"), QStringLiteral("day"));
+    QVERIFY(cacheRead.value(QStringLiteral("available")).toBool());
+    QCOMPARE(cacheRead.value(QStringLiteral("modelScope")).toString(),
+             QStringLiteral("claude-sonnet-4-20250514"));
+    QCOMPARE(cacheRead.value(QStringLiteral("projectScope")).toString(),
+             QStringLiteral("workspace-a"));
+    QCOMPARE(server.hitCount(QStringLiteral("/v1/organizations/usage_report/messages")), 2);
+    QVERIFY(server.targets().filter(QRegularExpression(
+                QStringLiteral("[?&]page=usage-next(?:&|$)"))).size() == 1);
+    QVERIFY(server.targets().filter(QRegularExpression(
+                QStringLiteral("[?&]limit=31(?:&|$)"))).size() >= 2);
+    for (const QString &target : server.targets()) {
+        QVERIFY(!target.contains(QStringLiteral("standard-secret")));
+        QVERIFY(!target.contains(QStringLiteral("admin-secret")));
+    }
+    bool modelsUsedStandard = false;
+    bool reportsUsedAdmin = false;
+    for (const QByteArray &request : server.requests()) {
+        if (request.startsWith("GET /v1/models "))
+            modelsUsedStandard = request.contains("standard-secret")
+                && !request.contains("admin-secret");
+        if (request.startsWith("GET /v1/organizations/usage_report/messages"))
+            reportsUsedAdmin = request.contains("admin-secret")
+                && !request.contains("standard-secret");
+    }
+    QVERIFY(modelsUsedStandard);
+    QVERIFY(reportsUsedAdmin);
+}
+
+void ProvidersMockedHttpTest::anthropicAdminPartialCostAndPriorityRemainTruthful()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    const QByteArray priorityUsageBody =
+        R"JSON({"data":[{"starting_at":"2026-07-26T00:00:00Z","ending_at":"2026-07-27T00:00:00Z","results":[{"uncached_input_tokens":0,"cache_read_input_tokens":0,"cache_creation":{},"output_tokens":0,"workspace_id":"workspace-priority","model":"claude-opus-4-8","service_tier":"priority"}]}],"has_more":false,"next_page":null})JSON";
+    server.setResponseSequence(
+        QStringLiteral("GET"), QStringLiteral("/v1/organizations/usage_report/messages"),
+        {{200, priorityUsageBody, {}, 0}, {200, priorityUsageBody, {}, 0}});
+    server.setResponseSequence(
+        QStringLiteral("GET"), QStringLiteral("/v1/organizations/cost_report"),
+        {
+            {200, R"JSON({"data":[{"starting_at":"2026-07-26T00:00:00Z","ending_at":"2026-07-27T00:00:00Z","results":[{"amount":"100","currency":"USD","workspace_id":"workspace-priority","model":"claude-opus-4-8","service_tier":"standard"}]}],"has_more":false,"next_page":null})JSON", {}, 0},
+            {403, R"JSON({"error":"forbidden"})JSON", {}, 0},
+        });
+
+    AnthropicProvider provider;
+    provider.setAdminApiKey(QStringLiteral("admin-secret"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+    QCOMPARE(provider.cost(), 1.0);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 2, 3000);
+
+    QVERIFY(provider.isConnected());
+    QCOMPARE(provider.inputTokens(), 0);
+    QCOMPARE(provider.capabilityStatus().value(QStringLiteral("usage")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("available"));
+    QCOMPARE(provider.capabilityStatus().value(QStringLiteral("cost")).toMap()
+                 .value(QStringLiteral("status")).toString(), QStringLiteral("failed"));
+    QCOMPARE(provider.cost(), 1.0);
+    QCOMPARE(provider.metric(QStringLiteral("cost"), QStringLiteral("api_key"),
+                             QStringLiteral("current"))
+                 .value(QStringLiteral("quality")).toString(), QStringLiteral("stale"));
+    const QVariantMap priorityUsage = provider.metric(
+        QStringLiteral("input_tokens"), QStringLiteral("organization:priority"),
+        QStringLiteral("day"));
+    QVERIFY(priorityUsage.value(QStringLiteral("available")).toBool());
+    QCOMPARE(priorityUsage.value(QStringLiteral("value")).toLongLong(), 0);
+    QVERIFY(!provider.metric(QStringLiteral("cost"),
+                             QStringLiteral("organization:priority"),
+                             QStringLiteral("day"))
+                 .value(QStringLiteral("available")).toBool());
+}
+
+void ProvidersMockedHttpTest::anthropicAdminTypedFailures()
+{
+    const auto verifyFailure = [](int status, ProviderBackend::ProviderErrorKind expected) {
+        HttpStubServer server;
+        QVERIFY(server.listen());
+        const QList<QPair<QByteArray, QByteArray>> headers = status == 429
+            ? QList<QPair<QByteArray, QByteArray>>{{"retry-after", "120"}}
+            : QList<QPair<QByteArray, QByteArray>>{};
+        server.setResponse(QStringLiteral("GET"),
+                           QStringLiteral("/v1/organizations/usage_report/messages"),
+                           status, QByteArrayLiteral(R"JSON({"error":"failure"})JSON"), headers);
+        server.setResponse(QStringLiteral("GET"),
+                           QStringLiteral("/v1/organizations/cost_report"),
+                           status, QByteArrayLiteral(R"JSON({"error":"failure"})JSON"), headers);
+        AnthropicProvider provider;
+        provider.setAdminApiKey(QStringLiteral("admin-secret"));
+        provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+        QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+        provider.refresh();
+        QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+        QCOMPARE(provider.errorKind(), expected);
+        QVERIFY(!provider.isConnected());
+        if (status == 429) QVERIFY(provider.retryAfter().isValid());
+    };
+    verifyFailure(401, ProviderBackend::ProviderErrorKind::Authentication);
+    verifyFailure(403, ProviderBackend::ProviderErrorKind::Permission);
+    verifyFailure(429, ProviderBackend::ProviderErrorKind::RateLimit);
+
+    HttpStubServer schemaServer;
+    QVERIFY(schemaServer.listen());
+    const QByteArray invalid = R"JSON({"data":"wrong","has_more":false})JSON";
+    schemaServer.setResponse(QStringLiteral("GET"),
+        QStringLiteral("/v1/organizations/usage_report/messages"), 200, invalid);
+    schemaServer.setResponse(QStringLiteral("GET"),
+        QStringLiteral("/v1/organizations/cost_report"), 200, invalid);
+    AnthropicProvider schemaProvider;
+    schemaProvider.setAdminApiKey(QStringLiteral("admin-secret"));
+    schemaProvider.setCustomBaseUrl(schemaServer.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy schemaSpy(&schemaProvider, &ProviderBackend::dataUpdated);
+    schemaProvider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(schemaSpy.count() >= 1, 3000);
+    QCOMPARE(schemaProvider.errorKind(), ProviderBackend::ProviderErrorKind::Schema);
+
+    HttpStubServer emptyServer;
+    QVERIFY(emptyServer.listen());
+    const QByteArray empty = R"JSON({"data":[],"has_more":false,"next_page":null})JSON";
+    emptyServer.setResponse(QStringLiteral("GET"),
+        QStringLiteral("/v1/organizations/usage_report/messages"), 200, empty);
+    emptyServer.setResponse(QStringLiteral("GET"),
+        QStringLiteral("/v1/organizations/cost_report"), 200, empty);
+    AnthropicProvider emptyProvider;
+    emptyProvider.setAdminApiKey(QStringLiteral("admin-secret"));
+    emptyProvider.setCustomBaseUrl(emptyServer.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy emptySpy(&emptyProvider, &ProviderBackend::dataUpdated);
+    emptyProvider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(emptySpy.count() >= 1, 3000);
+    QVERIFY(emptyProvider.isConnected());
+    QVERIFY(emptyProvider.metric(QStringLiteral("input_tokens"),
+                                 QStringLiteral("organization"),
+                                 QStringLiteral("current"))
+                .value(QStringLiteral("available")).toBool());
+    QVERIFY(emptyProvider.metric(QStringLiteral("cost"), QStringLiteral("api_key"),
+                                 QStringLiteral("current"))
+                .value(QStringLiteral("available")).toBool());
+}
+
+void ProvidersMockedHttpTest::anthropicAdminCancellationDiscardsOldGeneration()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    const auto usageBody = [](int input) {
+        return QStringLiteral(R"JSON({"data":[{"starting_at":"2026-07-26T00:00:00Z","ending_at":"2026-07-27T00:00:00Z","results":[{"uncached_input_tokens":%1,"cache_read_input_tokens":0,"cache_creation":{},"output_tokens":1,"workspace_id":"workspace-a","model":"claude-sonnet-4-20250514","service_tier":"standard"}]}],"has_more":false,"next_page":null})JSON").arg(input).toUtf8();
+    };
+    server.setResponseSequence(QStringLiteral("GET"),
+        QStringLiteral("/v1/organizations/usage_report/messages"),
+        {{200, usageBody(100), {}, 300}, {200, usageBody(5), {}, 0}});
+    const QByteArray empty = R"JSON({"data":[],"has_more":false,"next_page":null})JSON";
+    server.setResponseSequence(QStringLiteral("GET"),
+        QStringLiteral("/v1/organizations/cost_report"),
+        {{200, empty, {}, 300}, {200, empty, {}, 0}});
+    AnthropicProvider provider;
+    provider.setAdminApiKey(QStringLiteral("admin-secret"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTest::qWait(30);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+    QCOMPARE(provider.inputTokens(), 5);
+    QCOMPARE(provider.outputTokens(), 1);
+    QVERIFY(provider.cancellationCount() >= 1);
 }
 
 void ProvidersMockedHttpTest::deepSeekUsageAndBalance()

@@ -31,6 +31,7 @@ QtObject {
     property string resultSummary: ""
 
     readonly property var requiredCredentialSlots: selectedSource.requiredCredentialSlots || []
+    readonly property bool acceptsAnyCredentialSet: !!selectedSource.acceptAnyCredentialSet
     readonly property bool needsCustomEndpoint: !!selectedSource.customEndpointRequired
     readonly property bool busy: step === verificationStep
     readonly property bool paused: step === pausedStep
@@ -207,6 +208,8 @@ QtObject {
 
     function credentialLabel(slot) {
         var labels = {
+            "anthropic": qsTr("Standard API key (connectivity only)"),
+            "anthropic_admin": qsTr("Admin API key (usage and cost)"),
             "bedrock_access_key_id": qsTr("Access key ID"),
             "bedrock_secret_access_key": qsTr("Secret access key"),
             "azure_openai_api_key": qsTr("API key")
@@ -249,10 +252,26 @@ QtObject {
                 fail(qsTr("Enter a valid HTTP or HTTPS endpoint URL."));
                 return false;
             }
+            if (acceptsAnyCredentialSet) {
+                var hasAlternative = false;
+                for (var alternativeIndex = 0;
+                     alternativeIndex < requiredCredentialSlots.length;
+                     alternativeIndex++) {
+                    var alternativeSlot = requiredCredentialSlots[alternativeIndex];
+                    hasAlternative = hasAlternative
+                        || !!(credentialValues[alternativeSlot] || "").trim()
+                        || hasStoredCredential(alternativeSlot);
+                }
+                if (!hasAlternative) {
+                    fail(qsTr("Enter at least one supported credential before continuing."));
+                    return false;
+                }
+            }
             for (var i = 0; i < requiredCredentialSlots.length; i++) {
                 var slot = requiredCredentialSlots[i];
                 var value = (credentialValues[slot] || "").trim();
-                if (!value && !hasStoredCredential(slot)) {
+                if (!acceptsAnyCredentialSet
+                        && !value && !hasStoredCredential(slot)) {
                     fail(qsTr("Enter the required credential before continuing."));
                     return false;
                 }

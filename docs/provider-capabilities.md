@@ -7,7 +7,7 @@ This matrix is generated from the same Catalog v5 descriptors used by the widget
 | Provider | Monitoring level | Scheduled call(s) | Scope | Request budget | Billable background request |
 | --- | --- | --- | --- | ---: | --- |
 | OpenAI | Actual account usage and spend | `GET /organization/usage/completions`; `GET /organization/costs` | credential/account | 4 | No |
-| Anthropic | Connectivity/model discovery only | `GET /models` | credential/account | 1 | No |
+| Anthropic | Actual account usage and spend | `GET /models`; `GET /organizations/usage_report/messages`; `GET /organizations/cost_report` | credential/account | 64 | No |
 | Google Gemini | Connectivity/model discovery only | `GET /models` | credential/account | 20 | No |
 | Mistral AI | Connectivity/model discovery only | `GET /models` | credential/account | 1 | No |
 | DeepSeek | Balance and connectivity | `GET /models`; `GET /user/balance` | credential/account | 2 | No |
