@@ -53,14 +53,14 @@ except EvidenceError:
 else:
     raise SystemExit("Release-media evidence accepted the wrong AT-SPI process")
 
-capture_script = (ROOT / "scripts/demo/capture_v15_media.sh").read_text(
+capture_script = (ROOT / "scripts/demo/capture_v16_media.sh").read_text(
     encoding="utf-8"
 )
 capture_contract = {
     "per-view isolated HOME": 'HOME="$view_home"',
     "panel isolated HOME": 'HOME="$panel_home"',
     "empty desktop": "desktopsList[d].widgets()",
-    "controlled wallpaper": 'wallpaperPlugin = "org.kde.color"',
+    "controlled wallpaper": 'wallpaperPlugin = \\"org.kde.image\\"',
     "PID-bound accessibility": '--pid "$WINDOW_PID" --window "$match_query"',
     "manifest evidence": "captureEvidence: $captureEvidence",
 }

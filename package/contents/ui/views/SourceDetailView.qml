@@ -14,13 +14,27 @@ QQC2.ScrollView {
 
     property var monitor: null
     property string sourceId: ""
+    readonly property bool mediaMode: AppInfo.demoMode
+        && AppInfo.smokeView === "media-source-detail"
+    readonly property var mediaSource: mediaMode && monitor
+        ? monitor.presentationDailyState.source(sourceId) : ({})
+    readonly property var sourceData: mediaMode ? mediaSource : detailModel.source
+    readonly property var quotaData: mediaMode
+        ? (mediaSource.quotaWindows || []) : detailModel.quotaWindows
+    readonly property var coverageData: mediaMode
+        ? ({ availableMetricCount: 2, totalMetricCount: 3 })
+        : detailModel.coverage
+    readonly property string actionLabelData: mediaMode
+        ? KI18n.i18n("Open source settings") : detailModel.actionLabel
+    readonly property var mediaMetrics: mediaMode
+        ? (mediaSource.detailMetrics || []) : []
     signal backRequested()
     signal actionRequested(string stableId, string actionKey, string sourceKind)
     signal settingsRequested(string stableId)
     signal historyRequested(string historyId, string metric, int rangeDays)
     Accessible.role: Accessible.Pane
-    Accessible.name: detailModel.source.displayName
-        ? KI18n.i18n("%1 source details", detailModel.source.displayName)
+    Accessible.name: sourceData.displayName
+        ? KI18n.i18n("%1 source details", sourceData.displayName)
         : KI18n.i18n("Source details")
 
     SourceDetailModel {
@@ -36,7 +50,7 @@ QQC2.ScrollView {
             connectivity_only: KI18n.i18n("Connectivity only"),
             unavailable: KI18n.i18n("Data unavailable")
         };
-        return labels[detailModel.source.qualityClass]
+        return labels[sourceData.qualityClass]
             || KI18n.i18n("Data unavailable");
     }
 
@@ -69,6 +83,14 @@ QQC2.ScrollView {
             points, samples);
     }
 
+    function configureModel() {
+        if (!detail.monitor) return;
+        detailModel.registerDailyState(detail.monitor.presentationDailyState);
+        detailModel.registerHistoryDatabase(detail.monitor.usageDb);
+    }
+
+    onMonitorChanged: configureModel()
+
     ColumnLayout {
         width: detail.availableWidth
         spacing: Kirigami.Units.mediumSpacing
@@ -93,13 +115,13 @@ QQC2.ScrollView {
                     objectName: "sourceDetailTitle"
                     Layout.fillWidth: true
                     level: 3
-                    text: detailModel.source.displayName || detail.sourceId
+                    text: detail.sourceData.displayName || detail.sourceId
                     elide: Text.ElideRight
                 }
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     text: detail.statusText()
-                        + KI18n.i18n(" · %1", detailModel.source.freshnessState
+                        + KI18n.i18n(" · %1", detail.sourceData.freshnessState
                                     || KI18n.i18n("unknown freshness"))
                     color: Kirigami.Theme.disabledTextColor
                     elide: Text.ElideRight
@@ -128,8 +150,8 @@ QQC2.ScrollView {
                     text: KI18n.i18np(
                         "%1 available metric of %2",
                         "%1 available metrics of %2",
-                        Number(detailModel.coverage.availableMetricCount || 0),
-                        Number(detailModel.coverage.totalMetricCount || 0))
+                        Number(detail.coverageData.availableMetricCount || 0),
+                        Number(detail.coverageData.totalMetricCount || 0))
                     wrapMode: Text.WordWrap
                 }
                 PlasmaComponents.Label {
@@ -140,17 +162,17 @@ QQC2.ScrollView {
                 }
                 RowLayout {
                     Layout.fillWidth: true
-                    visible: detailModel.actionLabel !== ""
+                    visible: detail.actionLabelData !== ""
                     PlasmaComponents.Button {
                         objectName: "sourceDetailPrimaryAction"
-                        text: detailModel.actionLabel
+                        text: detail.actionLabelData
                         icon.name: text === KI18n.i18n("Refresh")
                             ? "view-refresh" : "configure"
                         activeFocusOnTab: true
                         onClicked: detail.actionRequested(
                             detail.sourceId,
-                            detailModel.source.nextActionKey || "",
-                            detailModel.source.sourceKind || "")
+                            detail.sourceData.nextActionKey || "open_source_settings",
+                            detail.sourceData.sourceKind || "")
                     }
                     Item { Layout.fillWidth: true }
                 }
@@ -163,11 +185,11 @@ QQC2.ScrollView {
             Layout.rightMargin: Kirigami.Units.smallSpacing
             level: 4
             text: KI18n.i18n("Quota windows")
-            visible: detailModel.quotaWindows.length > 0
+            visible: detail.quotaData.length > 0
         }
 
         Repeater {
-            model: detailModel.quotaWindows
+            model: detail.quotaData
             Rectangle {
                 id: quotaRow
                 required property var modelData
@@ -212,6 +234,7 @@ QQC2.ScrollView {
 
         Repeater {
             model: detailModel
+            visible: !detail.mediaMode
             Rectangle {
                 id: metricRow
                 required property string kind
@@ -273,6 +296,63 @@ QQC2.ScrollView {
             }
         }
 
+        Repeater {
+            model: detail.mediaMetrics
+            Rectangle {
+                id: mediaMetricRow
+                required property var modelData
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                implicitHeight: mediaMetricContent.implicitHeight
+                    + Kirigami.Units.mediumSpacing * 2
+                radius: Kirigami.Units.smallSpacing
+                color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.7)
+                border.width: 1
+                border.color: Qt.alpha(Kirigami.Theme.textColor, 0.12)
+
+                ColumnLayout {
+                    id: mediaMetricContent
+                    anchors.fill: parent
+                    anchors.margins: Kirigami.Units.mediumSpacing
+                    RowLayout {
+                        Layout.fillWidth: true
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            text: mediaMetricRow.modelData.kind.replace(/_/g, " ")
+                            font.bold: true
+                        }
+                        PlasmaComponents.Label {
+                            text: mediaMetricRow.modelData.available
+                                ? detail.formatMetric(
+                                    mediaMetricRow.modelData.value,
+                                    mediaMetricRow.modelData.unit,
+                                    mediaMetricRow.modelData.currency)
+                                : KI18n.i18n("Unavailable")
+                            color: mediaMetricRow.modelData.available
+                                ? Kirigami.Theme.textColor
+                                : Kirigami.Theme.disabledTextColor
+                        }
+                    }
+                    PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        text: [
+                            mediaMetricRow.modelData.source,
+                            mediaMetricRow.modelData.quality,
+                            mediaMetricRow.modelData.semantic,
+                            mediaMetricRow.modelData.scope,
+                            mediaMetricRow.modelData.window
+                        ].filter(function(value) { return !!value; })
+                            .join(KI18n.i18n(" · "))
+                        color: Kirigami.Theme.disabledTextColor
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        elide: Text.ElideRight
+                        Accessible.name: KI18n.i18n("Metric provenance: %1", text)
+                    }
+                }
+            }
+        }
+
         PlasmaExtras.Heading {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.smallSpacing
@@ -288,14 +368,16 @@ QQC2.ScrollView {
             spacing: Kirigami.Units.smallSpacing
 
             PlasmaComponents.BusyIndicator {
-                visible: detailModel.historyLoading
+                visible: !detail.mediaMode && detailModel.historyLoading
                 running: visible
                 Layout.preferredWidth: Kirigami.Units.iconSizes.small
                 Layout.preferredHeight: width
             }
             PlasmaComponents.Label {
                 Layout.fillWidth: true
-                text: detailModel.historyLoading
+                text: detail.mediaMode
+                    ? KI18n.i18n("24 recent points from 96 stored samples")
+                    : detailModel.historyLoading
                     ? KI18n.i18n("Loading recent compatible history…")
                     : detail.recentHistoryText()
                 wrapMode: Text.WordWrap
@@ -334,8 +416,7 @@ QQC2.ScrollView {
     }
 
     Component.onCompleted: {
-        detailModel.registerDailyState(detail.monitor.presentationDailyState);
-        detailModel.registerHistoryDatabase(detail.monitor.usageDb);
+        configureModel();
         backButton.forceActiveFocus();
     }
 }

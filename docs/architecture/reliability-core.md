@@ -238,6 +238,22 @@ objects. `DailyOverviewState` delegates its compatibility compact API to the
 same selector. Available numeric zero remains distinct from unavailable state
 through every extracted object.
 
+## v16 maintainability boundaries
+
+Phase 5 keeps the provider catalog authoritative and extracts only verified
+hotspots. `AnthropicAdminParser` owns Admin report schema validation, duplicate
+row aggregation, decimal-to-micro-USD conversion, and bounded next-page
+decisions; `AnthropicProvider` retains network lifecycle, capability state, and
+metric publication. `AnalystQuery` owns the asynchronous Analyst SQL and result
+projection behind the unchanged superseding `UsageDatabase::requestAnalyst()`
+boundary.
+
+`ProviderRuntimeRegistration.qml` is the single runtime wiring boundary. It
+registers native backends, configures catalog-created descriptor backends, and
+connects catalog providers and local tools to readiness and Daily State models.
+`ProviderRegistry.qml` still projects the authoritative Catalog v5 descriptors;
+the extraction does not create a second provider inventory.
+
 Calendar totals include only compatible interval-total observations. Gauges, cumulative counters, and rolling windows are not relabeled as calendar totals. Queries preserve ISO currency and source quality.
 
 Large exports use worker instances, forward-only queries, and atomic output files so memory use does not grow with history size and partial files do not replace complete exports.

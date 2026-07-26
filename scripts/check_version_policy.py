@@ -40,8 +40,6 @@ def main() -> None:
     if stable is None:
         fail(f"VERSION is not stable semantic versioning: {version!r}")
     stable_major = int(stable.group(1))
-    planned_version = f"{stable_major + 1}.0.0"
-
     roadmap = (root / "ROADMAP.md").read_text(encoding="utf-8")
     roadmap_current = require_match(
         roadmap,
@@ -50,8 +48,8 @@ def main() -> None:
     ).group(1)
     if roadmap_current != version:
         fail(f"ROADMAP current release is {roadmap_current}, expected {version}")
-    if re.search(rf"^###\s+{re.escape(planned_version)}\b", roadmap, re.MULTILINE) is None:
-        fail(f"ROADMAP planned release {planned_version} is missing")
+    if re.search(rf"^###\s+{re.escape(version)}\b", roadmap, re.MULTILINE) is None:
+        fail(f"ROADMAP release section {version} is missing")
 
     security = (root / "SECURITY.md").read_text(encoding="utf-8")
     if (
@@ -99,18 +97,22 @@ def main() -> None:
     if appstream_version != version:
         fail(f"latest AppStream release is {appstream_version}, expected {version}")
 
-    plan = (
-        root / "docs" / "plans" / "PLASMA_AI_USAGE_MONITOR_V16_PLAN.md"
-    ).read_text(encoding="utf-8")
+    plan_path = (
+        root / "docs" / "plans"
+        / f"PLASMA_AI_USAGE_MONITOR_V{stable_major}_PLAN.md"
+    )
+    if not plan_path.is_file():
+        fail(f"canonical v{stable_major} plan is missing")
+    plan = plan_path.read_text(encoding="utf-8")
     target = require_match(
         plan, r"^- \*\*Target release:\*\*\s+`([^`]+)`", "v16 plan target"
     ).group(1)
-    if target != planned_version:
-        fail(f"v16 plan target is {target}, expected {planned_version}")
+    if target != version:
+        fail(f"v{stable_major} plan target is {target}, expected {version}")
 
     print(
         "Version policy OK: "
-        f"stable {version}, planned {planned_version}, all release surfaces aligned"
+        f"release candidate {version}, all release surfaces aligned"
     )
 
 

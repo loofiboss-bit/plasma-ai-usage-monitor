@@ -28,6 +28,12 @@ therefore be active even when no API provider is configured.
 
 The generated [provider capability matrix](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/provider-capabilities.md) is the exact contract used by the runtime.
 
+Anthropic can occupy two levels at once: its standard key can prove
+connectivity while its optional Admin key reports organization usage and cost.
+The two capabilities retain separate availability and failure states. Cache
+read and cache-creation input tokens remain explicit metric kinds, and Priority
+Tier usage does not imply that Priority Tier cost is available.
+
 ## Source labels
 
 - **Actual API usage** comes from a provider usage endpoint.

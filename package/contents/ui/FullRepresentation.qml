@@ -21,8 +21,8 @@ PlasmaExtras.Representation {
                             : AppInfo.smokeView === "analyst"
                               || AppInfo.smokeView.indexOf("media-analyst") === 0 ? 2 : 0
     property bool sourceDetailVisible: AppInfo.smokeView === "source-detail"
-    property string detailSourceId: AppInfo.smokeView === "source-detail"
-        ? "openrouter" : ""
+        || AppInfo.smokeView === "media-source-detail"
+    property string detailSourceId: sourceDetailVisible ? "openrouter" : ""
     property string returnFocusSourceId: ""
     property string historySourceId: ""
     property string historyMetric: ""

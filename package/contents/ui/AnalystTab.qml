@@ -18,9 +18,83 @@ Kirigami.ScrollablePage {
         ? KI18n.i18n("Analyst view loading")
         : KI18n.i18n("Analyst view ready")
 
-    readonly property var db: Plasmoid.configuration.historyEnabled
+    readonly property bool mediaScenario: AppInfo.demoMode
+        && AppInfo.smokeView.indexOf("media-analyst") === 0
+    readonly property bool mediaSufficient:
+        AppInfo.smokeView === "media-analyst-sufficient"
+    readonly property var db: analystPage.monitor
+        && (Plasmoid.configuration.historyEnabled || mediaScenario)
         ? analystPage.monitor.usageDb
         : null
+
+    function mediaSnapshot() {
+        var sufficient = mediaSufficient;
+        var spend = [];
+        for (var day = 0; day < (sufficient ? 20 : 1); ++day) {
+            spend.push({
+                date: "2026-07-" + String(day + 1).padStart(2, "0"),
+                actualAvailable: true,
+                actual: sufficient ? 0.34 + (day % 5) * 0.09 : 0.42,
+                estimatedAvailable: false,
+                estimated: null
+            });
+        }
+        return {
+            ok: true,
+            from: "2026-06-27T00:00:00Z",
+            to: "2026-07-27T00:00:00Z",
+            coverage: {
+                observedDayCount: sufficient ? 20 : 1,
+                requestedDayCount: 30,
+                percent: sufficient ? 67 : 3
+            },
+            currencyStatus: "single",
+            currency: "USD",
+            actualSampleCount: sufficient ? 20 : 1,
+            estimatedSampleCount: 0,
+            spendSeries: spend,
+            activityAvailable: false,
+            topDrivers: sufficient ? [{
+                provider: "OpenRouter",
+                model: "account",
+                quality: "actual",
+                value: 8.46,
+                currency: "USD"
+            }] : [],
+            kpis: {
+                averageDailySpend: sufficient
+                    ? { available: true, value: 0.56 }
+                    : {
+                        available: false,
+                        reasonKey: "insufficient_day_samples",
+                        sampleCount: 1,
+                        minimumSamples: 3
+                    },
+                weekOverWeekChange: sufficient
+                    ? { available: true, value: 12.4 }
+                    : {
+                        available: false,
+                        reasonKey: "incomplete_comparison_windows",
+                        sampleCount: 1,
+                        minimumSamples: 14
+                    },
+                volatility: sufficient
+                    ? { available: true, value: 18.2 }
+                    : {
+                        available: false,
+                        reasonKey: "insufficient_volatility_samples",
+                        sampleCount: 1,
+                        minimumSamples: 7
+                    },
+                outputInputRatio: {
+                    available: false,
+                    reasonKey: "insufficient_ratio_samples",
+                    sampleCount: sufficient ? 0 : 1,
+                    minimumSamples: 3
+                }
+            }
+        };
+    }
     Components.AnalystState {
         id: analystState
         db: analystPage.db
@@ -29,7 +103,15 @@ Kirigami.ScrollablePage {
         }
     }
 
-    Component.onCompleted: analystState.refreshData()
+    onDbChanged: if (!mediaScenario && db !== null) analystState.refreshData()
+    Component.onCompleted: {
+        if (mediaScenario) {
+            analystState.snapshot = mediaSnapshot();
+            analystState.loading = false;
+        } else {
+            analystState.refreshData();
+        }
+    }
     onVisibleChanged: if (visible && analystState.reportRequestId === "")
         analystState.refreshData()
 

@@ -1,7 +1,7 @@
 # Plasma AI Usage Monitor v16.0.0 — Control Loop
 
 - **Document type:** Implementation plan
-- **Status:** Phases 0–4 implemented and verified
+- **Status:** Phases 0–5 implemented; local release verification in progress
 - **Planning baseline:** `main` at `d51f597ebb0d23f7572c8d9d65f4ecf0beb85396`
 - **Current release:** `15.0.0`
 - **Target release:** `16.0.0`

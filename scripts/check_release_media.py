@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""Validate the canonical v15 screenshot set and its capture manifest."""
+"""Validate the canonical v16 screenshot set and its capture manifest."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 import subprocess
 import struct
@@ -18,23 +17,25 @@ SCREENSHOTS = ROOT / "assets" / "screenshots"
 REQUIRED = (
     "overview-popup.png",
     "attention-state.png",
-    "quota-reset-state.png",
-    "tool-only-overview.png",
-    "retained-history.png",
+    "source-detail.png",
     "history-gap.png",
     "analyst-sufficient.png",
     "analyst-insufficient.png",
+    "guided-first-success.png",
+    "provider-settings.png",
+    "plugin-recovery.png",
     "panel-lowest-quota.png",
 )
 SCENARIOS = {
     "overview-popup.png": "media-overview",
     "attention-state.png": "media-attention",
-    "quota-reset-state.png": "media-quota",
-    "tool-only-overview.png": "media-tool-only",
-    "retained-history.png": "media-history-retained",
+    "source-detail.png": "media-source-detail",
     "history-gap.png": "media-history-gap",
     "analyst-sufficient.png": "media-analyst-sufficient",
     "analyst-insufficient.png": "media-analyst-insufficient",
+    "guided-first-success.png": "onboarding-source",
+    "provider-settings.png": "settings",
+    "plugin-recovery.png": "plugin-recovery",
     "panel-lowest-quota.png": "media-panel",
 }
 
@@ -86,11 +87,52 @@ def committed_source_tree_sha256(commit: str) -> str:
         )
     return hashlib.sha256("".join(inventory).encode()).hexdigest()
 
+def filesystem_source_tree_sha256() -> str:
+    git_paths = subprocess.run(
+        [
+            "git",
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            "VERSION",
+            "package",
+            "scripts/demo",
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if git_paths.returncode == 0:
+        paths = git_paths.stdout.splitlines()
+    else:
+        paths = [
+            str(path.relative_to(ROOT))
+            for root in (ROOT / "package", ROOT / "scripts" / "demo")
+            for path in root.rglob("*")
+            if path.is_file()
+            and "__pycache__" not in path.parts
+            and path.suffix not in {".pyc", ".pyo"}
+        ]
+        paths.append("VERSION")
+
+    inventory = []
+    for relative in sorted(paths):
+        path = ROOT / relative
+        if path.is_file():
+            inventory.append(
+                hashlib.sha256(path.read_bytes()).hexdigest()
+                + "  " + relative + "\n"
+            )
+    return hashlib.sha256("".join(inventory).encode()).hexdigest()
+
 
 version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-manifest_path = SCREENSHOTS / "v15-media-manifest.json"
+manifest_path = SCREENSHOTS / "v16-media-manifest.json"
 if not manifest_path.is_file():
-    fail("assets/screenshots/v15-media-manifest.json is missing")
+    fail("assets/screenshots/v16-media-manifest.json is missing")
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 if manifest.get("version") != version:
     fail(f"manifest version {manifest.get('version')!r} does not match VERSION {version}")
@@ -120,32 +162,33 @@ expected_fixture = hashlib.sha256(
         + "\n"
         for path in (
             ROOT / "scripts" / "demo" / "showcase_preset.json",
-            ROOT / "scripts" / "demo" / "generate_v15_media_history.py",
+            ROOT / "scripts" / "demo" / "generate_v16_media_history.py",
             ROOT / "package" / "contents" / "ui" / "components"
             / "MediaDailyState.qml",
         )
     ).encode()
 ).hexdigest()
 if manifest["fixtureSha256"] != expected_fixture:
-    fail("manifest fixture hash does not match the v15 media fixtures")
+    fail("manifest fixture hash does not match the v16 media fixtures")
 
 source_tree_commit = manifest["sourceTreeCommit"]
 if not re.fullmatch(r"[0-9a-f]{40}", source_tree_commit):
     fail("manifest sourceTreeCommit must be a full Git object ID")
-if not os.environ.get("AI_USAGE_MONITOR_MEDIA_FORCE_FILESYSTEM"):
+source_tree_mode = manifest.get("sourceTreeMode", "git-commit")
+if source_tree_mode == "git-commit":
     expected_source_tree = committed_source_tree_sha256(source_tree_commit)
-    if manifest["sourceTreeSha256"] != expected_source_tree:
-        fail(
-            "manifest source tree hash does not match its recorded "
-            "source-tree commit"
-        )
+elif source_tree_mode == "filesystem-release-candidate":
+    expected_source_tree = filesystem_source_tree_sha256()
+else:
+    fail(f"unsupported sourceTreeMode {source_tree_mode!r}")
+if manifest["sourceTreeSha256"] != expected_source_tree:
+    fail("manifest source tree hash does not match its recorded source")
 if manifest.get("scenarios") != SCENARIOS:
-    fail("manifest scenarios do not match the v15 capture contract")
-if int(version.split(".", 1)[0]) >= 16:
-    try:
-        validate_capture_evidence(manifest.get("captureEvidence"), REQUIRED)
-    except EvidenceError as error:
-        fail(str(error))
+    fail("manifest scenarios do not match the v16 capture contract")
+try:
+    validate_capture_evidence(manifest.get("captureEvidence"), REQUIRED)
+except EvidenceError as error:
+    fail(str(error))
 
 asset_hashes: dict[str, str] = {}
 for filename in REQUIRED:

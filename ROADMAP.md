@@ -1,12 +1,15 @@
 # Roadmap
 
-**Current release:** 15.0.0, Daily Control
+**Current release:** 16.0.0, Control Loop local release candidate
 
 **Last updated:** 2026-07-26
 
-AI Usage Monitor remains a desktop-native, local-first Plasma widget. v15 makes daily status actionable while preserving the source and quality boundaries established by v13 and v14. The planned v16 Control Loop release will make the path from status to explanation and action more direct without widening the local-first boundary.
+AI Usage Monitor remains a desktop-native, local-first Plasma widget. v16 makes
+the path from status to explanation and action direct without widening the
+local-first boundary. The implementation is complete locally; public release
+surfaces remain unchanged until explicit release authorization.
 
-## Planned release
+## Release candidate
 
 ### 16.0.0 Control Loop
 
@@ -18,7 +21,8 @@ AI Usage Monitor remains a desktop-native, local-first Plasma widget. v15 makes 
 
 The decision-complete implementation plan is
 [`docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md).
-Phases 0 through 4 are implemented; the stable release remains `15.0.0`.
+Phases 0 through 5 are implemented. Publication and public readback remain
+separate release work.
 
 ## Current priorities
 
@@ -53,6 +57,7 @@ Phases 0 through 4 are implemented; the stable release remains `15.0.0`.
 
 | Release | Result |
 | --- | --- |
+| 16.0.0 Control Loop | Daily Focus, Source Detail, responsive History and Analyst, exact UTC periods, optional Anthropic Admin reporting, and reproducible release evidence |
 | 15.0.0 Daily Control | Shared daily source state, action-first Overview, truthful compact modes, retained History, evidence-bound Analyst, unified notifications, and performance/accessibility gates |
 | 14.0.0 First Successful Use | Dependency-safe startup, Guided first success, source-focused Settings, outcome-first Overview, and native Diagnostics |
 | 13.0.0 Provider Intelligence | Read-only scheduled monitoring, nullable metric contract, SQLite schema v4, Catalog v5 adapters, LiteLLM, Cerebras, Fireworks, and Perplexity |

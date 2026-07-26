@@ -14,6 +14,7 @@ set(aiusagemonitor_SRCS
     openaicompatibleprovider.cpp
     openaiprovider.cpp
     azureopenaiprovider.cpp
+    anthropicadminparser.cpp
     anthropicprovider.cpp
     googleprovider.cpp
     mistralprovider.cpp
@@ -61,6 +62,7 @@ set(aiusagemonitor_HDRS
     openaicompatibleprovider.h
     openaiprovider.h
     azureopenaiprovider.h
+    anthropicadminparser.h
     anthropicprovider.h
     googleprovider.h
     mistralprovider.h

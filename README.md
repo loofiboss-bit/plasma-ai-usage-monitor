@@ -6,7 +6,7 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **15.0.0 (Daily Control)** prioritizes the source that needs attention, the lowest live quota, and the next live reset. Actual data, local estimates, balances, fixed fees, and unavailable values remain separate from the panel through History and Analyst.
+Version **16.0.0 (Control Loop)** connects Daily Focus to source-specific evidence, actions, and compatible History. Anthropic can optionally report organization usage and cost with a separate Admin API key. Actual data, local estimates, balances, fixed fees, and unavailable values remain separate from the panel through History and Analyst.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 
@@ -96,12 +96,13 @@ Read [Understanding the data](docs/user-guide/understanding-data.md) before sett
 | --- | --- |
 | Narrow Overview | ![Narrow Overview popup with separate actual, estimated, balance, and fixed-fee data](assets/screenshots/overview-popup.png) |
 | Attention | ![Overview prioritizing a critical Codex CLI quota](assets/screenshots/attention-state.png) |
-| Quota and reset | ![Overview showing the lowest live quota and next live reset](assets/screenshots/quota-reset-state.png) |
-| Tool-only setup | ![Overview driven only by coding-tool sources](assets/screenshots/tool-only-overview.png) |
-| Retained disabled source | ![History keeping a disabled OpenAI source selectable](assets/screenshots/retained-history.png) |
+| Source Detail | ![Source Detail with freshness, quota, typed metrics, and provenance](assets/screenshots/source-detail.png) |
 | Real history gap | ![History chart with an explicit missing-data gap](assets/screenshots/history-gap.png) |
 | Analyst with sufficient data | ![Analyst snapshot with documented coverage and compatible spend](assets/screenshots/analyst-sufficient.png) |
 | Analyst with insufficient data | ![Analyst explaining unavailable results when samples are insufficient](assets/screenshots/analyst-insufficient.png) |
+| Guided setup | ![Guided first success source selection](assets/screenshots/guided-first-success.png) |
+| Provider settings | ![Source-focused provider settings](assets/screenshots/provider-settings.png) |
+| Plugin recovery | ![Native plugin recovery with matching-package instructions](assets/screenshots/plugin-recovery.png) |
 | Panel lowest quota | ![Compact panel showing the lowest provider-reported or synchronized quota](assets/screenshots/panel-lowest-quota.png) |
 
 ## Distribution notes

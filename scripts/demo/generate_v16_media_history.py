@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create isolated schema-v4 history fixtures for v15 release media."""
+"""Create isolated schema-v4 history fixtures for v16 release media."""
 
 from __future__ import annotations
 
@@ -116,7 +116,7 @@ def insert_observation(
             "organization",
             "day" if kind == "cost" else "current",
             model,
-            f"v15-media-{kind}-{observed_at.timestamp():.0f}",
+            f"v16-media-{kind}-{observed_at.timestamp():.0f}",
         ),
     )
 

@@ -10,6 +10,7 @@ CATALOG = ROOT / "package/contents/catalog/providers-v4.json"
 PROVIDER_UI = ROOT / "package/contents/ui/configProviders.qml"
 PROVIDER_DETAILS = ROOT / "package/contents/ui/ProviderSourceDetails.qml"
 PROVIDER_REGISTRY = ROOT / "package/contents/ui/ProviderRegistry.qml"
+RUNTIME_REGISTRATION = ROOT / "package/contents/ui/ProviderRuntimeRegistration.qml"
 COST_SUMMARY = ROOT / "package/contents/ui/CostSummaryCard.qml"
 
 NATIVE_BACKENDS = {
@@ -74,6 +75,15 @@ def main() -> None:
     )
     if missing_backends:
         fail(f"native provider backends are not stable in the registry: {', '.join(missing_backends)}")
+
+    runtime_registration = RUNTIME_REGISTRATION.read_text(encoding="utf-8")
+    if "providerRegistry.providerCatalog.providers" not in runtime_registration:
+        fail("provider runtime registration must iterate the authoritative catalog")
+    if "registerProviderBackend" not in runtime_registration or "registerLocalTool" not in runtime_registration:
+        fail("provider runtime registration must own provider and local-tool model wiring")
+    native_monitor = (ROOT / "package/contents/ui/NativeMonitor.qml").read_text(encoding="utf-8")
+    if "function configureSourceReadiness()" in native_monitor:
+        fail("NativeMonitor must not retain the extracted runtime registration loop")
 
     cost_summary = COST_SUMMARY.read_text(encoding="utf-8")
     if "required property var summary" not in cost_summary:

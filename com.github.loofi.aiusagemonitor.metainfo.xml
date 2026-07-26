@@ -14,8 +14,8 @@
     <p>
       AI Usage Monitor is a Plasma 6 widget for provider-reported usage and spend,
       synchronized coding-tool quota, local activity, balances, rate limits, and
-      read-only connection checks. Daily Control prioritizes the source that needs
-      attention, the lowest live quota, and the next live reset.
+      read-only connection checks. Control Loop connects one Daily Focus to
+      source-specific evidence, actions, and compatible History.
     </p>
     <p>
       The widget stores secrets in KWallet and history on the local computer. Actual
@@ -41,16 +41,8 @@
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/attention-state.png</image>
     </screenshot>
     <screenshot>
-      <caption>Lowest synchronized quota and next live reset</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/quota-reset-state.png</image>
-    </screenshot>
-    <screenshot>
-      <caption>Tool-only Overview with live and estimated data kept separate</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/tool-only-overview.png</image>
-    </screenshot>
-    <screenshot>
-      <caption>Retained history for a disabled source</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/retained-history.png</image>
+      <caption>Source Detail with freshness, quota, provenance, and typed metrics</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/source-detail.png</image>
     </screenshot>
     <screenshot>
       <caption>History chart with a real missing-data gap</caption>
@@ -65,6 +57,18 @@
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-insufficient.png</image>
     </screenshot>
     <screenshot>
+      <caption>Guided first success source selection</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/guided-first-success.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Source-focused provider settings</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/provider-settings.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Deterministic recovery for a missing native plugin</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/plugin-recovery.png</image>
+    </screenshot>
+    <screenshot>
       <caption>Compact panel showing the lowest synchronized quota</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/panel-lowest-quota.png</image>
     </screenshot>
@@ -72,6 +76,15 @@
 
   <releases>
 
+    <release version="16.0.0" date="2026-07-26">
+      <description>
+        <ul>
+          <li>Add Daily Focus and source-specific detail, actions, provenance, and History links.</li>
+          <li>Add responsive History and Analyst with exact UTC period semantics.</li>
+          <li>Add optional Anthropic Admin API organization usage and cost reporting.</li>
+        </ul>
+      </description>
+    </release>
     <release version="15.0.0" date="2026-07-23">
       <description>
         <ul>

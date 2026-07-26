@@ -4,25 +4,10 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QNetworkRequest>
-#include <QRegularExpression>
 #include <QTimeZone>
 #include <QUrlQuery>
-#include <limits>
 
 namespace {
-QDateTime utcDateTime(const QJsonValue &value) {
-  const QDateTime parsed = QDateTime::fromString(value.toString(), Qt::ISODate);
-  return parsed.isValid() ? parsed.toUTC() : QDateTime();
-}
-
-QString rowKey(const QDateTime &start, const QDateTime &end,
-               const QString &model, const QString &project,
-               const QString &tier) {
-  return start.toString(Qt::ISODateWithMs) + QLatin1Char('|') +
-         end.toString(Qt::ISODateWithMs) + QLatin1Char('|') + model +
-         QLatin1Char('|') + project + QLatin1Char('|') + tier;
-}
-
 QString capabilityName(AnthropicProvider::AdminCapability capability) {
   return capability == AnthropicProvider::AdminCapability::Usage
              ? QStringLiteral("usage")
@@ -230,8 +215,10 @@ void AnthropicProvider::handleAdminReply(AdminCapability capability,
   const bool valid =
       parseError.error == QJsonParseError::NoError && document.isObject() &&
       (capability == AdminCapability::Usage
-           ? parseUsagePage(document.object(), &m_pendingUsageRows, &diagnostic)
-           : parseCostPage(document.object(), &m_pendingCostRows, &diagnostic));
+           ? AnthropicAdminParser::parseUsagePage(
+                 document.object(), &m_pendingUsageRows, &diagnostic)
+           : AnthropicAdminParser::parseCostPage(
+                 document.object(), &m_pendingCostRows, &diagnostic));
   if (!valid) {
     reply->deleteLater();
     finishCapability(
@@ -245,29 +232,21 @@ void AnthropicProvider::handleAdminReply(AdminCapability capability,
   }
 
   const QJsonObject root = document.object();
-  const bool hasMore = root.value(QStringLiteral("has_more")).toBool();
-  const QString nextPage = root.value(QStringLiteral("next_page")).toString();
   const int pages =
       capability == AdminCapability::Usage ? m_usagePages : m_costPages;
-  if (hasMore) {
-    if (nextPage.isEmpty() || pages >= MAX_ADMIN_PAGES) {
-      reply->deleteLater();
-      finishCapability(
-          capability, false,
-          pages >= MAX_ADMIN_PAGES
-              ? i18n("Anthropic pagination exceeded the safety limit")
-              : i18n("Anthropic pagination did not provide a next-page token"),
-          ProviderErrorKind::Schema, status);
-      finalizeRefresh(generation);
-      return;
-    }
-    QUrl nextUrl = reply->url();
-    QUrlQuery query(nextUrl);
-    query.removeAllQueryItems(QStringLiteral("page"));
-    query.addQueryItem(QStringLiteral("page"), nextPage);
-    nextUrl.setQuery(query);
+  const AnthropicAdminParser::Pagination pagination =
+      AnthropicAdminParser::pagination(root, reply->url(), pages,
+                                       MAX_ADMIN_PAGES);
+  if (!pagination.valid) {
     reply->deleteLater();
-    fetchAdminPage(capability, nextUrl, generation);
+    finishCapability(capability, false, pagination.diagnostic,
+                     ProviderErrorKind::Schema, status);
+    finalizeRefresh(generation);
+    return;
+  }
+  if (!pagination.complete) {
+    reply->deleteLater();
+    fetchAdminPage(capability, pagination.nextUrl, generation);
     return;
   }
 
@@ -369,7 +348,8 @@ void AnthropicProvider::publishUsage(bool stale) {
   qint64 cacheCreation = 0;
   qint64 output = 0;
   bool prioritySeen = false;
-  for (const UsageRow &row : std::as_const(m_lastUsageRows)) {
+  for (const AnthropicAdminParser::UsageRow &row :
+       std::as_const(m_lastUsageRows)) {
     input += row.input;
     cacheRead += row.cacheRead;
     cacheCreation += row.cacheCreation;
@@ -431,7 +411,8 @@ void AnthropicProvider::publishCost(bool stale) {
   qint64 todayMicroUsd = 0;
   qint64 monthMicroUsd = 0;
   const QDate today = QDateTime::currentDateTimeUtc().date();
-  for (const CostRow &row : std::as_const(m_lastCostRows)) {
+  for (const AnthropicAdminParser::CostRow &row :
+       std::as_const(m_lastCostRows)) {
     totalMicroUsd += row.microUsd;
     if (row.periodStart.date() == today)
       todayMicroUsd += row.microUsd;
@@ -464,201 +445,6 @@ void AnthropicProvider::publishCost(bool stale) {
                     QStringLiteral("USD"), QStringLiteral("organization"),
                     QStringLiteral("month"), MetricSource::BillingApi,
                     QStringLiteral("actual"));
-}
-
-bool AnthropicProvider::parseUsagePage(const QJsonObject &root,
-                                       QList<UsageRow> *rows,
-                                       QString *diagnostic) {
-  if (!root.value(QStringLiteral("data")).isArray() ||
-      !root.value(QStringLiteral("has_more")).isBool()) {
-    *diagnostic = i18n("The Anthropic usage report is missing required fields");
-    return false;
-  }
-  QHash<QString, qsizetype> indexes;
-  for (qsizetype index = 0; index < rows->size(); ++index) {
-    const UsageRow &row = rows->at(index);
-    indexes.insert(rowKey(row.periodStart, row.periodEnd, row.model,
-                          row.project, row.serviceTier),
-                   index);
-  }
-  for (const QJsonValue &bucketValue :
-       root.value(QStringLiteral("data")).toArray()) {
-    if (!bucketValue.isObject()) {
-      *diagnostic =
-          i18n("The Anthropic usage report contains an invalid bucket");
-      return false;
-    }
-    const QJsonObject bucket = bucketValue.toObject();
-    const QDateTime start =
-        utcDateTime(bucket.value(QStringLiteral("starting_at")));
-    const QDateTime end =
-        utcDateTime(bucket.value(QStringLiteral("ending_at")));
-    if (!start.isValid() || !end.isValid() || end <= start ||
-        !bucket.value(QStringLiteral("results")).isArray()) {
-      *diagnostic = i18n("The Anthropic usage bucket has an invalid period");
-      return false;
-    }
-    for (const QJsonValue &resultValue :
-         bucket.value(QStringLiteral("results")).toArray()) {
-      if (!resultValue.isObject()) {
-        *diagnostic =
-            i18n("The Anthropic usage report contains an invalid result");
-        return false;
-      }
-      const QJsonObject result = resultValue.toObject();
-      const auto nonNegativeInteger = [&result](const QString &key,
-                                                qint64 *value) {
-        if (!result.value(key).isDouble())
-          return false;
-        *value = result.value(key).toInteger(-1);
-        return *value >= 0;
-      };
-      qint64 uncached = 0;
-      qint64 cacheRead = 0;
-      qint64 output = 0;
-      if (!nonNegativeInteger(QStringLiteral("uncached_input_tokens"),
-                              &uncached) ||
-          !nonNegativeInteger(QStringLiteral("cache_read_input_tokens"),
-                              &cacheRead) ||
-          !nonNegativeInteger(QStringLiteral("output_tokens"), &output)) {
-        *diagnostic =
-            i18n("The Anthropic usage report contains invalid token totals");
-        return false;
-      }
-      qint64 cacheCreation = 0;
-      const QJsonObject creation =
-          result.value(QStringLiteral("cache_creation")).toObject();
-      for (auto it = creation.constBegin(); it != creation.constEnd(); ++it) {
-        if (!it.value().isDouble() || it.value().toInteger(-1) < 0) {
-          *diagnostic =
-              i18n("The Anthropic usage report contains invalid cache totals");
-          return false;
-        }
-        cacheCreation += it.value().toInteger();
-      }
-      UsageRow row;
-      row.periodStart = start;
-      row.periodEnd = end;
-      row.model = result.value(QStringLiteral("model")).toString();
-      row.project = result.value(QStringLiteral("workspace_id")).toString();
-      row.serviceTier = result.value(QStringLiteral("service_tier")).toString();
-      row.input = uncached;
-      row.cacheRead = cacheRead;
-      row.cacheCreation = cacheCreation;
-      row.output = output;
-      const QString key =
-          rowKey(start, end, row.model, row.project, row.serviceTier);
-      if (indexes.contains(key)) {
-        UsageRow &existing = (*rows)[indexes.value(key)];
-        existing.input += row.input;
-        existing.cacheRead += row.cacheRead;
-        existing.cacheCreation += row.cacheCreation;
-        existing.output += row.output;
-      } else {
-        indexes.insert(key, rows->size());
-        rows->append(row);
-      }
-    }
-  }
-  return true;
-}
-
-bool AnthropicProvider::parseCostPage(const QJsonObject &root,
-                                      QList<CostRow> *rows,
-                                      QString *diagnostic) {
-  if (!root.value(QStringLiteral("data")).isArray() ||
-      !root.value(QStringLiteral("has_more")).isBool()) {
-    *diagnostic = i18n("The Anthropic cost report is missing required fields");
-    return false;
-  }
-  QHash<QString, qsizetype> indexes;
-  for (qsizetype index = 0; index < rows->size(); ++index) {
-    const CostRow &row = rows->at(index);
-    indexes.insert(rowKey(row.periodStart, row.periodEnd, row.model,
-                          row.project, row.serviceTier),
-                   index);
-  }
-  for (const QJsonValue &bucketValue :
-       root.value(QStringLiteral("data")).toArray()) {
-    if (!bucketValue.isObject()) {
-      *diagnostic =
-          i18n("The Anthropic cost report contains an invalid bucket");
-      return false;
-    }
-    const QJsonObject bucket = bucketValue.toObject();
-    const QDateTime start =
-        utcDateTime(bucket.value(QStringLiteral("starting_at")));
-    const QDateTime end =
-        utcDateTime(bucket.value(QStringLiteral("ending_at")));
-    if (!start.isValid() || !end.isValid() || end <= start ||
-        !bucket.value(QStringLiteral("results")).isArray()) {
-      *diagnostic = i18n("The Anthropic cost bucket has an invalid period");
-      return false;
-    }
-    for (const QJsonValue &resultValue :
-         bucket.value(QStringLiteral("results")).toArray()) {
-      const QJsonObject result = resultValue.toObject();
-      qint64 microUsd = 0;
-      if (!resultValue.isObject() ||
-          result.value(QStringLiteral("currency")).toString().toUpper() !=
-              QLatin1String("USD") ||
-          !result.value(QStringLiteral("amount")).isString() ||
-          !parseMicroUsd(result.value(QStringLiteral("amount")).toString(),
-                         &microUsd)) {
-        *diagnostic =
-            i18n("The Anthropic cost report contains an invalid amount");
-        return false;
-      }
-      CostRow row;
-      row.periodStart = start;
-      row.periodEnd = end;
-      row.model = result.value(QStringLiteral("model")).toString();
-      row.project = result.value(QStringLiteral("workspace_id")).toString();
-      row.serviceTier = result.value(QStringLiteral("service_tier")).toString();
-      row.microUsd = microUsd;
-      const QString key =
-          rowKey(start, end, row.model, row.project, row.serviceTier);
-      if (indexes.contains(key))
-        (*rows)[indexes.value(key)].microUsd += microUsd;
-      else {
-        indexes.insert(key, rows->size());
-        rows->append(row);
-      }
-    }
-  }
-  return true;
-}
-
-bool AnthropicProvider::parseMicroUsd(const QString &fractionalCents,
-                                      qint64 *microUsd) {
-  static const QRegularExpression pattern(
-      QStringLiteral("^([+-]?)([0-9]+)(?:\\.([0-9]+))?$"));
-  const QRegularExpressionMatch match =
-      pattern.match(fractionalCents.trimmed());
-  if (!match.hasMatch())
-    return false;
-  bool ok = false;
-  const quint64 whole = match.captured(2).toULongLong(&ok);
-  if (!ok ||
-      whole > static_cast<quint64>(std::numeric_limits<qint64>::max() / 10'000))
-    return false;
-  QString fraction = match.captured(3);
-  const bool roundUp =
-      fraction.size() > 4 && fraction.at(4) >= QLatin1Char('5');
-  fraction = fraction.left(4).leftJustified(4, QLatin1Char('0'));
-  quint64 value = whole * 10'000;
-  value += fraction.isEmpty() ? 0 : fraction.toULongLong(&ok);
-  if (!ok || (roundUp && value == static_cast<quint64>(
-                                      std::numeric_limits<qint64>::max())))
-    return false;
-  if (roundUp)
-    ++value;
-  if (value > static_cast<quint64>(std::numeric_limits<qint64>::max()))
-    return false;
-  *microUsd = match.captured(1) == QLatin1String("-")
-                  ? -static_cast<qint64>(value)
-                  : static_cast<qint64>(value);
-  return true;
 }
 
 void AnthropicProvider::countTokensDiagnostic() {

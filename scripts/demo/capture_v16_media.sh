@@ -9,7 +9,7 @@ PREFIX="${SESSION_ROOT}/prefix"
 CONFIG_HOME="${SESSION_ROOT}/config"
 CACHE_HOME="${SESSION_ROOT}/cache"
 EVIDENCE_JSONL="${SESSION_ROOT}/capture-evidence.jsonl"
-KWIN_SCRIPT_NAME="ai-usage-monitor-v15-capture"
+KWIN_SCRIPT_NAME="ai-usage-monitor-v16-capture"
 WINDOW_PID=""
 SERVER_PID=""
 NESTED_PID=""
@@ -129,6 +129,7 @@ capture_view() {
   local view_cache_home="${CACHE_HOME}/${view}"
   local view_data_home="${SESSION_ROOT}/data/${view}"
   local view_home="${SESSION_ROOT}/home/${view}"
+  local view_qml_path="$QML_PATH"
   local layout_script="$ROOT_DIR/scripts/demo/kwin_capture_layout.js"
   local match_query="AI Usage Monitor"
   local accessible_marker="Overview view ready"
@@ -141,22 +142,22 @@ capture_view() {
   fi
   case "$view" in
     media-history-retained)
-      python3 "$ROOT_DIR/scripts/demo/generate_v15_media_history.py" \
+      python3 "$ROOT_DIR/scripts/demo/generate_v16_media_history.py" \
         --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
         --scenario retained
       ;;
     media-history-gap)
-      python3 "$ROOT_DIR/scripts/demo/generate_v15_media_history.py" \
+      python3 "$ROOT_DIR/scripts/demo/generate_v16_media_history.py" \
         --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
         --scenario gap
       ;;
     media-analyst-sufficient)
-      python3 "$ROOT_DIR/scripts/demo/generate_v15_media_history.py" \
+      python3 "$ROOT_DIR/scripts/demo/generate_v16_media_history.py" \
         --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
         --scenario analyst-sufficient
       ;;
     media-analyst-insufficient)
-      python3 "$ROOT_DIR/scripts/demo/generate_v15_media_history.py" \
+      python3 "$ROOT_DIR/scripts/demo/generate_v16_media_history.py" \
         --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
         --scenario analyst-insufficient
       ;;
@@ -164,6 +165,13 @@ capture_view() {
   case "$view" in
     media-history-*) accessible_marker="History view ready" ;;
     media-analyst-*) accessible_marker="Analyst view ready" ;;
+    media-source-detail) accessible_marker="Back to source list" ;;
+    onboarding-*) accessible_marker="Guided first success" ;;
+    settings) accessible_marker="Providers" ;;
+    plugin-recovery)
+      accessible_marker="The native plugin is older than the widget"
+      view_qml_path="$ROOT_DIR/scripts/fixtures/bootstrap/plugin-older:$QML_PATH"
+      ;;
   esac
   cp /usr/share/color-schemes/BreezeDark.colors "$view_config_home/kdeglobals"
   XDG_CONFIG_HOME="$view_config_home" kwriteconfig6 \
@@ -176,8 +184,8 @@ capture_view() {
   XDG_DATA_DIRS="$PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \
   XDG_CONFIG_HOME="$view_config_home" \
   XDG_CACHE_HOME="$view_cache_home" \
-  QML_IMPORT_PATH="$QML_PATH" \
-  QML2_IMPORT_PATH="$QML_PATH" \
+  QML_IMPORT_PATH="$view_qml_path" \
+  QML2_IMPORT_PATH="$view_qml_path" \
   KDE_COLOR_SCHEME_PATH="/usr/share/color-schemes/BreezeDark.colors" \
   PLASMA_AI_MONITOR_DEMO=1 \
   PLASMA_AI_MONITOR_SMOKE_VIEW="$view" \
@@ -298,6 +306,7 @@ capture_panel() {
   local panel_cache_home="${CACHE_HOME}/panel"
   local panel_data_home="${SESSION_ROOT}/panel-data"
   local panel_home="${SESSION_ROOT}/home/panel"
+  local panel_runtime_dir="${SESSION_ROOT}/panel-runtime"
   local nested_pid_file="${SESSION_ROOT}/nested-kwin.pid"
   local panel_pid_file="${SESSION_ROOT}/nested-plasmashell.pid"
   local nested_bus_file="${SESSION_ROOT}/nested-dbus-address"
@@ -308,14 +317,17 @@ capture_panel() {
   local height
   local cropped_height
 
-  mkdir -p "$panel_config_home" "$panel_cache_home" "$panel_data_home" "$panel_home"
+  mkdir -p "$panel_config_home" "$panel_cache_home" "$panel_data_home" \
+    "$panel_home" "$panel_runtime_dir"
+  chmod 700 "$panel_runtime_dir"
   cp /usr/share/color-schemes/BreezeDark.colors "$panel_config_home/kdeglobals"
   XDG_CONFIG_HOME="$panel_config_home" kwriteconfig6 \
     --file kdeglobals --group General --key ColorScheme BreezeDark
   XDG_CONFIG_HOME="$panel_config_home" kwriteconfig6 \
     --file plasmarc --group Theme --key name breeze-dark
 
-  panel_script='var existing = panels(); for (var i = 0; i < existing.length; ++i) existing[i].remove(); var desktopsList = desktops(); for (var d = 0; d < desktopsList.length; ++d) { var widgets = desktopsList[d].widgets(); for (var w = 0; w < widgets.length; ++w) widgets[w].remove(); desktopsList[d].wallpaperPlugin = "org.kde.color"; desktopsList[d].currentConfigGroup = ["Wallpaper", "org.kde.color", "General"]; desktopsList[d].writeConfig("Color", "32,35,38"); } var panel = new Panel; panel.location = "bottom"; panel.height = 58; panel.addWidget("org.kde.plasma.kickoff"); var monitor = panel.addWidget("com.github.loofi.aiusagemonitor"); monitor.currentConfigGroup = ["General"]; monitor.writeConfig("compactDisplayMode", "lowest-quota"); panel.addWidget("org.kde.plasma.panelspacer"); panel.addWidget("org.kde.plasma.digitalclock");'
+  magick -size 1600x900 'xc:#202326' "$panel_home/wallpaper.png"
+  panel_script="var existing = panels(); for (var i = 0; i < existing.length; ++i) existing[i].remove(); var desktopsList = desktops(); for (var d = 0; d < desktopsList.length; ++d) { var widgets = desktopsList[d].widgets(); for (var w = 0; w < widgets.length; ++w) widgets[w].remove(); desktopsList[d].wallpaperPlugin = \"org.kde.image\"; desktopsList[d].currentConfigGroup = [\"Wallpaper\", \"org.kde.image\", \"General\"]; desktopsList[d].writeConfig(\"Image\", \"file://${panel_home}/wallpaper.png\"); } var panel = new Panel; panel.location = \"bottom\"; panel.height = 58; panel.addWidget(\"org.kde.plasma.kickoff\"); var monitor = panel.addWidget(\"com.github.loofi.aiusagemonitor\"); monitor.currentConfigGroup = [\"General\"]; monitor.writeConfig(\"compactDisplayMode\", \"lowest-quota\"); panel.addWidget(\"org.kde.plasma.panelspacer\"); panel.addWidget(\"org.kde.plasma.digitalclock\");"
 
   # The quoted script expands its variables inside the isolated D-Bus session.
   # shellcheck disable=SC2016
@@ -325,6 +337,8 @@ capture_panel() {
     XDG_DATA_DIRS="$PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \
     XDG_CONFIG_HOME="$panel_config_home" \
     XDG_CACHE_HOME="$panel_cache_home" \
+    WAYLAND_DISPLAY="${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY}" \
+    XDG_RUNTIME_DIR="$panel_runtime_dir" \
     QML_IMPORT_PATH="$QML_PATH" \
     QML2_IMPORT_PATH="$QML_PATH" \
     KDE_COLOR_SCHEME_PATH="/usr/share/color-schemes/BreezeDark.colors" \
@@ -333,6 +347,9 @@ capture_panel() {
     QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 \
     QT_ACCESSIBILITY=1 \
     bash -c '
+      /usr/libexec/at-spi-bus-launcher --launch-immediately --a11y=1 >/dev/null 2>&1 &
+      sleep 1
+      /usr/libexec/at-spi2-registryd --dbus-name org.a11y.atspi.Registry >/dev/null 2>&1 &
       kwin_wayland --wayland-display "$WAYLAND_DISPLAY" -s "$1" \
         --width 1600 --height 900 --scale 1 --xwayland --no-lockscreen \
         --no-global-shortcuts --exit-with-session /usr/bin/plasmashell &
@@ -361,7 +378,10 @@ capture_panel() {
   NESTED_PID=$!
 
   for _ in {1..55}; do
-    rg -q '^PANEL_READY$' "${SESSION_ROOT}/panel.log" && break
+    if rg -q '^PANEL_READY$' "${SESSION_ROOT}/panel.log" \
+        && rg -q '^PANEL_ACCESSIBLE_READY$' "${SESSION_ROOT}/panel.log"; then
+      break
+    fi
     kill -0 "$NESTED_PID" 2>/dev/null || {
       echo "Nested Plasma session exited before panel capture" >&2
       sed -n '1,180p' "${SESSION_ROOT}/panel.log" >&2
@@ -429,7 +449,9 @@ capture_panel() {
     echo "Nested panel capture is too short: ${width}x${height}" >&2
     exit 1
   }
-  magick "$raw" -gravity South -crop "${width}x${cropped_height}+0+0" \
+  magick "$raw" -fill '#202326' \
+    -draw "rectangle 0,0 ${width},$((height - 70))" \
+    -gravity South -crop "${width}x${cropped_height}+0+0" \
     +repage -resize '1600x900>' "$temporary"
   unlink "$raw"
 
@@ -452,12 +474,13 @@ capture_panel() {
 
 capture_view media-overview overview-popup.png 6 narrow
 capture_view media-attention attention-state.png 5
-capture_view media-quota quota-reset-state.png 5
-capture_view media-tool-only tool-only-overview.png 5
-capture_view media-history-retained retained-history.png 10
+capture_view media-source-detail source-detail.png 6
 capture_view media-history-gap history-gap.png 10
 capture_view media-analyst-sufficient analyst-sufficient.png 6
 capture_view media-analyst-insufficient analyst-insufficient.png 6
+capture_view onboarding-source guided-first-success.png 6
+capture_view settings provider-settings.png 7
+capture_view plugin-recovery plugin-recovery.png 6
 capture_panel
 
 SESSION_ID="$(cat /proc/sys/kernel/random/uuid)"
@@ -465,7 +488,7 @@ FIXTURE_SHA="$(
   cd "$ROOT_DIR"
   sha256sum \
     scripts/demo/showcase_preset.json \
-    scripts/demo/generate_v15_media_history.py \
+    scripts/demo/generate_v16_media_history.py \
     package/contents/ui/components/MediaDailyState.qml \
     | sha256sum | cut -d' ' -f1
 )"
@@ -480,13 +503,17 @@ SOURCE_TREE_SHA="$(
 )"
 CAPTURE_COMMIT="${CAPTURE_COMMIT:-$(git -C "$ROOT_DIR" rev-parse HEAD)}"
 SOURCE_TREE_COMMIT="${SOURCE_TREE_COMMIT:-$CAPTURE_COMMIT}"
+SOURCE_TREE_MODE="git-commit"
+if [[ -n "$(git -C "$ROOT_DIR" status --short -- VERSION package scripts/demo)" ]]; then
+  SOURCE_TREE_MODE="filesystem-release-candidate"
+fi
 CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 PLASMA_VERSION="$(plasmashell --version | awk '{print $2}')"
 ASSETS_JSON="$(
   for filename in \
-    overview-popup.png attention-state.png quota-reset-state.png \
-    tool-only-overview.png retained-history.png history-gap.png \
-    analyst-sufficient.png analyst-insufficient.png panel-lowest-quota.png; do
+    overview-popup.png attention-state.png source-detail.png history-gap.png \
+    analyst-sufficient.png analyst-insufficient.png guided-first-success.png \
+    provider-settings.png plugin-recovery.png panel-lowest-quota.png; do
     sha256sum "${OUTPUT_DIR}/${filename}"
   done | jq -Rn '[inputs | split("  ") | {(.[1] | split("/") | last): .[0]}] | add'
 )"
@@ -501,6 +528,7 @@ jq -n \
   --arg fixtureSha256 "$FIXTURE_SHA" \
   --arg sourceTreeSha256 "$SOURCE_TREE_SHA" \
   --arg sourceTreeCommit "$SOURCE_TREE_COMMIT" \
+  --arg sourceTreeMode "$SOURCE_TREE_MODE" \
   --arg plasmaSession "Fedora KDE Plasma" \
   --arg theme "Breeze Dark" \
   --arg environment "isolated demo user" \
@@ -513,6 +541,7 @@ jq -n \
   '{version: $version, sessionId: $sessionId, fixtureSha256: $fixtureSha256,
     sourceTreeSha256: $sourceTreeSha256,
     sourceTreeCommit: $sourceTreeCommit,
+    sourceTreeMode: $sourceTreeMode,
     plasmaSession: $plasmaSession, theme: $theme, environment: $environment,
     captureCommit: $captureCommit, capturedAt: $capturedAt,
     plasmaVersion: $plasmaVersion, scale: $scale,
@@ -520,16 +549,17 @@ jq -n \
     scenarios: {
       "overview-popup.png": "media-overview",
       "attention-state.png": "media-attention",
-      "quota-reset-state.png": "media-quota",
-      "tool-only-overview.png": "media-tool-only",
-      "retained-history.png": "media-history-retained",
+      "source-detail.png": "media-source-detail",
       "history-gap.png": "media-history-gap",
       "analyst-sufficient.png": "media-analyst-sufficient",
       "analyst-insufficient.png": "media-analyst-insufficient",
+      "guided-first-success.png": "onboarding-source",
+      "provider-settings.png": "settings",
+      "plugin-recovery.png": "plugin-recovery",
       "panel-lowest-quota.png": "media-panel"
     },
     assets: $assets}' \
-  >"${OUTPUT_DIR}/v15-media-manifest.json"
+  >"${OUTPUT_DIR}/v16-media-manifest.json"
 
 python3 "$ROOT_DIR/scripts/check_release_media.py"
-echo "v15 media capture complete: $OUTPUT_DIR"
+echo "v16 media capture complete: $OUTPUT_DIR"

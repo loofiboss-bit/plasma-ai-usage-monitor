@@ -1,10 +1,8 @@
 #ifndef ANTHROPICPROVIDER_H
 #define ANTHROPICPROVIDER_H
 
+#include "anthropicadminparser.h"
 #include "providerbackend.h"
-
-#include <QHash>
-#include <QJsonObject>
 
 class AnthropicProvider : public ProviderBackend {
   Q_OBJECT
@@ -35,27 +33,6 @@ Q_SIGNALS:
   void credentialsChanged();
 
 private:
-  struct UsageRow {
-    QDateTime periodStart;
-    QDateTime periodEnd;
-    QString model;
-    QString project;
-    QString serviceTier;
-    qint64 input = 0;
-    qint64 cacheRead = 0;
-    qint64 cacheCreation = 0;
-    qint64 output = 0;
-  };
-
-  struct CostRow {
-    QDateTime periodStart;
-    QDateTime periodEnd;
-    QString model;
-    QString project;
-    QString serviceTier;
-    qint64 microUsd = 0;
-  };
-
   void fetchModels(int generation);
   void fetchRateLimits(int generation);
   void fetchAdminPage(AdminCapability capability, const QUrl &url,
@@ -74,18 +51,12 @@ private:
   void publishCost(bool stale);
   QUrl adminUrl(AdminCapability capability, int days) const;
 
-  static bool parseUsagePage(const QJsonObject &root, QList<UsageRow> *rows,
-                             QString *diagnostic);
-  static bool parseCostPage(const QJsonObject &root, QList<CostRow> *rows,
-                            QString *diagnostic);
-  static bool parseMicroUsd(const QString &fractionalCents, qint64 *microUsd);
-
   QString m_model = QStringLiteral("claude-sonnet-4-20250514");
   QString m_adminApiKey;
-  QList<UsageRow> m_pendingUsageRows;
-  QList<CostRow> m_pendingCostRows;
-  QList<UsageRow> m_lastUsageRows;
-  QList<CostRow> m_lastCostRows;
+  QList<AnthropicAdminParser::UsageRow> m_pendingUsageRows;
+  QList<AnthropicAdminParser::CostRow> m_pendingCostRows;
+  QList<AnthropicAdminParser::UsageRow> m_lastUsageRows;
+  QList<AnthropicAdminParser::CostRow> m_lastCostRows;
   bool m_connectivityPending = false;
   bool m_usagePending = false;
   bool m_costPending = false;

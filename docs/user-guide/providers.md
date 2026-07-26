@@ -21,6 +21,21 @@ Use HTTPS for remote endpoints. Plain HTTP is accepted only for loopback develop
 
 OpenAI usage and cost endpoints require an Admin API key. A normal project key can return a permission error even when it works for inference. The optional project ID narrows usage to one project.
 
+### Anthropic
+
+Anthropic uses two independent credentials. A standard API key verifies model
+access. An optional Admin API key reads organization message-usage and cost
+reports. Configure either credential or both; adding the Admin key never
+replaces the standard key.
+
+The scheduled Admin requests are read-only. Startup, manual verification, and
+credential changes may backfill at most 31 UTC daily buckets; normal refreshes
+cover the current and previous UTC day and run no more often than every five
+minutes. Usage and cost can succeed independently. Partial or failed refreshes
+keep the previous value visibly stale instead of replacing it with zero.
+Anthropic cost is parsed as integer micro-USD, and model/workspace scopes remain
+attached to their observations.
+
 ### OpenRouter
 
 OpenRouter reads key usage and remaining-limit fields from its key endpoint. The values belong to the configured key and may not represent every key in the account.
@@ -35,7 +50,7 @@ DeepSeek combines model discovery with the account balance endpoint. Balance is 
 
 ## Connectivity-only providers
 
-Anthropic, Gemini, Mistral, Groq, xAI, Ollama Cloud, Together, Cohere, Google Veo, Azure OpenAI, AWS Bedrock, Cerebras, Fireworks, and Perplexity may confirm credentials or model access without returning account usage or billing.
+Gemini, Mistral, Groq, xAI, Ollama Cloud, Together, Cohere, Google Veo, Azure OpenAI, AWS Bedrock, Cerebras, Fireworks, and Perplexity may confirm credentials or model access without returning account usage or billing. Anthropic remains connectivity-only when only its standard key is configured.
 
 Perplexity's current model discovery is public, so the card can prove endpoint availability without a key. It still cannot infer account usage from that response.
 
@@ -58,7 +73,7 @@ The runtime-generated [capability matrix](../provider-capabilities.md) lists eve
 ## Connection errors
 
 - **401:** the key is missing, expired, revoked, or sent to the wrong endpoint.
-- **403:** the key lacks the required role or account permission. OpenAI account usage commonly fails here when the key is not an Admin key.
+- **403:** the key lacks the required role or account permission. OpenAI and Anthropic account reporting require their respective Admin credentials.
 - **404:** the base URL, API version, deployment, or model is wrong.
 - **429:** the provider rate-limited the request. The scheduler honors retry guidance and backs off.
 - **TLS or host error:** remove a custom base URL and retry the default endpoint.

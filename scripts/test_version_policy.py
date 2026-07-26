@@ -44,20 +44,23 @@ with tempfile.TemporaryDirectory(prefix="ai-monitor-version-policy-") as temp:
     if baseline.returncode != 0:
         raise SystemExit(baseline.stdout + baseline.stderr)
 
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    major = int(version.split(".", 1)[0])
+    previous = f"{major - 1}.0.0"
     mutations = {
-        "roadmap": ("ROADMAP.md", "**Current release:** 15.0.0", "**Current release:** 14.0.0"),
-        "security": ("SECURITY.md", "| 15.x | Supported |", "| 15.x | Unsupported |"),
-        "metadata": ("package/metadata.json", '"Version": "15.0.0"', '"Version": "14.0.0"'),
+        "roadmap": ("ROADMAP.md", f"**Current release:** {version}", f"**Current release:** {previous}"),
+        "security": ("SECURITY.md", f"| {major}.x | Supported |", f"| {major}.x | Unsupported |"),
+        "metadata": ("package/metadata.json", f'"Version": "{version}"', f'"Version": "{previous}"'),
         "appstream": (
             "com.github.loofi.aiusagemonitor.metainfo.xml",
-            '<release version="15.0.0"',
-            '<release version="14.0.0"',
+            f'<release version="{version}"',
+            f'<release version="{previous}"',
         ),
-        "rpm": ("plasma-ai-usage-monitor.spec", "Version:        15.0.0", "Version:        14.0.0"),
+        "rpm": ("plasma-ai-usage-monitor.spec", f"Version:        {version}", f"Version:        {previous}"),
         "catalog": (
             "package/contents/catalog/providers-v4.json",
-            '"release": "15.0.0"',
-            '"release": "14.0.0"',
+            f'"release": "{version}"',
+            f'"release": "{previous}"',
         ),
     }
     for label, (relative, before, after) in mutations.items():

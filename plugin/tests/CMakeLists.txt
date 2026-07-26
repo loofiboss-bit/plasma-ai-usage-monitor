@@ -15,6 +15,7 @@ set(TEST_PROVIDER_SRC
     ${CMAKE_SOURCE_DIR}/plugin/openaicompatibleprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/openaiprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/azureopenaiprovider.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/anthropicadminparser.cpp
     ${CMAKE_SOURCE_DIR}/plugin/anthropicprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/cohereprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/deepseekprovider.cpp
@@ -127,6 +128,18 @@ target_link_libraries(test_providers_mocked_http
 )
 
 add_test(NAME providers_mocked_http COMMAND test_providers_mocked_http)
+
+add_executable(test_anthropicadminparser
+    test_anthropicadminparser.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/anthropicadminparser.cpp
+)
+target_include_directories(test_anthropicadminparser
+    PRIVATE ${CMAKE_SOURCE_DIR}/plugin
+)
+target_link_libraries(test_anthropicadminparser
+    PRIVATE Qt6::Core Qt6::Test KF6::I18n
+)
+add_test(NAME anthropicadminparser COMMAND test_anthropicadminparser)
 
 # --- Subscription tools test (from remote) ---
 add_executable(test_subscription_tools

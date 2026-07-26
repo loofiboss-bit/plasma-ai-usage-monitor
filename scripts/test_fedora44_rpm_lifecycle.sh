@@ -32,39 +32,77 @@ run_lifecycle() {
     -e EXPECTED_CANDIDATE="$expected_candidate" \
     "$image" bash -lc '
       set -euo pipefail
-      dnf install -y /rpms/base.rpm
+      dnf install -y --setopt=install_weak_deps=False /rpms/base.rpm
+      dnf install -y --setopt=install_weak_deps=False sqlite
       test "$(rpm -q --qf "%{VERSION}-%{RELEASE}" plasma-ai-usage-monitor)" = "$EXPECTED_BASE"
       install -d /root/.local/share/plasma-ai-usage-monitor /root/.local/share/kwalletd /root/.config
-      printf "base-history-fixture\n" > /root/.local/share/plasma-ai-usage-monitor/usage_history.db
-      printf "base-config-fixture\n" > /root/.config/plasma-org.kde.plasma.desktop-appletsrc
+      history_db=/root/.local/share/plasma-ai-usage-monitor/usage_history.db
+      sqlite3 "$history_db" <<SQL
+PRAGMA user_version = 4;
+CREATE TABLE observations (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  provider TEXT NOT NULL,
+  observed_at_utc DATETIME NOT NULL,
+  metric_kind TEXT NOT NULL,
+  unit TEXT NOT NULL,
+  value REAL NULL,
+  semantic TEXT NOT NULL,
+  source TEXT NOT NULL,
+  data_quality TEXT NOT NULL,
+  scope TEXT NOT NULL,
+  window TEXT NOT NULL,
+  correlation_id TEXT NOT NULL
+);
+INSERT INTO observations
+  (provider, observed_at_utc, metric_kind, unit, value, semantic, source,
+   data_quality, scope, window, correlation_id)
+VALUES
+  (1, 1, 1, 1, NULL, 1, 1, 1, 1, 1, 1),
+  (1, 2, 1, 1, 0, 1, 1, 1, 1, 1, 2);
+SQL
+      cat > /root/.config/plasma-org.kde.plasma.desktop-appletsrc <<CONFIG
+[Containments][1][Applets][1][Configuration][General]
+historyEnabled=true
+openaiEnabled=true
+compactMode=lowestQuota
+CONFIG
       printf "base-wallet-fixture\n" > /root/.local/share/kwalletd/kdewallet.kwl
       fixture_hashes="$(sha256sum \
-        /root/.local/share/plasma-ai-usage-monitor/usage_history.db \
+        "$history_db" \
         /root/.config/plasma-org.kde.plasma.desktop-appletsrc \
         /root/.local/share/kwalletd/kdewallet.kwl)"
 
       assert_user_data() {
         test "$fixture_hashes" = "$(sha256sum \
-          /root/.local/share/plasma-ai-usage-monitor/usage_history.db \
+          "$history_db" \
           /root/.config/plasma-org.kde.plasma.desktop-appletsrc \
           /root/.local/share/kwalletd/kdewallet.kwl)"
+        test "$(sqlite3 "$history_db" "PRAGMA user_version")" = 4
+        test "$(sqlite3 "$history_db" \
+          "SELECT value IS NULL FROM observations WHERE id = 1")" = 1
+        test "$(sqlite3 "$history_db" \
+          "SELECT value = 0 FROM observations WHERE id = 2")" = 1
+        grep -Fq "historyEnabled=true" /root/.config/plasma-org.kde.plasma.desktop-appletsrc
+        grep -Fxq "base-wallet-fixture" /root/.local/share/kwalletd/kdewallet.kwl
       }
 
-      dnf install -y /rpms/candidate.rpm
+      dnf install -y --setopt=install_weak_deps=False /rpms/candidate.rpm
       test "$(rpm -q --qf "%{VERSION}-%{RELEASE}" plasma-ai-usage-monitor)" = "$EXPECTED_CANDIDATE"
       assert_user_data
       test -f /usr/share/plasma/plasmoids/com.github.loofi.aiusagemonitor/metadata.json
       test -f /usr/lib64/qt6/qml/com/github/loofi/aiusagemonitor/libaiusagemonitorplugin.so
-      dnf downgrade -y /rpms/base.rpm
+      grep -Fq "\"Id\": \"com.github.loofi.aiusagemonitor\"" \
+        /usr/share/plasma/plasmoids/com.github.loofi.aiusagemonitor/metadata.json
+      dnf downgrade -y --setopt=install_weak_deps=False /rpms/base.rpm
       test "$(rpm -q --qf "%{VERSION}-%{RELEASE}" plasma-ai-usage-monitor)" = "$EXPECTED_BASE"
       assert_user_data
-      dnf install -y /rpms/candidate.rpm
+      dnf install -y --setopt=install_weak_deps=False /rpms/candidate.rpm
       test "$(rpm -q --qf "%{VERSION}-%{RELEASE}" plasma-ai-usage-monitor)" = "$EXPECTED_CANDIDATE"
       assert_user_data
       dnf remove -y --no-autoremove plasma-ai-usage-monitor
       ! rpm -q plasma-ai-usage-monitor
       assert_user_data
-      dnf install -y /rpms/candidate.rpm
+      dnf install -y --setopt=install_weak_deps=False /rpms/candidate.rpm
       test "$(rpm -q --qf "%{VERSION}-%{RELEASE}" plasma-ai-usage-monitor)" = "$EXPECTED_CANDIDATE"
       assert_user_data
       dnf remove -y --no-autoremove plasma-ai-usage-monitor
@@ -80,7 +118,7 @@ run_clean_install() {
     "$image" bash -lc '
       set -euo pipefail
       ! rpm -q plasma-ai-usage-monitor
-      dnf install -y /rpms/candidate.rpm
+      dnf install -y --setopt=install_weak_deps=False /rpms/candidate.rpm
       test "$(rpm -q --qf "%{VERSION}-%{RELEASE}" plasma-ai-usage-monitor)" = "$EXPECTED_CANDIDATE"
       test -f /usr/share/plasma/plasmoids/com.github.loofi.aiusagemonitor/metadata.json
       test -f /usr/lib64/qt6/qml/com/github/loofi/aiusagemonitor/libaiusagemonitorplugin.so
@@ -89,7 +127,7 @@ run_clean_install() {
       dnf remove -y --no-autoremove plasma-ai-usage-monitor
       ! rpm -q plasma-ai-usage-monitor
       grep -Fxq "clean-install-history" /root/.local/share/plasma-ai-usage-monitor/usage_history.db
-      dnf install -y /rpms/candidate.rpm
+      dnf install -y --setopt=install_weak_deps=False /rpms/candidate.rpm
       test "$(rpm -q --qf "%{VERSION}-%{RELEASE}" plasma-ai-usage-monitor)" = "$EXPECTED_CANDIDATE"
       grep -Fxq "clean-install-history" /root/.local/share/plasma-ai-usage-monitor/usage_history.db
     '

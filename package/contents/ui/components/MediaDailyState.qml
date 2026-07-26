@@ -8,7 +8,8 @@ QtObject {
     readonly property bool active: AppInfo.demoMode
         && scenario.indexOf("media-") === 0
         && ["media-overview", "media-attention", "media-quota",
-            "media-tool-only", "media-panel"].indexOf(scenario) >= 0
+            "media-tool-only", "media-panel",
+            "media-source-detail"].indexOf(scenario) >= 0
     readonly property var rows: buildRows()
     readonly property var summary: buildSummary()
 
@@ -80,6 +81,38 @@ QtObject {
         openRouter.primaryMetricValue = 0.42;
         openRouter.primaryMetricUnit = "currency";
         openRouter.currency = "USD";
+        openRouter.historyDbName = "OpenRouter";
+        if (scenario === "media-source-detail") {
+            openRouter.quotaWindows = [{
+                kind: "credits",
+                window: "account",
+                percentUsed: 63,
+                percentRemaining: 37,
+                sourceClass: "actual",
+                sourceKey: "usage_api",
+                resetAt: resetAt(12)
+            }];
+            openRouter.detailMetrics = [
+                {
+                    kind: "cost", available: true, value: 0.42,
+                    unit: "USD", currency: "USD", source: "usage_api",
+                    quality: "actual", semantic: "spend",
+                    scope: "key", window: "day", resetAt: ""
+                },
+                {
+                    kind: "requests", available: true, value: 184,
+                    unit: "request", currency: "", source: "usage_api",
+                    quality: "actual", semantic: "usage",
+                    scope: "key", window: "day", resetAt: ""
+                },
+                {
+                    kind: "tokens", available: false, value: undefined,
+                    unit: "token", currency: "", source: "unavailable",
+                    quality: "unavailable", semantic: "usage",
+                    scope: "key", window: "day", resetAt: ""
+                }
+            ];
+        }
 
         var deepSeek = baseRow("deepseek", "DeepSeek", "provider", "balance");
         deepSeek.monitoringLevel = "balance";

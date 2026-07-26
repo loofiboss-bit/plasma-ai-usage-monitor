@@ -14,9 +14,19 @@ AI Usage Monitor is local-first. It has no telemetry, account service, hosted da
 
 Configuration exports exclude keys, tokens, cookies, personal access tokens, and webhook URLs.
 
+Anthropic's standard and Admin API keys are separate KWallet entries. The
+widget never copies one into the other. Admin report rows may include model and
+workspace identifiers; those scopes stay in local schema-v4 history and are
+excluded from diagnostics, support reports, configuration exports, and alert
+payloads.
+
 ## Network traffic
 
 Enabled providers connect directly to their configured API endpoints. Scheduled calls are read-only and listed in the generated capability matrix. Manual inference tests are explicit and may consume quota or money.
+
+Anthropic organization usage and cost requests require the optional Admin key,
+use read-only report endpoints, follow bounded pagination, and never send a
+message or inference request.
 
 Remote custom base URLs must use HTTPS. Plain HTTP is accepted only for loopback development endpoints.
 

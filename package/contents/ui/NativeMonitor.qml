@@ -151,37 +151,6 @@ Item {
         }
     }
 
-    function configureSourceReadiness() {
-        dailyStateModel.registerReadinessModel(sourceReadinessModel);
-        var providers = providerRegistry.allProviders || [];
-        for (var i = 0; i < providers.length; i++) {
-            sourceReadinessModel.registerProviderBackend(providers[i].configKey, providers[i].backend);
-            sourceReadinessModel.setSourceEnabled(providers[i].configKey, providers[i].enabled);
-            dailyStateModel.registerProviderBackend(providers[i].configKey, providers[i].backend);
-            dailyStateModel.setHistoryIdentity(providers[i].configKey,
-                                               providers[i].dbName);
-        }
-
-        var localTools = [
-            { stableId: "google-antigravity", backend: antigravityMonitor },
-            { stableId: "claude-code", backend: claudeCodeMonitor },
-            { stableId: "codex-cli", backend: codexCliMonitor },
-            { stableId: "github-copilot", backend: copilotMonitor },
-            { stableId: "cursor", backend: cursorMonitor },
-            { stableId: "windsurf", backend: windsurfMonitor },
-            { stableId: "jetbrains-ai", backend: jetbrainsAiMonitor }
-        ];
-        for (var j = 0; j < localTools.length; j++) {
-            sourceReadinessModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
-            dailyStateModel.registerLocalTool(localTools[j].stableId, localTools[j].backend);
-        }
-        var configuredTools = providerRegistry.allSubscriptionTools || [];
-        for (var k = 0; k < configuredTools.length; ++k) {
-            dailyStateModel.setHistoryIdentity(configuredTools[k].stableId,
-                                               configuredTools[k].name);
-        }
-    }
-
     function setGuidedSourceEnabled(stableId, enabled) {
         var provider = providerRegistry.providerByConfigKey(stableId);
         if (provider) {
@@ -359,6 +328,10 @@ Item {
     UsageDatabase {
         id: usageDatabase
         enabled: Plasmoid.configuration.historyEnabled
+            || (AppInfo.demoMode
+                && (AppInfo.smokeView.indexOf("media-history") === 0
+                    || AppInfo.smokeView.indexOf("media-analyst") === 0
+                    || AppInfo.smokeView === "media-source-detail"))
         retentionDays: Plasmoid.configuration.historyRetentionDays
     }
 
@@ -495,41 +468,31 @@ Item {
 
     ProviderManager {
         id: providerManager
+    }
 
-        function configureDescriptorBackend(key) {
-            var backend = providerManager.backend(key);
-            if (!backend) return;
-            var modelKey = key + "Model";
-            var urlKey = key + "CustomBaseUrl";
-            // The manager intentionally returns heterogeneous provider backends.
-            // qmllint disable missing-property
-            if (backend["model"] !== undefined) {
-                backend["model"] = Plasmoid.configuration[modelKey] || "";
-            }
-            // qmllint enable missing-property
-            backend.customBaseUrl = Plasmoid.configuration[urlKey] || "";
-            backend.dailyBudget = (Plasmoid.configuration[key + "DailyBudget"] || 0) / 100.0;
-            backend.monthlyBudget = (Plasmoid.configuration[key + "MonthlyBudget"] || 0) / 100.0;
-            backend.budgetWarningPercent = Plasmoid.configuration.budgetWarningPercent;
-        }
-
-        Component.onCompleted: {
-            registerBackend("openai", openaiBackend);
-            registerBackend("anthropic", anthropicBackend);
-            registerBackend("google", googleBackend);
-            registerBackend("mistral", mistralBackend);
-            registerBackend("deepseek", deepseekBackend);
-            registerBackend("groq", groqBackend);
-            registerBackend("xai", xaiBackend);
-            registerBackend("ollama", ollamaBackend);
-            registerBackend("openrouter", openrouterBackend);
-            registerBackend("together", togetherBackend);
-            registerBackend("cohere", cohereBackend);
-            registerBackend("googleveo", googleveoBackend);
-            registerBackend("azure", azureBackend);
-            registerBackend("bedrock", bedrockBackend);
-            ["litellm", "cerebras", "fireworks", "perplexity"].forEach(configureDescriptorBackend);
-        }
+    ProviderRuntimeRegistration {
+        id: providerRuntimeRegistration
+        configuration: Plasmoid.configuration
+        providerManager: providerManager
+        providerRegistry: providerRegistry
+        sourceReadinessModel: sourceReadinessModel
+        dailyStateModel: dailyStateModel
+        nativeBackends: [
+            { configKey: "openai", backend: openaiBackend },
+            { configKey: "anthropic", backend: anthropicBackend },
+            { configKey: "google", backend: googleBackend },
+            { configKey: "mistral", backend: mistralBackend },
+            { configKey: "deepseek", backend: deepseekBackend },
+            { configKey: "groq", backend: groqBackend },
+            { configKey: "xai", backend: xaiBackend },
+            { configKey: "ollama", backend: ollamaBackend },
+            { configKey: "openrouter", backend: openrouterBackend },
+            { configKey: "together", backend: togetherBackend },
+            { configKey: "cohere", backend: cohereBackend },
+            { configKey: "googleveo", backend: googleveoBackend },
+            { configKey: "azure", backend: azureBackend },
+            { configKey: "bedrock", backend: bedrockBackend }
+        ]
     }
 
     SourceReadinessModel {
@@ -819,7 +782,7 @@ Item {
     }
 
     Component.onCompleted: {
-        root.configureSourceReadiness();
+        providerRuntimeRegistration.initialize();
         root.scheduleDiagnosticsSnapshot();
         root.processSettingsVerificationRequest();
         var saved = Plasmoid.configuration.deepseekModel || "";

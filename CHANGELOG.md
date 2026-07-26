@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [16.0.0] — 2026-07-26
+
+### Added
+- Add Daily Focus and Source Detail with source-specific actions, provenance, freshness, typed metrics, quota windows, and compatible History deep links.
+- Add exact UTC half-open Analyst periods and responsive History and Analyst layouts.
+- Add optional Anthropic Admin API organization usage and cost reporting with bounded pagination, cache-token metrics, micro-USD parsing, and independent capability state.
+- Add PID-, window-, and AT-SPI-bound v16 release media plus a reproducible local release-candidate contract.
+
+### Changed
+- Extract Analyst queries, Anthropic Admin parsing and pagination, and catalog-driven provider runtime registration into focused units.
+- Refresh the user guide, generated wiki, architecture, capability matrix, privacy material, and ten-surface screenshot set for Control Loop.
+- Make QML lint, version policy, release media, source archives, and Fedora lifecycle checks release-blocking and reproducible.
+
+### Fixed
+- Keep Analyst date ranges exact across UTC, local time zones, and DST boundaries.
+- Keep Anthropic partial usage or cost failures stale or unavailable instead of replacing missing data with zero.
+- Preserve Source Detail keyboard return, retained History gaps, mixed-currency failures, and available numeric zero.
+
 ## [15.0.0] — 2026-07-23
 
 ### Added
@@ -837,7 +855,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v15.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v16.0.0...HEAD
+[16.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v15.0.0...v16.0.0
 [15.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v15.0.0
 [14.1.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v14.1.2
 [14.1.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.0...v14.1.1
