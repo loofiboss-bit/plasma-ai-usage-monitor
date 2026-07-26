@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 import "../Utils.js" as Utils
 
 QtObject {
@@ -33,13 +32,13 @@ QtObject {
         var reset = new Date(value);
         var now = nowValue ? new Date(nowValue) : new Date();
         if (!Number.isFinite(reset.getTime()) || reset.getTime() <= now.getTime())
-            return KI18n.i18n("now");
+            return i18n("now");
         var minutes = Math.max(1, Math.ceil((reset.getTime() - now.getTime()) / 60000));
-        if (minutes < 60) return KI18n.i18np("%1 min", "%1 min", minutes);
+        if (minutes < 60) return i18np("%1 min", "%1 min", minutes);
         var hours = Math.ceil(minutes / 60);
-        if (hours < 48) return KI18n.i18np("%1 hour", "%1 hours", hours);
+        if (hours < 48) return i18np("%1 hour", "%1 hours", hours);
         var days = Math.ceil(hours / 24);
-        return KI18n.i18np("%1 day", "%1 days", days);
+        return i18np("%1 day", "%1 days", days);
     }
 
     function displayText(mode) {
@@ -47,15 +46,15 @@ QtObject {
         if (normalized === "attention") {
             var urgent = summary.mostUrgentSource || {};
             if (urgent.stableId) return urgent.displayName;
-            if (Number(summary.reportingUsefulSourceCount || 0) > 0) return KI18n.i18n("All clear");
+            if (Number(summary.reportingUsefulSourceCount || 0) > 0) return i18n("All clear");
             if (Number(summary.connectivityOnlySourceCount || 0) > 0)
-                return KI18n.i18n("Connectivity only");
+                return i18n("Connectivity only");
             return formatter.unavailableValue();
         }
         if (normalized === "lowest-quota") {
             var quota = summary.lowestActualRemainingQuota || {};
             return quota.stableId
-                ? KI18n.i18n("%1% · %2", Math.round(Number(quota.percentRemaining)), quota.displayName)
+                ? i18n("%1% · %2", Math.round(Number(quota.percentRemaining)), quota.displayName)
                 : formatter.unavailableValue();
         }
         if (normalized === "next-reset") {
@@ -72,7 +71,7 @@ QtObject {
         if (normalized === "requests") {
             var requests = summary.remainingRequests || {};
             return requests.stableId
-                ? KI18n.i18n("%1 req", requests.value) : formatter.unavailableValue();
+                ? i18n("%1 req", requests.value) : formatter.unavailableValue();
         }
         return "";
     }
@@ -85,16 +84,16 @@ QtObject {
         var severity = summary.highestSeverity || "none";
         if (urgent.stableId && (severity === "critical" || severity === "warning")) {
             parts.push(severity === "critical"
-                ? KI18n.i18n("Critical: %1", urgent.displayName)
-                : KI18n.i18n("Warning: %1", urgent.displayName));
+                ? i18n("Critical: %1", urgent.displayName)
+                : i18n("Warning: %1", urgent.displayName));
         }
-        parts.push(KI18n.i18n("%1 of %2 active sources", useful, enabled));
+        parts.push(i18n("%1 of %2 active sources", useful, enabled));
         var connectivity = Number(summary.connectivityOnlySourceCount || 0);
         var attention = Number(summary.attentionSourceCount || 0);
         if (connectivity > 0)
-            parts.push(KI18n.i18np("%1 connectivity only", "%1 connectivity only", connectivity));
+            parts.push(i18np("%1 connectivity only", "%1 connectivity only", connectivity));
         if (attention > 0)
-            parts.push(KI18n.i18np("%1 needs attention", "%1 need attention", attention));
-        return parts.join(KI18n.i18n(" · "));
+            parts.push(i18np("%1 needs attention", "%1 need attention", attention));
+        return parts.join(i18n(" · "));
     }
 }

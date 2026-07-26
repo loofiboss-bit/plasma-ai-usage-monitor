@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import org.kde.ki18n
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
@@ -47,7 +46,7 @@ Rectangle {
                 spacing: 0
 
                 PlasmaComponents.Label {
-                    text: KI18n.i18n("Daily focus")
+                    text: i18n("Daily focus")
                     color: Kirigami.Theme.disabledTextColor
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     font.capitalization: Font.AllUppercase

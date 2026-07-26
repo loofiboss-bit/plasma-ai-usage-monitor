@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.plasma.components as PlasmaComponents
@@ -20,13 +19,13 @@ ColumnLayout {
 
         PlasmaComponents.Label {
             Layout.fillWidth: true
-            text: quotaRow.rowData?.label || KI18n.i18n("Quota")
+            text: quotaRow.rowData?.label || i18n("Quota")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             elide: Text.ElideRight
         }
 
         SourceBadge {
-            text: quotaRow.rowData?.badge || KI18n.i18n("Unknown")
+            text: quotaRow.rowData?.badge || i18n("Unknown")
         }
 
         PlasmaComponents.Label {
@@ -69,7 +68,7 @@ ColumnLayout {
     PlasmaComponents.Label {
         Layout.fillWidth: true
         visible: (quotaRow.rowData?.timeUntilReset || "").length > 0
-        text: KI18n.i18n("Resets in %1", quotaRow.rowData?.timeUntilReset || "")
+        text: i18n("Resets in %1", quotaRow.rowData?.timeUntilReset || "")
         font.pointSize: Kirigami.Theme.smallFont.pointSize
         opacity: 0.55
         elide: Text.ElideRight
@@ -89,15 +88,15 @@ ColumnLayout {
     }
 
     function valueText() {
-        if (!rowData) return KI18n.i18n("Unknown");
-        if (rowData.availability === "disabled") return KI18n.i18n("Unavailable");
-        if (rowData.precision === "availability_only") return KI18n.i18n("Available");
+        if (!rowData) return i18n("Unknown");
+        if (rowData.availability === "disabled") return i18n("Unavailable");
+        if (rowData.precision === "availability_only") return i18n("Available");
         var unit = rowData.unit || "";
         if (rowData.used !== undefined && rowData.limit !== undefined && rowData.limit > 0) {
             return rowData.used + " / " + rowData.limit;
         }
         if (rowData.remaining !== undefined && rowData.limit !== undefined && rowData.limit > 0) {
-            return KI18n.i18n("%1 left", rowData.remaining);
+            return i18n("%1 left", rowData.remaining);
         }
         if (rowData.percentRemaining !== undefined) {
             return Math.round(rowData.percentRemaining) + "%";
@@ -112,6 +111,6 @@ ColumnLayout {
             if (unit === "usage_multiplier") return rowData.limit + "x";
             return rowData.limit + "";
         }
-        return KI18n.i18n("See note");
+        return i18n("See note");
     }
 }

@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.kirigami as Kirigami
 
@@ -20,8 +19,8 @@ Kirigami.InlineMessage {
         : stateKey === "verifying" ? Kirigami.MessageType.Information
         : Kirigami.MessageType.Positive
     text: {
-        var detail = message.length > 0 ? message : KI18n.i18n("Verification result: %1", stateKey);
+        var detail = message.length > 0 ? message : i18n("Verification result: %1", stateKey);
         if (timestamp.length === 0) return detail;
-        return detail + "\n" + KI18n.i18n("Last verified: %1", timestamp);
+        return detail + "\n" + i18n("Last verified: %1", timestamp);
     }
 }

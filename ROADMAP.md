@@ -1,6 +1,6 @@
 # Roadmap
 
-**Current release:** 16.0.0, Control Loop
+**Current release:** 16.0.1, Control Loop
 
 **Last updated:** 2026-07-26
 
@@ -10,13 +10,15 @@ local-first boundary.
 
 ## Current release
 
-### 16.0.0 Control Loop
+### 16.0.1 Control Loop
 
 - Consolidate repeated Overview facts into one daily focus and source-first drill-down.
 - Correct Analyst UTC range semantics and improve responsive History and Analyst layouts.
 - Add optional Anthropic Admin API usage and cost reporting without weakening secret handling.
 - Make QML lint and release-media evidence trustworthy, reproducible release gates.
 - Preserve v15 configuration, KWallet secrets, schema-v4 history, package identity, and metric truth boundaries.
+- Restore all localized Settings and widget text through Plasma's supported QML
+  translation context and guard that runtime contract in the release gate.
 
 The implementation plan is
 [`docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md).
@@ -55,6 +57,7 @@ Phases 0 through 5 and the public release readback are complete.
 
 | Release | Result |
 | --- | --- |
+| 16.0.1 Control Loop | Restore localized Settings and widget text and add a release-blocking QML localization contract |
 | 16.0.0 Control Loop | Daily Focus, Source Detail, responsive History and Analyst, exact UTC periods, optional Anthropic Admin reporting, and reproducible release evidence |
 | 15.0.0 Daily Control | Shared daily source state, action-first Overview, truthful compact modes, retained History, evidence-bound Analyst, unified notifications, and performance/accessibility gates |
 | 14.0.0 First Successful Use | Dependency-safe startup, Guided first success, source-focused Settings, outcome-first Overview, and native Diagnostics |

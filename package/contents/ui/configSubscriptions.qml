@@ -1,6 +1,5 @@
 import QtQuick
 import org.kde.plasma.plasmoid
-import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -99,13 +98,13 @@ KCM.SimpleKCM {
 
     function syncGuidance(code, serviceLabel) {
         var normalized = normalizedSyncCode(code);
-        if (normalized === "connected") return KI18n.i18n("%1 session looks valid in Firefox.", serviceLabel);
-        if (normalized === "profile_missing") return KI18n.i18n("Choose a supported browser profile or open the browser once.");
-        if (normalized === "cookie_db_missing") return KI18n.i18n("Open Firefox once, sign in to %1, then retry so the cookie database exists.", serviceLabel);
-        if (normalized === "cookies_not_found") return KI18n.i18n("Open %1 in Firefox and sign in at least once.", serviceLabel);
-        if (normalized === "session_missing_or_expired") return KI18n.i18n("Log in to %1 again in Firefox, then retry.", serviceLabel);
-        if (normalized === "unsupported_browser") return KI18n.i18n("The selected browser profile is not supported for sync.");
-        return KI18n.i18n("Check your browser session and retry.");
+        if (normalized === "connected") return i18n("%1 session looks valid in Firefox.", serviceLabel);
+        if (normalized === "profile_missing") return i18n("Choose a supported browser profile or open the browser once.");
+        if (normalized === "cookie_db_missing") return i18n("Open Firefox once, sign in to %1, then retry so the cookie database exists.", serviceLabel);
+        if (normalized === "cookies_not_found") return i18n("Open %1 in Firefox and sign in at least once.", serviceLabel);
+        if (normalized === "session_missing_or_expired") return i18n("Log in to %1 again in Firefox, then retry.", serviceLabel);
+        if (normalized === "unsupported_browser") return i18n("The selected browser profile is not supported for sync.");
+        return i18n("Check your browser session and retry.");
     }
 
     function planIndexFor(detector, planId, legacyIndex) {
@@ -135,7 +134,7 @@ KCM.SimpleKCM {
 
     function reloadBrowserProfiles() {
         var profiles = syncDetector.browserProfiles();
-        var entries = [KI18n.i18n("Auto (Default Profile)")];
+        var entries = [i18n("Auto (Default Profile)")];
         for (var i = 0; i < profiles.length; i++) {
             entries.push(profiles[i]);
         }
@@ -235,12 +234,12 @@ KCM.SimpleKCM {
         secretStatusError = !result.ok;
         if (result.ok) {
             secretStatusMessage = result.appliedKeys.length > 0
-                ? KI18n.i18n("GitHub token saved securely in KDE Wallet.") : "";
+                ? i18n("GitHub token saved securely in KDE Wallet.") : "";
             if (result.appliedKeys.length > 0) subscriptionsPage.loadCopilotToken();
         } else if (result.message === "wallet-not-open") {
-            secretStatusMessage = KI18n.i18n("KDE Wallet is not open. Unlock it and retry Apply.");
+            secretStatusMessage = i18n("KDE Wallet is not open. Unlock it and retry Apply.");
         } else {
-            secretStatusMessage = KI18n.i18n("The GitHub token could not be saved. Retry Apply.");
+            secretStatusMessage = i18n("The GitHub token could not be saved. Retry Apply.");
         }
         if (!result.ok) {
             Qt.callLater(function() { subscriptionsPage.configurationChanged(); });
@@ -266,15 +265,15 @@ KCM.SimpleKCM {
         
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("Settings Mode")
+            Kirigami.FormData.label: i18n("Settings Mode")
         }
         
         QQC2.Switch {
             id: advancedModeSwitch
-            Kirigami.FormData.label: KI18n.i18n("Advanced Mode:")
+            Kirigami.FormData.label: i18n("Advanced Mode:")
             checked: subscriptionsPage.advancedMode
             onCheckedChanged: subscriptionsPage.advancedMode = checked
-            QQC2.ToolTip.text: KI18n.i18n("Show advanced configuration options like custom limits, notifications, and Labs features.")
+            QQC2.ToolTip.text: i18n("Show advanced configuration options like custom limits, notifications, and Labs features.")
             QQC2.ToolTip.visible: hovered
         }
         
@@ -283,7 +282,7 @@ KCM.SimpleKCM {
         QQC2.Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: KI18n.i18n("Track subscription quotas for AI coding tools. Most tools use local activity estimates; "
+            text: i18n("Track subscription quotas for AI coding tools. Most tools use local activity estimates; "
                      + "supported authenticated sources such as Antigravity local can report live quota windows.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
@@ -293,18 +292,18 @@ KCM.SimpleKCM {
         // ── Google Antigravity ──
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("Google Antigravity")
+            Kirigami.FormData.label: i18n("Google Antigravity")
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Google Antigravity:")
+            Kirigami.FormData.label: i18n("Google Antigravity:")
             QQC2.Switch {
                 id: antigravitySwitch
                 checked: Plasmoid.configuration.antigravityEnabled
-                text: antigravityDetector.installed ? KI18n.i18n("Installed") : KI18n.i18n("Not installed")
+                text: antigravityDetector.installed ? i18n("Installed") : i18n("Not installed")
             }
             QQC2.Button {
-                text: antigravityDetector.syncing ? KI18n.i18n("Refreshing…") : KI18n.i18n("Refresh / Test connection")
+                text: antigravityDetector.syncing ? i18n("Refreshing…") : i18n("Refresh / Test connection")
                 enabled: !antigravityDetector.syncing
                 icon.name: "view-refresh"
                 onClicked: antigravityDetector.refreshQuota()
@@ -312,39 +311,39 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: KI18n.i18n("Detected plan:")
-            text: antigravityDetector.detectedPlanLabel || KI18n.i18n("Detected automatically")
+            Kirigami.FormData.label: i18n("Detected plan:")
+            text: antigravityDetector.detectedPlanLabel || i18n("Detected automatically")
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: KI18n.i18n("Daemon status:")
+            Kirigami.FormData.label: i18n("Daemon status:")
             text: antigravityDetector.connectionState
                   + (antigravityDetector.readinessCode ? " (" + antigravityDetector.readinessCode + ")" : "")
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: KI18n.i18n("Last successful sync:")
+            Kirigami.FormData.label: i18n("Last successful sync:")
             text: antigravityDetector.lastSuccessfulRefresh
                   ? Qt.formatDateTime(antigravityDetector.lastSuccessfulRefresh,
                                       Locale.ShortFormat)
-                  : KI18n.i18n("Never")
+                  : i18n("Never")
         }
 
         QQC2.SpinBox {
             id: antigravityRefreshSpin
-            Kirigami.FormData.label: KI18n.i18n("Refresh interval:")
+            Kirigami.FormData.label: i18n("Refresh interval:")
             from: 60
             to: 3600
             stepSize: 60
             value: Math.max(60, Plasmoid.configuration.antigravityRefreshInterval || 300)
             enabled: antigravitySwitch.checked
-            textFromValue: function(value) { return KI18n.i18n("%1 seconds", value); }
+            textFromValue: function(value) { return i18n("%1 seconds", value); }
         }
 
         QQC2.Switch {
             id: antigravityNotifySwitch
-            Kirigami.FormData.label: KI18n.i18n("Notifications:")
-            text: KI18n.i18n("Warn when model quota is low")
+            Kirigami.FormData.label: i18n("Notifications:")
+            text: i18n("Warn when model quota is low")
             checked: Plasmoid.configuration.antigravityNotifications
             enabled: antigravitySwitch.checked
         }
@@ -353,7 +352,7 @@ KCM.SimpleKCM {
             Layout.fillWidth: true
             type: Kirigami.MessageType.Information
             visible: true
-            text: KI18n.i18n("Antigravity must be installed, running, and signed in. The monitor reads only plan and model quota from its authenticated localhost daemon; credentials and prompts are never exported.")
+            text: i18n("Antigravity must be installed, running, and signed in. The monitor reads only plan and model quota from its authenticated localhost daemon; credentials and prompts are never exported.")
         }
 
         // ── Claude Code ──
@@ -361,11 +360,11 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("Claude Code")
+            Kirigami.FormData.label: i18n("Claude Code")
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Enable:")
+            Kirigami.FormData.label: i18n("Enable:")
             spacing: Kirigami.Units.largeSpacing
 
             QQC2.Switch {
@@ -378,8 +377,8 @@ KCM.SimpleKCM {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
                 text: claudeDetector.installed
-                    ? "✓ " + KI18n.i18n("Detected")
-                    : "✗ " + KI18n.i18n("Not found")
+                    ? "✓ " + i18n("Detected")
+                    : "✗ " + i18n("Not found")
                 color: claudeDetector.installed
                     ? Kirigami.Theme.positiveTextColor
                     : Kirigami.Theme.disabledTextColor
@@ -389,7 +388,7 @@ KCM.SimpleKCM {
 
         QQC2.ComboBox {
             id: claudeCodePlanCombo
-            Kirigami.FormData.label: KI18n.i18n("Plan:")
+            Kirigami.FormData.label: i18n("Plan:")
             enabled: claudeCodeSwitch.checked
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
@@ -409,7 +408,7 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Usage limit (per 5h):")
+            Kirigami.FormData.label: i18n("Usage limit (per 5h):")
             spacing: Kirigami.Units.smallSpacing
             visible: subscriptionsPage.advancedMode
 
@@ -435,14 +434,14 @@ KCM.SimpleKCM {
 
             QQC2.CheckBox {
                 id: claudeCodeLimitOverride
-                text: KI18n.i18n("Custom")
+                text: i18n("Custom")
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
             }
         }
 
         QQC2.Label {
             visible: claudeCodeSwitch.checked
-            text: KI18n.i18n("Claude Code also has a weekly rolling limit. The secondary limit "
+            text: i18n("Claude Code also has a weekly rolling limit. The secondary limit "
                      + "is automatically calculated from the plan tier.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
@@ -452,7 +451,7 @@ KCM.SimpleKCM {
 
         QQC2.Switch {
             id: claudeCodeNotifySwitch
-            Kirigami.FormData.label: KI18n.i18n("Notifications:")
+            Kirigami.FormData.label: i18n("Notifications:")
             enabled: claudeCodeSwitch.checked
             visible: subscriptionsPage.advancedMode
             checked: Plasmoid.configuration.claudeCodeNotifications
@@ -464,11 +463,11 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("Codex CLI")
+            Kirigami.FormData.label: i18n("Codex CLI")
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Enable:")
+            Kirigami.FormData.label: i18n("Enable:")
             spacing: Kirigami.Units.largeSpacing
 
             QQC2.Switch {
@@ -480,8 +479,8 @@ KCM.SimpleKCM {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
                 text: codexDetector.installed
-                    ? "✓ " + KI18n.i18n("Detected")
-                    : "✗ " + KI18n.i18n("Not found")
+                    ? "✓ " + i18n("Detected")
+                    : "✗ " + i18n("Not found")
                 color: codexDetector.installed
                     ? Kirigami.Theme.positiveTextColor
                     : Kirigami.Theme.disabledTextColor
@@ -491,7 +490,7 @@ KCM.SimpleKCM {
 
         QQC2.ComboBox {
             id: codexPlanCombo
-            Kirigami.FormData.label: KI18n.i18n("Plan:")
+            Kirigami.FormData.label: i18n("Plan:")
             enabled: codexSwitch.checked
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
@@ -510,7 +509,7 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Usage limit (per 5h):")
+            Kirigami.FormData.label: i18n("Usage limit (per 5h):")
             spacing: Kirigami.Units.smallSpacing
             visible: subscriptionsPage.advancedMode
 
@@ -535,14 +534,14 @@ KCM.SimpleKCM {
 
             QQC2.CheckBox {
                 id: codexLimitOverride
-                text: KI18n.i18n("Custom")
+                text: i18n("Custom")
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
             }
         }
 
         QQC2.Switch {
             id: codexNotifySwitch
-            Kirigami.FormData.label: KI18n.i18n("Notifications:")
+            Kirigami.FormData.label: i18n("Notifications:")
             enabled: codexSwitch.checked
             visible: subscriptionsPage.advancedMode
             checked: Plasmoid.configuration.codexNotifications
@@ -554,11 +553,11 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("GitHub Copilot")
+            Kirigami.FormData.label: i18n("GitHub Copilot")
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Enable:")
+            Kirigami.FormData.label: i18n("Enable:")
             spacing: Kirigami.Units.largeSpacing
 
             QQC2.Switch {
@@ -570,8 +569,8 @@ KCM.SimpleKCM {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
                 text: copilotDetector.installed
-                    ? "✓ " + KI18n.i18n("Detected")
-                    : "✗ " + KI18n.i18n("Not found")
+                    ? "✓ " + i18n("Detected")
+                    : "✗ " + i18n("Not found")
                 color: copilotDetector.installed
                     ? Kirigami.Theme.positiveTextColor
                     : Kirigami.Theme.disabledTextColor
@@ -581,7 +580,7 @@ KCM.SimpleKCM {
 
         QQC2.ComboBox {
             id: copilotPlanCombo
-            Kirigami.FormData.label: KI18n.i18n("Plan:")
+            Kirigami.FormData.label: i18n("Plan:")
             enabled: copilotSwitch.checked
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
@@ -600,7 +599,7 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Premium requests (monthly):")
+            Kirigami.FormData.label: i18n("Premium requests (monthly):")
             spacing: Kirigami.Units.smallSpacing
             visible: subscriptionsPage.advancedMode
 
@@ -625,23 +624,23 @@ KCM.SimpleKCM {
 
             QQC2.CheckBox {
                 id: copilotLimitOverride
-                text: KI18n.i18n("Custom")
+                text: i18n("Custom")
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
             }
         }
 
         QQC2.ComboBox {
             id: copilotBillingModeCombo
-            Kirigami.FormData.label: KI18n.i18n("Billing mode:")
+            Kirigami.FormData.label: i18n("Billing mode:")
             enabled: copilotSwitch.checked
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
             textRole: "text"
             valueRole: "value"
             model: [
-                { text: KI18n.i18n("Auto"), value: "auto" },
-                { text: KI18n.i18n("Premium requests legacy"), value: "premium_requests_legacy" },
-                { text: KI18n.i18n("AI credits usage-based"), value: "ai_credits_usage_based" }
+                { text: i18n("Auto"), value: "auto" },
+                { text: i18n("Premium requests legacy"), value: "premium_requests_legacy" },
+                { text: i18n("AI credits usage-based"), value: "ai_credits_usage_based" }
             ]
             Component.onCompleted: {
                 for (var i = 0; i < model.length; i++) {
@@ -660,7 +659,7 @@ KCM.SimpleKCM {
 
         QQC2.SpinBox {
             id: copilotResetDaySpin
-            Kirigami.FormData.label: KI18n.i18n("Reset day:")
+            Kirigami.FormData.label: i18n("Reset day:")
             enabled: copilotSwitch.checked
             visible: subscriptionsPage.advancedMode
             from: 1
@@ -675,12 +674,12 @@ KCM.SimpleKCM {
             wrapMode: Text.WordWrap
             text: {
                 if (subscriptionsPage.cfg_copilotBillingMode === "ai_credits_usage_based") {
-                    return KI18n.i18n("AI credits mode keeps local activity estimates separate from exact GitHub billing data.");
+                    return i18n("AI credits mode keeps local activity estimates separate from exact GitHub billing data.");
                 }
                 if (subscriptionsPage.cfg_copilotBillingMode === "auto") {
-                    return KI18n.i18n("Auto switches from premium requests to AI credits on the GitHub transition date.");
+                    return i18n("Auto switches from premium requests to AI credits on the GitHub transition date.");
                 }
-                return KI18n.i18n("Premium request legacy mode keeps the monthly request counter and configurable reset day.");
+                return i18n("Premium request legacy mode keeps the monthly request counter and configurable reset day.");
             }
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
@@ -688,7 +687,7 @@ KCM.SimpleKCM {
 
         QQC2.Switch {
             id: copilotNotifySwitch
-            Kirigami.FormData.label: KI18n.i18n("Notifications:")
+            Kirigami.FormData.label: i18n("Notifications:")
             enabled: copilotSwitch.checked
             visible: subscriptionsPage.advancedMode
             checked: Plasmoid.configuration.copilotNotifications
@@ -697,13 +696,13 @@ KCM.SimpleKCM {
         // ── Optional GitHub API integration ──
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("GitHub API (Optional)")
+            Kirigami.FormData.label: i18n("GitHub API (Optional)")
             visible: copilotSwitch.checked
         }
 
         QQC2.Label {
             visible: copilotSwitch.checked
-            text: KI18n.i18n("Provide a GitHub Personal Access Token to fetch organization-level "
+            text: i18n("Provide a GitHub Personal Access Token to fetch organization-level "
                      + "Copilot seat metrics. Requires 'manage_billing:copilot' scope.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
@@ -712,7 +711,7 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("GitHub Token:")
+            Kirigami.FormData.label: i18n("GitHub Token:")
             visible: copilotSwitch.checked
             Layout.fillWidth: true
             spacing: Kirigami.Units.smallSpacing
@@ -721,7 +720,7 @@ KCM.SimpleKCM {
                 id: copilotTokenField
                 enabled: copilotSwitch.checked && secrets.walletOpen
                 echoMode: copilotTokenVisible.checked ? TextInput.Normal : TextInput.Password
-                placeholderText: KI18n.i18n("ghp_...")
+                placeholderText: i18n("ghp_...")
                 Layout.fillWidth: true
                 onTextEdited: {
                     if (text.length > 0) secretChanges.stageStore("copilot_github", text);
@@ -736,7 +735,7 @@ KCM.SimpleKCM {
                 checkable: true; checked: false
                 icon.name: checked ? "password-show-off" : "password-show-on"
                 display: QQC2.AbstractButton.IconOnly
-                QQC2.ToolTip.text: checked ? KI18n.i18n("Hide token") : KI18n.i18n("Show token")
+                QQC2.ToolTip.text: checked ? i18n("Hide token") : i18n("Show token")
                 QQC2.ToolTip.visible: hovered
             }
 
@@ -744,7 +743,7 @@ KCM.SimpleKCM {
                 icon.name: "edit-clear"
                 enabled: secrets.walletOpen && copilotTokenField.text.length > 0
                 display: QQC2.AbstractButton.IconOnly
-                QQC2.ToolTip.text: KI18n.i18n("Clear token"); QQC2.ToolTip.visible: hovered
+                QQC2.ToolTip.text: i18n("Clear token"); QQC2.ToolTip.visible: hovered
                 onClicked: {
                     copilotTokenField.text = "";
                     secretChanges.stageRemove("copilot_github");
@@ -756,11 +755,11 @@ KCM.SimpleKCM {
 
         QQC2.TextField {
             id: copilotOrgField
-            Kirigami.FormData.label: KI18n.i18n("Organization:")
+            Kirigami.FormData.label: i18n("Organization:")
             visible: copilotSwitch.checked
             enabled: copilotSwitch.checked
             text: Plasmoid.configuration.copilotOrgName
-            placeholderText: KI18n.i18n("my-org-name")
+            placeholderText: i18n("my-org-name")
             Layout.fillWidth: true
         }
 
@@ -770,11 +769,11 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("Cursor")
+            Kirigami.FormData.label: i18n("Cursor")
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Enable:")
+            Kirigami.FormData.label: i18n("Enable:")
             spacing: Kirigami.Units.largeSpacing
 
             QQC2.Switch {
@@ -785,7 +784,7 @@ KCM.SimpleKCM {
             QQC2.Label {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
-                text: cursorDetector.installed ? "✓ " + KI18n.i18n("Detected") : "✗ " + KI18n.i18n("Not found")
+                text: cursorDetector.installed ? "✓ " + i18n("Detected") : "✗ " + i18n("Not found")
                 color: cursorDetector.installed ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.disabledTextColor
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
             }
@@ -793,7 +792,7 @@ KCM.SimpleKCM {
 
         QQC2.ComboBox {
             id: cursorPlanCombo
-            Kirigami.FormData.label: KI18n.i18n("Plan:")
+            Kirigami.FormData.label: i18n("Plan:")
             enabled: cursorSwitch.checked
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
@@ -804,7 +803,7 @@ KCM.SimpleKCM {
 
         QQC2.SpinBox {
             id: cursorLimitSpin
-            Kirigami.FormData.label: KI18n.i18n("Usage limit:")
+            Kirigami.FormData.label: i18n("Usage limit:")
             enabled: cursorSwitch.checked
             visible: subscriptionsPage.advancedMode
             from: 0
@@ -815,7 +814,7 @@ KCM.SimpleKCM {
 
         QQC2.Switch {
             id: cursorNotifySwitch
-            Kirigami.FormData.label: KI18n.i18n("Notifications:")
+            Kirigami.FormData.label: i18n("Notifications:")
             enabled: cursorSwitch.checked
             visible: subscriptionsPage.advancedMode
             checked: Plasmoid.configuration.cursorNotifications
@@ -827,11 +826,11 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("Windsurf")
+            Kirigami.FormData.label: i18n("Windsurf")
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Enable:")
+            Kirigami.FormData.label: i18n("Enable:")
             spacing: Kirigami.Units.largeSpacing
 
             QQC2.Switch {
@@ -842,7 +841,7 @@ KCM.SimpleKCM {
             QQC2.Label {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
-                text: windsurfDetector.installed ? "✓ " + KI18n.i18n("Detected") : "✗ " + KI18n.i18n("Not found")
+                text: windsurfDetector.installed ? "✓ " + i18n("Detected") : "✗ " + i18n("Not found")
                 color: windsurfDetector.installed ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.disabledTextColor
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
             }
@@ -850,7 +849,7 @@ KCM.SimpleKCM {
 
         QQC2.ComboBox {
             id: windsurfPlanCombo
-            Kirigami.FormData.label: KI18n.i18n("Plan:")
+            Kirigami.FormData.label: i18n("Plan:")
             enabled: windsurfSwitch.checked
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
@@ -861,7 +860,7 @@ KCM.SimpleKCM {
 
         QQC2.SpinBox {
             id: windsurfLimitSpin
-            Kirigami.FormData.label: KI18n.i18n("Usage limit:")
+            Kirigami.FormData.label: i18n("Usage limit:")
             enabled: windsurfSwitch.checked
             visible: subscriptionsPage.advancedMode
             from: 0
@@ -872,7 +871,7 @@ KCM.SimpleKCM {
 
         QQC2.Switch {
             id: windsurfNotifySwitch
-            Kirigami.FormData.label: KI18n.i18n("Notifications:")
+            Kirigami.FormData.label: i18n("Notifications:")
             enabled: windsurfSwitch.checked
             visible: subscriptionsPage.advancedMode
             checked: Plasmoid.configuration.windsurfNotifications
@@ -884,11 +883,11 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("JetBrains AI")
+            Kirigami.FormData.label: i18n("JetBrains AI")
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Enable:")
+            Kirigami.FormData.label: i18n("Enable:")
             spacing: Kirigami.Units.largeSpacing
 
             QQC2.Switch {
@@ -899,7 +898,7 @@ KCM.SimpleKCM {
             QQC2.Label {
                 Layout.fillWidth: true
                 elide: Text.ElideRight
-                text: jetbrainsAiDetector.installed ? "✓ " + KI18n.i18n("Detected") : "✗ " + KI18n.i18n("Not found")
+                text: jetbrainsAiDetector.installed ? "✓ " + i18n("Detected") : "✗ " + i18n("Not found")
                 color: jetbrainsAiDetector.installed ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.disabledTextColor
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
             }
@@ -907,7 +906,7 @@ KCM.SimpleKCM {
 
         QQC2.ComboBox {
             id: jetbrainsAiPlanCombo
-            Kirigami.FormData.label: KI18n.i18n("Plan:")
+            Kirigami.FormData.label: i18n("Plan:")
             enabled: jetbrainsAiSwitch.checked
             visible: subscriptionsPage.advancedMode
             Layout.fillWidth: true
@@ -918,7 +917,7 @@ KCM.SimpleKCM {
 
         QQC2.SpinBox {
             id: jetbrainsAiLimitSpin
-            Kirigami.FormData.label: KI18n.i18n("Usage limit:")
+            Kirigami.FormData.label: i18n("Usage limit:")
             enabled: jetbrainsAiSwitch.checked
             visible: subscriptionsPage.advancedMode
             from: 0
@@ -929,7 +928,7 @@ KCM.SimpleKCM {
 
         QQC2.Switch {
             id: jetbrainsAiNotifySwitch
-            Kirigami.FormData.label: KI18n.i18n("Notifications:")
+            Kirigami.FormData.label: i18n("Notifications:")
             enabled: jetbrainsAiSwitch.checked
             visible: subscriptionsPage.advancedMode
             checked: Plasmoid.configuration.jetbrainsAiNotifications
@@ -941,14 +940,14 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("Labs: Browser Sync (Experimental)")
+            Kirigami.FormData.label: i18n("Labs: Browser Sync (Experimental)")
             visible: subscriptionsPage.advancedMode
         }
 
         QQC2.Label {
             Layout.fillWidth: true
             wrapMode: Text.WordWrap
-            text: KI18n.i18n("Sync real-time usage data from Claude browser cookies and the existing local Codex login. "
+            text: i18n("Sync real-time usage data from Claude browser cookies and the existing local Codex login. "
                      + "Browser cookie databases are read-only; credentials are never stored by the widget.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
@@ -969,7 +968,7 @@ KCM.SimpleKCM {
                     margins: Kirigami.Units.smallSpacing
                 }
                 wrapMode: Text.WordWrap
-                text: KI18n.i18n("⚠ This feature uses internal, undocumented APIs. It may stop working "
+                text: i18n("⚠ This feature uses internal, undocumented APIs. It may stop working "
                          + "if services change their API. Credentials are sent only to the "
                          + "corresponding official service.")
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -978,7 +977,7 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Enable sync:")
+            Kirigami.FormData.label: i18n("Enable sync:")
             spacing: Kirigami.Units.largeSpacing
 
             QQC2.Switch {
@@ -990,8 +989,8 @@ KCM.SimpleKCM {
             Layout.fillWidth: true
             elide: Text.ElideRight
             text: syncDetector.hasCurrentBrowserProfile
-                ? "✓ " + KI18n.i18n("Browser profile found")
-                : "✗ " + KI18n.i18n("No browser profile")
+                ? "✓ " + i18n("Browser profile found")
+                : "✗ " + i18n("No browser profile")
             color: syncDetector.hasCurrentBrowserProfile
                     ? Kirigami.Theme.positiveTextColor
                     : Kirigami.Theme.disabledTextColor
@@ -1001,14 +1000,14 @@ KCM.SimpleKCM {
 
         QQC2.ComboBox {
             id: browserSyncBrowserCombo
-            Kirigami.FormData.label: KI18n.i18n("Browser:")
+            Kirigami.FormData.label: i18n("Browser:")
             enabled: browserSyncSwitch.checked
             Layout.fillWidth: true
             model: [
-                KI18n.i18n("Firefox"),
-                KI18n.i18n("Chrome"),
-                KI18n.i18n("Chromium"),
-                KI18n.i18n("Brave")
+                i18n("Firefox"),
+                i18n("Chrome"),
+                i18n("Chromium"),
+                i18n("Brave")
             ]
             currentIndex: Plasmoid.configuration.browserSyncBrowser
 
@@ -1021,7 +1020,7 @@ KCM.SimpleKCM {
 
         QQC2.Label {
             visible: browserSyncSwitch.checked
-            text: KI18n.i18n("Browser Sync supports Firefox plus Linux Chrome, Chromium, and Brave profiles when readable cookies and safe-storage secrets are available. If Labs sync is not ready, local estimation still works.")
+            text: i18n("Browser Sync supports Firefox plus Linux Chrome, Chromium, and Brave profiles when readable cookies and safe-storage secrets are available. If Labs sync is not ready, local estimation still works.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -1030,7 +1029,7 @@ KCM.SimpleKCM {
 
         QQC2.Label {
             visible: browserSyncSwitch.checked
-            Kirigami.FormData.label: KI18n.i18n("Readiness:")
+            Kirigami.FormData.label: i18n("Readiness:")
             text: syncDetector.readinessSummary
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: syncDetector.hasCurrentBrowserProfile && syncDetector.hasSafeStorageAccess
@@ -1041,7 +1040,7 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Browser profile:")
+            Kirigami.FormData.label: i18n("Browser profile:")
             visible: browserSyncSwitch.checked
             enabled: browserSyncSwitch.checked
             spacing: Kirigami.Units.smallSpacing
@@ -1049,7 +1048,7 @@ KCM.SimpleKCM {
             QQC2.ComboBox {
                 id: firefoxProfileCombo
                 Layout.fillWidth: true
-                model: [KI18n.i18n("Auto (Default Profile)")]
+                model: [i18n("Auto (Default Profile)")]
                 onActivated: {
                     if (currentIndex <= 0) {
                         subscriptionsPage.cfg_browserSyncProfile = "";
@@ -1064,14 +1063,14 @@ KCM.SimpleKCM {
             QQC2.ToolButton {
                 icon.name: "view-refresh"
                 display: QQC2.AbstractButton.IconOnly
-                QQC2.ToolTip.text: KI18n.i18n("Reload browser profiles")
+                QQC2.ToolTip.text: i18n("Reload browser profiles")
                 QQC2.ToolTip.visible: hovered
                 onClicked: subscriptionsPage.reloadBrowserProfiles()
             }
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Sync interval:")
+            Kirigami.FormData.label: i18n("Sync interval:")
             enabled: browserSyncSwitch.checked
             spacing: Kirigami.Units.smallSpacing
 
@@ -1092,7 +1091,7 @@ KCM.SimpleKCM {
             }
 
             QQC2.Label {
-                text: KI18n.i18n("(minimum 60 seconds)")
+                text: i18n("(minimum 60 seconds)")
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 color: Kirigami.Theme.disabledTextColor
                 elide: Text.ElideRight
@@ -1102,12 +1101,12 @@ KCM.SimpleKCM {
 
         // Connection test
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Connection test:")
+            Kirigami.FormData.label: i18n("Connection test:")
             visible: browserSyncSwitch.checked
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
-                text: KI18n.i18n("Test Claude.ai")
+                text: i18n("Test Claude.ai")
                 icon.name: "network-connect"
                 onClicked: {
                     var result = subscriptionsPage.normalizedSyncCode(syncDetector.testConnection("claude"));
@@ -1148,7 +1147,7 @@ KCM.SimpleKCM {
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Button {
-                text: KI18n.i18n("Test ChatGPT")
+                text: i18n("Test ChatGPT")
                 icon.name: "network-connect"
                 onClicked: {
                     var result = subscriptionsPage.normalizedSyncCode(syncDetector.testConnection("chatgpt"));

@@ -26,22 +26,22 @@ def main() -> None:
     errors += require(
         "package/contents/ui/CompactRepresentation.qml",
         "Accessible.role: Accessible.Button",
-        "Accessible.name: KI18n.i18n(\"AI Usage Monitor: %1\", accessibleText())",
+        "Accessible.name: i18n(\"AI Usage Monitor: %1\", accessibleText())",
         'objectName: "compactSeveritySymbol"',
         'text: "!"',
     )
     errors += require(
         "package/contents/ui/components/CompactMetricState.qml",
-        'KI18n.i18n("Critical: %1", urgent.displayName)',
-        'KI18n.i18n("Warning: %1", urgent.displayName)',
+        'i18n("Critical: %1", urgent.displayName)',
+        'i18n("Warning: %1", urgent.displayName)',
         "summary.mostUrgentSource",
     )
     errors += require(
         "package/contents/ui/DailySourceCard.qml",
         "Accessible.name:",
         "attentionText()",
-        'KI18n.i18n("Critical · ")',
-        'KI18n.i18n("Warning · ")',
+        'i18n("Critical · ")',
+        'i18n("Warning · ")',
         "activeFocusOnTab: true",
     )
     errors += require(
@@ -54,10 +54,10 @@ def main() -> None:
     errors += require(
         "package/contents/ui/FullRepresentation.qml",
         "Kirigami.NavigationTabBar",
-        'Accessible.name: KI18n.i18n("Monitor actions")',
-        'Accessible.name: KI18n.i18n("Refresh all configured sources")',
-        'Accessible.name: KI18n.i18n("Run guided setup again")',
-        'Accessible.name: KI18n.i18n("Configure AI Usage Monitor")',
+        'Accessible.name: i18n("Monitor actions")',
+        'Accessible.name: i18n("Refresh all configured sources")',
+        'Accessible.name: i18n("Run guided setup again")',
+        'Accessible.name: i18n("Configure AI Usage Monitor")',
         "returnFocusSourceId",
         "restoreSourceFocus(sourceId)",
     )
@@ -69,17 +69,17 @@ def main() -> None:
     )
     errors += require(
         "package/contents/ui/views/SourceDetailView.qml",
-        'Accessible.name: KI18n.i18n("Back to source list")',
+        'Accessible.name: i18n("Back to source list")',
         'objectName: "sourceDetailPrimaryAction"',
         'objectName: "sourceDetailSettings"',
         'objectName: "sourceDetailHistory"',
         "activeFocusOnTab: true",
-        'Accessible.name: KI18n.i18n("Metric provenance: %1", text)',
+        'Accessible.name: i18n("Metric provenance: %1", text)',
     )
     errors += require(
         "package/contents/ui/AnalystTab.qml",
-        'KI18n.i18n("Analyst view loading")',
-        'KI18n.i18n("Analyst view ready")',
+        'i18n("Analyst view loading")',
+        'i18n("Analyst view ready")',
     )
     errors += require(
         "package/contents/ui/RuntimeCoordinator.qml",

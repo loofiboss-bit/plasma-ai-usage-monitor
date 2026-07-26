@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 
 QtObject {
     id: controller
@@ -48,13 +47,13 @@ QtObject {
 
     function metricLabel(metric) {
         var labels = {
-            cost: KI18n.i18n("Cost"),
-            tokens: KI18n.i18n("Tokens"),
-            requests: KI18n.i18n("Requests"),
-            rateLimitUsed: KI18n.i18n("Rate-limit utilization"),
-            usageCount: KI18n.i18n("Tool usage"),
-            percentUsed: KI18n.i18n("Percent used"),
-            remaining: KI18n.i18n("Remaining quota")
+            cost: i18n("Cost"),
+            tokens: i18n("Tokens"),
+            requests: i18n("Requests"),
+            rateLimitUsed: i18n("Rate-limit utilization"),
+            usageCount: i18n("Tool usage"),
+            percentUsed: i18n("Percent used"),
+            remaining: i18n("Remaining quota")
         };
         return labels[metric] || metric;
     }
@@ -114,13 +113,13 @@ QtObject {
     }
 
     function sourceStatusText(row) {
-        if (row.statusKey === "history_only") return KI18n.i18n("History only");
-        if (row.statusKey === "disabled") return KI18n.i18n("Disabled");
-        return KI18n.i18n("Enabled");
+        if (row.statusKey === "history_only") return i18n("History only");
+        if (row.statusKey === "disabled") return i18n("Disabled");
+        return i18n("Enabled");
     }
 
     function sourceLabel(row) {
-        return KI18n.i18nc("History source and status", "%1 — %2",
+        return i18nc("History source and status", "%1 — %2",
                      row.displayName, sourceStatusText(row));
     }
 
@@ -232,14 +231,14 @@ QtObject {
             var suffixes = [];
             if (row.currency) suffixes.push(row.currency);
             if (row.window && row.window !== "current") suffixes.push(row.window);
-            if (row.semantic === "local_estimate") suffixes.push(KI18n.i18n("estimated"));
+            if (row.semantic === "local_estimate") suffixes.push(i18n("estimated"));
             var label = row.displayName || row.dbName;
             if (displayCounts[label] > 1 && row.source)
                 suffixes.push(row.source);
             if (displayCounts[label] > 1 && row.scope && row.scope !== "api_key")
                 suffixes.push(row.scope);
             if (suffixes.length > 0)
-                label += KI18n.i18nc("History series qualifiers", " (%1)", suffixes.join(", "));
+                label += i18nc("History series qualifiers", " (%1)", suffixes.join(", "));
             row.name = label;
             row.color = source.color || "";
             decorated.push(row);
@@ -249,10 +248,10 @@ QtObject {
 
     function errorText() {
         var messages = {
-            mixed_currencies: KI18n.i18n("These sources use different currencies. Select one source or compare sources with the same currency."),
-            incompatible_units: KI18n.i18n("These sources do not use compatible units."),
-            incompatible_semantics: KI18n.i18n("These sources use different measurement semantics and cannot be compared truthfully."),
-            invalid_request: KI18n.i18n("The selected history request is not valid.")
+            mixed_currencies: i18n("These sources use different currencies. Select one source or compare sources with the same currency."),
+            incompatible_units: i18n("These sources do not use compatible units."),
+            incompatible_semantics: i18n("These sources use different measurement semantics and cannot be compared truthfully."),
+            invalid_request: i18n("The selected history request is not valid.")
         };
         return messages[errorKey] || "";
     }
@@ -260,12 +259,12 @@ QtObject {
     function coverageText(row) {
         var available = Number(row.availablePointCount || 0);
         var samples = Number(row.sampleCount || 0);
-        var text = KI18n.i18np("%1 plotted point from %2 stored sample",
+        var text = i18np("%1 plotted point from %2 stored sample",
                          "%1 plotted points from %2 stored samples",
                          available, samples);
-        if (row.containsGaps) text += KI18n.i18n(" · contains gaps");
-        if (row.historyOnly) text += KI18n.i18n(" · history only");
-        if (row.stale) text += KI18n.i18n(" · stale");
+        if (row.containsGaps) text += i18n(" · contains gaps");
+        if (row.historyOnly) text += i18n(" · history only");
+        if (row.stale) text += i18n(" · stale");
         return text;
     }
 

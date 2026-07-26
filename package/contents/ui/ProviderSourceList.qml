@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -14,8 +13,8 @@ ColumnLayout {
 
     Kirigami.SearchField {
         Layout.fillWidth: true
-        placeholderText: KI18n.i18n("Search sources")
-        Accessible.name: KI18n.i18n("Search provider sources")
+        placeholderText: i18n("Search sources")
+        Accessible.name: i18n("Search provider sources")
         onTextChanged: sourceList.controller.searchText = text
     }
 
@@ -23,21 +22,21 @@ ColumnLayout {
         Layout.fillWidth: true
         textRole: "text"
         valueRole: "value"
-        Accessible.name: KI18n.i18n("Filter by monitoring level")
+        Accessible.name: i18n("Filter by monitoring level")
         model: [
-            { text: KI18n.i18n("All monitoring levels"), value: "all" },
-            { text: KI18n.i18n("Usage & spend"), value: "usage" },
-            { text: KI18n.i18n("Detected local tools"), value: "local" },
-            { text: KI18n.i18n("Gateway"), value: "gateway" },
-            { text: KI18n.i18n("Balance"), value: "balance" },
-            { text: KI18n.i18n("Connectivity only"), value: "connectivity" }
+            { text: i18n("All monitoring levels"), value: "all" },
+            { text: i18n("Usage & spend"), value: "usage" },
+            { text: i18n("Detected local tools"), value: "local" },
+            { text: i18n("Gateway"), value: "gateway" },
+            { text: i18n("Balance"), value: "balance" },
+            { text: i18n("Connectivity only"), value: "connectivity" }
         ]
         onActivated: sourceList.controller.filterKey = currentValue
     }
 
     ListView {
         id: providersList
-        Accessible.name: KI18n.i18n("Provider and detected local sources")
+        Accessible.name: i18n("Provider and detected local sources")
         activeFocusOnTab: true
         Layout.fillWidth: true
         Layout.fillHeight: true
@@ -72,7 +71,7 @@ ColumnLayout {
             required property int index
             width: ListView.view.width
             highlighted: modelData.configKey === sourceList.controller.selectedSourceId
-            Accessible.name: KI18n.i18n("Configure %1, %2", modelData.name, modelData.categoryLabel)
+            Accessible.name: i18n("Configure %1, %2", modelData.name, modelData.categoryLabel)
             contentItem: RowLayout {
                 QQC2.Label {
                     Layout.fillWidth: true
@@ -84,7 +83,7 @@ ColumnLayout {
                     source: "emblem-checked"
                     Layout.preferredWidth: Kirigami.Units.iconSizes.small
                     Layout.preferredHeight: width
-                    Accessible.name: KI18n.i18n("Enabled")
+                    Accessible.name: i18n("Enabled")
                 }
             }
             onClicked: sourceList.controller.selectedSourceId = modelData.configKey
@@ -94,7 +93,7 @@ ColumnLayout {
             anchors.centerIn: parent
             width: parent.width
             visible: providersList.count === 0
-            text: KI18n.i18n("No sources match the current search and filter.")
+            text: i18n("No sources match the current search and filter.")
         }
     }
 }

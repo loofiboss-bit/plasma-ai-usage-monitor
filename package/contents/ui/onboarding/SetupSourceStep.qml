@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
@@ -12,11 +11,11 @@ ColumnLayout {
     required property var controller
     spacing: Kirigami.Units.mediumSpacing
 
-    PlasmaExtras.Heading { level: 4; text: KI18n.i18n("Choose a source") }
+    PlasmaExtras.Heading { level: 4; text: i18n("Choose a source") }
     PlasmaComponents.Label {
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
-        text: KI18n.i18n("Recommended sources appear first. The monitoring level tells you what the result can prove.")
+        text: i18n("Recommended sources appear first. The monitoring level tells you what the result can prove.")
     }
 
     ColumnLayout {
@@ -46,15 +45,15 @@ ColumnLayout {
         visible: step.controller.candidates.length === 0
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
-        text: KI18n.i18n("No matching source is available. Go back and choose another goal.")
+        text: i18n("No matching source is available. Go back and choose another goal.")
     }
 
     RowLayout {
         Layout.fillWidth: true
-        PlasmaComponents.Button { text: KI18n.i18n("Back"); onClicked: step.controller.back() }
+        PlasmaComponents.Button { text: i18n("Back"); onClicked: step.controller.back() }
         Item { Layout.fillWidth: true }
         PlasmaComponents.Button {
-            text: KI18n.i18n("Continue")
+            text: i18n("Continue")
             enabled: step.controller.selectedSourceId.length > 0
             onClicked: step.controller.selectSource(step.controller.selectedSourceId, true)
         }

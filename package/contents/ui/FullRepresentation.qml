@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.plasma.plasmoid
@@ -57,7 +56,7 @@ PlasmaExtras.Representation {
             }
             PlasmaExtras.Heading {
                 level: 3
-                text: KI18n.i18n("AI Usage Monitor")
+                text: i18n("AI Usage Monitor")
                 Layout.fillWidth: true
             }
         }
@@ -72,7 +71,7 @@ PlasmaExtras.Representation {
             visible: !fullRoot.showGuidedSetup
             actions: [
                 Kirigami.Action {
-                    text: KI18n.i18n("Overview")
+                    text: i18n("Overview")
                     icon.name: "view-dashboard"
                     checkable: true
                     checked: !fullRoot.sourceDetailVisible
@@ -83,7 +82,7 @@ PlasmaExtras.Representation {
                     }
                 },
                 Kirigami.Action {
-                    text: KI18n.i18n("History")
+                    text: i18n("History")
                     icon.name: "view-history"
                     checkable: true
                     checked: !fullRoot.sourceDetailVisible
@@ -94,7 +93,7 @@ PlasmaExtras.Representation {
                     }
                 },
                 Kirigami.Action {
-                    text: KI18n.i18n("Analyst")
+                    text: i18n("Analyst")
                     icon.name: "office-chart-line"
                     checkable: true
                     checked: !fullRoot.sourceDetailVisible
@@ -110,7 +109,7 @@ PlasmaExtras.Representation {
         QQC2.ToolBar {
             Layout.fillWidth: true
             visible: !fullRoot.showGuidedSetup
-            Accessible.name: KI18n.i18n("Monitor actions")
+            Accessible.name: i18n("Monitor actions")
 
             RowLayout {
                 anchors.fill: parent
@@ -120,29 +119,29 @@ PlasmaExtras.Representation {
                 PlasmaComponents.ToolButton {
                     activeFocusOnTab: true
                     icon.name: "view-refresh"
-                    text: KI18n.i18n("Refresh")
+                    text: i18n("Refresh")
                     display: QQC2.AbstractButton.TextBesideIcon
-                    Accessible.name: KI18n.i18n("Refresh all configured sources")
+                    Accessible.name: i18n("Refresh all configured sources")
                     onClicked: fullRoot.monitor.refreshAll()
                     PlasmaComponents.ToolTip {
-                        text: KI18n.i18n("Refresh all configured sources")
+                        text: i18n("Refresh all configured sources")
                     }
                 }
                 PlasmaComponents.ToolButton {
                     activeFocusOnTab: true
                     icon.name: "tools-wizard"
-                    Accessible.name: KI18n.i18n("Run guided setup again")
+                    Accessible.name: i18n("Run guided setup again")
                     onClicked: onboardingFlow.startAgain()
                     PlasmaComponents.ToolTip {
-                        text: KI18n.i18n("Run guided setup again")
+                        text: i18n("Run guided setup again")
                     }
                 }
                 PlasmaComponents.ToolButton {
                     activeFocusOnTab: true
                     icon.name: "configure"
-                    Accessible.name: KI18n.i18n("Configure AI Usage Monitor")
+                    Accessible.name: i18n("Configure AI Usage Monitor")
                     onClicked: Plasmoid.internalAction("configure").trigger()
-                    PlasmaComponents.ToolTip { text: KI18n.i18n("Configure") }
+                    PlasmaComponents.ToolTip { text: i18n("Configure") }
                 }
             }
         }
@@ -169,12 +168,12 @@ PlasmaExtras.Representation {
             PlasmaComponents.Label {
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-                text: KI18n.i18n("Setup was skipped. No source has been verified yet.")
+                text: i18n("Setup was skipped. No source has been verified yet.")
             }
             PlasmaComponents.Button {
-                text: KI18n.i18n("Resume setup")
+                text: i18n("Resume setup")
                 activeFocusOnTab: true
-                Accessible.name: KI18n.i18n("Resume guided setup")
+                Accessible.name: i18n("Resume guided setup")
                 onClicked: onboardingFlow.resume()
             }
         }

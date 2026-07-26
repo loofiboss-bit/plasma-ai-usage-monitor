@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -53,10 +52,10 @@ Item {
 
                 Repeater {
                     model: [
-                        { label: KI18n.i18n("Cost"), value: "cost" },
-                        { label: KI18n.i18n("Tokens"), value: "tokens" },
-                        { label: KI18n.i18n("Requests"), value: "requests" },
-                        { label: KI18n.i18n("Rate Limit"), value: "rateLimit" }
+                        { label: i18n("Cost"), value: "cost" },
+                        { label: i18n("Tokens"), value: "tokens" },
+                        { label: i18n("Requests"), value: "requests" },
+                        { label: i18n("Rate Limit"), value: "rateLimit" }
                     ]
 
                     PlasmaComponents.ToolButton {
@@ -82,7 +81,7 @@ Item {
     PlasmaComponents.Label {
         anchors.centerIn: parent
         visible: chartRoot.showEmptyState && !chartRoot.hasEnoughData
-        text: KI18n.i18n("Not enough data to display chart")
+        text: i18n("Not enough data to display chart")
         opacity: 0.5
         font.pointSize: Kirigami.Theme.smallFont.pointSize
     }

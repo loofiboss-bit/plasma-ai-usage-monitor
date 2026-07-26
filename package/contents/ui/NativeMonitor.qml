@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.ki18n
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import com.github.loofi.aiusagemonitor 1.0
@@ -39,11 +38,11 @@ Item {
                 } else if ((provider.backend.rateLimitTokensRemaining || 0) > 0) {
                     info += provider.backend.rateLimitTokensRemaining + " tokens left";
                 } else {
-                    info += KI18n.i18n("Healthy");
+                    info += i18n("Healthy");
                 }
                 lines.push(info);
             } else if (provider.enabled && provider.backend && provider.backend.error) {
-                lines.push(provider.name + ": " + KI18n.i18n("Error"));
+                lines.push(provider.name + ": " + i18n("Error"));
             }
         }
         var tools = root.allSubscriptionTools || [];
@@ -52,16 +51,16 @@ Item {
             if (tool.enabled && tool.monitor && tool.monitor.installed) {
                 var toolInfo = tool.name + ": ";
                 if (tool.monitor.limitReached) {
-                    toolInfo += KI18n.i18n("Limit Reached");
+                    toolInfo += i18n("Limit Reached");
                 } else if ((tool.monitor.usageLimit || 0) > 0) {
-                    toolInfo += tool.monitor.usageCount + "/" + tool.monitor.usageLimit + " " + KI18n.i18n("used");
+                    toolInfo += tool.monitor.usageCount + "/" + tool.monitor.usageLimit + " " + i18n("used");
                 } else {
-                    toolInfo += KI18n.i18n("Active");
+                    toolInfo += i18n("Active");
                 }
                 lines.push(toolInfo);
             }
         }
-        return lines.length > 0 ? lines.join("\n") : KI18n.i18n("Click to configure providers");
+        return lines.length > 0 ? lines.join("\n") : i18n("Click to configure providers");
     }
 
     property alias openai: openaiBackend
@@ -212,14 +211,14 @@ Item {
     function settingsVerificationMessage(source) {
         var state = source.readinessStateKey || "failed";
         if (state === "reporting_actual")
-            return KI18n.i18n("Verification succeeded and returned supported usage or spend data.");
+            return i18n("Verification succeeded and returned supported usage or spend data.");
         if (state === "reporting_estimate")
-            return KI18n.i18n("Verification succeeded and returned estimated or local activity data.");
+            return i18n("Verification succeeded and returned estimated or local activity data.");
         if (state === "connected_connectivity_only")
-            return KI18n.i18n("Verification succeeded. This source confirms connectivity only.");
+            return i18n("Verification succeeded. This source confirms connectivity only.");
         if (state === "degraded")
-            return source.nextActionText || KI18n.i18n("Verification completed with degraded data.");
-        return source.nextActionText || KI18n.i18n("Verification failed. Review the source configuration and retry.");
+            return source.nextActionText || i18n("Verification completed with degraded data.");
+        return source.nextActionText || i18n("Verification failed. Review the source configuration and retry.");
     }
 
     function finishSettingsVerification(source) {
@@ -243,7 +242,7 @@ Item {
         pendingSettingsVerificationId = requestId;
         pendingSettingsVerificationSourceId = sourceId;
         Plasmoid.configuration.settingsVerificationState = "verifying";
-        Plasmoid.configuration.settingsVerificationMessage = KI18n.i18n("Running the safe read-only scheduled check…");
+        Plasmoid.configuration.settingsVerificationMessage = i18n("Running the safe read-only scheduled check…");
         Plasmoid.configuration.settingsVerificationTimestamp = "";
 
         Qt.callLater(function() {
@@ -789,28 +788,28 @@ Item {
         var effective = ProviderPricingCatalog.effectiveModelId("deepseek", saved);
         if (saved && effective !== saved) {
             Plasmoid.configuration.deepseekModel = effective;
-            root.modelMigrationNotice = KI18n.i18n("DeepSeek model %1 was retired and migrated to %2.", saved, effective);
+            root.modelMigrationNotice = i18n("DeepSeek model %1 was retired and migrated to %2.", saved, effective);
         }
     }
 
     Plasmoid.contextualActions: [
         PlasmaCore.Action {
-            text: KI18n.i18n("Refresh All")
+            text: i18n("Refresh All")
             icon.name: "view-refresh"
             onTriggered: root.refreshAll()
         },
         PlasmaCore.Action {
-            text: KI18n.i18n("Configure Settings")
+            text: i18n("Configure Settings")
             icon.name: "configure"
             onTriggered: Plasmoid.internalAction("configure").trigger()
         },
         PlasmaCore.Action {
-            text: KI18n.i18n("Open Dashboard")
+            text: i18n("Open Dashboard")
             icon.name: "window-new"
             onTriggered: Plasmoid.expanded = true
         },
         PlasmaCore.Action {
-            text: Plasmoid.configuration.alertsEnabled ? KI18n.i18n("Mute Alerts") : KI18n.i18n("Unmute Alerts")
+            text: Plasmoid.configuration.alertsEnabled ? i18n("Mute Alerts") : i18n("Unmute Alerts")
             icon.name: Plasmoid.configuration.alertsEnabled ? "notifications-disabled" : "notifications"
             onTriggered: Plasmoid.configuration.alertsEnabled = !Plasmoid.configuration.alertsEnabled
         }

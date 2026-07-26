@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -278,7 +277,7 @@ Item {
             PlasmaComponents.Label {
                 anchors.centerIn: parent
                 visible: chartRoot.showEmptyState && !chartRoot.hasData()
-                text: KI18n.i18n("No comparison data available for this range")
+                text: i18n("No comparison data available for this range")
                 opacity: 0.55
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
             }
@@ -421,7 +420,7 @@ Item {
     function accessibleSummary() {
         var visible = chartRoot.visibleSeries();
         if (visible.length === 0)
-            return KI18n.i18n("%1 chart. No compatible data.", chartRoot.metricLabel());
+            return i18n("%1 chart. No compatible data.", chartRoot.metricLabel());
         var descriptions = [];
         for (var i = 0; i < visible.length; ++i) {
             var points = visible[i].points || [];
@@ -436,10 +435,10 @@ Item {
                     available++;
                 }
             }
-            descriptions.push(KI18n.i18n("%1: %2 recorded points, %3 gaps",
+            descriptions.push(i18n("%1: %2 recorded points, %3 gaps",
                                    visible[i].name, available, gaps));
         }
-        return KI18n.i18n("%1 chart. %2", chartRoot.metricLabel(), descriptions.join(KI18n.i18n(" · ")));
+        return i18n("%1 chart. %2", chartRoot.metricLabel(), descriptions.join(i18n(" · ")));
     }
 
     function visibleSeries() {
@@ -455,7 +454,7 @@ Item {
             });
             if (available) {
                 out.push({
-                    name: series[i].name || KI18n.i18n("Series %1", i + 1),
+                    name: series[i].name || i18n("Series %1", i + 1),
                     color: series[i].color || paletteColor(i),
                     points: points
                 });
@@ -493,7 +492,7 @@ Item {
             pts.sort(function(a, b) { return a.t - b.t; });
             if (pts.length > 0) {
                 parsed.push({
-                    name: s.name || KI18n.i18n("Series %1", i + 1),
+                    name: s.name || i18n("Series %1", i + 1),
                     color: s.color || paletteColor(i),
                     points: pts
                 });
@@ -610,7 +609,7 @@ Item {
             var keys = Object.keys(currencies).filter(function(key) { return key !== "__mixed"; });
             return keys.length === 1 && !currencies.__mixed
                 ? Utils.formatMoney(value, keys[0])
-                : value.toFixed(value < 1 ? 4 : 2) + " " + KI18n.i18n("mixed currencies");
+                : value.toFixed(value < 1 ? 4 : 2) + " " + i18n("mixed currencies");
         }
         if (metric === "tokens") {
             if (value >= 1000000) return (value / 1000000).toFixed(1) + "M";
@@ -626,14 +625,14 @@ Item {
 
     function metricLabel() {
         switch (metric) {
-            case "cost": return KI18n.i18n("Cost");
-            case "tokens": return KI18n.i18n("Tokens");
-            case "requests": return KI18n.i18n("Requests");
-            case "rateLimitUsed": return KI18n.i18n("Rate Limit Used");
-            case "percentUsed": return KI18n.i18n("Percent Used");
-            case "usageCount": return KI18n.i18n("Usage Count");
-            case "remaining": return KI18n.i18n("Remaining");
-            default: return KI18n.i18n("Value");
+            case "cost": return i18n("Cost");
+            case "tokens": return i18n("Tokens");
+            case "requests": return i18n("Requests");
+            case "rateLimitUsed": return i18n("Rate Limit Used");
+            case "percentUsed": return i18n("Percent Used");
+            case "usageCount": return i18n("Usage Count");
+            case "remaining": return i18n("Remaining");
+            default: return i18n("Value");
         }
     }
 

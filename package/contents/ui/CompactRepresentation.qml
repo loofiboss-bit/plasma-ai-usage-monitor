@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
@@ -38,7 +37,7 @@ MouseArea {
     }
 
     Accessible.role: Accessible.Button
-    Accessible.name: KI18n.i18n("AI Usage Monitor: %1", accessibleText())
+    Accessible.name: i18n("AI Usage Monitor: %1", accessibleText())
     hoverEnabled: true
     onClicked: Plasmoid.activated()
 

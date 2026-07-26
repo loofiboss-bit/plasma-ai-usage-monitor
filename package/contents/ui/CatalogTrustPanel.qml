@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -15,7 +14,7 @@ ColumnLayout {
     Repeater {
         model: [
             {
-                label: KI18n.i18n("Providers"),
+                label: i18n("Providers"),
                 schemaVersion: ProviderPricingCatalog.schemaVersion,
                 catalogVersion: ProviderPricingCatalog.catalogVersion,
                 lastReviewed: ProviderPricingCatalog.lastReviewed,
@@ -27,7 +26,7 @@ ColumnLayout {
                 reviewItems: ProviderPricingCatalog.reviewItems
             },
             {
-                label: KI18n.i18n("Subscriptions"),
+                label: i18n("Subscriptions"),
                 schemaVersion: SubscriptionPlanCatalog.schemaVersion,
                 catalogVersion: SubscriptionPlanCatalog.catalogVersion,
                 lastReviewed: SubscriptionPlanCatalog.lastReviewed,
@@ -66,12 +65,12 @@ ColumnLayout {
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    text: KI18n.i18n("%1: schema %2, catalog %3, reviewed %4, runtime scraping %5, review items %6, conflicts %7",
+                    text: i18n("%1: schema %2, catalog %3, reviewed %4, runtime scraping %5, review items %6, conflicts %7",
                                catalogRow.modelData.label,
                                catalogRow.modelData.schemaVersion,
                                catalogRow.modelData.catalogVersion,
                                catalogRow.modelData.lastReviewed,
-                               catalogRow.modelData.runtimeScraping ? KI18n.i18n("enabled") : KI18n.i18n("disabled"),
+                               catalogRow.modelData.runtimeScraping ? i18n("enabled") : i18n("disabled"),
                                catalogRow.modelData.manualReviewCount,
                                catalogRow.modelData.sourceConflictCount)
                     wrapMode: Text.WordWrap
@@ -106,9 +105,9 @@ ColumnLayout {
                                 : reviewRow.modelData.reviewReason;
                             if (!reason || reason.length === 0) {
                                 reason = reviewRow.modelData.source
-                                    || KI18n.i18n("Needs maintainer review before it can be shown as exact.");
+                                    || i18n("Needs maintainer review before it can be shown as exact.");
                             }
-                            return KI18n.i18n(
+                            return i18n(
                                 "%1: %2", reviewRow.modelData.label, reason);
                         }
                         wrapMode: Text.WordWrap

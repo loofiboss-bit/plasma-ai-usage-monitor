@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
-import org.kde.ki18n
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 
@@ -18,7 +17,7 @@ QQC2.ItemDelegate {
     width: parent ? parent.width : implicitWidth
     activeFocusOnTab: true
     Accessible.name: row.displayName + ". " + attentionText() + stateText()
-        + ". " + metricText() + ". " + KI18n.i18n("Open source details")
+        + ". " + metricText() + ". " + i18n("Open source details")
     onClicked: sourceRequested(row.stableId)
 
     background: Rectangle {
@@ -75,7 +74,7 @@ QQC2.ItemDelegate {
             }
             PlasmaComponents.Label {
                 text: card.row.freshnessState === "stale"
-                    ? KI18n.i18n("Stale") : KI18n.i18n("Current")
+                    ? i18n("Stale") : i18n("Current")
                 color: card.row.freshnessState === "stale"
                     ? Kirigami.Theme.neutralTextColor
                     : Kirigami.Theme.disabledTextColor
@@ -119,18 +118,18 @@ QQC2.ItemDelegate {
 
     function stateText() {
         var labels = {
-            actual: KI18n.i18n("Provider-reported data"),
-            estimated: KI18n.i18n("Local estimate"),
-            balance: KI18n.i18n("Account balance"),
-            connectivity_only: KI18n.i18n("Connectivity only"),
-            unavailable: KI18n.i18n("Data unavailable")
+            actual: i18n("Provider-reported data"),
+            estimated: i18n("Local estimate"),
+            balance: i18n("Account balance"),
+            connectivity_only: i18n("Connectivity only"),
+            unavailable: i18n("Data unavailable")
         };
-        return labels[row.qualityClass] || KI18n.i18n("Data unavailable");
+        return labels[row.qualityClass] || i18n("Data unavailable");
     }
 
     function attentionText() {
-        if (row.attentionSeverity === "critical") return KI18n.i18n("Critical · ");
-        if (row.attentionSeverity === "warning") return KI18n.i18n("Warning · ");
+        if (row.attentionSeverity === "critical") return i18n("Critical · ");
+        if (row.attentionSeverity === "warning") return i18n("Warning · ");
         return "";
     }
 
@@ -139,9 +138,9 @@ QQC2.ItemDelegate {
         var value = Number(row.primaryMetricValue);
         if (!Number.isFinite(value)) return "\u2014";
         if (row.primaryMetricUnit === "percent_remaining")
-            return KI18n.i18n("%1% left", Math.round(value));
+            return i18n("%1% left", Math.round(value));
         if (row.currency && row.currency !== "MIXED")
-            return KI18n.i18n("%1 %2", row.currency,
+            return i18n("%1 %2", row.currency,
                               value.toLocaleString(Qt.locale(), "f", 2));
         return value.toLocaleString(Qt.locale());
     }

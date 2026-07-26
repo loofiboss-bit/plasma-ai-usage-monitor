@@ -1,6 +1,5 @@
 import QtQuick
 import org.kde.plasma.plasmoid
-import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -191,9 +190,9 @@ KCM.SimpleKCM {
     function secretPlaceholder(key) {
         var pending = secretChanges.pendingChanges[key];
         if (pending !== undefined)
-            return pending.action === "remove" ? KI18n.i18n("Removal pending") : KI18n.i18n("Replacement pending");
+            return pending.action === "remove" ? i18n("Removal pending") : i18n("Replacement pending");
         return secrets.walletOpen && secrets.hasKey(key)
-            ? KI18n.i18n("Saved in KDE Wallet — leave blank to keep") : KI18n.i18n("Required");
+            ? i18n("Saved in KDE Wallet — leave blank to keep") : i18n("Required");
     }
 
     function saveConfig() {
@@ -201,12 +200,12 @@ KCM.SimpleKCM {
         secretStatusError = !result.ok;
         if (result.ok) {
             secretStatusMessage = result.appliedKeys.length > 0
-                ? KI18n.i18n("Credentials saved securely in KDE Wallet.") : "";
+                ? i18n("Credentials saved securely in KDE Wallet.") : "";
             settingsController.acceptChanges();
         } else if (result.message === "wallet-not-open") {
-            secretStatusMessage = KI18n.i18n("KDE Wallet is not open. Unlock it and retry Apply.");
+            secretStatusMessage = i18n("KDE Wallet is not open. Unlock it and retry Apply.");
         } else {
-            secretStatusMessage = KI18n.i18n("Some credentials could not be saved. Retry Apply.");
+            secretStatusMessage = i18n("Some credentials could not be saved. Retry Apply.");
         }
         if (!result.ok) Qt.callLater(function() { providersPage.configurationChanged(); });
     }
@@ -215,7 +214,7 @@ KCM.SimpleKCM {
         if (hasUnsavedChanges || !sourceId) return;
         Plasmoid.configuration.settingsVerificationSourceId = sourceId;
         Plasmoid.configuration.settingsVerificationState = "verifying";
-        Plasmoid.configuration.settingsVerificationMessage = KI18n.i18n("Verification requested from the running widget.");
+        Plasmoid.configuration.settingsVerificationMessage = i18n("Verification requested from the running widget.");
         Plasmoid.configuration.settingsVerificationTimestamp = "";
         Plasmoid.configuration.settingsVerificationRequestId =
             Number(Plasmoid.configuration.settingsVerificationRequestId || 0) + 1;
@@ -241,20 +240,20 @@ KCM.SimpleKCM {
             Kirigami.Heading {
                 Layout.fillWidth: true
                 level: 2
-                text: KI18n.i18n("Provider sources")
+                text: i18n("Provider sources")
             }
 
             QQC2.Switch {
-                text: KI18n.i18n("Advanced")
+                text: i18n("Advanced")
                 checked: providersPage.advancedMode
-                Accessible.name: KI18n.i18n("Show advanced provider settings")
+                Accessible.name: i18n("Show advanced provider settings")
                 onToggled: settingsController.setValue("advancedSettingsMode", checked)
             }
         }
 
         QQC2.Label {
             Layout.fillWidth: true
-            text: KI18n.i18n("Choose one source to configure. Usage and spend sources are listed before connectivity-only checks.")
+            text: i18n("Choose one source to configure. Usage and spend sources are listed before connectivity-only checks.")
             wrapMode: Text.WordWrap
             color: Kirigami.Theme.disabledTextColor
         }

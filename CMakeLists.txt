@@ -75,6 +75,10 @@ if(BUILD_TESTING)
         NAME daily_ui_accessibility
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_daily_ui_accessibility.py"
     )
+    add_test(
+        NAME qml_localization
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_qml_localization.py"
+    )
 endif()
 
 # Install the plasmoid package

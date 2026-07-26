@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
-import org.kde.ki18n
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
@@ -25,7 +24,7 @@ QQC2.ScrollView {
         ? ({ availableMetricCount: 2, totalMetricCount: 3 })
         : detailModel.coverage
     readonly property string actionLabelData: mediaMode
-        ? KI18n.i18n("Open source settings") : detailModel.actionLabel
+        ? i18n("Open source settings") : detailModel.actionLabel
     readonly property var mediaMetrics: mediaMode
         ? (mediaSource.detailMetrics || []) : []
     signal backRequested()
@@ -34,8 +33,8 @@ QQC2.ScrollView {
     signal historyRequested(string historyId, string metric, int rangeDays)
     Accessible.role: Accessible.Pane
     Accessible.name: sourceData.displayName
-        ? KI18n.i18n("%1 source details", sourceData.displayName)
-        : KI18n.i18n("Source details")
+        ? i18n("%1 source details", sourceData.displayName)
+        : i18n("Source details")
 
     SourceDetailModel {
         id: detailModel
@@ -44,14 +43,14 @@ QQC2.ScrollView {
 
     function statusText() {
         var labels = {
-            actual: KI18n.i18n("Provider-reported data"),
-            estimated: KI18n.i18n("Local estimate"),
-            balance: KI18n.i18n("Account balance"),
-            connectivity_only: KI18n.i18n("Connectivity only"),
-            unavailable: KI18n.i18n("Data unavailable")
+            actual: i18n("Provider-reported data"),
+            estimated: i18n("Local estimate"),
+            balance: i18n("Account balance"),
+            connectivity_only: i18n("Connectivity only"),
+            unavailable: i18n("Data unavailable")
         };
         return labels[sourceData.qualityClass]
-            || KI18n.i18n("Data unavailable");
+            || i18n("Data unavailable");
     }
 
     function formatMetric(value, unit, currency) {
@@ -59,17 +58,17 @@ QQC2.ScrollView {
         var number = Number(value);
         if (!Number.isFinite(number)) return "\u2014";
         if (unit === "percent_remaining")
-            return KI18n.i18n("%1% remaining", Math.round(number));
+            return i18n("%1% remaining", Math.round(number));
         if (currency)
-            return KI18n.i18n("%1 %2", currency,
+            return i18n("%1 %2", currency,
                               number.toLocaleString(Qt.locale(), "f", 2));
-        return KI18n.i18n("%1 %2", number.toLocaleString(Qt.locale()), unit);
+        return i18n("%1 %2", number.toLocaleString(Qt.locale()), unit);
     }
 
     function recentHistoryText() {
         var result = detailModel.recentHistory || {};
         if (!result.ok)
-            return KI18n.i18n("No compatible observations were retained in the last 7 days.");
+            return i18n("No compatible observations were retained in the last 7 days.");
         var series = result.series || [];
         var points = 0;
         var samples = 0;
@@ -77,7 +76,7 @@ QQC2.ScrollView {
             points += Number(series[i].availablePointCount || 0);
             samples += Number(series[i].sampleCount || 0);
         }
-        return KI18n.i18np(
+        return i18np(
             "%1 recent point from %2 stored sample",
             "%1 recent points from %2 stored samples",
             points, samples);
@@ -103,9 +102,9 @@ QQC2.ScrollView {
                 id: backButton
                 objectName: "sourceDetailBack"
                 icon.name: "go-previous-symbolic"
-                text: KI18n.i18n("Back")
+                text: i18n("Back")
                 activeFocusOnTab: true
-                Accessible.name: KI18n.i18n("Back to source list")
+                Accessible.name: i18n("Back to source list")
                 onClicked: detail.backRequested()
             }
             ColumnLayout {
@@ -121,8 +120,8 @@ QQC2.ScrollView {
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     text: detail.statusText()
-                        + KI18n.i18n(" · %1", detail.sourceData.freshnessState
-                                    || KI18n.i18n("unknown freshness"))
+                        + i18n(" · %1", detail.sourceData.freshnessState
+                                    || i18n("unknown freshness"))
                     color: Kirigami.Theme.disabledTextColor
                     elide: Text.ElideRight
                 }
@@ -147,7 +146,7 @@ QQC2.ScrollView {
 
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    text: KI18n.i18np(
+                    text: i18np(
                         "%1 available metric of %2",
                         "%1 available metrics of %2",
                         Number(detail.coverageData.availableMetricCount || 0),
@@ -156,7 +155,7 @@ QQC2.ScrollView {
                 }
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    text: KI18n.i18n("Provenance and data quality are shown for every metric. Missing values stay unavailable.")
+                    text: i18n("Provenance and data quality are shown for every metric. Missing values stay unavailable.")
                     color: Kirigami.Theme.disabledTextColor
                     wrapMode: Text.WordWrap
                 }
@@ -166,7 +165,7 @@ QQC2.ScrollView {
                     PlasmaComponents.Button {
                         objectName: "sourceDetailPrimaryAction"
                         text: detail.actionLabelData
-                        icon.name: text === KI18n.i18n("Refresh")
+                        icon.name: text === i18n("Refresh")
                             ? "view-refresh" : "configure"
                         activeFocusOnTab: true
                         onClicked: detail.actionRequested(
@@ -184,7 +183,7 @@ QQC2.ScrollView {
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
             level: 4
-            text: KI18n.i18n("Quota windows")
+            text: i18n("Quota windows")
             visible: detail.quotaData.length > 0
         }
 
@@ -213,7 +212,7 @@ QQC2.ScrollView {
                         font.bold: true
                     }
                     PlasmaComponents.Label {
-                        text: KI18n.i18n("%1% remaining",
+                        text: i18n("%1% remaining",
                             Math.round(Number(quotaRow.modelData.percentRemaining)))
                     }
                     PlasmaComponents.Label {
@@ -229,7 +228,7 @@ QQC2.ScrollView {
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
             level: 4
-            text: KI18n.i18n("Typed metrics")
+            text: i18n("Typed metrics")
         }
 
         Repeater {
@@ -274,7 +273,7 @@ QQC2.ScrollView {
                                 ? detail.formatMetric(metricRow.value,
                                                       metricRow.unit,
                                                       metricRow.currency)
-                                : KI18n.i18n("Unavailable")
+                                : i18n("Unavailable")
                             color: metricRow.available
                                 ? Kirigami.Theme.textColor
                                 : Kirigami.Theme.disabledTextColor
@@ -286,11 +285,11 @@ QQC2.ScrollView {
                                metricRow.semantic, metricRow.scope,
                                metricRow.window].filter(function(value) {
                                    return !!value;
-                               }).join(KI18n.i18n(" · "))
+                               }).join(i18n(" · "))
                         color: Kirigami.Theme.disabledTextColor
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         elide: Text.ElideRight
-                        Accessible.name: KI18n.i18n("Metric provenance: %1", text)
+                        Accessible.name: i18n("Metric provenance: %1", text)
                     }
                 }
             }
@@ -328,7 +327,7 @@ QQC2.ScrollView {
                                     mediaMetricRow.modelData.value,
                                     mediaMetricRow.modelData.unit,
                                     mediaMetricRow.modelData.currency)
-                                : KI18n.i18n("Unavailable")
+                                : i18n("Unavailable")
                             color: mediaMetricRow.modelData.available
                                 ? Kirigami.Theme.textColor
                                 : Kirigami.Theme.disabledTextColor
@@ -343,11 +342,11 @@ QQC2.ScrollView {
                             mediaMetricRow.modelData.scope,
                             mediaMetricRow.modelData.window
                         ].filter(function(value) { return !!value; })
-                            .join(KI18n.i18n(" · "))
+                            .join(i18n(" · "))
                         color: Kirigami.Theme.disabledTextColor
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         elide: Text.ElideRight
-                        Accessible.name: KI18n.i18n("Metric provenance: %1", text)
+                        Accessible.name: i18n("Metric provenance: %1", text)
                     }
                 }
             }
@@ -358,7 +357,7 @@ QQC2.ScrollView {
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
             level: 4
-            text: KI18n.i18n("Recent compatible history")
+            text: i18n("Recent compatible history")
         }
 
         RowLayout {
@@ -376,9 +375,9 @@ QQC2.ScrollView {
             PlasmaComponents.Label {
                 Layout.fillWidth: true
                 text: detail.mediaMode
-                    ? KI18n.i18n("24 recent points from 96 stored samples")
+                    ? i18n("24 recent points from 96 stored samples")
                     : detailModel.historyLoading
-                    ? KI18n.i18n("Loading recent compatible history…")
+                    ? i18n("Loading recent compatible history…")
                     : detail.recentHistoryText()
                 wrapMode: Text.WordWrap
                 color: Kirigami.Theme.disabledTextColor
@@ -392,14 +391,14 @@ QQC2.ScrollView {
 
             PlasmaComponents.Button {
                 objectName: "sourceDetailSettings"
-                text: KI18n.i18n("Open source settings")
+                text: i18n("Open source settings")
                 icon.name: "configure"
                 activeFocusOnTab: true
                 onClicked: detail.settingsRequested(detail.sourceId)
             }
             PlasmaComponents.Button {
                 objectName: "sourceDetailHistory"
-                text: KI18n.i18n("Open compatible history")
+                text: i18n("Open compatible history")
                 icon.name: "view-history"
                 activeFocusOnTab: true
                 enabled: detailModel.historyMetric !== ""

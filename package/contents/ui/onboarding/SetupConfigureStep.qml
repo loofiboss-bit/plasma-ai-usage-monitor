@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
@@ -15,7 +14,7 @@ ColumnLayout {
 
     PlasmaExtras.Heading {
         level: 4
-        text: KI18n.i18n("Set up %1", step.controller.selectedSource.displayName || KI18n.i18n("source"))
+        text: i18n("Set up %1", step.controller.selectedSource.displayName || i18n("source"))
     }
     PlasmaComponents.Label {
         Layout.fillWidth: true
@@ -26,16 +25,16 @@ ColumnLayout {
     PlasmaComponents.Label {
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
-        text: KI18n.i18n("Expected result: %1", step.controller.qualityLabel(step.controller.selectedSource))
+        text: i18n("Expected result: %1", step.controller.qualityLabel(step.controller.selectedSource))
     }
     PlasmaComponents.Label {
         Layout.fillWidth: true
         wrapMode: Text.WordWrap
         text: step.controller.selectedSource.sourceKindKey === "local_tool"
-            ? KI18n.i18n("No credential is needed. The verification reads local activity metadata and never sends an inference request.")
+            ? i18n("No credential is needed. The verification reads local activity metadata and never sends an inference request.")
             : step.controller.selectedSource.stableId === "anthropic"
-                ? KI18n.i18n("Choose either a standard key for a connection check or an organization Admin key for actual usage and spend. Both remain separate in KDE Wallet.")
-            : KI18n.i18n("Only fields required for this source are shown. Credentials are saved explicitly in KDE Wallet.")
+                ? i18n("Choose either a standard key for a connection check or an organization Admin key for actual usage and spend. Both remain separate in KDE Wallet.")
+            : i18n("Only fields required for this source are shown. Credentials are saved explicitly in KDE Wallet.")
     }
 
     Repeater {
@@ -52,10 +51,10 @@ ColumnLayout {
             showClearAction: false
             placeholderText: step.controller.hasStoredCredential(
                                  credentialEditor.modelData)
-                ? KI18n.i18n("Saved in KDE Wallet — leave blank to keep")
+                ? i18n("Saved in KDE Wallet — leave blank to keep")
                 : step.controller.acceptsAnyCredentialSet
-                    ? KI18n.i18n("Configure either key")
-                    : KI18n.i18n("Required")
+                    ? i18n("Configure either key")
+                    : i18n("Required")
             onCredentialEdited: function(value) {
                 step.controller.setCredential(credentialEditor.modelData, value);
             }
@@ -67,12 +66,12 @@ ColumnLayout {
         Layout.fillWidth: true
         spacing: Kirigami.Units.smallSpacing
 
-        PlasmaComponents.Label { text: KI18n.i18n("Endpoint URL") }
+        PlasmaComponents.Label { text: i18n("Endpoint URL") }
         PlasmaComponents.TextField {
             Layout.fillWidth: true
             inputMethodHints: Qt.ImhUrlCharactersOnly
-            placeholderText: KI18n.i18n("https://gateway.example.com")
-            Accessible.name: KI18n.i18n("Required endpoint URL")
+            placeholderText: i18n("https://gateway.example.com")
+            Accessible.name: i18n("Required endpoint URL")
             onTextChanged: step.controller.customEndpoint = text
         }
     }
@@ -87,11 +86,11 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
-        PlasmaComponents.Button { text: KI18n.i18n("Back"); onClicked: step.controller.back() }
+        PlasmaComponents.Button { text: i18n("Back"); onClicked: step.controller.back() }
         Item { Layout.fillWidth: true }
         PlasmaComponents.Button {
             text: step.controller.selectedSource.sourceKindKey === "provider"
-                ? KI18n.i18n("Save and verify") : KI18n.i18n("Enable and verify")
+                ? i18n("Save and verify") : i18n("Enable and verify")
             icon.name: "security-high"
             onClicked: step.controller.saveAndVerify()
         }

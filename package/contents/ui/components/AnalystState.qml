@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 
 QtObject {
     id: state
@@ -111,12 +110,12 @@ QtObject {
         var actual = Number(data.actualSampleCount || 0);
         var estimated = Number(data.estimatedSampleCount || 0);
         if (actual > 0 && estimated > 0) {
-            return KI18n.i18n("Average daily spend (actual + estimated)");
+            return i18n("Average daily spend (actual + estimated)");
         }
         if (estimated > 0) {
-            return KI18n.i18n("Average daily spend (estimated)");
+            return i18n("Average daily spend (estimated)");
         }
-        return KI18n.i18n("Average daily spend (actual)");
+        return i18n("Average daily spend (actual)");
     }
 
     function spendChartSeries() {
@@ -137,13 +136,13 @@ QtObject {
         }
         return [
             {
-                name: KI18n.i18n("Actual"),
+                name: i18n("Actual"),
                 color: "#10A37F",
                 currency: snapshot.currency || "",
                 points: actual
             },
             {
-                name: KI18n.i18n("Estimated"),
+                name: i18n("Estimated"),
                 color: "#D4A574",
                 currency: snapshot.currency || "",
                 points: estimated
@@ -163,9 +162,9 @@ QtObject {
             });
         }
         return [{
-            name: kind === "tokens" ? KI18n.i18n("Tokens")
-                  : (kind === "requests" ? KI18n.i18n("Requests")
-                                         : KI18n.i18n("Local tool usage")),
+            name: kind === "tokens" ? i18n("Tokens")
+                  : (kind === "requests" ? i18n("Requests")
+                                         : i18n("Local tool usage")),
             color: kind === "tokens" ? "#4285F4"
                   : (kind === "requests" ? "#6e40c9" : "#FF7000"),
             points: points
@@ -188,20 +187,20 @@ QtObject {
         var reportCoverage = reportSnapshot.coverage || ({});
         var currency = reportSnapshot.currency || "";
         var lines = [];
-        lines.push(KI18n.i18n("AI Usage Monitor Analyst Report (%1 days)", days));
-        lines.push(KI18n.i18n("Generated: %1", new Date(reportSnapshot.generatedAt).toLocaleString()));
-        lines.push(KI18n.i18n("Period: %1 through %2",
+        lines.push(i18n("AI Usage Monitor Analyst Report (%1 days)", days));
+        lines.push(i18n("Generated: %1", new Date(reportSnapshot.generatedAt).toLocaleString()));
+        lines.push(i18n("Period: %1 through %2",
                         formatDate(reportSnapshot.from),
                         formatDate(new Date(new Date(reportSnapshot.to).getTime()
                                             - 1))));
-        lines.push(KI18n.i18n("Coverage: %1 of %2 days (%3%)",
+        lines.push(i18n("Coverage: %1 of %2 days (%3%)",
                         reportCoverage.observedDayCount || 0,
                         reportCoverage.requestedDayCount || days,
                         Number(reportCoverage.percent || 0).toFixed(0)));
-        lines.push(KI18n.i18n("Cost currency status: %1",
+        lines.push(i18n("Cost currency status: %1",
                         currencyStatusText(reportSnapshot.currencyStatus,
                                            currency)));
-        lines.push(KI18n.i18n("Cost samples: %1 actual, %2 estimated",
+        lines.push(i18n("Cost samples: %1 actual, %2 estimated",
                         reportSnapshot.actualSampleCount || 0,
                         reportSnapshot.estimatedSampleCount || 0));
         lines.push("");
@@ -211,7 +210,7 @@ QtObject {
             if (item.available) {
                 lines.push(label + ": " + formatterFunction(item.value));
             } else {
-                lines.push(label + ": " + KI18n.i18n("Unavailable — %1",
+                lines.push(label + ": " + i18n("Unavailable — %1",
                     reasonText(item.reasonKey, item.sampleCount,
                                item.minimumSamples)));
             }
@@ -219,21 +218,21 @@ QtObject {
 
         appendKpi(averageSpendLabel(reportSnapshot), "averageDailySpend",
                   function(value) { return formatMoney(value, currency); });
-        appendKpi(KI18n.i18n("Week-over-week change"), "weekOverWeekChange",
+        appendKpi(i18n("Week-over-week change"), "weekOverWeekChange",
                   formatPercent);
-        appendKpi(KI18n.i18n("Volatility"), "volatility", formatPercent);
-        appendKpi(KI18n.i18n("Average output / input ratio"), "outputInputRatio",
+        appendKpi(i18n("Volatility"), "volatility", formatPercent);
+        appendKpi(i18n("Average output / input ratio"), "outputInputRatio",
                   function(value) { return Number(value).toFixed(2) + "x"; });
 
         lines.push("");
-        lines.push(KI18n.i18n("Top compatible spend drivers:"));
+        lines.push(i18n("Top compatible spend drivers:"));
         var drivers = reportSnapshot.topDrivers || [];
         if (drivers.length === 0) {
-            lines.push(KI18n.i18n("- Unavailable for this period"));
+            lines.push(i18n("- Unavailable for this period"));
         } else {
             for (var i = 0; i < Math.min(5, drivers.length); ++i) {
                 var driver = drivers[i];
-                lines.push(KI18n.i18n("- %1 (%2, %3): %4",
+                lines.push(i18n("- %1 (%2, %3): %4",
                                 driver.provider, driver.model,
                                 driver.quality,
                                 formatMoney(driver.value, driver.currency)));
@@ -241,18 +240,18 @@ QtObject {
         }
 
         lines.push("");
-        lines.push(KI18n.i18n("Anomaly candidates:"));
+        lines.push(i18n("Anomaly candidates:"));
         if (reportSnapshot.anomaliesAvailable !== true) {
-            lines.push(KI18n.i18n("- Unavailable — %1",
+            lines.push(i18n("- Unavailable — %1",
                             reasonText(reportSnapshot.anomaliesReasonKey,
                                        (reportSnapshot.spendSeries || []).length,
                                        7)));
         } else if ((reportSnapshot.anomalies || []).length === 0) {
-            lines.push(KI18n.i18n("- None crossed the documented threshold"));
+            lines.push(i18n("- None crossed the documented threshold"));
         } else {
             var anomalies = reportSnapshot.anomalies || [];
             for (var j = 0; j < Math.min(5, anomalies.length); ++j) {
-                lines.push(KI18n.i18n("- %1: %2 (period baseline %3)",
+                lines.push(i18n("- %1: %2 (period baseline %3)",
                                 anomalies[j].date,
                                 formatMoney(anomalies[j].value,
                                             anomalies[j].currency),
@@ -261,19 +260,19 @@ QtObject {
             }
         }
         lines.push("");
-        lines.push(KI18n.i18n("Method: volatility requires seven recorded days; anomaly candidates require a value at least two standard deviations above the period mean and a material absolute increase."));
-        lines.push(KI18n.i18n("Output / input ratio is descriptive and does not measure quality, productivity, or prompt clarity."));
+        lines.push(i18n("Method: volatility requires seven recorded days; anomaly candidates require a value at least two standard deviations above the period mean and a material absolute increase."));
+        lines.push(i18n("Output / input ratio is descriptive and does not measure quality, productivity, or prompt clarity."));
         return lines.join("\n");
     }
 
     function writtenSummary() {
         if (!hasSnapshot) {
-            return KI18n.i18n("No Analyst snapshot is available.");
+            return i18n("No Analyst snapshot is available.");
         }
         var parts = [];
         var average = kpi("averageDailySpend");
         if (average.available) {
-            parts.push(KI18n.i18n("%1 is %2.",
+            parts.push(i18n("%1 is %2.",
                             averageSpendLabel(snapshot),
                             formatMoney(average.value, snapshot.currency)));
         } else {
@@ -281,14 +280,14 @@ QtObject {
                                   average.minimumSamples));
         }
         if (snapshot.activityAvailable === true) {
-            parts.push(KI18n.i18n("Compatible activity is available independently of cost analysis."));
+            parts.push(i18n("Compatible activity is available independently of cost analysis."));
         }
         if (snapshot.anomaliesAvailable === true) {
             parts.push((snapshot.anomalies || []).length > 0
-                ? KI18n.i18np("%1 anomaly candidate crossed the documented threshold.",
+                ? i18np("%1 anomaly candidate crossed the documented threshold.",
                         "%1 anomaly candidates crossed the documented threshold.",
                         snapshot.anomalies.length)
-                : KI18n.i18n("No day crossed the documented anomaly threshold."));
+                : i18n("No day crossed the documented anomaly threshold."));
         }
         return parts.join(" ");
     }

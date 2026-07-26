@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import org.kde.plasma.plasmoid
-import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -51,16 +50,16 @@ KCM.SimpleKCM {
     function formatInterval(secs) {
         if (secs >= 60) {
             var mins = Math.floor(secs / 60);
-            return KI18n.i18np("%1 minute", "%1 minutes", mins);
+            return i18np("%1 minute", "%1 minutes", mins);
         }
-        return KI18n.i18np("%1 second", "%1 seconds", secs);
+        return i18np("%1 second", "%1 seconds", secs);
     }
 
     Kirigami.FormLayout {
         anchors.fill: parent
 
         ColumnLayout {
-            Kirigami.FormData.label: KI18n.i18n("Default refresh interval:")
+            Kirigami.FormData.label: i18n("Default refresh interval:")
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.Slider {
@@ -70,7 +69,7 @@ KCM.SimpleKCM {
                 to: 1800
                 stepSize: 60
                 value: Plasmoid.configuration.refreshInterval
-                QQC2.ToolTip.text: KI18n.i18n("How often to poll provider APIs for updated data (60s–30min)")
+                QQC2.ToolTip.text: i18n("How often to poll provider APIs for updated data (60s–30min)")
                 QQC2.ToolTip.visible: hovered
                 QQC2.ToolTip.delay: 500
             }
@@ -84,21 +83,21 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("Panel Display")
+            Kirigami.FormData.label: i18n("Panel Display")
         }
 
         QQC2.ComboBox {
             id: compactModeCombo
-            Kirigami.FormData.label: KI18n.i18n("Show in panel:")
+            Kirigami.FormData.label: i18n("Show in panel:")
             model: [
-                KI18n.i18n("Icon only"),
-                KI18n.i18n("Highest-priority source"),
-                KI18n.i18n("Lowest live quota"),
-                KI18n.i18n("Next live reset"),
-                KI18n.i18n("Actual provider spend"),
-                KI18n.i18n("Active sources")
+                i18n("Icon only"),
+                i18n("Highest-priority source"),
+                i18n("Lowest live quota"),
+                i18n("Next live reset"),
+                i18n("Actual provider spend"),
+                i18n("Active sources")
             ]
-            QQC2.ToolTip.text: KI18n.i18n("Choose what to display next to the icon in the system panel")
+            QQC2.ToolTip.text: i18n("Choose what to display next to the icon in the system panel")
             QQC2.ToolTip.visible: hovered
             QQC2.ToolTip.delay: 500
             currentIndex: {
@@ -127,24 +126,24 @@ KCM.SimpleKCM {
         }
 
         QQC2.Switch {
-            Kirigami.FormData.label: KI18n.i18n("Advanced settings:")
+            Kirigami.FormData.label: i18n("Advanced settings:")
             checked: generalPage.cfg_advancedSettingsMode
-            text: KI18n.i18n("Show per-source scheduling controls")
-            Accessible.name: KI18n.i18n("Show advanced scheduling settings")
+            text: i18n("Show per-source scheduling controls")
+            Accessible.name: i18n("Show advanced scheduling settings")
             onToggled: generalPage.cfg_advancedSettingsMode = checked
         }
 
         Kirigami.Separator {
             visible: generalPage.cfg_advancedSettingsMode
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("Advanced scheduling")
+            Kirigami.FormData.label: i18n("Advanced scheduling")
         }
 
         QQC2.Label {
             visible: generalPage.cfg_advancedSettingsMode
             text: generalPage.enabledProviders.length > 0
-                ? KI18n.i18n("Only enabled sources are shown. Set an interval to 0 to use the default above.")
-                : KI18n.i18n("Enable a provider source to configure its individual refresh interval.")
+                ? i18n("Only enabled sources are shown. Set an interval to 0 to use the default above.")
+                : i18n("Enable a provider source to configure its individual refresh interval.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -168,7 +167,7 @@ KCM.SimpleKCM {
                     stepSize: 60
                     value: generalPage.refreshValue(
                         providerSchedule.modelData.refreshConfigKey)
-                    Accessible.name: KI18n.i18n(
+                    Accessible.name: i18n(
                         "Refresh interval for %1",
                         providerSchedule.modelData.label)
                     onValueChanged: generalPage.setRefreshValue(
@@ -177,7 +176,7 @@ KCM.SimpleKCM {
 
                 QQC2.Label {
                     text: providerRefreshSlider.value === 0
-                        ? KI18n.i18n("Use default")
+                        ? i18n("Use default")
                         : generalPage.formatInterval(providerRefreshSlider.value)
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     color: Kirigami.Theme.disabledTextColor
@@ -188,11 +187,11 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: KI18n.i18n("About")
+            Kirigami.FormData.label: i18n("About")
         }
 
         RowLayout {
-            Kirigami.FormData.label: KI18n.i18n("Icon:")
+            Kirigami.FormData.label: i18n("Icon:")
 
             Kirigami.Icon {
                 source: Qt.resolvedUrl("../icons/logo.png")
@@ -201,13 +200,13 @@ KCM.SimpleKCM {
             }
 
             QQC2.Label {
-                text: KI18n.i18n("AI Usage Monitor")
+                text: i18n("AI Usage Monitor")
                 opacity: 0.8
             }
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: KI18n.i18n("Version:")
+            Kirigami.FormData.label: i18n("Version:")
             // Plasma's KPluginMetaData value type is absent from its installed qmltypes.
             // qmllint disable unresolved-type
             text: (Plasmoid["metaData"]
@@ -218,8 +217,8 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: KI18n.i18n("Description:")
-            text: KI18n.i18n("Monitor AI API token usage, rate limits, costs, and budgets across multiple providers")
+            Kirigami.FormData.label: i18n("Description:")
+            text: i18n("Monitor AI API token usage, rate limits, costs, and budgets across multiple providers")
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
         }

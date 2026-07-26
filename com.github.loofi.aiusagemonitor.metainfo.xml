@@ -76,6 +76,14 @@
 
   <releases>
 
+    <release version="16.0.1" date="2026-07-26">
+      <description>
+        <ul>
+          <li>Restore Settings labels and translated widget text through Plasma's supported QML localization context.</li>
+          <li>Add a release-blocking localization check for unsupported qualified translation calls.</li>
+        </ul>
+      </description>
+    </release>
     <release version="16.0.0" date="2026-07-26">
       <description>
         <ul>

@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
-import org.kde.ki18n
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
@@ -16,7 +15,7 @@ QQC2.ScrollView {
     property var monitor: null
     signal sourceRequested(string stableId)
     Accessible.role: Accessible.Pane
-    Accessible.name: KI18n.i18n("Overview view ready")
+    Accessible.name: i18n("Overview view ready")
 
     Components.DailyOverviewState {
         id: overviewState
@@ -68,13 +67,13 @@ QQC2.ScrollView {
 
             PlasmaExtras.Heading {
                 level: 4
-                text: KI18n.i18n("Sources")
+                text: i18n("Sources")
                 Layout.fillWidth: true
             }
             PlasmaComponents.Label {
                 text: overviewState.sourceRows.length
                 color: Kirigami.Theme.disabledTextColor
-                Accessible.name: KI18n.i18np("%1 source", "%1 sources",
+                Accessible.name: i18np("%1 source", "%1 sources",
                                              overviewState.sourceRows.length)
             }
         }
@@ -84,7 +83,7 @@ QQC2.ScrollView {
             Layout.leftMargin: Kirigami.Units.largeSpacing
             Layout.rightMargin: Kirigami.Units.largeSpacing
             visible: overviewState.sourceRows.length === 0
-            text: KI18n.i18n("Enable a source or run guided setup to start monitoring.")
+            text: i18n("Enable a source or run guided setup to start monitoring.")
             wrapMode: Text.WordWrap
             color: Kirigami.Theme.disabledTextColor
         }

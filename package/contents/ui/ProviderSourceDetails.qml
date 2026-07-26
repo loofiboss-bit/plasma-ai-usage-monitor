@@ -1,6 +1,5 @@
 pragma ComponentBehavior: Bound
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -25,54 +24,54 @@ Kirigami.FormLayout {
 
     function credentialLabel(slot) {
         var labels = {
-            "openai": KI18n.i18n("Admin API key"),
-            "anthropic": KI18n.i18n("Standard API key (connectivity only)"),
-            "anthropic_admin": KI18n.i18n("Admin API key (usage and cost)"),
-            "azure_openai_api_key": KI18n.i18n("API key"),
-            "bedrock_access_key_id": KI18n.i18n("Access key ID"),
-            "bedrock_secret_access_key": KI18n.i18n("Secret access key"),
-            "bedrock_session_token": KI18n.i18n("Session token (optional)")
+            "openai": i18n("Admin API key"),
+            "anthropic": i18n("Standard API key (connectivity only)"),
+            "anthropic_admin": i18n("Admin API key (usage and cost)"),
+            "azure_openai_api_key": i18n("API key"),
+            "bedrock_access_key_id": i18n("Access key ID"),
+            "bedrock_secret_access_key": i18n("Secret access key"),
+            "bedrock_session_token": i18n("Session token (optional)")
         };
-        return labels[slot] || KI18n.i18n("API key");
+        return labels[slot] || i18n("API key");
     }
 
     function permissionLabel(auth) {
         if (details.localTool)
-            return KI18n.i18n("Read local activity metadata; no provider credential or inference request");
+            return i18n("Read local activity metadata; no provider credential or inference request");
         if (descriptor.configKey === "anthropic")
-            return KI18n.i18n("A standard key checks connectivity. An optional organization Admin key reads actual usage and cost reports.");
+            return i18n("A standard key checks connectivity. An optional organization Admin key reads actual usage and cost reports.");
         var scheme = auth.scheme || "none";
-        if (scheme === "none") return KI18n.i18n("No credential required");
+        if (scheme === "none") return i18n("No credential required");
         if (descriptor.monitoringLevel === "actual_usage_spend")
-            return KI18n.i18n("Read-only organization usage and costs permission");
+            return i18n("Read-only organization usage and costs permission");
         if (descriptor.monitoringLevel === "gateway_aggregate")
-            return KI18n.i18n("Read-only gateway spend-log permission");
+            return i18n("Read-only gateway spend-log permission");
         if (descriptor.monitoringLevel === "balance_connectivity")
-            return KI18n.i18n("Read-only balance and model discovery permission");
-        return KI18n.i18n("Read-only model discovery permission");
+            return i18n("Read-only balance and model discovery permission");
+        return i18n("Read-only model discovery permission");
     }
 
     function endpointSummary(safeRefresh) {
-        if (details.localTool) return KI18n.i18n("Local installation and activity check");
+        if (details.localTool) return i18n("Local installation and activity check");
         var paths = safeRefresh.paths || [safeRefresh.path || ""];
         var calls = [];
         for (var i = 0; i < paths.length; ++i) {
             if (paths[i]) calls.push((safeRefresh.method || "GET") + " " + paths[i]);
         }
-        return calls.length > 0 ? calls.join(" · ") : KI18n.i18n("No scheduled request");
+        return calls.length > 0 ? calls.join(" · ") : i18n("No scheduled request");
     }
 
     Kirigami.Heading {
         Kirigami.FormData.isSection: true
         Kirigami.FormData.label: ""
-        text: details.hasSource ? details.descriptor.name : KI18n.i18n("Select a source")
+        text: details.hasSource ? details.descriptor.name : i18n("Select a source")
         level: 2
         Accessible.name: text
     }
 
     QQC2.Label {
         visible: details.hasSource
-        Kirigami.FormData.label: KI18n.i18n("Monitoring level:")
+        Kirigami.FormData.label: i18n("Monitoring level:")
         text: details.controller.categoryLabel(details.descriptor.monitoringLevel)
         wrapMode: Text.WordWrap
         Layout.fillWidth: true
@@ -80,7 +79,7 @@ Kirigami.FormLayout {
 
     QQC2.Label {
         visible: details.hasSource
-        Kirigami.FormData.label: KI18n.i18n("Required permission:")
+        Kirigami.FormData.label: i18n("Required permission:")
         text: details.permissionLabel(details.descriptor.auth || ({}))
         wrapMode: Text.WordWrap
         Layout.fillWidth: true
@@ -88,7 +87,7 @@ Kirigami.FormLayout {
 
     QQC2.Label {
         visible: details.hasSource
-        Kirigami.FormData.label: KI18n.i18n("Scheduled check:")
+        Kirigami.FormData.label: i18n("Scheduled check:")
         text: details.endpointSummary(details.descriptor.safeRefresh || ({}))
         wrapMode: Text.WrapAnywhere
         font.family: "monospace"
@@ -97,11 +96,11 @@ Kirigami.FormLayout {
 
     QQC2.Switch {
         visible: details.hasSource
-        Kirigami.FormData.label: KI18n.i18n("Enabled:")
+        Kirigami.FormData.label: i18n("Enabled:")
         checked: details.sourceEnabled
-        text: checked ? KI18n.i18n("Scheduled monitoring is enabled")
-                      : KI18n.i18n("Scheduled monitoring is disabled")
-        Accessible.name: KI18n.i18n("Enable %1", details.descriptor.name || KI18n.i18n("source"))
+        text: checked ? i18n("Scheduled monitoring is enabled")
+                      : i18n("Scheduled monitoring is disabled")
+        Accessible.name: i18n("Enable %1", details.descriptor.name || i18n("source"))
         onToggled: details.controller.setValue(details.descriptor.enabledConfigKey, checked)
     }
 
@@ -116,10 +115,10 @@ Kirigami.FormLayout {
             clearEnabled: details.configPage.hasStoredOrPendingSecret(modelData)
             placeholderText: modelData === "bedrock_session_token"
                 && !details.configPage.hasStoredOrPendingSecret(modelData)
-                ? KI18n.i18n("Optional")
+                ? i18n("Optional")
                 : details.descriptor.configKey === "anthropic"
                     && !details.configPage.hasStoredOrPendingSecret(modelData)
-                    ? KI18n.i18n("Configure either key")
+                    ? i18n("Configure either key")
                     : details.configPage.secretPlaceholder(modelData)
             onCredentialEdited: function(value) {
                 details.configPage.stageSecret(modelData, value);
@@ -130,7 +129,7 @@ Kirigami.FormLayout {
 
     QQC2.Label {
         visible: details.credentialSlots.length > 0 && !details.configPage.walletOpen
-        text: KI18n.i18n("Unlock KDE Wallet to edit credentials.")
+        text: i18n("Unlock KDE Wallet to edit credentials.")
         color: Kirigami.Theme.negativeTextColor
         wrapMode: Text.WordWrap
         Layout.fillWidth: true
@@ -138,13 +137,13 @@ Kirigami.FormLayout {
 
     QQC2.ComboBox {
         visible: details.hasSource && !details.localTool && details.configPage.advancedMode
-        Kirigami.FormData.label: KI18n.i18n("Model override:")
+        Kirigami.FormData.label: i18n("Model override:")
         enabled: details.sourceEnabled
         editable: true
         model: details.hasSource ? details.configPage.catalogModelIds(details.descriptor.configKey) : []
         editText: details.hasSource
             ? String(details.controller.value(details.descriptor.modelConfigKey) || "") : ""
-        Accessible.name: KI18n.i18n("Model override for %1", details.descriptor.name || KI18n.i18n("source"))
+        Accessible.name: i18n("Model override for %1", details.descriptor.name || i18n("source"))
         Layout.fillWidth: true
         onEditTextChanged: {
             if (details.hasSource)
@@ -154,12 +153,12 @@ Kirigami.FormLayout {
 
     QQC2.TextField {
         visible: details.hasSource && !details.localTool && details.configPage.advancedMode
-        Kirigami.FormData.label: KI18n.i18n("Custom base URL:")
+        Kirigami.FormData.label: i18n("Custom base URL:")
         enabled: details.sourceEnabled
         text: details.baseUrlKey ? String(details.controller.value(details.baseUrlKey) || "") : ""
-        placeholderText: KI18n.i18n("Leave empty for the catalog endpoint")
+        placeholderText: i18n("Leave empty for the catalog endpoint")
         inputMethodHints: Qt.ImhUrlCharactersOnly
-        Accessible.name: KI18n.i18n("Custom base URL for %1", details.descriptor.name || KI18n.i18n("source"))
+        Accessible.name: i18n("Custom base URL for %1", details.descriptor.name || i18n("source"))
         Layout.fillWidth: true
         onTextEdited: details.controller.setValue(details.baseUrlKey, text)
     }
@@ -167,7 +166,7 @@ Kirigami.FormLayout {
     QQC2.Label {
         visible: details.hasSource && details.configPage.advancedMode
                  && details.configPage.isInvalidUrl(String(details.controller.value(details.baseUrlKey) || ""))
-        text: KI18n.i18n("Use HTTPS. HTTP is allowed only for a loopback endpoint.")
+        text: i18n("Use HTTPS. HTTP is allowed only for a loopback endpoint.")
         color: Kirigami.Theme.negativeTextColor
         wrapMode: Text.WordWrap
         Layout.fillWidth: true
@@ -175,32 +174,32 @@ Kirigami.FormLayout {
 
     QQC2.TextField {
         visible: details.configPage.advancedMode && details.descriptor.configKey === "openai"
-        Kirigami.FormData.label: KI18n.i18n("Project ID:")
+        Kirigami.FormData.label: i18n("Project ID:")
         enabled: details.sourceEnabled
         text: String(details.controller.value("openaiProjectId") || "")
         placeholderText: "proj_..."
-        Accessible.name: KI18n.i18n("OpenAI project ID")
+        Accessible.name: i18n("OpenAI project ID")
         Layout.fillWidth: true
         onTextEdited: details.controller.setValue("openaiProjectId", text)
     }
 
     QQC2.TextField {
         visible: details.configPage.advancedMode && details.descriptor.configKey === "azure"
-        Kirigami.FormData.label: KI18n.i18n("Deployment ID:")
+        Kirigami.FormData.label: i18n("Deployment ID:")
         enabled: details.sourceEnabled
         text: String(details.controller.value("azureDeploymentId") || "")
-        Accessible.name: KI18n.i18n("Azure OpenAI deployment ID")
+        Accessible.name: i18n("Azure OpenAI deployment ID")
         Layout.fillWidth: true
         onTextEdited: details.controller.setValue("azureDeploymentId", text)
     }
 
     QQC2.TextField {
         visible: details.configPage.advancedMode && details.descriptor.configKey === "bedrock"
-        Kirigami.FormData.label: KI18n.i18n("Region:")
+        Kirigami.FormData.label: i18n("Region:")
         enabled: details.sourceEnabled
         text: String(details.controller.value("bedrockRegion") || "")
         placeholderText: "us-east-1"
-        Accessible.name: KI18n.i18n("AWS Bedrock region")
+        Accessible.name: i18n("AWS Bedrock region")
         Layout.fillWidth: true
         onTextEdited: details.controller.setValue("bedrockRegion", text)
     }
@@ -209,14 +208,14 @@ Kirigami.FormLayout {
         visible: details.configPage.advancedMode
                  && (details.descriptor.configKey === "google"
                      || details.descriptor.configKey === "googleveo")
-        Kirigami.FormData.label: KI18n.i18n("Pricing tier:")
+        Kirigami.FormData.label: i18n("Pricing tier:")
         enabled: details.sourceEnabled
         textRole: "text"
         valueRole: "value"
-        Accessible.name: KI18n.i18n("Pricing tier for %1", details.descriptor.name || KI18n.i18n("source"))
+        Accessible.name: i18n("Pricing tier for %1", details.descriptor.name || i18n("source"))
         model: [
-            { text: KI18n.i18n("Free tier"), value: "free" },
-            { text: KI18n.i18n("Paid (pay as you go)"), value: "paid" }
+            { text: i18n("Free tier"), value: "free" },
+            { text: i18n("Paid (pay as you go)"), value: "paid" }
         ]
         currentIndex: {
             var key = details.descriptor.configKey === "google" ? "googleTier" : "googleveoTier";
@@ -245,16 +244,16 @@ Kirigami.FormLayout {
         QQC2.Label {
             Layout.fillWidth: true
             visible: details.configPage.hasUnsavedChanges
-            text: KI18n.i18n("Apply the pending changes before verification.")
+            text: i18n("Apply the pending changes before verification.")
             color: Kirigami.Theme.neutralTextColor
             wrapMode: Text.WordWrap
         }
 
         QQC2.Button {
-            text: KI18n.i18n("Verify")
+            text: i18n("Verify")
             icon.name: "security-high"
             enabled: details.sourceEnabled && !details.configPage.hasUnsavedChanges
-            Accessible.name: KI18n.i18n("Verify %1 using its read-only scheduled check", details.descriptor.name)
+            Accessible.name: i18n("Verify %1 using its read-only scheduled check", details.descriptor.name)
             onClicked: details.configPage.requestVerification(details.descriptor.configKey)
         }
     }

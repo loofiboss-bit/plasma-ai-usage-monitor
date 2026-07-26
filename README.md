@@ -6,7 +6,7 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **16.0.0 (Control Loop)** connects Daily Focus to source-specific evidence, actions, and compatible History. Anthropic can optionally report organization usage and cost with a separate Admin API key. Actual data, local estimates, balances, fixed fees, and unavailable values remain separate from the panel through History and Analyst.
+Version **16.0.1 (Control Loop)** connects Daily Focus to source-specific evidence, actions, and compatible History. Anthropic can optionally report organization usage and cost with a separate Admin API key. Actual data, local estimates, balances, fixed fees, and unavailable values remain separate from the panel through History and Analyst.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 

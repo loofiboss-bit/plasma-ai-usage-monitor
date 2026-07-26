@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [16.0.1] — 2026-07-26
+
+### Fixed
+- Restore Settings labels and other translated QML text by using Plasma's localized runtime context instead of the incompatible `KI18n` singleton path.
+- Add a release-blocking localization check so unsupported qualified translation
+  calls cannot silently remove QML text again.
+
 ## [16.0.0] — 2026-07-26
 
 ### Added
@@ -855,7 +862,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v16.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v16.0.1...HEAD
+[16.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v16.0.0...v16.0.1
 [16.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v15.0.0...v16.0.0
 [15.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v15.0.0
 [14.1.2]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v14.1.2

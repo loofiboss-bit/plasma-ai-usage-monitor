@@ -1,7 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
@@ -58,7 +57,7 @@ Rectangle {
             PlasmaComponents.Label {
                 Layout.fillWidth: true
                 visible: Number(attention.presentation.summary.attentionSourceCount || 0) > 1
-                text: KI18n.i18np("%1 other source also needs attention",
+                text: i18np("%1 other source also needs attention",
                             "%1 other sources also need attention",
                             Number(attention.presentation.summary.attentionSourceCount) - 1)
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
@@ -71,7 +70,7 @@ Rectangle {
             text: attention.presentation.actionLabel(attention.row)
             icon.name: attention.row.nextActionKey === "refresh_stale_data" ? "view-refresh" : "configure"
             activeFocusOnTab: true
-            Accessible.name: KI18n.i18n("%1 for %2: %3", text,
+            Accessible.name: i18n("%1 for %2: %3", text,
                                   attention.row.displayName,
                                   attention.presentation.actionText(attention.row))
             onClicked: attention.fixRequested(attention.row.stableId,

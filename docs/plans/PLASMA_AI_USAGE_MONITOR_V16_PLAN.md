@@ -1,10 +1,10 @@
-# Plasma AI Usage Monitor v16.0.0 — Control Loop
+# Plasma AI Usage Monitor v16.0.1 — Control Loop
 
 - **Document type:** Implementation plan
 - **Status:** Released on 2026-07-26
 - **Planning baseline:** `main` at `d51f597ebb0d23f7572c8d9d65f4ecf0beb85396`
-- **Current release:** `16.0.0`
-- **Target release:** `16.0.0`
+- **Current release:** `16.0.1`
+- **Target release:** `16.0.1`
 - **Primary platform:** Fedora 44 KDE Plasma 6
 - **Primary audience:** Individual developers monitoring AI API usage, spend,
 subscription activity, quota, and reset windows from the Plasma panel

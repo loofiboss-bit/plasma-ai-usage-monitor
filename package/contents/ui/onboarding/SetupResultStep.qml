@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
@@ -20,7 +19,7 @@ ColumnLayout {
         Layout.fillWidth: true
         horizontalAlignment: Text.AlignHCenter
         level: 4
-        text: KI18n.i18n("%1 is ready", step.controller.selectedSource.displayName || KI18n.i18n("Source"))
+        text: i18n("%1 is ready", step.controller.selectedSource.displayName || i18n("Source"))
     }
     PlasmaComponents.Label {
         Layout.fillWidth: true
@@ -36,7 +35,7 @@ ColumnLayout {
     }
     PlasmaComponents.Button {
         Layout.alignment: Qt.AlignHCenter
-        text: KI18n.i18n("Open dashboard")
+        text: i18n("Open dashboard")
         icon.name: "go-next"
         onClicked: step.controller.finish()
     }

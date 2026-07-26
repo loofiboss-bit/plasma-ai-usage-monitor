@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -30,7 +29,7 @@ Item {
         id: emptyStateLabel
         anchors.centerIn: parent
         visible: trendRoot.showEmptyState && !trendRoot.hasSummaryData
-        text: KI18n.i18n("No historical data available")
+        text: i18n("No historical data available")
         color: Kirigami.Theme.disabledTextColor
         font.pointSize: Kirigami.Theme.smallFont.pointSize
     }
@@ -45,7 +44,7 @@ Item {
 
         // ── Total Cost ──
         PlasmaComponents.Label {
-            text: KI18n.i18n("Total Cost:")
+            text: i18n("Total Cost:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
@@ -61,7 +60,7 @@ Item {
 
         // ── Average Daily Cost ──
         PlasmaComponents.Label {
-            text: KI18n.i18n("Avg Daily Cost:")
+            text: i18n("Avg Daily Cost:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
@@ -69,14 +68,14 @@ Item {
         PlasmaComponents.Label {
             text: trendRoot.dailyCosts.length > 0
                 ? Utils.formatMoney(trendRoot.summaryData.avgDailyCost || 0, trendRoot.dailyCosts[0].currency || "USD")
-                : KI18n.i18n("Not derivable")
+                : i18n("Not derivable")
             elide: Text.ElideRight
             Layout.fillWidth: true
         }
 
         // ── Max Daily Cost ──
         PlasmaComponents.Label {
-            text: KI18n.i18n("Peak Daily Cost:")
+            text: i18n("Peak Daily Cost:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
@@ -84,7 +83,7 @@ Item {
         PlasmaComponents.Label {
             text: trendRoot.dailyCosts.length > 0
                 ? Utils.formatMoney(trendRoot.summaryData.maxDailyCost || 0, trendRoot.dailyCosts[0].currency || "USD")
-                : KI18n.i18n("Not derivable")
+                : i18n("Not derivable")
             color: (trendRoot.summaryData.maxDailyCost || 0) > (trendRoot.summaryData.avgDailyCost || 0) * 2
                    ? Kirigami.Theme.negativeTextColor
                    : Kirigami.Theme.textColor
@@ -92,7 +91,7 @@ Item {
 
         // ── Total Requests ──
         PlasmaComponents.Label {
-            text: KI18n.i18n("Total Requests:")
+            text: i18n("Total Requests:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
@@ -103,7 +102,7 @@ Item {
 
         // ── Peak Token Usage ──
         PlasmaComponents.Label {
-            text: KI18n.i18n("Peak Tokens:")
+            text: i18n("Peak Tokens:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
@@ -114,7 +113,7 @@ Item {
 
         // ── Data Points ──
         PlasmaComponents.Label {
-            text: KI18n.i18n("Data Points:")
+            text: i18n("Data Points:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
@@ -127,7 +126,7 @@ Item {
 
         // ── Trend indicator ──
         PlasmaComponents.Label {
-            text: KI18n.i18n("Trend:")
+            text: i18n("Trend:")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.alignment: Qt.AlignRight
@@ -152,9 +151,9 @@ Item {
                 elide: Text.ElideRight
                 text: {
                     var dir = trendRoot.trendDirection();
-                    if (dir > 0) return KI18n.i18n("Costs increasing");
-                    if (dir < 0) return KI18n.i18n("Costs decreasing");
-                    return KI18n.i18n("Costs stable");
+                    if (dir > 0) return i18n("Costs increasing");
+                    if (dir < 0) return i18n("Costs decreasing");
+                    return i18n("Costs stable");
                 }
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 color: trendRoot.trendDirection() > 0 ? Kirigami.Theme.negativeTextColor

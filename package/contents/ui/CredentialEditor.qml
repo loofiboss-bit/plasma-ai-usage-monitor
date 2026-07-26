@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
@@ -35,7 +34,7 @@ RowLayout {
         checkable: true
         icon.name: checked ? "password-show-off" : "password-show-on"
         display: QQC2.AbstractButton.IconOnly
-        Accessible.name: checked ? KI18n.i18n("Hide %1", editor.label) : KI18n.i18n("Show %1", editor.label)
+        Accessible.name: checked ? i18n("Hide %1", editor.label) : i18n("Show %1", editor.label)
         QQC2.ToolTip.text: Accessible.name
         QQC2.ToolTip.visible: hovered
     }
@@ -45,7 +44,7 @@ RowLayout {
         enabled: editor.editable && editor.clearEnabled
         icon.name: "edit-clear"
         display: QQC2.AbstractButton.IconOnly
-        Accessible.name: KI18n.i18n("Clear %1", editor.label)
+        Accessible.name: i18n("Clear %1", editor.label)
         QQC2.ToolTip.text: Accessible.name
         QQC2.ToolTip.visible: hovered
         onClicked: {

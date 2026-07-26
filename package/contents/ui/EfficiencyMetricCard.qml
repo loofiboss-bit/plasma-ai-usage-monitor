@@ -1,5 +1,4 @@
 import QtQuick
-import org.kde.ki18n
 import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
@@ -14,7 +13,7 @@ Kirigami.Card {
     
     header: Kirigami.Heading {
         objectName: "ratioTitle"
-        text: KI18n.i18n("Output / Input Ratio")
+        text: i18n("Output / Input Ratio")
         level: 4
     }
     
@@ -31,7 +30,7 @@ Kirigami.Card {
         
         PlasmaComponents.Label {
             objectName: "ratioDescription"
-            text: KI18n.i18n("Output tokens divided by input tokens")
+            text: i18n("Output tokens divided by input tokens")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             Layout.fillWidth: true
