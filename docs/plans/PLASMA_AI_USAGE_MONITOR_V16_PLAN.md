@@ -1,9 +1,9 @@
 # Plasma AI Usage Monitor v16.0.0 — Control Loop
 
 - **Document type:** Implementation plan
-- **Status:** Phases 0–5 implemented; local release verification in progress
+- **Status:** Released on 2026-07-26
 - **Planning baseline:** `main` at `d51f597ebb0d23f7572c8d9d65f4ecf0beb85396`
-- **Current release:** `15.0.0`
+- **Current release:** `16.0.0`
 - **Target release:** `16.0.0`
 - **Primary platform:** Fedora 44 KDE Plasma 6
 - **Primary audience:** Individual developers monitoring AI API usage, spend,
@@ -152,8 +152,8 @@ pass and the working diff contains no v16 runtime feature.
   panel states.
 - Verify a real v15-to-v16 Fedora package upgrade preserves KConfig, KWallet,
   schema-v4 history, package identity, and typed data semantics.
-- Prepare a complete local release candidate. Commit, push, tag, COPR, GitHub,
-  wiki, and KDE Store publication require explicit release authorization.
+- Prepare a complete local release candidate, then publish its exact commit to
+  GitHub, COPR, the wiki, and KDE Store after explicit release authorization.
 
 ## 4. Public interfaces and data contracts
 
@@ -211,8 +211,8 @@ by more than 10% without documented evidence and an explicit plan change.
 
 ## 6. Release completion
 
-v16 is complete only after all five implementation phases pass, the exact
-source archive and Fedora package upgrade are verified, the release-media
-manifest proves the intended surfaces, and every requested public surface is
-independently read back. Local implementation does not itself authorize public
+v16 completed after all five implementation phases passed, the exact source
+archive and Fedora package upgrade were verified, the release-media manifest
+proved the intended surfaces, and every requested public surface was
+independently read back. Local implementation did not itself authorize public
 release.

@@ -1,4 +1,4 @@
-# v15 GitHub and KDE Store submission checklist
+# v16 GitHub and KDE Store submission checklist
 
 Use this checklist after runtime, performance, accessibility, documentation, and
 release media are complete.
@@ -8,7 +8,7 @@ release media are complete.
 - `just release-check` passes against the exact candidate tree
 - the Fedora 44 performance and accessibility evidence is complete
 - roadmap, changelog, user guide, generated wiki, AppStream, and RPM metadata agree
-- the nine canonical screenshots pass `scripts/check_release_media.py`
+- the ten canonical screenshots pass `scripts/check_release_media.py`
 - the install story remains explicit: the Store archive is the frontend and the matching compiled plugin is required
 
 ## Listing copy
@@ -35,17 +35,18 @@ install the matching native plugin from COPR or a source build first.
 
 ## Release media inventory
 
-Keep the nine reviewed Breeze Dark captures from the same isolated session in
+Keep the ten reviewed Breeze Dark captures from the same isolated session in
 the release manifest:
 
 - `assets/screenshots/overview-popup.png`
 - `assets/screenshots/attention-state.png`
-- `assets/screenshots/quota-reset-state.png`
-- `assets/screenshots/tool-only-overview.png`
-- `assets/screenshots/retained-history.png`
+- `assets/screenshots/source-detail.png`
 - `assets/screenshots/history-gap.png`
 - `assets/screenshots/analyst-sufficient.png`
 - `assets/screenshots/analyst-insufficient.png`
+- `assets/screenshots/guided-first-success.png`
+- `assets/screenshots/provider-settings.png`
+- `assets/screenshots/plugin-recovery.png`
 - `assets/screenshots/panel-lowest-quota.png`
 
 The manifest must identify the capture commit, date, Plasma version, scale,
@@ -55,8 +56,8 @@ KDE Store accepts at most five gallery pictures. Upload these representative
 captures there:
 
 - `assets/screenshots/overview-popup.png`
-- `assets/screenshots/attention-state.png`
-- `assets/screenshots/retained-history.png`
+- `assets/screenshots/source-detail.png`
+- `assets/screenshots/history-gap.png`
 - `assets/screenshots/analyst-sufficient.png`
 - `assets/screenshots/panel-lowest-quota.png`
 
@@ -66,16 +67,16 @@ captures there:
 - `com.github.loofi.aiusagemonitor.plasmoid`
 - SHA-256 checksums
 - SPDX source SBOM
-- v15 changelog and release notes
+- v16 changelog and release notes
 - exact-tag provenance from the release workflow
 
-Release notes must call out Daily State semantics, truthful quota/reset rules,
-retained History, Analyst methodology, v14 compact-mode migration, and the
-frontend/native-plugin packaging boundary.
+Release notes must call out Daily Focus and Source Detail, exact UTC period
+semantics, retained History gaps, Analyst methodology, optional Anthropic Admin
+reporting, and the frontend/native-plugin packaging boundary.
 
 ## Manual publication sequence
 
-1. verify `docs/release/v15.0.0-checklist.md` is complete
+1. verify `docs/release/v16.0.0-checklist.md` is complete
 2. push the release commit and exact annotated tag
 3. verify CI and the draft GitHub release assets against that tag
 4. publish the GitHub release
@@ -87,8 +88,8 @@ frontend/native-plugin packaging boundary.
 ## Final review
 
 - unavailable values never look like actual zeroes
-- the quota/reset screenshots use synchronized or provider-reported windows
-- the tool-only screenshot does not imply an API provider is required
+- the quota/reset displays use synchronized or provider-reported windows
+- Source Detail preserves availability, freshness, and provenance
 - History labels the disabled source and visible gap
 - Analyst sufficient and insufficient states match the documented thresholds
-- GitHub, COPR, and KDE Store describe the same v15 product
+- GitHub, COPR, and KDE Store describe the same v16 product
