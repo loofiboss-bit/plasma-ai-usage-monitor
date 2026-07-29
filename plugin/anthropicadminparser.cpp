@@ -15,10 +15,11 @@ QDateTime utcDateTime(const QJsonValue &value) {
 
 QString rowKey(const QDateTime &start, const QDateTime &end,
                const QString &model, const QString &project,
-               const QString &tier) {
+               const QString &tier, const QString &lineItem = QString()) {
   return start.toString(Qt::ISODateWithMs) + QLatin1Char('|') +
          end.toString(Qt::ISODateWithMs) + QLatin1Char('|') + model +
-         QLatin1Char('|') + project + QLatin1Char('|') + tier;
+         QLatin1Char('|') + project + QLatin1Char('|') + tier +
+         QLatin1Char('|') + lineItem;
 }
 } // namespace
 
@@ -139,7 +140,7 @@ bool AnthropicAdminParser::parseCostPage(const QJsonObject &root,
   for (qsizetype index = 0; index < rows->size(); ++index) {
     const CostRow &row = rows->at(index);
     indexes.insert(rowKey(row.periodStart, row.periodEnd, row.model,
-                          row.project, row.serviceTier),
+                          row.project, row.serviceTier, row.lineItem),
                    index);
   }
   for (const QJsonValue &bucketValue :
@@ -179,9 +180,11 @@ bool AnthropicAdminParser::parseCostPage(const QJsonObject &root,
       row.model = result.value(QStringLiteral("model")).toString();
       row.project = result.value(QStringLiteral("workspace_id")).toString();
       row.serviceTier = result.value(QStringLiteral("service_tier")).toString();
+      row.lineItem = result.value(QStringLiteral("description")).toString();
       row.microUsd = microUsd;
       const QString key =
-          rowKey(start, end, row.model, row.project, row.serviceTier);
+          rowKey(start, end, row.model, row.project, row.serviceTier,
+                 row.lineItem);
       if (indexes.contains(key))
         (*rows)[indexes.value(key)].microUsd += microUsd;
       else {

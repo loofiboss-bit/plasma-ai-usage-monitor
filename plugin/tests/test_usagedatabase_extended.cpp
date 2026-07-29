@@ -14,6 +14,7 @@
 #include <QRegularExpression>
 #include <QTimeZone>
 
+#include "forecastcontract.h"
 #include "usagedatabase.h"
 
 namespace {
@@ -122,6 +123,30 @@ bool installSqlFixture(const QString &fixturePath)
     QSqlDatabase::removeDatabase(connectionName);
     return ok;
 }
+
+ForecastContract::Result guardrailForecast(ForecastContract::State state)
+{
+    ForecastContract::Result result;
+    result.kind = ForecastContract::Kind::BudgetOverrun;
+    result.state = state;
+    result.sourceId = QStringLiteral("provider:openai");
+    result.sourceKind = QStringLiteral("provider");
+    result.window = QStringLiteral("2026-07");
+    result.scope = QStringLiteral("account");
+    result.currentValue = 75.0;
+    result.projectedValue = 120.0;
+    result.limitValue = 100.0;
+    result.unit = QStringLiteral("USD");
+    result.currency = QStringLiteral("USD");
+    result.predictedAt = QDateTime(QDate(2026, 7, 27), QTime(0, 0), QTimeZone::UTC);
+    result.periodEnd = QDateTime(QDate(2026, 8, 1), QTime(0, 0), QTimeZone::UTC);
+    result.sampleCount = 20;
+    result.coveragePercent = 90.0;
+    result.evidenceGrade = ForecastContract::EvidenceGrade::Strong;
+    result.methodId = QStringLiteral("budget-pacing-v1");
+    result.generatedAt = QDateTime(QDate(2026, 7, 24), QTime(12, 0), QTimeZone::UTC);
+    return result;
+}
 } // namespace
 
 class UsageDatabaseExtendedTest : public QObject
@@ -137,6 +162,9 @@ private Q_SLOTS:
     void testExportJson();
     void testSourceMetadataSchemaMigration();
     void testObservationSchemaV4AndCurrencyIsolation();
+    void testSchemaV5MigrationRollbackAndRecovery();
+    void testGuardrailTransitionRestartDeduplication();
+    void testGuardrailEventExportAndRetention();
     void testNullableTypedMetricPersistence();
     void testRealLegacyFixtureMigration_data();
     void testRealLegacyFixtureMigration();
@@ -155,6 +183,7 @@ void UsageDatabaseExtendedTest::testRealLegacyFixtureMigration_data()
     QTest::addColumn<QString>("source");
     QTest::newRow("v11") << QStringLiteral("v11.sql") << QStringLiteral("OpenAI") << QStringLiteral("billing_api");
     QTest::newRow("v12") << QStringLiteral("v12.sql") << QStringLiteral("OpenRouter") << QStringLiteral("actual_api");
+    QTest::newRow("v16") << QStringLiteral("v16.sql") << QStringLiteral("Anthropic") << QStringLiteral("billing_api");
 }
 
 void UsageDatabaseExtendedTest::testRealLegacyFixtureMigration()
@@ -172,7 +201,10 @@ void UsageDatabaseExtendedTest::testRealLegacyFixtureMigration()
         UsageDatabase db;
         db.init();
     }
-    QVERIFY(QFileInfo::exists(databasePath() + QStringLiteral(".v13-backup")));
+    if (fixtureName != QLatin1String("v16.sql")) {
+        QVERIFY(QFileInfo::exists(databasePath() + QStringLiteral(".v13-backup")));
+    }
+    QVERIFY(QFileInfo::exists(databasePath() + QStringLiteral(".v17-backup")));
 
     const QString connectionName = QStringLiteral("verify_fixture_%1")
         .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
@@ -183,7 +215,7 @@ void UsageDatabaseExtendedTest::testRealLegacyFixtureMigration()
         QVERIFY(check.open());
         QSqlQuery query(check);
         QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")) && query.next());
-        QCOMPARE(query.value(0).toInt(), 4);
+        QCOMPARE(query.value(0).toInt(), 5);
         query.prepare(QStringLiteral("SELECT COUNT(*), MIN(source) FROM observations WHERE provider=? AND metric_kind='cost'"));
         query.addBindValue(provider);
         QVERIFY(query.exec() && query.next());
@@ -278,7 +310,7 @@ void UsageDatabaseExtendedTest::testObservationSchemaV4AndCurrencyIsolation()
         QSqlQuery query(check);
         QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")));
         QVERIFY(query.next());
-        QCOMPARE(query.value(0).toInt(), 4);
+        QCOMPARE(query.value(0).toInt(), 5);
 
         QVERIFY(query.exec(QStringLiteral("PRAGMA table_info(observations)")));
         bool nullableValue = false;
@@ -315,6 +347,173 @@ void UsageDatabaseExtendedTest::testObservationSchemaV4AndCurrencyIsolation()
     }
     QSqlDatabase::removeDatabase(connectionName);
 
+}
+
+void UsageDatabaseExtendedTest::testSchemaV5MigrationRollbackAndRecovery()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+    const QString fixture = QFINDTESTDATA(QStringLiteral("fixtures/database/v16.sql"));
+    QVERIFY(!fixture.isEmpty());
+    QVERIFY(installSqlFixture(fixture));
+
+    const QString conflictConnection
+        = QStringLiteral("v5_conflict_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), conflictConnection);
+        db.setDatabaseName(databasePath());
+        QVERIFY(db.open());
+        QSqlQuery query(db);
+        QVERIFY(query.exec(QStringLiteral("CREATE TABLE guardrail_events(id INTEGER)")));
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(conflictConnection);
+
+    {
+        UsageDatabase db;
+        db.init();
+    }
+    QVERIFY(QFileInfo::exists(databasePath() + QStringLiteral(".v17-backup")));
+
+    const QString rollbackConnection
+        = QStringLiteral("v5_rollback_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), rollbackConnection);
+        db.setDatabaseName(databasePath());
+        QVERIFY(db.open());
+        QSqlQuery query(db);
+        QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")) && query.next());
+        QCOMPARE(query.value(0).toInt(), 4);
+        QVERIFY(query.exec(QStringLiteral("SELECT COUNT(*) FROM observations")) && query.next());
+        QCOMPARE(query.value(0).toInt(), 1);
+        QVERIFY(query.exec(QStringLiteral("SELECT COUNT(*) FROM pragma_table_info('guardrail_events')")));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toInt(), 1);
+        QVERIFY(query.exec(QStringLiteral("DROP TABLE guardrail_events")));
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(rollbackConnection);
+
+    {
+        UsageDatabase db;
+        db.init();
+    }
+    const QString recoveryConnection
+        = QStringLiteral("v5_recovery_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), recoveryConnection);
+        db.setDatabaseName(databasePath());
+        QVERIFY(db.open());
+        QSqlQuery query(db);
+        QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")) && query.next());
+        QCOMPARE(query.value(0).toInt(), 5);
+        QVERIFY(query.exec(QStringLiteral("SELECT COUNT(*) FROM observations")) && query.next());
+        QCOMPARE(query.value(0).toInt(), 1);
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(recoveryConnection);
+}
+
+void UsageDatabaseExtendedTest::testGuardrailTransitionRestartDeduplication()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+    ForecastContract::Result forecast = guardrailForecast(ForecastContract::State::Warning);
+    const QString stableId = forecast.stableId();
+
+    {
+        UsageDatabase db;
+        db.init();
+        QVERIFY(db.recordGuardrailTransition(forecast.toVariantMap(), QStringLiteral("warning")));
+        QVERIFY(!db.recordGuardrailTransition(forecast.toVariantMap(), QStringLiteral("warning")));
+        const QVariantMap event = db.lastGuardrailTransition(stableId);
+        QCOMPARE(event.value(QStringLiteral("transition")).toString(), QStringLiteral("warning"));
+        QCOMPARE(event.value(QStringLiteral("currentValue")).toDouble(), 75.0);
+    }
+
+    {
+        UsageDatabase db;
+        db.init();
+        QVERIFY(!db.recordGuardrailTransition(forecast.toVariantMap(), QStringLiteral("warning")));
+        forecast.state = ForecastContract::State::Critical;
+        forecast.generatedAt = forecast.generatedAt.addSecs(60);
+        QVERIFY(db.recordGuardrailTransition(forecast.toVariantMap(), QStringLiteral("critical")));
+        forecast.state = ForecastContract::State::Safe;
+        forecast.generatedAt = forecast.generatedAt.addSecs(60);
+        forecast.predictedAt.reset();
+        QVERIFY(db.recordGuardrailTransition(forecast.toVariantMap(), QStringLiteral("recovered")));
+        QVERIFY(!db.recordGuardrailTransition(forecast.toVariantMap(), QStringLiteral("recovered")));
+        const QVariantMap event = db.lastGuardrailTransition(stableId);
+        QCOMPARE(event.value(QStringLiteral("transition")).toString(), QStringLiteral("recovered"));
+    }
+
+    const QString connectionName
+        = QStringLiteral("v5_dedup_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        db.setDatabaseName(databasePath());
+        QVERIFY(db.open());
+        QSqlQuery query(db);
+        QVERIFY(query.exec(QStringLiteral("SELECT COUNT(*) FROM guardrail_events")) && query.next());
+        QCOMPARE(query.value(0).toInt(), 3);
+        QVERIFY(query.exec(QStringLiteral("SELECT COUNT(*) FROM observations")) && query.next());
+        QCOMPARE(query.value(0).toInt(), 0);
+        db.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+}
+
+void UsageDatabaseExtendedTest::testGuardrailEventExportAndRetention()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+    UsageDatabase db;
+    db.init();
+    db.setRetentionDays(1);
+
+    ForecastContract::Result forecast = guardrailForecast(ForecastContract::State::Warning);
+    forecast.generatedAt = QDateTime::currentDateTimeUtc().addDays(-5);
+    forecast.predictedAt = forecast.generatedAt.addDays(1);
+    forecast.periodEnd = forecast.generatedAt.addDays(7);
+    QVERIFY(db.recordGuardrailTransition(forecast.toVariantMap(), QStringLiteral("warning")));
+    forecast.state = ForecastContract::State::Critical;
+    forecast.generatedAt = QDateTime::currentDateTimeUtc();
+    forecast.predictedAt = forecast.generatedAt.addSecs(3600);
+    forecast.periodEnd = forecast.generatedAt.addDays(7);
+    QVERIFY(db.recordGuardrailTransition(forecast.toVariantMap(), QStringLiteral("critical")));
+
+    const QString exportDir = tmp.path() + QStringLiteral("/guardrail-export");
+    const QStringList exports = db.exportAllToDirectory(exportDir, { QStringLiteral("json"), QStringLiteral("csv") });
+    QCOMPARE(exports.size(), 5);
+    const QString jsonPath = exports.filter(QRegularExpression(QStringLiteral("\\.json$"))).value(0);
+    QFile jsonFile(jsonPath);
+    QVERIFY(jsonFile.open(QIODevice::ReadOnly));
+    const QJsonObject root = QJsonDocument::fromJson(jsonFile.readAll()).object();
+    QCOMPARE(root.value(QStringLiteral("schemaVersion")).toInt(), 5);
+    QCOMPARE(root.value(QStringLiteral("guardrailEvents")).toArray().size(), 2);
+    const QString guardrailCsv
+        = exports.filter(QRegularExpression(QStringLiteral("guardrail-events-.*\\.csv$"))).value(0);
+    QFile csvFile(guardrailCsv);
+    QVERIFY(csvFile.open(QIODevice::ReadOnly | QIODevice::Text));
+    QCOMPARE(QString::fromUtf8(csvFile.readAll()).split(QLatin1Char('\n'), Qt::SkipEmptyParts).size(), 3);
+
+    db.pruneOldData();
+    const QString connectionName
+        = QStringLiteral("v5_retention_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+    {
+        QSqlDatabase check = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+        check.setDatabaseName(databasePath());
+        QVERIFY(check.open());
+        QSqlQuery query(check);
+        QVERIFY(query.exec(QStringLiteral("SELECT transition FROM guardrail_events ORDER BY id")) && query.next());
+        QCOMPARE(query.value(0).toString(), QStringLiteral("critical"));
+        QVERIFY(!query.next());
+        check.close();
+    }
+    QSqlDatabase::removeDatabase(connectionName);
 }
 
 void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
@@ -376,7 +575,7 @@ void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
 
     const QString exportDir = tmp.path() + QStringLiteral("/typed-export");
     const QStringList exports = db.exportAllToDirectory(exportDir, {QStringLiteral("json"), QStringLiteral("csv")});
-    QCOMPARE(exports.size(), 4); // combined JSON plus observations/providers/tools CSV files
+    QCOMPARE(exports.size(), 5); // combined JSON plus four typed CSV files
     const QString jsonPath = exports.filter(QRegularExpression(QStringLiteral("\\.json$"))).value(0);
     QFile jsonFile(jsonPath);
     QVERIFY(jsonFile.open(QIODevice::ReadOnly));

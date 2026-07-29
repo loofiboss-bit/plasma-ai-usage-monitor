@@ -24,7 +24,7 @@ TestCase {
 
     Component {
         id: ratioCardComponent
-        Monitor.EfficiencyMetricCard { width: 320 }
+        Monitor.OutputInputRatioCard { width: 320 }
     }
 
     function test_heatmapKeepsMissingAndExplicitZeroDistinct() {
@@ -51,8 +51,8 @@ TestCase {
     }
 
     function test_ratioCardIsNeutral() {
-        var card = createTemporaryObject(ratioCardComponent, testCase, { efficiencyRatio: 0.25 });
-        var highCard = createTemporaryObject(ratioCardComponent, testCase, { efficiencyRatio: 2.5 });
+        var card = createTemporaryObject(ratioCardComponent, testCase, { outputInputRatio: 0.25 });
+        var highCard = createTemporaryObject(ratioCardComponent, testCase, { outputInputRatio: 2.5 });
         verify(card);
         verify(highCard);
         compare(findChild(card, "ratioTitle").text, "Output / Input Ratio");

@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        16.0.1
+Version:        17.0.0
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget for truthful AI usage, quota, resets, and spend
 License:        GPL-3.0-or-later
@@ -41,13 +41,15 @@ Fireworks AI, and Perplexity API.
 Features:
 - Action-first daily status shared by the panel, Overview, and notifications
 - Capability-aware quota and reset monitoring where sources expose live pairs
+- Deterministic quota runway and monthly budget pacing with explicit evidence
+- Provider-reported scope detail without aggregate double counting
 - Usage and cost tracking with retained disabled-source history and real gaps
 - Evidence-bound Analyst snapshots with explicit sample requirements
 - Catalog-backed cost estimation with local JSON metadata
 - Budget management with daily/monthly limits
 - SQLite-based usage history with chart visualization
 - Secure API key storage via KDE Wallet
-- Configurable alerts with KDE notifications
+- Configurable alerts plus opt-in restart-safe guardrail transitions
 - Per-provider refresh intervals and notification controls
 - Collapsible provider cards with accessibility support
 - Data export (CSV/JSON) and non-secret configuration portability
@@ -79,6 +81,11 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Wed Jul 29 2026 Loofi <loofi@github.com> - 17.0.0-1
+- Add deterministic runway and monthly budget pacing
+- Complete OpenAI usage and cost pagination
+- Add schema-v5 transition evidence and private guardrail integrations
+
 * Sun Jul 26 2026 Loofi <loofi@github.com> - 16.0.1-1
 - Prepare v16.0.1 release
 

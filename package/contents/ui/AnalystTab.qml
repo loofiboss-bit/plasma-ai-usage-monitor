@@ -25,6 +25,7 @@ Kirigami.ScrollablePage {
         && (Plasmoid.configuration.historyEnabled || mediaScenario)
         ? analystPage.monitor.usageDb
         : null
+    readonly property var runwayRows: pacingAndRunwayRows()
 
     function mediaSnapshot() {
         var sufficient = mediaSufficient;
@@ -94,6 +95,45 @@ Kirigami.ScrollablePage {
             }
         };
     }
+
+    function pacingAndRunwayRows() {
+        if (!Plasmoid.configuration.forecastUiEnabled) return [];
+        if (mediaScenario) {
+            return [{
+                kind: "budget_overrun",
+                state: mediaSufficient ? "warning" : "unavailable",
+                sourceId: "openrouter",
+                sourceKind: "provider",
+                window: "calendar_month",
+                scope: "organization",
+                currentValue: mediaSufficient ? 8.46 : null,
+                projectedValue: mediaSufficient ? 18.72 : null,
+                limitValue: mediaSufficient ? 15.0 : null,
+                unit: "USD",
+                currency: "USD",
+                predictedAt: mediaSufficient
+                    ? "2026-07-29T10:00:00Z" : null,
+                periodEnd: "2026-08-01T00:00:00Z",
+                sampleCount: mediaSufficient ? 20 : 1,
+                coveragePercent: mediaSufficient ? 80 : 3,
+                evidenceGrade: mediaSufficient ? "strong" : "unavailable",
+                methodId: "budget-pacing-v1",
+                reasonKey: mediaSufficient ? "" : "insufficient_samples",
+                reasonText: mediaSufficient ? ""
+                    : i18n("Not enough compatible observations"),
+                valueClass: "actual"
+            }];
+        }
+        var rows = analystPage.monitor && analystPage.monitor.guardrails
+            ? (analystPage.monitor.guardrails.forecasts || []).slice() : [];
+        var rank = { critical: 0, warning: 1, safe: 2, unavailable: 3 };
+        rows.sort(function(left, right) {
+            return Number(rank[left.state] === undefined ? 4 : rank[left.state])
+                - Number(rank[right.state] === undefined
+                         ? 4 : rank[right.state]);
+        });
+        return rows.slice(0, 8);
+    }
     Components.AnalystState {
         id: analystState
         db: analystPage.db
@@ -119,7 +159,10 @@ Kirigami.ScrollablePage {
             icon.name: "view-refresh"
             text: i18n("Refresh")
             enabled: analystState.reportRequestId === ""
-            onTriggered: analystState.refreshData()
+            onTriggered: {
+                analystState.refreshData();
+                analystPage.monitor.refreshGuardrails();
+            }
         },
         Kirigami.Action {
             icon.name: "edit-copy"
@@ -158,6 +201,45 @@ Kirigami.ScrollablePage {
             type: Kirigami.MessageType.Information
             text: analystState.reasonText(analystState.snapshot.errorKey || "history_unavailable",
                              0, 0)
+        }
+
+        Kirigami.Heading {
+            Layout.fillWidth: true
+            visible: Plasmoid.configuration.forecastUiEnabled
+            text: i18n("Pacing and runway")
+            level: 3
+        }
+
+        Kirigami.InlineMessage {
+            Layout.fillWidth: true
+            visible: Plasmoid.configuration.forecastUiEnabled
+                && analystPage.runwayRows.length === 0
+                && !(analystPage.monitor
+                     && analystPage.monitor.guardrails
+                     && analystPage.monitor.guardrails.busy)
+            type: Kirigami.MessageType.Information
+            text: i18n("No compatible runway forecast is available for the current local history and guardrail settings.")
+            Accessible.name: text
+        }
+
+        Controls.BusyIndicator {
+            Layout.alignment: Qt.AlignHCenter
+            visible: Plasmoid.configuration.forecastUiEnabled
+                && analystPage.monitor
+                && analystPage.monitor.guardrails
+                && analystPage.monitor.guardrails.busy
+                && analystPage.runwayRows.length === 0
+            running: visible
+        }
+
+        Repeater {
+            model: analystPage.runwayRows
+
+            RunwayCard {
+                required property var modelData
+                Layout.fillWidth: true
+                forecast: modelData
+            }
         }
 
         Kirigami.Card {
@@ -360,10 +442,10 @@ Kirigami.ScrollablePage {
                     }
                 }
 
-                EfficiencyMetricCard {
+                OutputInputRatioCard {
                     Layout.fillWidth: true
                     visible: analystState.kpi("outputInputRatio").available
-                    efficiencyRatio: Number(
+                    outputInputRatio: Number(
                         analystState.kpi("outputInputRatio").value)
                 }
 

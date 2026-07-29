@@ -90,6 +90,34 @@ This can be correct. Many provider APIs expose model discovery but no account us
 
 Connectivity-only responses do not create fake usage rows.
 
+## Runway forecast is unavailable
+
+Open Source Detail or Analyst and read the unavailable reason, samples,
+coverage, period end, and method.
+
+- Wait for at least four compatible quota observations spanning 15 minutes.
+- Confirm the newest quota observation is no more than 15 minutes old and the
+  provider still reports the same reset, limit, unit, and window.
+- For monthly pacing, wait for five completed UTC days and at least 70 percent
+  elapsed-day coverage.
+- Configure a positive monthly budget under **Settings → Guardrails**.
+- Keep actual and estimated values separate and use the same ISO currency as
+  the budget; the widget never converts currencies.
+
+An unavailable result is not zero and does not mean a budget or quota is safe.
+
+## Guardrail notification did not arrive
+
+- Enable global alerts and **Settings → Guardrails → Notify only when a
+  guardrail state changes**.
+- Confirm notifications are enabled for that provider.
+- Check that the predicted event is inside the selected lead-time horizon.
+- Check Do Not Disturb and cooldown settings.
+
+An unchanged warning or critical state is intentionally suppressed after
+refresh and restart. A new notification appears only on the next meaningful
+state transition.
+
 ## Browser Sync Labs fails
 
 - Sign in again in the selected browser.

@@ -79,6 +79,16 @@ public:
     Q_INVOKABLE bool recordProviderMetrics(const QString &provider, const QVariantList &metrics);
 
     /**
+     * Persist one guardrail state transition. Forecast calculations remain
+     * ephemeral; only warning, critical, and recovered transitions are stored.
+     *
+     * Returns true only when a new transition was inserted. Repeated current
+     * state after refresh or restart returns false.
+     */
+    Q_INVOKABLE bool recordGuardrailTransition(const QVariantMap &forecast, const QString &transition);
+    Q_INVOKABLE QVariantMap lastGuardrailTransition(const QString &stableId) const;
+
+    /**
      * Query aggregated cost or token usage per day for the last 365 days.
      * Mode 0 = Daily Cost, Mode 1 = Tokens (Input + Output).
      * Returns a map with:
@@ -294,6 +304,7 @@ private:
     void createTables();
     bool migrateToObservationSchemaV3();
     bool migrateToObservationSchemaV4();
+    bool migrateToSchemaV5();
     bool recordObservations(const QString &provider,
                             const QString &model,
                             qint64 inputTokens,

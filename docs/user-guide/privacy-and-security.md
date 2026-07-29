@@ -14,22 +14,37 @@ AI Usage Monitor is local-first. It has no telemetry, account service, hosted da
 Configuration exports exclude keys, tokens, cookies, personal access tokens, and webhook URLs.
 
 Anthropic's standard and Admin API keys are separate KWallet entries. The
-widget never copies one into the other. Admin report rows may include model and
-workspace identifiers; those scopes stay in local schema-v4 history and are
-excluded from diagnostics, support reports, configuration exports, and alert
-payloads.
+widget never copies one into the other. Provider report rows may include model,
+project, workspace, service-tier, or line-item identifiers. Those raw scopes
+stay in local schema-v5 history and are excluded from diagnostics, support
+reports, configuration exports, webhook payloads, and default Prometheus
+labels.
+
+Schema v5 adds `guardrail_events`, which stores only warning, critical, and
+recovered transition evidence. Forecast rows remain ephemeral and are never
+written into raw observation history as provider facts. Migration from schema
+v4 is transactional and creates a `.v17-backup` before changing the database.
 
 ## Network traffic
 
 Enabled providers connect directly to their configured API endpoints. Scheduled calls are read-only and listed in the generated capability matrix. Manual inference tests are explicit and may consume quota or money.
 
-Anthropic organization usage and cost requests require the optional Admin key,
-use read-only report endpoints, follow bounded pagination, and never send a
-message or inference request.
+OpenAI and Anthropic organization reports use read-only endpoints, bounded
+pagination, and never send a message or inference request. Forecast
+calculations read local SQLite history only and make no network request.
 
 Remote custom base URLs must use HTTPS. Plain HTTP is accepted only for loopback development endpoints.
 
-The optional Prometheus server binds to 127.0.0.1. Slack and Discord webhooks send alert content to the configured webhook service. Daily alerts contain the stable source name, severity, reason, recommended action, freshness, and compatible quota context. They do not include endpoint URLs, account or project identifiers, credentials, cookies, unrestricted backend errors, or wallet contents.
+The optional Prometheus server binds to 127.0.0.1. Guardrail metrics aggregate
+by provider, risk kind, and actual/estimated value class; they do not add model,
+project, workspace, scope, stable-ID, or API-key labels.
+
+Slack and Discord webhooks send alert content to the configured webhook service.
+Guardrail notifications use an allow-listed typed payload with provider,
+risk, state, transition, timing, evidence, method, and value class. Daily and
+guardrail alerts do not include endpoint URLs, account or raw scope
+identifiers, credentials, cookies, unrestricted backend errors, or wallet
+contents. Guardrail notifications are off by default.
 
 ## KWallet
 

@@ -6,7 +6,7 @@ This matrix is generated from the same Catalog v5 descriptors used by the widget
 
 | Provider | Monitoring level | Scheduled call(s) | Scope | Request budget | Billable background request |
 | --- | --- | --- | --- | ---: | --- |
-| OpenAI | Actual account usage and spend | `GET /organization/usage/completions`; `GET /organization/costs` | credential/account | 4 | No |
+| OpenAI | Actual account usage and spend | `GET /organization/usage/completions`; `GET /organization/costs` | credential/account | 18 | No |
 | Anthropic | Actual account usage and spend | `GET /models`; `GET /organizations/usage_report/messages`; `GET /organizations/cost_report` | credential/account | 64 | No |
 | Google Gemini | Connectivity/model discovery only | `GET /models` | credential/account | 20 | No |
 | Mistral AI | Connectivity/model discovery only | `GET /models` | credential/account | 1 | No |
@@ -32,6 +32,15 @@ This matrix is generated from the same Catalog v5 descriptors used by the widget
 - `rateLimits` means a live limit/remaining pair; published caps use published-documentation metadata.
 - Missing values remain unavailable in QML, SQLite, exports, alerts, and Prometheus.
 - Fireworks billing remains deferred until a real read-only billing fixture is validated.
+
+## Runway and scope support
+
+- OpenAI usage and cost totals use bounded, cursor-complete pagination. A partial traversal is never published as a complete total.
+- OpenAI usage can group by reported model and project. OpenAI cost can group by project and line item; model-level cost is not inferred.
+- Anthropic usage retains reported model, workspace, and service-tier detail; cost retains provider-reported line items.
+- Aggregate rows drive daily status and runway. Scoped rows are detail-only and never added to aggregate totals a second time.
+- Only synchronized remaining-plus-limit quota windows and compatible completed UTC daily spend can produce runway forecasts.
+- Raw scope identifiers remain local and are absent from default webhook and Prometheus payloads.
 
 ## Setup guides
 

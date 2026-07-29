@@ -21,6 +21,8 @@ TestCase {
         property bool notifyOnDisconnect: true
         property bool notifyOnReconnect: true
         property bool notifyOnUpdate: false
+        property bool forecastNotificationsEnabled: true
+        property int forecastLeadTimeHours: 24
         property int warningThreshold: 80
         property int criticalThreshold: 95
         property int notificationCooldownMinutes: 15
@@ -32,6 +34,16 @@ TestCase {
         id: fakeRegistry
         function isProviderNotificationEnabled(displayName) { return true; }
         function isToolNotificationEnabled(displayName) { return true; }
+        function providerByConfigKey(configKey) {
+            return configKey === "openai"
+                ? {
+                    enabled: true,
+                    notificationsEnabled: true,
+                    label: "OpenAI",
+                    name: "OpenAI"
+                }
+                : null;
+        }
     }
 
     QtObject {
@@ -43,10 +55,27 @@ TestCase {
     }
 
     QtObject {
+        id: fakeGuardrails
+        property var forecasts: []
+    }
+
+    QtObject {
         id: fakeUsageDatabase
         property int recordedEvents: 0
+        property var transitions: ({})
         function recordRateLimitEvent(source, severity, percentUsed) {
             recordedEvents++;
+        }
+        function recordGuardrailTransition(forecast, transition) {
+            var previous = transitions[forecast.stableId];
+            if (previous && previous.transition === transition)
+                return false;
+            transitions[forecast.stableId] = { transition: transition };
+            recordedEvents++;
+            return true;
+        }
+        function lastGuardrailTransition(stableId) {
+            return transitions[stableId] || ({});
         }
     }
 
@@ -54,6 +83,9 @@ TestCase {
         id: fakeWebhookNotifier
         property int sentAlerts: 0
         function sendAlert(eventKey, title, message, critical) {
+            sentAlerts++;
+        }
+        function sendGuardrailEvent(event) {
             sentAlerts++;
         }
     }
@@ -64,6 +96,7 @@ TestCase {
             configuration: fakeConfiguration
             registry: fakeRegistry
             dailyState: fakeDailyState
+            guardrails: fakeGuardrails
             usageDatabase: fakeUsageDatabase
             webhookNotifier: fakeWebhookNotifier
             deliveryEnabled: false
@@ -114,6 +147,36 @@ TestCase {
         return result;
     }
 
+    function forecast(state, options) {
+        var values = options || {};
+        return {
+            stableId: values.stableId || "forecast-contract-stable-id",
+            kind: values.kind || "quota_exhaustion",
+            state: state,
+            sourceId: "openai",
+            sourceKind: "provider",
+            window: values.window || "requests_24h",
+            scope: values.scope || "organization",
+            currentValue: values.currentValue === undefined ? 40 : values.currentValue,
+            projectedValue: values.projectedValue === undefined ? 100 : values.projectedValue,
+            limitValue: values.limitValue === undefined ? 100 : values.limitValue,
+            unit: values.unit || "requests",
+            currency: values.currency,
+            predictedAt: values.predictedAt === undefined
+                ? new Date(Date.now() + 60 * 60 * 1000)
+                : values.predictedAt,
+            periodEnd: values.periodEnd
+                || new Date(Date.now() + 24 * 60 * 60 * 1000),
+            sampleCount: 8,
+            coveragePercent: 100,
+            evidenceGrade: "strong",
+            methodId: values.methodId || "quota_theil_sen_v1",
+            reasonKey: state === "unavailable" ? "stale_data" : "",
+            generatedAt: new Date(),
+            valueClass: values.valueClass || "actual"
+        };
+    }
+
     function payload(index) {
         return notificationSpy.signalArguments[index][0];
     }
@@ -129,7 +192,11 @@ TestCase {
         fakeConfiguration.notificationCooldownMinutes = 15;
         fakeConfiguration.dndStartHour = -1;
         fakeConfiguration.dndEndHour = -1;
+        fakeConfiguration.forecastNotificationsEnabled = true;
+        fakeConfiguration.forecastLeadTimeHours = 24;
         fakeUsageDatabase.recordedEvents = 0;
+        fakeUsageDatabase.transitions = ({});
+        fakeGuardrails.forecasts = [];
         fakeWebhookNotifier.sentAlerts = 0;
         controller = createTemporaryObject(controllerComponent, testCase);
         verify(controller);
@@ -289,5 +356,80 @@ TestCase {
         compare(payload(0).sourceId, "openai");
         verify(payload(0).message.indexOf("OpenAI") >= 0);
         verify(payload(0).message.indexOf("super-secret") < 0);
+    }
+
+    function test_guardrailTransitionsAreOptInAndRestartDeduplicated() {
+        fakeConfiguration.forecastNotificationsEnabled = false;
+        verify(!controller.processGuardrail(forecast("warning")));
+        compare(fakeUsageDatabase.recordedEvents, 0);
+
+        fakeConfiguration.forecastNotificationsEnabled = true;
+        verify(controller.processGuardrail(forecast("warning")));
+        verify(!controller.processGuardrail(forecast("warning")));
+        verify(controller.processGuardrail(forecast("critical")));
+        verify(controller.processGuardrail(forecast("safe", {
+            predictedAt: null
+        })));
+        verify(!controller.processGuardrail(forecast("safe", {
+            predictedAt: null
+        })));
+        compare(notificationSpy.count, 3);
+        compare(fakeUsageDatabase.recordedEvents, 3);
+        compare(payload(0).transition, "warning");
+        compare(payload(1).transition, "critical");
+        compare(payload(2).transition, "recovered");
+
+        notificationSpy.target = null;
+        controller.destroy();
+        controller = createTemporaryObject(controllerComponent, testCase);
+        verify(controller);
+        notificationSpy.target = controller;
+        notificationSpy.clear();
+        verify(!controller.processGuardrail(forecast("safe", {
+            predictedAt: null
+        })));
+        compare(notificationSpy.count, 0);
+        compare(fakeUsageDatabase.recordedEvents, 3);
+    }
+
+    function test_guardrailLeadTimeAndPayloadPrivacy() {
+        var later = forecast("warning", {
+            predictedAt: new Date(Date.now() + 25 * 60 * 60 * 1000),
+            scope: "project:secret-project",
+            modelScope: "secret-model",
+            projectScope: "secret-project"
+        });
+        verify(!controller.processGuardrail(later));
+        compare(fakeUsageDatabase.recordedEvents, 0);
+
+        later.predictedAt = new Date(Date.now() + 23 * 60 * 60 * 1000);
+        verify(controller.processGuardrail(later));
+        compare(notificationSpy.count, 1);
+        var event = payload(0);
+        compare(event.type, "guardrail");
+        compare(event.sourceId, "openai");
+        verify(event.scope === undefined);
+        verify(event.modelScope === undefined);
+        verify(event.projectScope === undefined);
+        verify(event.message.indexOf("secret-project") < 0);
+        verify(event.message.indexOf("secret-model") < 0);
+    }
+
+    function test_budgetGuardrailUsesForecastContractKind() {
+        var budget = forecast("warning", {
+            stableId: "budget-forecast-contract-stable-id",
+            kind: "budget_overrun",
+            window: "calendar_month",
+            unit: "USD",
+            currency: "USD",
+            projectedValue: 18.72,
+            methodId: "budget-pacing-v1"
+        });
+
+        verify(controller.processGuardrail(budget));
+        compare(notificationSpy.count, 1);
+        compare(payload(0).kind, "budget_overrun");
+        verify(payload(0).message.indexOf("monthly budget pacing") >= 0);
+        verify(payload(0).message.indexOf("quota runway") < 0);
     }
 }

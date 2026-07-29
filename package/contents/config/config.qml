@@ -18,8 +18,8 @@ ConfigModel {
         source: "configAlerts.qml"
     }
     ConfigCategory {
-        name: i18n("Budget")
-        icon: "wallet-open"
+        name: i18n("Guardrails")
+        icon: "security-high"
         source: "configBudget.qml"
     }
     ConfigCategory {

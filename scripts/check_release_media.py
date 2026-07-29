@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the canonical v16 screenshot set and its capture manifest."""
+"""Validate the canonical v17 screenshot set and its capture manifest."""
 
 from __future__ import annotations
 
@@ -61,7 +61,9 @@ def committed_source_tree_sha256(commit: str) -> str:
             commit,
             "--",
             "VERSION",
+            "CMakeLists.txt",
             "package",
+            "plugin",
             "scripts/demo",
         ],
         cwd=ROOT,
@@ -97,7 +99,9 @@ def filesystem_source_tree_sha256() -> str:
             "--exclude-standard",
             "--",
             "VERSION",
+            "CMakeLists.txt",
             "package",
+            "plugin",
             "scripts/demo",
         ],
         cwd=ROOT,
@@ -110,13 +114,17 @@ def filesystem_source_tree_sha256() -> str:
     else:
         paths = [
             str(path.relative_to(ROOT))
-            for root in (ROOT / "package", ROOT / "scripts" / "demo")
+            for root in (
+                ROOT / "package",
+                ROOT / "plugin",
+                ROOT / "scripts" / "demo",
+            )
             for path in root.rglob("*")
             if path.is_file()
             and "__pycache__" not in path.parts
             and path.suffix not in {".pyc", ".pyo"}
         ]
-        paths.append("VERSION")
+        paths.extend(("VERSION", "CMakeLists.txt"))
 
     inventory = []
     for relative in sorted(paths):
@@ -130,9 +138,9 @@ def filesystem_source_tree_sha256() -> str:
 
 
 version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-manifest_path = SCREENSHOTS / "v16-media-manifest.json"
+manifest_path = SCREENSHOTS / "v17-media-manifest.json"
 if not manifest_path.is_file():
-    fail("assets/screenshots/v16-media-manifest.json is missing")
+    fail("assets/screenshots/v17-media-manifest.json is missing")
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
 if manifest.get("version") != version:
     fail(f"manifest version {manifest.get('version')!r} does not match VERSION {version}")
@@ -162,14 +170,14 @@ expected_fixture = hashlib.sha256(
         + "\n"
         for path in (
             ROOT / "scripts" / "demo" / "showcase_preset.json",
-            ROOT / "scripts" / "demo" / "generate_v16_media_history.py",
+            ROOT / "scripts" / "demo" / "generate_v17_media_history.py",
             ROOT / "package" / "contents" / "ui" / "components"
             / "MediaDailyState.qml",
         )
     ).encode()
 ).hexdigest()
 if manifest["fixtureSha256"] != expected_fixture:
-    fail("manifest fixture hash does not match the v16 media fixtures")
+    fail("manifest fixture hash does not match the v17 media fixtures")
 
 source_tree_commit = manifest["sourceTreeCommit"]
 if not re.fullmatch(r"[0-9a-f]{40}", source_tree_commit):
@@ -184,7 +192,7 @@ else:
 if manifest["sourceTreeSha256"] != expected_source_tree:
     fail("manifest source tree hash does not match its recorded source")
 if manifest.get("scenarios") != SCENARIOS:
-    fail("manifest scenarios do not match the v16 capture contract")
+    fail("manifest scenarios do not match the v17 capture contract")
 try:
     validate_capture_evidence(manifest.get("captureEvidence"), REQUIRED)
 except EvidenceError as error:
@@ -219,7 +227,12 @@ for filename in REQUIRED:
     if filename not in metainfo:
         fail(f"AppStream metadata does not reference {filename}")
 
+source_identity = (
+    source_tree_commit[:12]
+    if source_tree_mode == "git-commit"
+    else f"{manifest['sourceTreeSha256'][:12]} (filesystem release candidate)"
+)
 print(
     f"Release media OK: {len(REQUIRED)} screenshots from session "
-    f"{manifest['sessionId']} at source tree {source_tree_commit[:12]}"
+    f"{manifest['sessionId']} at source tree {source_identity}"
 )

@@ -1,5 +1,6 @@
 set(TEST_USAGE_DB_SRC
     ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
 )
 
@@ -14,6 +15,7 @@ set(TEST_PROVIDER_SRC
     ${CMAKE_SOURCE_DIR}/plugin/providerbackend.cpp
     ${CMAKE_SOURCE_DIR}/plugin/openaicompatibleprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/openaiprovider.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/scopebreakdownquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/azureopenaiprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/anthropicadminparser.cpp
     ${CMAKE_SOURCE_DIR}/plugin/anthropicprovider.cpp
@@ -56,6 +58,7 @@ set(TEST_INTEGRATION_SRC
     ${CMAKE_SOURCE_DIR}/plugin/localmetricsserver.cpp
     ${CMAKE_SOURCE_DIR}/plugin/webhooknotifier.cpp
     ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
     ${CMAKE_SOURCE_DIR}/plugin/awssigv4signer.cpp
 )
@@ -63,6 +66,57 @@ set(TEST_INTEGRATION_SRC
 set(TEST_UPDATECHECKER_SRC
     ${CMAKE_SOURCE_DIR}/plugin/updatechecker.cpp
 )
+
+# --- Forecast Contract v1 ---
+add_executable(test_forecastcontract
+    test_forecastcontract.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
+)
+
+target_include_directories(test_forecastcontract
+    PRIVATE ${CMAKE_SOURCE_DIR}/plugin
+)
+
+target_link_libraries(test_forecastcontract
+    PRIVATE Qt6::Core Qt6::Test
+)
+
+add_test(NAME forecastcontract COMMAND test_forecastcontract)
+
+# --- Deterministic asynchronous runway engine ---
+add_executable(test_runwayquery
+    test_runwayquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/runwayquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/guardrailmodel.cpp
+)
+
+target_include_directories(test_runwayquery
+    PRIVATE ${CMAKE_SOURCE_DIR}/plugin
+)
+
+target_link_libraries(test_runwayquery
+    PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent KF6::I18n
+)
+
+add_test(NAME runwayquery COMMAND test_runwayquery)
+set_tests_properties(runwayquery PROPERTIES TIMEOUT 30)
+
+# --- Provider-supported scope breakdowns ---
+add_executable(test_scopebreakdownquery
+    test_scopebreakdownquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/scopebreakdownquery.cpp
+)
+
+target_include_directories(test_scopebreakdownquery
+    PRIVATE ${CMAKE_SOURCE_DIR}/plugin
+)
+
+target_link_libraries(test_scopebreakdownquery
+    PRIVATE Qt6::Core Qt6::Test
+)
+
+add_test(NAME scopebreakdownquery COMMAND test_scopebreakdownquery)
 
 # --- UsageDatabase series test ---
 add_executable(test_usagedatabase_series
@@ -270,6 +324,17 @@ add_test(
             -platform offscreen
 )
 
+add_executable(test_runway_qml
+    test_runway_qml.cpp
+)
+target_link_libraries(test_runway_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME runway_qml
+    COMMAND test_runway_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/runway"
+            -platform offscreen
+)
+
 add_executable(test_notifications_qml
     test_notifications_qml.cpp
 )
@@ -322,6 +387,7 @@ set(QML_TEST_NAMES
     overview_qml
     dailytruth_qml
     dailycontrol_qml
+    runway_qml
     notifications_qml
     history_qml
     phase6_qml
@@ -340,6 +406,7 @@ set(QML_TEST_TARGETS
     test_overview_qml
     test_dailytruth_qml
     test_dailycontrol_qml
+    test_runway_qml
     test_notifications_qml
     test_history_qml
     test_phase6_qml
@@ -421,7 +488,9 @@ add_executable(test_dailystatemodel
     ${CMAKE_SOURCE_DIR}/plugin/sourcereadinessmodel.cpp
     ${CMAKE_SOURCE_DIR}/plugin/dailystatemodel.cpp
     ${CMAKE_SOURCE_DIR}/plugin/sourcedetailmodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/scopebreakdownquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
 )
 target_include_directories(test_dailystatemodel PRIVATE ${CMAKE_SOURCE_DIR}/plugin)

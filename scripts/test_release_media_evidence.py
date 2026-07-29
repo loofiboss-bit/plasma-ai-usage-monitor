@@ -53,7 +53,7 @@ except EvidenceError:
 else:
     raise SystemExit("Release-media evidence accepted the wrong AT-SPI process")
 
-capture_script = (ROOT / "scripts/demo/capture_v16_media.sh").read_text(
+capture_script = (ROOT / "scripts/demo/capture_v17_media.sh").read_text(
     encoding="utf-8"
 )
 capture_contract = {

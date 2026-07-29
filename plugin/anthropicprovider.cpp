@@ -3,6 +3,7 @@
 #include <KLocalizedString>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QMap>
 #include <QNetworkRequest>
 #include <QTimeZone>
 #include <QUrlQuery>
@@ -343,11 +344,24 @@ void AnthropicProvider::finalizeRefresh(int generation) {
 
 void AnthropicProvider::publishUsage(bool stale) {
   Q_UNUSED(stale)
+  removeProviderMetrics(
+      MetricSource::UsageApi, QStringLiteral("day"),
+      {MetricKind::InputTokens, MetricKind::CacheReadInputTokens,
+       MetricKind::CacheCreationInputTokens, MetricKind::OutputTokens});
+  struct PeriodTotals {
+    QDateTime start;
+    QDateTime end;
+    qint64 input = 0;
+    qint64 cacheRead = 0;
+    qint64 cacheCreation = 0;
+    qint64 output = 0;
+  };
   qint64 input = 0;
   qint64 cacheRead = 0;
   qint64 cacheCreation = 0;
   qint64 output = 0;
   bool prioritySeen = false;
+  QMap<QString, PeriodTotals> periodTotals;
   for (const AnthropicAdminParser::UsageRow &row :
        std::as_const(m_lastUsageRows)) {
     input += row.input;
@@ -357,8 +371,9 @@ void AnthropicProvider::publishUsage(bool stale) {
     prioritySeen = prioritySeen || row.serviceTier == QLatin1String("priority");
     const QString scope =
         row.serviceTier.isEmpty()
-            ? QStringLiteral("organization")
-            : QStringLiteral("organization:") + row.serviceTier;
+            ? QStringLiteral("organization_scoped")
+            : QStringLiteral("organization_scoped:service_tier:") +
+                  row.serviceTier;
     setProviderMetric(MetricKind::InputTokens, row.input,
                       QStringLiteral("token"), QString(), scope,
                       QStringLiteral("day"), MetricSource::UsageApi,
@@ -379,6 +394,39 @@ void AnthropicProvider::publishUsage(bool stale) {
                       QStringLiteral("day"), MetricSource::UsageApi,
                       QStringLiteral("actual"), {}, row.periodStart,
                       row.periodEnd, row.model, row.project);
+    const QString periodKey =
+        row.periodStart.toUTC().toString(Qt::ISODateWithMs) +
+        QLatin1Char('|') +
+        row.periodEnd.toUTC().toString(Qt::ISODateWithMs);
+    PeriodTotals &period = periodTotals[periodKey];
+    period.start = row.periodStart;
+    period.end = row.periodEnd;
+    period.input += row.input;
+    period.cacheRead += row.cacheRead;
+    period.cacheCreation += row.cacheCreation;
+    period.output += row.output;
+  }
+  for (const PeriodTotals &period : std::as_const(periodTotals)) {
+    setProviderMetric(MetricKind::InputTokens, period.input,
+                      QStringLiteral("token"), QString(),
+                      QStringLiteral("organization"), QStringLiteral("day"),
+                      MetricSource::UsageApi, QStringLiteral("actual"), {},
+                      period.start, period.end);
+    setProviderMetric(MetricKind::CacheReadInputTokens, period.cacheRead,
+                      QStringLiteral("token"), QString(),
+                      QStringLiteral("organization"), QStringLiteral("day"),
+                      MetricSource::UsageApi, QStringLiteral("actual"), {},
+                      period.start, period.end);
+    setProviderMetric(MetricKind::CacheCreationInputTokens,
+                      period.cacheCreation, QStringLiteral("token"), QString(),
+                      QStringLiteral("organization"), QStringLiteral("day"),
+                      MetricSource::UsageApi, QStringLiteral("actual"), {},
+                      period.start, period.end);
+    setProviderMetric(MetricKind::OutputTokens, period.output,
+                      QStringLiteral("token"), QString(),
+                      QStringLiteral("organization"), QStringLiteral("day"),
+                      MetricSource::UsageApi, QStringLiteral("actual"), {},
+                      period.start, period.end);
   }
   setInputTokens(input + cacheRead + cacheCreation);
   setOutputTokens(output);
@@ -400,17 +448,28 @@ void AnthropicProvider::publishUsage(bool stale) {
                     QStringLiteral("actual"));
   if (prioritySeen) {
     clearProviderMetric(MetricKind::Cost,
-                        QStringLiteral("organization:priority"),
+                        QStringLiteral(
+                            "organization_scoped:service_tier:priority"),
                         QStringLiteral("day"));
   }
 }
 
 void AnthropicProvider::publishCost(bool stale) {
   Q_UNUSED(stale)
+  removeProviderMetrics(MetricSource::BillingApi, QStringLiteral("day"),
+                        {MetricKind::Cost});
+  removeProviderMetrics(MetricSource::BillingApi, QStringLiteral("month"),
+                        {MetricKind::Cost});
+  struct PeriodTotals {
+    QDateTime start;
+    QDateTime end;
+    qint64 microUsd = 0;
+  };
   qint64 totalMicroUsd = 0;
   qint64 todayMicroUsd = 0;
   qint64 monthMicroUsd = 0;
   const QDate today = QDateTime::currentDateTimeUtc().date();
+  QMap<QString, PeriodTotals> periodTotals;
   for (const AnthropicAdminParser::CostRow &row :
        std::as_const(m_lastCostRows)) {
     totalMicroUsd += row.microUsd;
@@ -420,15 +479,32 @@ void AnthropicProvider::publishCost(bool stale) {
         row.periodStart.date().month() == today.month())
       monthMicroUsd += row.microUsd;
     const QString scope =
-        row.serviceTier.isEmpty()
-            ? QStringLiteral("organization")
-            : QStringLiteral("organization:") + row.serviceTier;
+        row.lineItem.isEmpty()
+            ? QStringLiteral("organization_scoped")
+            : QStringLiteral("organization_scoped:line_item:") + row.lineItem;
     setProviderMetric(MetricKind::Cost,
                       static_cast<double>(row.microUsd) / 1'000'000.0,
                       QStringLiteral("USD"), QStringLiteral("USD"), scope,
                       QStringLiteral("day"), MetricSource::BillingApi,
                       QStringLiteral("actual"), {}, row.periodStart,
                       row.periodEnd, row.model, row.project);
+    const QString periodKey =
+        row.periodStart.toUTC().toString(Qt::ISODateWithMs) +
+        QLatin1Char('|') +
+        row.periodEnd.toUTC().toString(Qt::ISODateWithMs);
+    PeriodTotals &period = periodTotals[periodKey];
+    period.start = row.periodStart;
+    period.end = row.periodEnd;
+    period.microUsd += row.microUsd;
+  }
+  for (const PeriodTotals &period : std::as_const(periodTotals)) {
+    setProviderMetric(
+        MetricKind::Cost,
+        static_cast<double>(period.microUsd) / 1'000'000.0,
+        QStringLiteral("USD"), QStringLiteral("USD"),
+        QStringLiteral("organization"), QStringLiteral("day"),
+        MetricSource::BillingApi, QStringLiteral("actual"), {}, period.start,
+        period.end);
   }
   const double total = static_cast<double>(totalMicroUsd) / 1'000'000.0;
   const double daily = static_cast<double>(todayMicroUsd) / 1'000'000.0;

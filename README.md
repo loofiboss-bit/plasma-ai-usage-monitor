@@ -6,7 +6,9 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **16.0.1 (Control Loop)** connects Daily Focus to source-specific evidence, actions, and compatible History. Anthropic can optionally report organization usage and cost with a separate Admin API key. Actual data, local estimates, balances, fixed fees, and unavailable values remain separate from the panel through History and Analyst.
+Version **17.0.0 (Runway Guardrails)** adds local deterministic quota runway,
+monthly budget pacing, provider-reported scope detail, and transition-only
+guardrail notifications without adding inference or provider writes.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 
@@ -41,6 +43,7 @@ For source builds and other installation details, read the [installation guide](
 - [Understand actual, estimated, and unavailable values](docs/user-guide/understanding-data.md)
 - [Configure API providers](docs/user-guide/providers.md)
 - [Track subscription tools and Browser Sync Labs](docs/user-guide/subscriptions.md)
+- [Use deterministic runway guardrails](docs/user-guide/runway-guardrails.md)
 - [Use history, exports, Prometheus, and webhooks](docs/user-guide/history-and-integrations.md)
 - [Fix common problems](docs/user-guide/troubleshooting.md)
 - [Review privacy and security behavior](docs/user-guide/privacy-and-security.md)
@@ -73,9 +76,11 @@ The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilo
 - Provider usage, spend, balances, limits, and connection state where the provider exposes them
 - Retained local history for enabled, disabled, and history-only sources, with explicit chart gaps
 - Analyst snapshots with documented sample requirements, coverage, spend trends, activity, anomalies, and compatible drivers
+- Deterministic quota runway and monthly budget pacing with explicit evidence and unavailable reasons
+- Provider-reported model, project, workspace, service-tier, and line-item detail without aggregate double counting
 - Compact panel modes for attention, lowest live quota, next reset, actual spend, and active sources
-- Daily and monthly budget warnings
-- KDE notifications plus optional Slack and Discord webhooks
+- Daily and monthly current-threshold warnings
+- Opt-in transition-only guardrail notifications through KDE and optional Slack or Discord webhooks
 - Scheduled JSON or CSV exports
 - A loopback-only Prometheus endpoint
 - Configuration export that excludes keys, tokens, cookies, and webhook URLs

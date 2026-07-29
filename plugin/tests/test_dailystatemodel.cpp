@@ -26,6 +26,15 @@ public:
                       window, source, QStringLiteral("actual"), resetAt);
   }
 
+  void addScopedCost(double value, const QString &model,
+                     const QString &project) {
+    setProviderMetric(
+        MetricKind::Cost, value, QStringLiteral("USD"),
+        QStringLiteral("USD"), QStringLiteral("organization_scoped"),
+        QStringLiteral("day"), MetricSource::BillingApi,
+        QStringLiteral("actual"), {}, {}, {}, model, project);
+  }
+
   void addQuota(double remaining, const QDateTime &resetAt = QDateTime()) {
     addMetric(MetricKind::RequestLimit, 100.0, QStringLiteral("request"),
               QString(), QStringLiteral("rolling"),
@@ -116,6 +125,7 @@ private Q_SLOTS:
   void monthlyBudgetUsesBackendBillingValue();
   void priorityTiesAreDeterministic();
   void panelAggregatesUseTypedDailyMetrics();
+  void scopedRowsNeverDoubleDailyTotals();
   void documentedAndLocalLimitsAreNotLiveQuota();
   void quotaWindowsPreserveSourceAndReset();
   void staleSnapshotsPrioritizeFreshnessOverCachedQuota();
@@ -500,6 +510,70 @@ void DailyStateModelTest::panelAggregatesUseTypedDailyMetrics() {
                .value(QStringLiteral("stableId"))
                .toString(),
            QStringLiteral("openai"));
+}
+
+void DailyStateModelTest::scopedRowsNeverDoubleDailyTotals() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  provider.makeReady();
+  provider.addMetric(ProviderBackend::MetricKind::Cost, 10.0,
+                     QStringLiteral("USD"), QStringLiteral("USD"),
+                     QStringLiteral("day"),
+                     ProviderBackend::MetricSource::BillingApi);
+  provider.addScopedCost(6.0, QStringLiteral("gpt-a"),
+                         QStringLiteral("project-a"));
+  provider.addScopedCost(4.0, QStringLiteral("gpt-b"),
+                         QStringLiteral("project-b"));
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+
+  const QVariantMap source = daily.source(QStringLiteral("openai"));
+  QCOMPARE(source.value(QStringLiteral("costValue")).toDouble(), 10.0);
+  QCOMPARE(daily.summary()
+               .value(QStringLiteral("providerDailyActualSpendTotals"))
+               .toMap()
+               .value(QStringLiteral("USD"))
+               .toDouble(),
+           10.0);
+
+  SourceDetailModel detail;
+  detail.registerDailyState(&daily);
+  detail.setSourceId(QStringLiteral("openai"));
+  QCOMPARE(detail.scopeBreakdown()
+               .value(QStringLiteral("scopedRows"))
+               .toList()
+               .size(),
+           2);
+  QCOMPARE(detail.scopeBreakdown()
+               .value(QStringLiteral("reconciliations"))
+               .toList()
+               .first()
+               .toMap()
+               .value(QStringLiteral("status"))
+               .toString(),
+           QStringLiteral("exact"));
+  bool foundProject = false;
+  for (int row = 0; row < detail.rowCount(); ++row) {
+    const QModelIndex index = detail.index(row, 0);
+    if (detail.data(index, SourceDetailModel::ProjectScopeRole).toString()
+        == QLatin1String("project-a")) {
+      foundProject = true;
+      QVERIFY(
+          detail.data(index, SourceDetailModel::ProjectScopeAvailableRole)
+              .toBool());
+      QCOMPARE(
+          detail.data(index, SourceDetailModel::ModelScopeRole).toString(),
+          QStringLiteral("gpt-a"));
+      QCOMPARE(
+          detail.data(index, SourceDetailModel::AggregationLevelRole)
+              .toString(),
+          QStringLiteral("scoped"));
+    }
+  }
+  QVERIFY(foundProject);
 }
 
 void DailyStateModelTest::documentedAndLocalLimitsAreNotLiveQuota() {

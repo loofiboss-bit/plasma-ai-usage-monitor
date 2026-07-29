@@ -44,6 +44,43 @@ ProviderBackend::NormalizedUsageCost normalizeOpenAiLikeUsage(const QJsonObject 
 
     return normalized;
 }
+
+QString metricKindName(ProviderBackend::MetricKind kind)
+{
+    switch (kind) {
+    case ProviderBackend::MetricKind::InputTokens: return QStringLiteral("input_tokens");
+    case ProviderBackend::MetricKind::CacheReadInputTokens: return QStringLiteral("cache_read_input_tokens");
+    case ProviderBackend::MetricKind::CacheCreationInputTokens: return QStringLiteral("cache_creation_input_tokens");
+    case ProviderBackend::MetricKind::OutputTokens: return QStringLiteral("output_tokens");
+    case ProviderBackend::MetricKind::Requests: return QStringLiteral("requests");
+    case ProviderBackend::MetricKind::Cost: return QStringLiteral("cost");
+    case ProviderBackend::MetricKind::CreditBalance: return QStringLiteral("credit_balance");
+    case ProviderBackend::MetricKind::RequestLimit: return QStringLiteral("request_limit");
+    case ProviderBackend::MetricKind::RequestRemaining: return QStringLiteral("request_remaining");
+    case ProviderBackend::MetricKind::TokenLimit: return QStringLiteral("token_limit");
+    case ProviderBackend::MetricKind::TokenRemaining: return QStringLiteral("token_remaining");
+    case ProviderBackend::MetricKind::Latency: return QStringLiteral("latency");
+    case ProviderBackend::MetricKind::ErrorRate: return QStringLiteral("error_rate");
+    }
+    return QStringLiteral("unknown");
+}
+
+QString metricSourceName(ProviderBackend::MetricSource source)
+{
+    switch (source) {
+    case ProviderBackend::MetricSource::BillingApi: return QStringLiteral("billing_api");
+    case ProviderBackend::MetricSource::UsageApi: return QStringLiteral("usage_api");
+    case ProviderBackend::MetricSource::MetricsApi: return QStringLiteral("metrics_api");
+    case ProviderBackend::MetricSource::ResponseHeaders: return QStringLiteral("response_headers");
+    case ProviderBackend::MetricSource::PublishedDocumentation: return QStringLiteral("published_documentation");
+    case ProviderBackend::MetricSource::LocalObservation: return QStringLiteral("local_observation");
+    case ProviderBackend::MetricSource::EstimatedPricing: return QStringLiteral("estimated_pricing");
+    case ProviderBackend::MetricSource::ConnectivityProbe: return QStringLiteral("connectivity_probe");
+    case ProviderBackend::MetricSource::SelfTracked: return QStringLiteral("self_tracked");
+    case ProviderBackend::MetricSource::BrowserSync: return QStringLiteral("browser_sync");
+    }
+    return QStringLiteral("unknown");
+}
 } // namespace
 
 ProviderBackend::ProviderBackend(QObject *parent)
@@ -642,39 +679,8 @@ void ProviderBackend::setProviderMetric(MetricKind kind,
                                         const QString &modelScope,
                                         const QString &projectScope)
 {
-    const QString kindName = [kind]() {
-        switch (kind) {
-        case MetricKind::InputTokens: return QStringLiteral("input_tokens");
-        case MetricKind::CacheReadInputTokens: return QStringLiteral("cache_read_input_tokens");
-        case MetricKind::CacheCreationInputTokens: return QStringLiteral("cache_creation_input_tokens");
-        case MetricKind::OutputTokens: return QStringLiteral("output_tokens");
-        case MetricKind::Requests: return QStringLiteral("requests");
-        case MetricKind::Cost: return QStringLiteral("cost");
-        case MetricKind::CreditBalance: return QStringLiteral("credit_balance");
-        case MetricKind::RequestLimit: return QStringLiteral("request_limit");
-        case MetricKind::RequestRemaining: return QStringLiteral("request_remaining");
-        case MetricKind::TokenLimit: return QStringLiteral("token_limit");
-        case MetricKind::TokenRemaining: return QStringLiteral("token_remaining");
-        case MetricKind::Latency: return QStringLiteral("latency");
-        case MetricKind::ErrorRate: return QStringLiteral("error_rate");
-        }
-        return QStringLiteral("unknown");
-    }();
-    const QString sourceName = [source]() {
-        switch (source) {
-        case MetricSource::BillingApi: return QStringLiteral("billing_api");
-        case MetricSource::UsageApi: return QStringLiteral("usage_api");
-        case MetricSource::MetricsApi: return QStringLiteral("metrics_api");
-        case MetricSource::ResponseHeaders: return QStringLiteral("response_headers");
-        case MetricSource::PublishedDocumentation: return QStringLiteral("published_documentation");
-        case MetricSource::LocalObservation: return QStringLiteral("local_observation");
-        case MetricSource::EstimatedPricing: return QStringLiteral("estimated_pricing");
-        case MetricSource::ConnectivityProbe: return QStringLiteral("connectivity_probe");
-        case MetricSource::SelfTracked: return QStringLiteral("self_tracked");
-        case MetricSource::BrowserSync: return QStringLiteral("browser_sync");
-        }
-        return QStringLiteral("unknown");
-    }();
+    const QString kindName = metricKindName(kind);
+    const QString sourceName = metricSourceName(source);
     for (qsizetype i = m_metrics.size() - 1; i >= 0; --i) {
         const QVariantMap current = m_metrics.at(i).toMap();
         if (current.value(QStringLiteral("kind")).toString() == kindName
@@ -706,28 +712,45 @@ void ProviderBackend::setProviderMetric(MetricKind kind,
     metric.insert(QStringLiteral("periodEnd"), periodEnd);
     if (!modelScope.isEmpty()) metric.insert(QStringLiteral("modelScope"), modelScope);
     if (!projectScope.isEmpty()) metric.insert(QStringLiteral("projectScope"), projectScope);
+    const bool scoped = !modelScope.isEmpty() || !projectScope.isEmpty()
+        || scope.startsWith(QLatin1String("organization_scoped"));
+    metric.insert(QStringLiteral("aggregationLevel"),
+                  scoped ? QStringLiteral("scoped")
+                         : QStringLiteral("aggregate"));
     m_metrics.append(metric);
     Q_EMIT metricsChanged();
+}
+
+void ProviderBackend::removeProviderMetrics(MetricSource source,
+                                            const QString &window,
+                                            const QList<MetricKind> &kinds)
+{
+    const QString sourceName = metricSourceName(source);
+    QSet<QString> kindNames;
+    for (MetricKind kind : kinds) {
+        kindNames.insert(metricKindName(kind));
+    }
+
+    bool changed = false;
+    for (qsizetype i = m_metrics.size() - 1; i >= 0; --i) {
+        const QVariantMap metric = m_metrics.at(i).toMap();
+        if (metric.value(QStringLiteral("source")).toString() != sourceName
+            || metric.value(QStringLiteral("window")).toString() != window
+            || !kindNames.contains(metric.value(QStringLiteral("kind")).toString())) {
+            continue;
+        }
+        m_metrics.removeAt(i);
+        changed = true;
+    }
+    if (changed) {
+        Q_EMIT metricsChanged();
+    }
 }
 
 void ProviderBackend::markProviderMetricsStale(MetricSource source,
                                                const QString &diagnostic)
 {
-    const QString sourceName = [source]() {
-        switch (source) {
-        case MetricSource::BillingApi: return QStringLiteral("billing_api");
-        case MetricSource::UsageApi: return QStringLiteral("usage_api");
-        case MetricSource::MetricsApi: return QStringLiteral("metrics_api");
-        case MetricSource::ResponseHeaders: return QStringLiteral("response_headers");
-        case MetricSource::PublishedDocumentation: return QStringLiteral("published_documentation");
-        case MetricSource::LocalObservation: return QStringLiteral("local_observation");
-        case MetricSource::EstimatedPricing: return QStringLiteral("estimated_pricing");
-        case MetricSource::ConnectivityProbe: return QStringLiteral("connectivity_probe");
-        case MetricSource::SelfTracked: return QStringLiteral("self_tracked");
-        case MetricSource::BrowserSync: return QStringLiteral("browser_sync");
-        }
-        return QStringLiteral("unknown");
-    }();
+    const QString sourceName = metricSourceName(source);
     bool changed = false;
     for (QVariant &entry : m_metrics) {
         QVariantMap metric = entry.toMap();

@@ -411,6 +411,18 @@
     <group name="Budget">
         <!-- Budget values are stored in cents (integer) to avoid floating-point issues.
              e.g. 1050 = $10.50. The SpinBox in configBudget.qml works in cents natively. -->
+        <entry name="forecastUiEnabled" type="Bool">
+            <default>true</default>
+            <label>Show deterministic runway and budget pacing forecasts</label>
+        </entry>
+        <entry name="forecastNotificationsEnabled" type="Bool">
+            <default>false</default>
+            <label>Notify on runway guardrail state transitions</label>
+        </entry>
+        <entry name="forecastLeadTimeHours" type="Int">
+            <default>6</default>
+            <label>Forecast notification lead time in hours: 1, 6, 24, or 48</label>
+        </entry>
         <entry name="openaiDailyBudget" type="Int">
             <default>0</default>
         </entry>

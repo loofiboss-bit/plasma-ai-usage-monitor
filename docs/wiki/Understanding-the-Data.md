@@ -108,3 +108,18 @@ Some settings pages offer an explicit manual inference test. That action may use
 ## Budgets
 
 Set budgets only when the card has compatible spend data. A budget based on estimated pricing remains an estimate. Connectivity-only providers cannot produce a meaningful spend warning.
+
+## Runway guardrails
+
+Runway is a deterministic interpretation of compatible local history, not a
+provider promise. Quota runway projects whether remaining requests or tokens
+reach zero before the reported reset. Monthly budget pacing projects
+completed-day spend through the end of the UTC calendar month.
+
+The current day is excluded from budget baselines, missing days are never
+filled with zero, and actual and estimated spend remain separate. A warning or
+critical result includes evidence, coverage, method, and timing. If a contract
+requirement is missing, the result is unavailable rather than guessed.
+
+See [Runway guardrails](Runway-Guardrails) for the exact thresholds,
+scope/privacy boundary, notification defaults, and Prometheus semantics.

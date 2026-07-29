@@ -19,7 +19,18 @@ Use HTTPS for remote endpoints. Plain HTTP is accepted only for loopback develop
 
 ### OpenAI
 
-OpenAI usage and cost endpoints require an Admin API key. A normal project key can return a permission error even when it works for inference. The optional project ID narrows usage to one project.
+OpenAI usage and cost endpoints require an Admin API key. A normal project key
+can return a permission error even when it works for inference. The optional
+project ID narrows usage to one project.
+
+Usage and daily/monthly cost reports follow every cursor with a fixed six-page,
+18-attempt ceiling. The widget publishes a new total only after every page
+completes; a partial failure retains the prior complete value as stale or makes
+the value explicitly unavailable. Daily usage pages request at most 31 buckets
+and cost pages at most 180 buckets.
+
+Usage grouping can expose model and project detail. Cost grouping exposes
+project and line item only; the widget never infers model-level OpenAI cost.
 
 ### Anthropic
 
@@ -33,8 +44,13 @@ credential changes may backfill at most 31 UTC daily buckets; normal refreshes
 cover the current and previous UTC day and run no more often than every five
 minutes. Usage and cost can succeed independently. Partial or failed refreshes
 keep the previous value visibly stale instead of replacing it with zero.
-Anthropic cost is parsed as integer micro-USD, and model/workspace scopes remain
-attached to their observations.
+Anthropic cost is parsed as integer micro-USD. Model, workspace, service-tier,
+and reported cost-line-item scopes remain attached to local detail observations
+without being added to the aggregate total a second time.
+
+Only complete scoped refreshes replace the previous scoped set. A failed page
+retains the last complete rows as stale, while a later successful refresh
+removes projects or periods no longer returned.
 
 ### OpenRouter
 

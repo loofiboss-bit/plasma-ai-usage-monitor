@@ -1,6 +1,7 @@
 #include "anthropicadminparser.h"
 
 #include <QJsonArray>
+#include <QSet>
 #include <QTest>
 #include <QUrlQuery>
 
@@ -10,6 +11,7 @@ class TestAnthropicAdminParser : public QObject {
 private Q_SLOTS:
   void parsesAndRoundsMicroUsd();
   void aggregatesDuplicateUsageRows();
+  void preservesCostLineItems();
   void validatesPagination();
 };
 
@@ -53,6 +55,37 @@ void TestAnthropicAdminParser::aggregatesDuplicateUsageRows() {
   QCOMPARE(rows.constFirst().cacheRead, 10);
   QCOMPARE(rows.constFirst().cacheCreation, 4);
   QCOMPARE(rows.constFirst().output, 8);
+}
+
+void TestAnthropicAdminParser::preservesCostLineItems() {
+  const auto result = [](const QString &description, const QString &amount) {
+    return QJsonObject{
+        {QStringLiteral("currency"), QStringLiteral("USD")},
+        {QStringLiteral("amount"), amount},
+        {QStringLiteral("workspace_id"), QStringLiteral("workspace-1")},
+        {QStringLiteral("description"), description},
+    };
+  };
+  const QJsonObject bucket{
+      {QStringLiteral("starting_at"), QStringLiteral("2026-07-25T00:00:00Z")},
+      {QStringLiteral("ending_at"), QStringLiteral("2026-07-26T00:00:00Z")},
+      {QStringLiteral("results"),
+       QJsonArray{result(QStringLiteral("tokens"), QStringLiteral("100")),
+                  result(QStringLiteral("priority"), QStringLiteral("200"))}},
+  };
+  QList<AnthropicAdminParser::CostRow> rows;
+  QString diagnostic;
+  QVERIFY(AnthropicAdminParser::parseCostPage(
+      QJsonObject{{QStringLiteral("data"), QJsonArray{bucket}},
+                  {QStringLiteral("has_more"), false}},
+      &rows, &diagnostic));
+  QCOMPARE(rows.size(), 2);
+  QSet<QString> lineItems;
+  for (const auto &row : rows)
+    lineItems.insert(row.lineItem);
+  QCOMPARE(lineItems,
+           QSet<QString>({QStringLiteral("tokens"),
+                          QStringLiteral("priority")}));
 }
 
 void TestAnthropicAdminParser::validatesPagination() {

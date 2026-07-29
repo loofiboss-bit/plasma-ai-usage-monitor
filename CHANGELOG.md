@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [17.0.0] — 2026-07-29
+
+### Added
+
+- Add Forecast Contract v1 and transactional SQLite schema v5 with separate,
+  restart-safe guardrail transition evidence, export, retention, and a
+  pre-migration backup.
+- Add deterministic quota runway and monthly budget pacing with explicit
+  evidence, coverage, UTC boundaries, actual/estimated separation, currency
+  compatibility, and typed unavailable reasons.
+- Add provider-reported OpenAI and Anthropic scope detail, Runway cards in
+  Daily Focus, Source Detail and Analyst, and opt-in transition notifications
+  for KDE, Slack, and Discord.
+- Add aggregate-only Prometheus guardrail state and predicted-event timing.
+
+### Changed
+
+- Traverse OpenAI usage and daily/monthly cost pagination completely within
+  fixed page and retry budgets; partial traversals stay stale or unavailable.
+- Keep aggregate and scoped metrics separate and replace scoped rows only after
+  a complete successful refresh.
+- Rename the neutral Output / Input Ratio card and remove unused subjective
+  Analyst components.
+- Update the user guide, generated wiki, architecture, capability matrix,
+  privacy contract, troubleshooting, release notes, and isolated media policy
+  for Runway Guardrails.
+
+### Fixed
+
+- Prevent truncated OpenAI reports from masquerading as complete totals.
+- Prevent missing values, mixed currencies, mixed actual/estimated data,
+  incomplete UTC days, reset changes, or non-monotonic quota from becoming
+  fabricated forecasts.
+- Prevent unchanged guardrail states from notifying again after refresh or
+  restart and keep high-cardinality scope identifiers out of webhooks and
+  Prometheus labels.
+
 ## [16.0.1] — 2026-07-26
 
 ### Fixed
@@ -862,7 +899,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v16.0.1...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v17.0.0...HEAD
+[17.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v16.0.1...v17.0.0
 [16.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v16.0.0...v16.0.1
 [16.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v15.0.0...v16.0.0
 [15.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v14.1.1...v15.0.0

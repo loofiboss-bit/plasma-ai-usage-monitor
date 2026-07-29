@@ -97,16 +97,20 @@ def main() -> None:
     if appstream_version != version:
         fail(f"latest AppStream release is {appstream_version}, expected {version}")
 
-    plan_path = (
-        root / "docs" / "plans"
-        / f"PLASMA_AI_USAGE_MONITOR_V{stable_major}_PLAN.md"
+    plan_candidates = (
+        root / "docs" / "plans" / f"PLASMA_AI_USAGE_MONITOR_V{stable_major}_PLAN.md",
+        root / "docs" / "plans" / f"PLASMA_AI_USAGE_MONITOR_V{stable_major}_CODEX_PLAN.md",
     )
-    if not plan_path.is_file():
+    plan_path = next((path for path in plan_candidates if path.is_file()), None)
+    if plan_path is None:
         fail(f"canonical v{stable_major} plan is missing")
     plan = plan_path.read_text(encoding="utf-8")
-    target = require_match(
-        plan, r"^- \*\*Target release:\*\*\s+`([^`]+)`", "v16 plan target"
-    ).group(1)
+    target_match = require_match(
+        plan,
+        r"^(?:- \*\*Target release:\*\*\s+`([^`]+)`|\|\s*Target\s*\|\s*`?([^`|]+?)`?\s*\|)",
+        f"v{stable_major} plan target",
+    )
+    target = next(group.strip() for group in target_match.groups() if group).removeprefix("v")
     if target != version:
         fail(f"v{stable_major} plan target is {target}, expected {version}")
 

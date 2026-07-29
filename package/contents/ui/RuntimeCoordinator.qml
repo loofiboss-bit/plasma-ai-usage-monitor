@@ -11,6 +11,7 @@ Item {
     required property var registry
     required property var secrets
     required property var usageDatabase
+    required property var guardrailModel
     required property var scheduler
     required property var metricsServer
     required property var webhookNotifier
@@ -23,6 +24,96 @@ Item {
     required property var antigravityMonitor
 
     property bool startupRefreshCompleted: false
+
+    function buildGuardrailQuery() {
+        var quotaSources = [];
+        var budgets = [];
+        var providers = registry.allProviders || [];
+        for (var i = 0; i < providers.length; i++) {
+            var provider = providers[i];
+            var backend = provider.backend;
+            if (!provider.enabled || !backend) continue;
+
+            var metrics = backend.metrics || [];
+            var descriptorKeys = {};
+            for (var metricIndex = 0; metricIndex < metrics.length;
+                    metricIndex++) {
+                var remaining = metrics[metricIndex] || {};
+                if (!remaining.available
+                        || remaining.aggregationLevel === "scoped"
+                        || (remaining.kind !== "request_remaining"
+                            && remaining.kind !== "token_remaining")
+                        || !remaining.resetAt) continue;
+                var limitKind = remaining.kind === "request_remaining"
+                    ? "request_limit" : "token_limit";
+                var matchingLimit = null;
+                for (var limitIndex = 0; limitIndex < metrics.length;
+                        limitIndex++) {
+                    var candidate = metrics[limitIndex] || {};
+                    if (candidate.available
+                            && candidate.kind === limitKind
+                            && candidate.scope === remaining.scope
+                            && candidate.window === remaining.window
+                            && candidate.unit === remaining.unit
+                            && candidate.source === remaining.source) {
+                        matchingLimit = candidate;
+                        break;
+                    }
+                }
+                if (!matchingLimit) continue;
+                var descriptorKey = [
+                    provider.configKey, remaining.kind,
+                    remaining.window, remaining.scope
+                ].join("|");
+                if (descriptorKeys[descriptorKey]) continue;
+                descriptorKeys[descriptorKey] = true;
+                quotaSources.push({
+                    sourceId: provider.configKey,
+                    sourceKind: "provider",
+                    provider: provider.dbName,
+                    remainingKind: remaining.kind,
+                    limitKind: limitKind,
+                    window: remaining.window,
+                    scope: remaining.scope,
+                    unit: remaining.unit
+                });
+            }
+
+            var monthlyBudgetCents = Number(
+                configuration[provider.monthlyBudgetKey] || 0);
+            if (monthlyBudgetCents > 0) {
+                var valueClass = backend.isEstimatedCost
+                    ? "estimated" : "actual";
+                budgets.push({
+                    sourceId: provider.configKey,
+                    sourceKind: "provider",
+                    provider: provider.dbName,
+                    window: "calendar_month",
+                    scope: "organization",
+                    budget: monthlyBudgetCents / 100.0,
+                    budgetCurrency: backend.budgetCurrency || "USD",
+                    valueClass: valueClass
+                });
+            }
+        }
+        return {
+            quotaSources: quotaSources,
+            budgets: budgets
+        };
+    }
+
+    function refreshGuardrails() {
+        if (!guardrailModel) return;
+        if (!configuration.forecastUiEnabled) {
+            guardrailModel.refreshWithQuery({});
+            return;
+        }
+        guardrailModel.refreshWithQuery(buildGuardrailQuery());
+    }
+
+    function scheduleGuardrailRefresh() {
+        guardrailRefreshTimer.restart();
+    }
 
     function loadIntegrationSecrets() {
         if (registry.demoMode) {
@@ -141,6 +232,7 @@ Item {
         if (backend.metrics !== undefined && backend.metrics.length > 0) {
             usageDatabase.recordProviderMetrics(providerName, backend.metrics);
         }
+        scheduleGuardrailRefresh();
         syncMetricsPayload();
     }
 
@@ -188,6 +280,11 @@ Item {
             var typedMetrics = backend.metrics || [];
             for (var metricIndex = 0; metricIndex < typedMetrics.length; metricIndex++) {
                 var metric = typedMetrics[metricIndex];
+                if ((metric.aggregationLevel || "") === "scoped"
+                        || metric.modelScope || metric.projectScope
+                        || String(metric.scope || "").startsWith("organization_scoped")) {
+                    continue;
+                }
                 var metricLabels = "provider=\"" + providerKey
                     + "\",kind=\"" + labelValue(metric.kind)
                     + "\",unit=\"" + labelValue(metric.unit)
@@ -195,9 +292,7 @@ Item {
                     + "\",source=\"" + labelValue(metric.source)
                     + "\",quality=\"" + labelValue(metric.quality)
                     + "\",scope=\"" + labelValue(metric.scope)
-                    + "\",window=\"" + labelValue(metric.window)
-                    + "\",model_scope=\"" + labelValue(metric.modelScope)
-                    + "\",project_scope=\"" + labelValue(metric.projectScope) + "\"";
+                    + "\",window=\"" + labelValue(metric.window) + "\"";
                 lines.push("ai_usage_provider_metric_available{" + metricLabels + "} "
                            + (metric.available ? "1" : "0"));
                 if (metric.available) {
@@ -250,6 +345,8 @@ Item {
         appendCurrencyMetrics(lines, "ai_usage_estimated_burn",
                               "period=\"month\",cost_source=\"estimated_from_usage\"", estimatedBurn);
 
+        appendGuardrailMetrics(lines);
+
         var exposure = {};
         mergeCurrencyValues(exposure, apiSpendMonth);
         mergeCurrencyValues(exposure, estimatedBurn);
@@ -257,6 +354,64 @@ Item {
         appendCurrencyMetrics(lines, "ai_usage_total_monthly_exposure", "", exposure);
 
         metricsServer.payload = lines.join("\n") + "\n";
+    }
+
+    function appendGuardrailMetrics(lines) {
+        var stateValues = {
+            unavailable: 0,
+            safe: 1,
+            warning: 2,
+            critical: 3
+        };
+        var grouped = {};
+        var forecasts = guardrailModel && guardrailModel.forecasts
+            ? guardrailModel.forecasts : [];
+        for (var i = 0; i < forecasts.length; i++) {
+            var row = forecasts[i] || {};
+            var provider = registry.providerByConfigKey(row.sourceId);
+            if (!provider || row.sourceKind !== "provider"
+                    || ["quota_exhaustion", "budget_overrun"].indexOf(row.kind) < 0
+                    || ["actual", "estimated"].indexOf(row.valueClass) < 0
+                    || stateValues[row.state] === undefined) {
+                continue;
+            }
+            var key = [row.sourceId, row.kind, row.valueClass].join("|");
+            var rank = stateValues[row.state];
+            var predicted = Date.parse(row.predictedAt);
+            var seconds = isNaN(predicted)
+                ? null : Math.max(0, Math.round((predicted - Date.now()) / 1000));
+            if (!grouped[key] || rank > grouped[key].rank) {
+                grouped[key] = {
+                    sourceId: row.sourceId,
+                    kind: row.kind,
+                    valueClass: row.valueClass,
+                    rank: rank,
+                    seconds: seconds
+                };
+            } else if (rank === grouped[key].rank && seconds !== null
+                       && (grouped[key].seconds === null
+                           || seconds < grouped[key].seconds)) {
+                grouped[key].seconds = seconds;
+            }
+        }
+
+        lines.push("# HELP ai_usage_guardrail_risk_state Current deterministic guardrail state: unavailable=0, safe=1, warning=2, critical=3.");
+        lines.push("# TYPE ai_usage_guardrail_risk_state gauge");
+        lines.push("# HELP ai_usage_guardrail_seconds_until_event Seconds until the earliest predicted event for the current state.");
+        lines.push("# TYPE ai_usage_guardrail_seconds_until_event gauge");
+        var keys = Object.keys(grouped).sort();
+        for (var j = 0; j < keys.length; j++) {
+            var group = grouped[keys[j]];
+            var labels = "source=\"" + labelValue(group.sourceId)
+                + "\",kind=\"" + labelValue(group.kind)
+                + "\",value_class=\"" + labelValue(group.valueClass) + "\"";
+            lines.push("ai_usage_guardrail_risk_state{" + labels + "} "
+                       + group.rank);
+            if (group.seconds !== null) {
+                lines.push("ai_usage_guardrail_seconds_until_event{" + labels
+                           + "} " + group.seconds);
+            }
+        }
     }
 
     function labelValue(value) {
@@ -318,11 +473,27 @@ Item {
         connectProviderSignals();
         connectToolSignals();
         usageDatabase.init();
+        scheduleGuardrailRefresh();
         syncMetricsPayload();
         startupTimer.start();
         initialPruneTimer.start();
         if (configuration.browserSyncEnabled) {
             initialSyncTimer.start();
+        }
+    }
+
+    Timer {
+        id: guardrailRefreshTimer
+        interval: 50
+        repeat: false
+        onTriggered: runtime.refreshGuardrails()
+    }
+
+    Connections {
+        target: runtime.guardrailModel
+
+        function onForecastsChanged() {
+            runtime.syncMetricsPayload();
         }
     }
 
@@ -433,6 +604,22 @@ Item {
         function onFireworksMonthlyBudgetChanged() { syncDescriptorProvider("fireworks", false); }
         function onPerplexityDailyBudgetChanged() { syncDescriptorProvider("perplexity", false); }
         function onPerplexityMonthlyBudgetChanged() { syncDescriptorProvider("perplexity", false); }
+        function onForecastUiEnabledChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onOpenaiMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onAnthropicMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onGoogleMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onMistralMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onDeepseekMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onGroqMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onXaiMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onOllamaMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onOpenrouterMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onTogetherMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onCohereMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onGoogleveoMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onAzureMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onBedrockMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
+        function onHistoryEnabledChanged() { runtime.scheduleGuardrailRefresh(); }
 
         function onClaudeCodeEnabledChanged() {
             if (runtime.claudeCodeMonitor.enabled) {

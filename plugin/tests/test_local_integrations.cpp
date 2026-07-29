@@ -12,14 +12,14 @@
 #include "usagedatabase.h"
 #include "webhooknotifier.h"
 
-class LocalIntegrationsTest : public QObject
-{
+class LocalIntegrationsTest : public QObject {
     Q_OBJECT
 
 private Q_SLOTS:
     void metricsServerResponds();
     void usageDatabaseExportsFiles();
     void webhookNotifierRejectsInsecureEndpoints();
+    void webhookNotifierSanitizesGuardrailPayload();
     void awsSigV4SignerShapesHeaders();
 };
 
@@ -46,7 +46,8 @@ void LocalIntegrationsTest::metricsServerResponds()
     auto request = [](const QByteArray &payload) {
         QTcpSocket client;
         client.connectToHost(QHostAddress::LocalHost, 19464);
-        if (!client.waitForConnected()) return QByteArray();
+        if (!client.waitForConnected())
+            return QByteArray();
         client.write(payload);
         client.waitForBytesWritten();
         for (int i = 0; i < 30 && client.bytesAvailable() == 0; ++i) {
@@ -58,21 +59,23 @@ void LocalIntegrationsTest::metricsServerResponds()
     QVERIFY(head.contains("HTTP/1.1 200 OK"));
     QVERIFY(!head.contains("test_metric 1"));
     QVERIFY(request("GET /missing HTTP/1.1\r\nHost: localhost\r\n\r\n").contains("404 Not Found"));
-    QVERIFY(request("POST /metrics HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n").contains("405 Method Not Allowed"));
+    QVERIFY(request("POST /metrics HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n")
+            .contains("405 Method Not Allowed"));
 }
 
 void LocalIntegrationsTest::usageDatabaseExportsFiles()
 {
     UsageDatabase db;
     db.init();
-    db.recordSnapshot(QStringLiteral("OpenAI"), 10, 5, 1, 0.25, 0.25, 0.25, 100, 99, 1000, 985, QStringLiteral("gpt-5.4-pro"), false);
+    db.recordSnapshot(
+        QStringLiteral("OpenAI"), 10, 5, 1, 0.25, 0.25, 0.25, 100, 99, 1000, 985, QStringLiteral("gpt-5.4-pro"), false);
     db.recordToolSnapshot(QStringLiteral("Cursor"), 3, 500, QStringLiteral("Monthly"), QStringLiteral("Pro"), false);
 
     QTemporaryDir dir;
     QVERIFY(dir.isValid());
 
-    const QStringList files = db.exportAllToDirectory(dir.path(), {QStringLiteral("json"), QStringLiteral("csv")});
-    QCOMPARE(files.size(), 4);
+    const QStringList files = db.exportAllToDirectory(dir.path(), { QStringLiteral("json"), QStringLiteral("csv") });
+    QCOMPARE(files.size(), 5);
     for (const QString &path : files) {
         QVERIFY(QFileInfo::exists(path));
         QVERIFY(QFileInfo(path).size() > 0);
@@ -92,31 +95,63 @@ void LocalIntegrationsTest::webhookNotifierRejectsInsecureEndpoints()
     notifier.setDiscordWebhookUrl(QStringLiteral("http://127.0.0.1:%1/discord").arg(port));
     notifier.setCooldownMinutes(1);
     QSignalSpy failureSpy(&notifier, &WebhookNotifier::deliveryFailed);
-    notifier.sendAlert(QStringLiteral("budget"), QStringLiteral("Budget warning"), QStringLiteral("Threshold reached"), true);
+    notifier.sendAlert(
+        QStringLiteral("budget"), QStringLiteral("Budget warning"), QStringLiteral("Threshold reached"), true);
     QCOMPARE(failureSpy.count(), 2);
     QVERIFY(!server.hasPendingConnections());
     QVERIFY(failureSpy.first().at(1).toString().contains(QStringLiteral("HTTPS")));
 }
 
+void LocalIntegrationsTest::webhookNotifierSanitizesGuardrailPayload()
+{
+    WebhookNotifier notifier;
+    QSignalSpy acceptedSpy(&notifier, &WebhookNotifier::guardrailEventAccepted);
+    QSignalSpy failureSpy(&notifier, &WebhookNotifier::deliveryFailed);
+    const QVariantMap event {
+        { QStringLiteral("type"), QStringLiteral("guardrail") },
+        { QStringLiteral("eventKey"), QStringLiteral("guardrail-local-key-warning") },
+        { QStringLiteral("sourceId"), QStringLiteral("openai") },
+        { QStringLiteral("kind"), QStringLiteral("quota_exhaustion") },
+        { QStringLiteral("state"), QStringLiteral("warning") },
+        { QStringLiteral("transition"), QStringLiteral("warning") },
+        { QStringLiteral("title"), QStringLiteral("OpenAI guardrail warning") },
+        { QStringLiteral("message"), QStringLiteral("Quota runway is warning.") },
+        { QStringLiteral("critical"), false },
+        { QStringLiteral("scope"), QStringLiteral("project:secret-project") },
+        { QStringLiteral("modelScope"), QStringLiteral("secret-model") },
+        { QStringLiteral("projectScope"), QStringLiteral("secret-project") },
+        { QStringLiteral("apiKeyId"), QStringLiteral("secret-key") },
+    };
+
+    notifier.sendGuardrailEvent(event);
+    QCOMPARE(acceptedSpy.count(), 1);
+    QCOMPARE(failureSpy.count(), 0);
+    const QVariantMap sanitized = acceptedSpy.first().at(0).toMap();
+    QCOMPARE(sanitized.value(QStringLiteral("sourceId")).toString(), QStringLiteral("openai"));
+    QVERIFY(!sanitized.contains(QStringLiteral("scope")));
+    QVERIFY(!sanitized.contains(QStringLiteral("modelScope")));
+    QVERIFY(!sanitized.contains(QStringLiteral("projectScope")));
+    QVERIFY(!sanitized.contains(QStringLiteral("apiKeyId")));
+
+    QVariantMap invalid = event;
+    invalid.insert(QStringLiteral("sourceId"), QStringLiteral("project:secret-project"));
+    notifier.sendGuardrailEvent(invalid);
+    QCOMPARE(acceptedSpy.count(), 1);
+    QCOMPARE(failureSpy.count(), 1);
+}
+
 void LocalIntegrationsTest::awsSigV4SignerShapesHeaders()
 {
-    const auto signedHeaders = AwsSigV4Signer::sign(
-        QStringLiteral("AKIDEXAMPLE"),
-        QStringLiteral("wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"),
-        QString(),
-        QStringLiteral("us-east-1"),
-        QStringLiteral("bedrock"),
-        QStringLiteral("GET"),
-        QStringLiteral("/foundation-models"),
+    const auto signedHeaders = AwsSigV4Signer::sign(QStringLiteral("AKIDEXAMPLE"),
+        QStringLiteral("wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY"), QString(), QStringLiteral("us-east-1"),
+        QStringLiteral("bedrock"), QStringLiteral("GET"), QStringLiteral("/foundation-models"),
         QStringLiteral("byOutputModality=TEXT"),
-        {
-            {QByteArrayLiteral("accept"), QByteArrayLiteral("application/json")},
-            {QByteArrayLiteral("host"), QByteArrayLiteral("bedrock.us-east-1.amazonaws.com")}
-        },
-        QByteArray(),
-        QDateTime(QDate(2026, 4, 10), QTime(12, 0), QTimeZone::utc()));
+        { { QByteArrayLiteral("accept"), QByteArrayLiteral("application/json") },
+            { QByteArrayLiteral("host"), QByteArrayLiteral("bedrock.us-east-1.amazonaws.com") } },
+        QByteArray(), QDateTime(QDate(2026, 4, 10), QTime(12, 0), QTimeZone::utc()));
 
-    QVERIFY(signedHeaders.authorizationHeader.startsWith("AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260410/us-east-1/bedrock/aws4_request"));
+    QVERIFY(signedHeaders.authorizationHeader.startsWith(
+        "AWS4-HMAC-SHA256 Credential=AKIDEXAMPLE/20260410/us-east-1/bedrock/aws4_request"));
     QVERIFY(signedHeaders.authorizationHeader.contains("SignedHeaders=accept;host;x-amz-content-sha256;x-amz-date"));
     QCOMPARE(signedHeaders.amzDate, QByteArray("20260410T120000Z"));
     QCOMPARE(signedHeaders.payloadHash.size(), 64);

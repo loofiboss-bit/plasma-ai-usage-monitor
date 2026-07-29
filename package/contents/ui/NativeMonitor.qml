@@ -81,6 +81,7 @@ Item {
     property alias refreshScheduler: refreshScheduler
     property alias sourceReadiness: sourceReadinessModel
     property alias dailyState: dailyStateModel
+    property alias guardrails: guardrailModel
     readonly property var presentationDailyState: mediaDailyState.active
         ? mediaDailyState : dailyStateModel
     property alias secretsManager: secrets
@@ -92,8 +93,6 @@ Item {
     property alias windsurf: windsurfMonitor
     property alias jetbrainsAi: jetbrainsAiMonitor
     property alias antigravity: antigravityMonitor
-    property alias intelligenceEngine: analystIntelligence
-
     readonly property var allProviders: providerRegistry.allProviders
     readonly property var allSubscriptionTools: providerRegistry.allSubscriptionTools
     readonly property int enabledToolCount: providerRegistry.enabledToolCount
@@ -290,6 +289,10 @@ Item {
         refreshScheduler.refreshAll();
     }
 
+    function refreshGuardrails() {
+        runtimeCoordinator.scheduleGuardrailRefresh();
+    }
+
     function performBrowserSync() {
         refreshScheduler.performBrowserSync();
     }
@@ -308,18 +311,6 @@ Item {
         refreshScheduler.refreshAntigravity(true);
     }
 
-    function generateAnalystInsight() {
-        if (!analystIntelligence) {
-            return;
-        }
-
-        var activity = usageDatabase.getYearlyActivity(Plasmoid.configuration.analystIntensityMode);
-        var efficiency = usageDatabase.getEfficiencySeries(14);
-        var overview = usageDatabase.getAnalystOverview(30);
-
-        analystIntelligence.generateInsight(activity.days, efficiency, overview);
-    }
-
     SecretsManager {
         id: secrets
     }
@@ -327,6 +318,7 @@ Item {
     UsageDatabase {
         id: usageDatabase
         enabled: Plasmoid.configuration.historyEnabled
+            || Plasmoid.configuration.forecastNotificationsEnabled
             || (AppInfo.demoMode
                 && (AppInfo.smokeView.indexOf("media-history") === 0
                     || AppInfo.smokeView.indexOf("media-analyst") === 0
@@ -508,6 +500,10 @@ Item {
         id: dailyStateModel
         warningThreshold: Plasmoid.configuration.warningThreshold
         criticalThreshold: Plasmoid.configuration.criticalThreshold
+    }
+
+    GuardrailModel {
+        id: guardrailModel
     }
 
     Components.MediaDailyState {
@@ -709,6 +705,7 @@ Item {
         configuration: Plasmoid.configuration
         registry: providerRegistry
         dailyState: dailyStateModel
+        guardrails: guardrailModel
         usageDatabase: usageDatabase
         webhookNotifier: webhookNotifier
     }
@@ -735,6 +732,7 @@ Item {
         registry: providerRegistry
         secrets: secrets
         usageDatabase: usageDatabase
+        guardrailModel: guardrailModel
         scheduler: refreshScheduler
         metricsServer: metricsServer
         webhookNotifier: webhookNotifier
@@ -761,10 +759,6 @@ Item {
         onUpdateAvailable: function(latestVersion, releaseUrl) {
             notificationController.sendUpdateAvailable(latestVersion, releaseUrl);
         }
-    }
-
-    IntelligenceEngine {
-        id: analystIntelligence
     }
 
     property Component compactRepresentationComponent: CompactRepresentation {

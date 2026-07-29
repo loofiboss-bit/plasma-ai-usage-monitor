@@ -3,10 +3,12 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
+import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import com.github.loofi.aiusagemonitor 1.0
+import ".." as Monitor
 
 QQC2.ScrollView {
     id: detail
@@ -27,6 +29,9 @@ QQC2.ScrollView {
         ? i18n("Open source settings") : detailModel.actionLabel
     readonly property var mediaMetrics: mediaMode
         ? (mediaSource.detailMetrics || []) : []
+    readonly property var runwayData: runwayRows()
+    readonly property var scopeData: mediaMode
+        ? [] : scopeRows()
     signal backRequested()
     signal actionRequested(string stableId, string actionKey, string sourceKind)
     signal settingsRequested(string stableId)
@@ -86,6 +91,68 @@ QQC2.ScrollView {
         if (!detail.monitor) return;
         detailModel.registerDailyState(detail.monitor.presentationDailyState);
         detailModel.registerHistoryDatabase(detail.monitor.usageDb);
+    }
+
+    function runwayRows() {
+        if (!Plasmoid.configuration.forecastUiEnabled) return [];
+        if (mediaMode) {
+            return [{
+                kind: "budget_overrun",
+                state: "warning",
+                sourceId: sourceId,
+                sourceKind: "provider",
+                window: "calendar_month",
+                scope: "organization",
+                currentValue: 8.46,
+                projectedValue: 18.72,
+                limitValue: 15.0,
+                unit: "USD",
+                currency: "USD",
+                predictedAt: "2026-07-29T10:00:00Z",
+                periodEnd: "2026-08-01T00:00:00Z",
+                sampleCount: 20,
+                coveragePercent: 80,
+                evidenceGrade: "strong",
+                methodId: "budget-pacing-v1",
+                reasonKey: "",
+                reasonText: "",
+                valueClass: "actual"
+            }];
+        }
+        var model = monitor ? monitor.guardrails : null;
+        var forecasts = model ? model.forecasts || [] : [];
+        var rows = [];
+        for (var i = 0; i < forecasts.length; ++i) {
+            if (forecasts[i].sourceId === sourceId)
+                rows.push(forecasts[i]);
+        }
+        return rows;
+    }
+
+    function scopeLabel(row) {
+        var labels = [];
+        if (row.modelScopeAvailable)
+            labels.push(i18n("Model: %1", row.modelScope));
+        if (row.projectScopeAvailable)
+            labels.push(row.projectDisplayKind === "deleted"
+                ? i18n("Deleted project · …%1",
+                       row.projectDisplaySuffix)
+                : i18n("Project · …%1",
+                       row.projectDisplaySuffix));
+        if (row.serviceTierAvailable)
+            labels.push(i18n("Service tier: %1", row.serviceTierScope));
+        if (row.lineItemAvailable)
+            labels.push(i18n("Line item: %1", row.lineItemScope));
+        return labels.length > 0
+            ? labels.join(i18n(" · ")) : i18n("Unattributed scope");
+    }
+
+    function scopeRows() {
+        var rows = (detailModel.scopeBreakdown.scopedRows || []).slice();
+        rows.sort(function(left, right) {
+            return Number(right.value || 0) - Number(left.value || 0);
+        });
+        return rows.slice(0, 8);
     }
 
     onMonitorChanged: configureModel()
@@ -228,6 +295,54 @@ QQC2.ScrollView {
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
             level: 4
+            text: i18n("Runway")
+            visible: Plasmoid.configuration.forecastUiEnabled
+        }
+
+        Kirigami.InlineMessage {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            visible: Plasmoid.configuration.forecastUiEnabled
+                && detail.runwayData.length === 0
+                && !(detail.monitor && detail.monitor.guardrails
+                     && detail.monitor.guardrails.busy)
+            type: Kirigami.MessageType.Information
+            text: i18n("Runway is unavailable until compatible local history meets the fixed sample, time, and coverage rules.")
+            Accessible.name: text
+        }
+
+        PlasmaComponents.BusyIndicator {
+            Layout.alignment: Qt.AlignHCenter
+            visible: Plasmoid.configuration.forecastUiEnabled
+                && detail.monitor && detail.monitor.guardrails
+                && detail.monitor.guardrails.busy
+                && detail.runwayData.length === 0
+            running: visible
+        }
+
+        Repeater {
+            model: detail.runwayData
+
+            Monitor.RunwayCard {
+                required property var modelData
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                forecast: modelData
+                showHistoryAction: detailModel.historyId !== ""
+                onHistoryRequested: function(metric) {
+                    detail.historyRequested(
+                        detailModel.historyId, metric, 30);
+                }
+            }
+        }
+
+        PlasmaExtras.Heading {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            level: 4
             text: i18n("Typed metrics")
         }
 
@@ -347,6 +462,67 @@ QQC2.ScrollView {
                         font.pointSize: Kirigami.Theme.smallFont.pointSize
                         elide: Text.ElideRight
                         Accessible.name: i18n("Metric provenance: %1", text)
+                    }
+                }
+            }
+        }
+
+        PlasmaExtras.Heading {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            level: 4
+            text: i18n("Reported scope breakdown")
+            visible: detail.scopeData.length > 0
+        }
+
+        Repeater {
+            model: detail.scopeData
+
+            Rectangle {
+                id: scopeRow
+                required property var modelData
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.smallSpacing
+                Layout.rightMargin: Kirigami.Units.smallSpacing
+                implicitHeight: scopeContent.implicitHeight
+                    + Kirigami.Units.mediumSpacing * 2
+                radius: Kirigami.Units.smallSpacing
+                color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.7)
+                border.width: 1
+                border.color: Qt.alpha(Kirigami.Theme.textColor, 0.12)
+                Accessible.role: Accessible.Grouping
+                Accessible.name: detail.scopeLabel(scopeRow.modelData)
+
+                ColumnLayout {
+                    id: scopeContent
+                    anchors.fill: parent
+                    anchors.margins: Kirigami.Units.mediumSpacing
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            text: detail.scopeLabel(scopeRow.modelData)
+                            font.bold: true
+                            elide: Text.ElideRight
+                        }
+                        PlasmaComponents.Label {
+                            text: detail.formatMetric(
+                                scopeRow.modelData.value,
+                                scopeRow.modelData.unit,
+                                scopeRow.modelData.currency)
+                        }
+                    }
+                    PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        text: i18n("%1 · %2 · provider-reported scope",
+                                   scopeRow.modelData.kind
+                                       .replace(/_/g, " "),
+                                   scopeRow.modelData.valueClass)
+                        color: Kirigami.Theme.disabledTextColor
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        wrapMode: Text.WordWrap
                     }
                 }
             }

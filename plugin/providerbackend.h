@@ -424,6 +424,9 @@ protected:
                            const QString &modelScope = QString(),
                            const QString &projectScope = QString());
     void clearProviderMetric(MetricKind kind, const QString &scope = QString(), const QString &window = QString());
+    void removeProviderMetrics(MetricSource source,
+                               const QString &window,
+                               const QList<MetricKind> &kinds);
     void markProviderMetricsStale(MetricSource source,
                                   const QString &diagnostic = QString());
     void setCapabilityStatus(const QString &capability,

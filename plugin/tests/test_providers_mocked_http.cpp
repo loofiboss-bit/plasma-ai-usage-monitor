@@ -1,14 +1,17 @@
 #include <QtTest>
 
 #include <QHash>
+#include <QHostAddress>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QSet>
 #include <QSignalSpy>
-#include <QHostAddress>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
 #include <QUrl>
-#include <QJsonObject>
+#include <QUrlQuery>
 
 #include "anthropicprovider.h"
 #include "cohereprovider.h"
@@ -22,6 +25,7 @@
 #include "openaiprovider.h"
 #include "openrouterprovider.h"
 #include "providerbackend.h"
+#include "scopebreakdownquery.h"
 #include "togetherprovider.h"
 #include "xaiprovider.h"
 
@@ -208,6 +212,17 @@ private Q_SLOTS:
     void openAiRetryAfterThenSuccess();
     void openAiAuthError();
     void openAiPartialCapabilitySuccess();
+    void openAiMoreThanSevenBucketsAndExplicitLimits();
+    void openAiPaginatesAndDeduplicates();
+    void openAiRejectsMissingOrRepeatedCursor();
+    void openAiPartialPagesNeverReplaceCompleteValue();
+    void openAiMalformedIntermediatePageRemainsUnavailable();
+    void openAiCancellationBetweenPages();
+    void openAiSupersededGenerationCannotPublish();
+    void openAiRequestBudgetIsBounded();
+    void openAiProviderSupportedScopeAttribution();
+    void openAiCalendarBoundaries_data();
+    void openAiCalendarBoundaries();
     void anthropicRateLimitHeaders();
     void anthropicAdminUsageCostPaginationAndDimensions();
     void anthropicAdminPartialCostAndPriorityRemainTruthful();
@@ -237,6 +252,70 @@ private Q_SLOTS:
     void azureNormalizeHappyPath();
     void azureNormalizeFailurePath();
 };
+
+class FixedClockOpenAIProvider : public OpenAIProvider {
+public:
+    QDateTime now;
+
+protected:
+    QDateTime currentDateTimeUtc() const override { return now; }
+};
+
+static QByteArray openAiUsagePage(
+    const QList<QPair<qint64, qint64>> &startAndInputTokens, bool hasMore = false, const QString &nextPage = QString())
+{
+    QJsonArray buckets;
+    for (const auto &[start, inputTokens] : startAndInputTokens) {
+        QJsonObject result {
+            { QStringLiteral("input_tokens"), inputTokens },
+            { QStringLiteral("output_tokens"), inputTokens / 2 },
+            { QStringLiteral("num_model_requests"), 1 },
+        };
+        buckets.append(QJsonObject {
+            { QStringLiteral("start_time"), start },
+            { QStringLiteral("end_time"), start + 86400 },
+            { QStringLiteral("results"), QJsonArray { result } },
+        });
+    }
+    QJsonObject root {
+        { QStringLiteral("data"), buckets },
+        { QStringLiteral("has_more"), hasMore },
+        { QStringLiteral("next_page"), nextPage.isEmpty() ? QJsonValue(QJsonValue::Null) : QJsonValue(nextPage) },
+    };
+    return QJsonDocument(root).toJson(QJsonDocument::Compact);
+}
+
+static QByteArray openAiCostPage(int bucketCount = 1, double amount = 0.01)
+{
+    QJsonArray buckets;
+    for (int index = 0; index < bucketCount; ++index) {
+        const qint64 start = 1767225600 + (index * 86400);
+        QJsonObject result {
+            { QStringLiteral("amount"),
+                QJsonObject {
+                    { QStringLiteral("value"), amount },
+                    { QStringLiteral("currency"), QStringLiteral("usd") },
+                } },
+        };
+        buckets.append(QJsonObject {
+            { QStringLiteral("start_time"), start },
+            { QStringLiteral("end_time"), start + 86400 },
+            { QStringLiteral("results"), QJsonArray { result } },
+        });
+    }
+    return QJsonDocument(QJsonObject {
+                             { QStringLiteral("data"), buckets },
+                             { QStringLiteral("has_more"), false },
+                             { QStringLiteral("next_page"), QJsonValue(QJsonValue::Null) },
+                         })
+        .toJson(QJsonDocument::Compact);
+}
+
+static void configureOpenAiCostSuccess(HttpStubServer &server, int bucketCount = 1, double amount = 0.01)
+{
+    server.setResponse(
+        QStringLiteral("GET"), QStringLiteral("/v1/organization/costs"), 200, openAiCostPage(bucketCount, amount));
+}
 
 static void assertProbeOnlyState(const ProviderBackend &provider,
                                  qint64 inputTokens,
@@ -331,6 +410,267 @@ void ProvidersMockedHttpTest::openAiSuccessAndHeaders()
 
     QVERIFY(server.hitCount(QStringLiteral("/v1/organization/usage/completions")) >= 1);
     QVERIFY(server.hitCount(QStringLiteral("/v1/organization/costs")) >= 2);
+}
+
+void ProvidersMockedHttpTest::openAiProviderSupportedScopeAttribution()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    const qint64 start =
+        QDateTime(QDate(2026, 7, 28), QTime(0, 0), QTimeZone::UTC)
+            .toSecsSinceEpoch();
+    const QJsonObject usagePage{
+        { QStringLiteral("data"),
+          QJsonArray{
+              QJsonObject{
+                  { QStringLiteral("start_time"), start },
+                  { QStringLiteral("end_time"), start + 86400 },
+                  { QStringLiteral("results"),
+                    QJsonArray{
+                        QJsonObject{
+                            { QStringLiteral("input_tokens"), 60 },
+                            { QStringLiteral("output_tokens"), 30 },
+                            { QStringLiteral("num_model_requests"), 6 },
+                            { QStringLiteral("model"),
+                              QStringLiteral("gpt-a") },
+                            { QStringLiteral("project_id"),
+                              QStringLiteral("project-a") },
+                        },
+                        QJsonObject{
+                            { QStringLiteral("input_tokens"), 40 },
+                            { QStringLiteral("output_tokens"), 20 },
+                            { QStringLiteral("num_model_requests"), 4 },
+                            { QStringLiteral("model"),
+                              QStringLiteral("gpt-b") },
+                            { QStringLiteral("project_id"),
+                              QStringLiteral("project-b") },
+                        },
+                    } },
+              },
+          } },
+        { QStringLiteral("has_more"), false },
+        { QStringLiteral("next_page"), QJsonValue(QJsonValue::Null) },
+    };
+    const QJsonObject costPage{
+        { QStringLiteral("data"),
+          QJsonArray{
+              QJsonObject{
+                  { QStringLiteral("start_time"), start },
+                  { QStringLiteral("end_time"), start + 86400 },
+                  { QStringLiteral("results"),
+                    QJsonArray{
+                        QJsonObject{
+                            { QStringLiteral("amount"),
+                              QJsonObject{
+                                  { QStringLiteral("value"), 0.6 },
+                                  { QStringLiteral("currency"),
+                                    QStringLiteral("usd") },
+                              } },
+                            { QStringLiteral("project_id"),
+                              QStringLiteral("project-a") },
+                            { QStringLiteral("line_item"),
+                              QStringLiteral("Responses") },
+                        },
+                        QJsonObject{
+                            { QStringLiteral("amount"),
+                              QJsonObject{
+                                  { QStringLiteral("value"), 0.4 },
+                                  { QStringLiteral("currency"),
+                                    QStringLiteral("usd") },
+                              } },
+                            { QStringLiteral("project_id"),
+                              QStringLiteral("project-b") },
+                            { QStringLiteral("line_item"),
+                              QStringLiteral("Batch") },
+                        },
+                    } },
+              },
+          } },
+        { QStringLiteral("has_more"), false },
+        { QStringLiteral("next_page"), QJsonValue(QJsonValue::Null) },
+    };
+    server.setResponse(
+        QStringLiteral("GET"),
+        QStringLiteral("/v1/organization/usage/completions"), 200,
+        QJsonDocument(usagePage).toJson(QJsonDocument::Compact));
+    server.setResponse(
+        QStringLiteral("GET"), QStringLiteral("/v1/organization/costs"), 200,
+        QJsonDocument(costPage).toJson(QJsonDocument::Compact));
+
+    FixedClockOpenAIProvider provider;
+    provider.now =
+        QDateTime(QDate(2026, 7, 29), QTime(0, 0), QTimeZone::UTC);
+    provider.setApiKey(QStringLiteral("admin-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+
+    QCOMPARE(provider.inputTokens(), 100);
+    QCOMPARE(provider.outputTokens(), 50);
+    QCOMPARE(provider.requestCount(), 10);
+    QCOMPARE(provider.dailyCost(), 1.0);
+    QCOMPARE(provider.monthlyCost(), 1.0);
+
+    bool foundUsageScope = false;
+    bool foundCostScope = false;
+    for (const QVariant &entry : provider.metrics()) {
+        const QVariantMap metric = entry.toMap();
+        if (metric.value(QStringLiteral("kind"))
+                == QLatin1String("input_tokens")
+            && metric.value(QStringLiteral("modelScope"))
+                == QLatin1String("gpt-a")
+            && metric.value(QStringLiteral("projectScope"))
+                == QLatin1String("project-a")) {
+            foundUsageScope = true;
+            QCOMPARE(metric.value(QStringLiteral("aggregationLevel")).toString(),
+                     QStringLiteral("scoped"));
+        }
+        if (metric.value(QStringLiteral("kind")) == QLatin1String("cost")
+            && metric.value(QStringLiteral("projectScope"))
+                == QLatin1String("project-a")
+            && metric.value(QStringLiteral("scope"))
+                   .toString()
+                   .endsWith(QLatin1String(":Responses"))) {
+            foundCostScope = true;
+            QVERIFY(!metric.contains(QStringLiteral("modelScope")));
+        }
+    }
+    QVERIFY(foundUsageScope);
+    QVERIFY(foundCostScope);
+
+    const QVariantMap breakdown =
+        ScopeBreakdownQuery::run(provider.metrics());
+    const QVariantList reconciliations =
+        breakdown.value(QStringLiteral("reconciliations")).toList();
+    QVERIFY(reconciliations.size() >= 5);
+    for (const QVariant &entry : reconciliations) {
+        const QVariantMap row = entry.toMap();
+        QVERIFY2(row.value(QStringLiteral("reconciled")).toBool(),
+                 qPrintable(row.value(QStringLiteral("kind")).toString()));
+        QCOMPARE(row.value(QStringLiteral("aggregateRowCount")).toInt(), 1);
+    }
+
+    bool usageGroupingVerified = false;
+    int costGroupingRequests = 0;
+    for (const QString &target : server.targets()) {
+        const QUrl url(target);
+        const QStringList groups =
+            QUrlQuery(url).allQueryItemValues(QStringLiteral("group_by"));
+        if (url.path().endsWith(QLatin1String("/usage/completions"))) {
+            QVERIFY(groups.contains(QStringLiteral("model")));
+            QVERIFY(groups.contains(QStringLiteral("project_id")));
+            usageGroupingVerified = true;
+        } else if (url.path().endsWith(QLatin1String("/organization/costs"))) {
+            QVERIFY(groups.contains(QStringLiteral("project_id")));
+            QVERIFY(groups.contains(QStringLiteral("line_item")));
+            QVERIFY(!groups.contains(QStringLiteral("model")));
+            ++costGroupingRequests;
+        }
+    }
+    QVERIFY(usageGroupingVerified);
+    QCOMPARE(costGroupingRequests, 2);
+
+    const QJsonObject replacementUsagePage{
+        { QStringLiteral("data"),
+          QJsonArray{
+              QJsonObject{
+                  { QStringLiteral("start_time"), start + 86400 },
+                  { QStringLiteral("end_time"), start + 172800 },
+                  { QStringLiteral("results"),
+                    QJsonArray{
+                        QJsonObject{
+                            { QStringLiteral("input_tokens"), 25 },
+                            { QStringLiteral("output_tokens"), 5 },
+                            { QStringLiteral("num_model_requests"), 2 },
+                            { QStringLiteral("model"),
+                              QStringLiteral("gpt-c") },
+                            { QStringLiteral("project_id"),
+                              QStringLiteral("project-c") },
+                        },
+                    } },
+              },
+          } },
+        { QStringLiteral("has_more"), false },
+        { QStringLiteral("next_page"), QJsonValue(QJsonValue::Null) },
+    };
+    const QJsonObject replacementCostPage{
+        { QStringLiteral("data"),
+          QJsonArray{
+              QJsonObject{
+                  { QStringLiteral("start_time"), start + 86400 },
+                  { QStringLiteral("end_time"), start + 172800 },
+                  { QStringLiteral("results"),
+                    QJsonArray{
+                        QJsonObject{
+                            { QStringLiteral("amount"),
+                              QJsonObject{
+                                  { QStringLiteral("value"), 0.25 },
+                                  { QStringLiteral("currency"),
+                                    QStringLiteral("usd") },
+                              } },
+                            { QStringLiteral("project_id"),
+                              QStringLiteral("project-c") },
+                            { QStringLiteral("line_item"),
+                              QStringLiteral("Responses") },
+                        },
+                    } },
+              },
+          } },
+        { QStringLiteral("has_more"), false },
+        { QStringLiteral("next_page"), QJsonValue(QJsonValue::Null) },
+    };
+    server.setResponse(
+        QStringLiteral("GET"),
+        QStringLiteral("/v1/organization/usage/completions"), 200,
+        QJsonDocument(replacementUsagePage).toJson(QJsonDocument::Compact));
+    server.setResponse(
+        QStringLiteral("GET"), QStringLiteral("/v1/organization/costs"), 200,
+        QJsonDocument(replacementCostPage).toJson(QJsonDocument::Compact));
+    provider.now =
+        QDateTime(QDate(2026, 7, 30), QTime(0, 0), QTimeZone::UTC);
+    const int firstRefreshSignals = dataSpy.count();
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() > firstRefreshSignals, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(!provider.isLoading(), 3000);
+
+    int aggregateInputDays = 0;
+    int aggregateCostDays = 0;
+    int aggregateCostMonths = 0;
+    bool foundReplacementScope = false;
+    for (const QVariant &entry : provider.metrics()) {
+        const QVariantMap metric = entry.toMap();
+        QVERIFY(metric.value(QStringLiteral("projectScope")).toString()
+                != QLatin1String("project-a"));
+        QVERIFY(metric.value(QStringLiteral("projectScope")).toString()
+                != QLatin1String("project-b"));
+        const QString kind = metric.value(QStringLiteral("kind")).toString();
+        const QString window =
+            metric.value(QStringLiteral("window")).toString();
+        const QString aggregation =
+            metric.value(QStringLiteral("aggregationLevel")).toString();
+        if (kind == QLatin1String("input_tokens")
+            && window == QLatin1String("day")
+            && aggregation == QLatin1String("aggregate")) {
+            ++aggregateInputDays;
+        }
+        if (kind == QLatin1String("cost")
+            && aggregation == QLatin1String("aggregate")) {
+            if (window == QLatin1String("day")) {
+                ++aggregateCostDays;
+            } else if (window == QLatin1String("month")) {
+                ++aggregateCostMonths;
+            }
+        }
+        foundReplacementScope =
+            foundReplacementScope
+            || metric.value(QStringLiteral("projectScope")).toString()
+                == QLatin1String("project-c");
+    }
+    QVERIFY(foundReplacementScope);
+    QCOMPARE(aggregateInputDays, 1);
+    QCOMPARE(aggregateCostDays, 1);
+    QCOMPARE(aggregateCostMonths, 1);
 }
 
 void ProvidersMockedHttpTest::openAiLegacyNumericCostFallback()
@@ -545,6 +885,310 @@ void ProvidersMockedHttpTest::openAiPartialCapabilitySuccess()
                  .value(QStringLiteral("status")).toString(), QStringLiteral("failed"));
 }
 
+void ProvidersMockedHttpTest::openAiMoreThanSevenBucketsAndExplicitLimits()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+
+    QList<QPair<qint64, qint64>> usageBuckets;
+    for (int index = 0; index < 8; ++index) {
+        usageBuckets.append({ 1767225600 + (index * 86400), index + 1 });
+    }
+    server.setResponse(QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"), 200,
+        openAiUsagePage(usageBuckets));
+    configureOpenAiCostSuccess(server, 8, 0.25);
+
+    OpenAIProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+
+    QCOMPARE(provider.inputTokens(), 36);
+    QCOMPARE(provider.requestCount(), 8);
+    QCOMPARE(provider.dailyCost(), 2.0);
+    QCOMPARE(provider.monthlyCost(), 2.0);
+
+    bool usageLimitSeen = false;
+    int costLimitCount = 0;
+    for (const QString &target : server.targets()) {
+        const QUrl url(target);
+        const QUrlQuery query(url);
+        if (url.path().endsWith(QStringLiteral("/organization/usage/completions"))) {
+            usageLimitSeen = query.queryItemValue(QStringLiteral("limit")) == QStringLiteral("31");
+        } else if (url.path().endsWith(QStringLiteral("/organization/costs"))
+            && query.queryItemValue(QStringLiteral("limit")) == QStringLiteral("180")) {
+            ++costLimitCount;
+        }
+    }
+    QVERIFY(usageLimitSeen);
+    QCOMPARE(costLimitCount, 2);
+}
+
+void ProvidersMockedHttpTest::openAiPaginatesAndDeduplicates()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    const auto first = openAiUsagePage({ { 1767225600, 10 } }, true, QStringLiteral("page-2"));
+    const auto duplicate = openAiUsagePage({ { 1767225600, 10 } }, true, QStringLiteral("page-3"));
+    const auto boundaryDuplicate = openAiUsagePage({ { 1767225600, 10 }, { 1767312000, 20 } }, false);
+    server.setResponseSequence(QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"),
+        {
+            { 200, first, { }, 0 },
+            { 200, duplicate, { }, 0 },
+            { 200, boundaryDuplicate, { }, 0 },
+        });
+    configureOpenAiCostSuccess(server);
+
+    OpenAIProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+
+    QCOMPARE(provider.inputTokens(), 30);
+    QCOMPARE(provider.outputTokens(), 15);
+    QCOMPARE(provider.requestCount(), 2);
+    QCOMPARE(server.hitCount(QStringLiteral("/v1/organization/usage/completions")), 3);
+    QVERIFY(server.targets().filter(QRegularExpression(QStringLiteral("[?&]page=page-2(?:&|$)"))).size() == 1);
+    QVERIFY(server.targets().filter(QRegularExpression(QStringLiteral("[?&]page=page-3(?:&|$)"))).size() == 1);
+}
+
+void ProvidersMockedHttpTest::openAiRejectsMissingOrRepeatedCursor()
+{
+    {
+        HttpStubServer server;
+        QVERIFY(server.listen());
+        const QJsonObject missingCursor {
+            { QStringLiteral("data"),
+                QJsonDocument::fromJson(openAiUsagePage({ { 1767225600, 10 } }))
+                    .object()
+                    .value(QStringLiteral("data")) },
+            { QStringLiteral("has_more"), true },
+        };
+        server.setResponse(QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"), 200,
+            QJsonDocument(missingCursor).toJson(QJsonDocument::Compact));
+        configureOpenAiCostSuccess(server);
+
+        OpenAIProvider provider;
+        provider.setApiKey(QStringLiteral("test-key"));
+        provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+        QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+        provider.refresh();
+        QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+        QCOMPARE(provider.inputTokens(), 0);
+        QCOMPARE(provider.capabilityStatus()
+                     .value(QStringLiteral("usage"))
+                     .toMap()
+                     .value(QStringLiteral("status"))
+                     .toString(),
+            QStringLiteral("partial"));
+    }
+
+    {
+        HttpStubServer server;
+        QVERIFY(server.listen());
+        server.setResponseSequence(QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"),
+            {
+                { 200, openAiUsagePage({ { 1767225600, 10 } }, true, QStringLiteral("same-cursor")), { }, 0 },
+                { 200, openAiUsagePage({ { 1767312000, 20 } }, true, QStringLiteral("same-cursor")), { }, 0 },
+            });
+        configureOpenAiCostSuccess(server);
+
+        OpenAIProvider provider;
+        provider.setApiKey(QStringLiteral("test-key"));
+        provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+        QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+        provider.refresh();
+        QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+        QCOMPARE(provider.inputTokens(), 0);
+        QCOMPARE(provider.capabilityStatus()
+                     .value(QStringLiteral("usage"))
+                     .toMap()
+                     .value(QStringLiteral("status"))
+                     .toString(),
+            QStringLiteral("partial"));
+        QCOMPARE(server.hitCount(QStringLiteral("/v1/organization/usage/completions")), 2);
+    }
+}
+
+void ProvidersMockedHttpTest::openAiPartialPagesNeverReplaceCompleteValue()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponseSequence(QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"),
+        {
+            { 200, openAiUsagePage({ { 1767225600, 10 } }), { }, 0 },
+            { 200, openAiUsagePage({ { 1767312000, 50 } }, true, QStringLiteral("terminal")), { }, 0 },
+            { 403, QByteArrayLiteral(R"JSON({"error":"forbidden"})JSON"), { }, 0 },
+        });
+    configureOpenAiCostSuccess(server);
+
+    OpenAIProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+    QCOMPARE(provider.inputTokens(), 10);
+
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 2, 3000);
+    QCOMPARE(provider.inputTokens(), 10);
+    QCOMPARE(
+        provider.capabilityStatus().value(QStringLiteral("usage")).toMap().value(QStringLiteral("status")).toString(),
+        QStringLiteral("stale"));
+}
+
+void ProvidersMockedHttpTest::openAiMalformedIntermediatePageRemainsUnavailable()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponseSequence(QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"),
+        {
+            { 200, openAiUsagePage({ { 1767225600, 50 } }, true, QStringLiteral("malformed")), { }, 0 },
+            { 200, QByteArrayLiteral("{"), { }, 0 },
+        });
+    configureOpenAiCostSuccess(server);
+
+    OpenAIProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+
+    QCOMPARE(provider.inputTokens(), 0);
+    QCOMPARE(
+        provider.capabilityStatus().value(QStringLiteral("usage")).toMap().value(QStringLiteral("status")).toString(),
+        QStringLiteral("partial"));
+    QCOMPARE(provider.errorKind(), ProviderBackend::ProviderErrorKind::Schema);
+}
+
+void ProvidersMockedHttpTest::openAiCancellationBetweenPages()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponseSequence(QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"),
+        {
+            { 200, openAiUsagePage({ { 1767225600, 50 } }, true, QStringLiteral("slow-page")), { }, 0 },
+            { 200, openAiUsagePage({ { 1767312000, 70 } }), { }, 1000 },
+        });
+    configureOpenAiCostSuccess(server);
+
+    OpenAIProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    provider.refresh();
+    QTRY_COMPARE_WITH_TIMEOUT(server.hitCount(QStringLiteral("/v1/organization/usage/completions")), 2, 3000);
+    provider.cancelRefresh();
+    QVERIFY(!provider.isLoading());
+    QTest::qWait(1100);
+    QCOMPARE(provider.inputTokens(), 0);
+}
+
+void ProvidersMockedHttpTest::openAiSupersededGenerationCannotPublish()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponseSequence(QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"),
+        {
+            { 200, openAiUsagePage({ { 1767225600, 100 } }), { }, 700 },
+            { 200, openAiUsagePage({ { 1767225600, 7 } }), { }, 0 },
+        });
+    configureOpenAiCostSuccess(server);
+
+    OpenAIProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_COMPARE_WITH_TIMEOUT(server.hitCount(QStringLiteral("/v1/organization/usage/completions")), 1, 3000);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+    QCOMPARE(provider.inputTokens(), 7);
+    QTest::qWait(800);
+    QCOMPARE(provider.inputTokens(), 7);
+}
+
+void ProvidersMockedHttpTest::openAiRequestBudgetIsBounded()
+{
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponseSequence(QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"),
+        {
+            { 200, openAiUsagePage({ { 1767225600, 1 } }, true, QStringLiteral("page-2")), { }, 0 },
+            { 200, openAiUsagePage({ { 1767312000, 1 } }, true, QStringLiteral("page-3")), { }, 0 },
+            { 200, openAiUsagePage({ { 1767398400, 1 } }, true, QStringLiteral("page-4")), { }, 0 },
+            { 200, openAiUsagePage({ { 1767484800, 1 } }, true, QStringLiteral("page-5")), { }, 0 },
+        });
+    configureOpenAiCostSuccess(server);
+
+    OpenAIProvider provider;
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+
+    QCOMPARE(server.hitCount(QStringLiteral("/v1/organization/usage/completions")), 4);
+    QCOMPARE(provider.inputTokens(), 0);
+    QCOMPARE(
+        provider.capabilityStatus().value(QStringLiteral("usage")).toMap().value(QStringLiteral("status")).toString(),
+        QStringLiteral("partial"));
+}
+
+void ProvidersMockedHttpTest::openAiCalendarBoundaries_data()
+{
+    QTest::addColumn<QDate>("date");
+    QTest::newRow("28-day-February") << QDate(2025, 2, 28);
+    QTest::newRow("29-day-February") << QDate(2024, 2, 29);
+    QTest::newRow("30-day-April") << QDate(2026, 4, 30);
+    QTest::newRow("31-day-July") << QDate(2026, 7, 31);
+}
+
+void ProvidersMockedHttpTest::openAiCalendarBoundaries()
+{
+    QFETCH(QDate, date);
+    HttpStubServer server;
+    QVERIFY(server.listen());
+    server.setResponse(
+        QStringLiteral("GET"), QStringLiteral("/v1/organization/usage/completions"), 200, openAiUsagePage({ }));
+    configureOpenAiCostSuccess(server);
+
+    FixedClockOpenAIProvider provider;
+    provider.now = QDateTime(date, QTime(12, 34, 56), QTimeZone::UTC);
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setCustomBaseUrl(server.baseUrl() + QStringLiteral("/v1"));
+    QSignalSpy dataSpy(&provider, &ProviderBackend::dataUpdated);
+    provider.refresh();
+    QTRY_VERIFY_WITH_TIMEOUT(dataSpy.count() >= 1, 3000);
+
+    const qint64 expectedEnd = provider.now.toSecsSinceEpoch();
+    const qint64 expectedMonthStart = QDate(date.year(), date.month(), 1).startOfDay(QTimeZone::UTC).toSecsSinceEpoch();
+    bool usageRangeSeen = false;
+    bool monthlyRangeSeen = false;
+    for (const QString &target : server.targets()) {
+        const QUrl url(target);
+        const QUrlQuery query(url);
+        const qint64 start = query.queryItemValue(QStringLiteral("start_time")).toLongLong();
+        const qint64 end = query.queryItemValue(QStringLiteral("end_time")).toLongLong();
+        QCOMPARE(end, expectedEnd);
+        if (url.path().endsWith(QStringLiteral("/organization/usage/completions"))) {
+            QCOMPARE(start, provider.now.addDays(-1).toSecsSinceEpoch());
+            QCOMPARE(query.queryItemValue(QStringLiteral("limit")), QStringLiteral("31"));
+            usageRangeSeen = true;
+        } else if (start == expectedMonthStart) {
+            QCOMPARE(query.queryItemValue(QStringLiteral("limit")), QStringLiteral("180"));
+            monthlyRangeSeen = true;
+        }
+    }
+    QVERIFY(usageRangeSeen);
+    QVERIFY(monthlyRangeSeen);
+}
+
 void ProvidersMockedHttpTest::anthropicRateLimitHeaders()
 {
     HttpStubServer server;
@@ -617,7 +1261,8 @@ void ProvidersMockedHttpTest::anthropicAdminUsageCostPaginationAndDimensions()
                  .value(QStringLiteral("status")).toString(), QStringLiteral("available"));
     const QVariantMap cacheRead = provider.metric(
         QStringLiteral("cache_read_input_tokens"),
-        QStringLiteral("organization:standard"), QStringLiteral("day"));
+        QStringLiteral("organization_scoped:service_tier:standard"),
+        QStringLiteral("day"));
     QVERIFY(cacheRead.value(QStringLiteral("available")).toBool());
     QCOMPARE(cacheRead.value(QStringLiteral("modelScope")).toString(),
              QStringLiteral("claude-sonnet-4-20250514"));
@@ -683,12 +1328,14 @@ void ProvidersMockedHttpTest::anthropicAdminPartialCostAndPriorityRemainTruthful
                              QStringLiteral("current"))
                  .value(QStringLiteral("quality")).toString(), QStringLiteral("stale"));
     const QVariantMap priorityUsage = provider.metric(
-        QStringLiteral("input_tokens"), QStringLiteral("organization:priority"),
+        QStringLiteral("input_tokens"),
+        QStringLiteral("organization_scoped:service_tier:priority"),
         QStringLiteral("day"));
     QVERIFY(priorityUsage.value(QStringLiteral("available")).toBool());
     QCOMPARE(priorityUsage.value(QStringLiteral("value")).toLongLong(), 0);
     QVERIFY(!provider.metric(QStringLiteral("cost"),
-                             QStringLiteral("organization:priority"),
+                             QStringLiteral(
+                                 "organization_scoped:service_tier:priority"),
                              QStringLiteral("day"))
                  .value(QStringLiteral("available")).toBool());
 }

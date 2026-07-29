@@ -26,6 +26,10 @@ set(aiusagemonitor_SRCS
     togetherprovider.cpp
     cohereprovider.cpp
     googleveoprovider.cpp
+    forecastcontract.cpp
+    runwayquery.cpp
+    guardrailmodel.cpp
+    scopebreakdownquery.cpp
     analystquery.cpp
     usagedatabase.cpp
     updatechecker.cpp
@@ -74,6 +78,10 @@ set(aiusagemonitor_HDRS
     togetherprovider.h
     cohereprovider.h
     googleveoprovider.h
+    forecastcontract.h
+    runwayquery.h
+    guardrailmodel.h
+    scopebreakdownquery.h
     analystquery.h
     usagedatabase.h
     clipboardhelper.h

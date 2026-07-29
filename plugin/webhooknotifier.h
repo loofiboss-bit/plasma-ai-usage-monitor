@@ -1,15 +1,15 @@
 #ifndef WEBHOOKNOTIFIER_H
 #define WEBHOOKNOTIFIER_H
 
-#include <QObject>
 #include <QDateTime>
 #include <QHash>
+#include <QObject>
+#include <QVariantMap>
 #include <QtQmlIntegration/qqmlintegration.h>
 
 class QNetworkAccessManager;
 
-class WebhookNotifier : public QObject
-{
+class WebhookNotifier : public QObject {
     Q_OBJECT
     QML_ELEMENT
 
@@ -38,15 +38,15 @@ public:
     int cooldownMinutes() const;
     void setCooldownMinutes(int minutes);
 
-    Q_INVOKABLE void sendAlert(const QString &eventKey,
-                               const QString &title,
-                               const QString &message,
-                               bool critical = false);
+    Q_INVOKABLE void sendAlert(
+        const QString &eventKey, const QString &title, const QString &message, bool critical = false);
+    Q_INVOKABLE void sendGuardrailEvent(const QVariantMap &event);
 
 Q_SIGNALS:
     void configChanged();
     void deliveryFailed(const QString &channel, const QString &message);
     void delivered(const QString &channel, int httpStatus);
+    void guardrailEventAccepted(const QVariantMap &event);
 
 private:
     bool shouldSend(const QString &eventKey);

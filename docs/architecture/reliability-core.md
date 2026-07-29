@@ -107,23 +107,32 @@ to `attention`, and `cost` to `actual-spend`; legacy `dailycost` and `requests`
 remain readable only when the Daily State Model exposes a compatible available
 metric.
 
-Phase 5 notifications observe Daily State source changes instead of raw provider
-or tool warning signals. They use the row severity, reason, action, freshness,
-and normalized quota windows; one source produces at most one grouped quota
-notification per cooldown. Stale snapshots suppress cached quota changes.
-Recovery is emitted only after a real failed readiness state, and webhook text
-is built from the same compact, source-explicit, redacted payload as the desktop
-notification.
+Current-state notifications observe Daily State source changes instead of raw
+provider or tool warning signals. They use the row severity, reason, action,
+freshness, and normalized quota windows; one source produces at most one
+grouped quota notification per cooldown. Stale snapshots suppress cached quota
+changes. Recovery is emitted only after a real failed readiness state.
+
+Runway notifications observe `GuardrailModel` separately. They are opt-in,
+lead-time bounded, and use schema-v5 transition persistence as the delivery
+gate. KDE, Slack, and Discord receive one source-explicit typed semantic event;
+the webhook boundary allow-lists fields and excludes raw scope identifiers.
 
 ## Daily presentation contract
 
-`SourceDetailModel` is the typed v16 projection for one selected source. It
+`SourceDetailModel` is the typed projection for one selected source. It
 observes `DailyStateModel`, exposes typed metric roles, quota windows, freshness,
 source-specific action, provenance, and coverage, and requests a bounded
-compatible seven-day series through the existing asynchronous schema-v4 History
+compatible seven-day series through the asynchronous schema-v5 History
 boundary. Its canonical History identity comes from the provider `dbName` or
 subscription-tool `name`; internal stable IDs are never substituted for stored
 database identities.
+
+Provider-reported scoped rows expose aggregation level, model, project,
+workspace, service tier, line item, value class, and masked display metadata.
+Daily State consumes aggregate rows only. Source Detail can display scoped rows
+without adding them back to the aggregate. OpenAI cost never receives inferred
+model scope.
 
 The panel, Overview, Source Detail, notifications, History freshness labels, and release media
 consume the same non-localized Daily State keys. Overview orders recovery before
@@ -154,9 +163,20 @@ project identifiers, credentials, cookies, webhook URLs, wallet contents, and
 free-form backend errors are excluded. The frontend-only bootstrap produces a
 separate minimal report for missing or mismatched native plugins.
 
-## SQLite schema v4
+## SQLite schema v5
 
-History stays local and uses WAL mode. Schema v4 stores normalized observations and permits null values. Migration from v3 is transactional, idempotent, and backed up before changes.
+History stays local and uses WAL mode. Schema v5 preserves the normalized,
+nullable v4 observations and adds a separate `guardrail_events` table.
+Migration from v4 is transactional, idempotent, and creates a `.v17-backup`
+before schema changes. An injected migration failure leaves `user_version=4`
+and existing observations unchanged.
+
+`guardrail_events` stores warning, critical, and recovered transitions only.
+Its stable identity covers source, risk, window, scope, actual/estimated value
+class, and normalized currency. Forecast results remain ephemeral and are never
+inserted into observations as provider facts. JSON export includes a separate
+guardrail array, CSV export uses a separate file, and normal retention pruning
+applies to transition timestamps.
 
 Phase 3 history discovery uses the union of configured provider descriptors,
 configured subscription tools, retained provider observations, and retained tool
@@ -179,9 +199,34 @@ window, or currency changes start a separate series. Multi-source comparisons
 fail closed when units, semantics, or currencies differ. Rolling tool quota is
 a gauge and is never summed or relabeled as calendar-day usage.
 
-The Analyst output/input query retains the schema-v4 compatibility projection
+The Analyst output/input query retains the schema-v5 compatibility projection
 and returns only days with positive total input. It does not synthesize ratios
 for missing input and does not interpret the ratio as prompt quality.
+
+## Forecast Contract v1 and runway queries
+
+`ForecastContract::Result` is the single representation shared by
+`RunwayQuery`, `GuardrailModel`, QML cards, persistence, notifications, and
+integrations. It requires source/risk/window/scope identity, explicit optional
+values, unit/currency, period end, samples, coverage, evidence, method,
+generation time, and actual/estimated value class. Missing values stay null and
+numeric zero stays numeric.
+
+`RunwayQuery` performs short-lived read-only SQLite work outside the UI thread.
+Quota runway accepts one compatible remaining/limit series with at least four
+samples, 15 minutes of span, 15-minute freshness, stable reset metadata, and
+adequate coverage. A bounded deterministic Theil–Sen slope projects exhaustion;
+changed reset or non-monotonic remaining values fail closed.
+
+Monthly budget pacing uses completed UTC days only, at least five represented
+days, and at least 70 percent elapsed-day coverage. The median completed day is
+projected over the remaining calendar month. Missing days are not zero-filled;
+actual and estimated observations, currencies, and budget currency must match
+without conversion.
+
+`GuardrailModel` supersedes older generations, ignores late completion, and
+releases worker watchers and query connections. UI surfaces consume its shared
+rows; no SQL or forecast arithmetic runs in QML.
 
 ## Analyst snapshot contract
 
@@ -238,7 +283,7 @@ objects. `DailyOverviewState` delegates its compatibility compact API to the
 same selector. Available numeric zero remains distinct from unavailable state
 through every extracted object.
 
-## v16 maintainability boundaries
+## Maintainability boundaries
 
 Phase 5 keeps the provider catalog authoritative and extracts only verified
 hotspots. `AnthropicAdminParser` owns Admin report schema validation, duplicate
@@ -266,7 +311,12 @@ BrowserSyncService owns profile discovery, cookie extraction, authenticated requ
 
 ## Local integrations
 
-The Prometheus server binds to loopback. Scheduled JSON and CSV export writes to a user-selected local directory. Slack and Discord webhooks are explicit outbound integrations and use KWallet-stored URLs plus alert cooldowns.
+The Prometheus server binds to loopback. Guardrail series are collapsed to the
+worst state and earliest event per provider, risk kind, and value class. They
+never use scope, model, project, workspace, stable-ID, or API-key labels.
+Scheduled JSON and CSV export writes to a user-selected local directory. Slack
+and Discord webhooks are explicit outbound integrations and use KWallet-stored
+URLs plus alert cooldowns.
 
 Configuration export uses schema v2 and excludes every secret-bearing field.
 

@@ -9,7 +9,7 @@ PREFIX="${SESSION_ROOT}/prefix"
 CONFIG_HOME="${SESSION_ROOT}/config"
 CACHE_HOME="${SESSION_ROOT}/cache"
 EVIDENCE_JSONL="${SESSION_ROOT}/capture-evidence.jsonl"
-KWIN_SCRIPT_NAME="ai-usage-monitor-v16-capture"
+KWIN_SCRIPT_NAME="ai-usage-monitor-v17-capture"
 WINDOW_PID=""
 SERVER_PID=""
 NESTED_PID=""
@@ -142,22 +142,22 @@ capture_view() {
   fi
   case "$view" in
     media-history-retained)
-      python3 "$ROOT_DIR/scripts/demo/generate_v16_media_history.py" \
+      python3 "$ROOT_DIR/scripts/demo/generate_v17_media_history.py" \
         --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
         --scenario retained
       ;;
     media-history-gap)
-      python3 "$ROOT_DIR/scripts/demo/generate_v16_media_history.py" \
+      python3 "$ROOT_DIR/scripts/demo/generate_v17_media_history.py" \
         --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
         --scenario gap
       ;;
     media-analyst-sufficient)
-      python3 "$ROOT_DIR/scripts/demo/generate_v16_media_history.py" \
+      python3 "$ROOT_DIR/scripts/demo/generate_v17_media_history.py" \
         --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
         --scenario analyst-sufficient
       ;;
     media-analyst-insufficient)
-      python3 "$ROOT_DIR/scripts/demo/generate_v16_media_history.py" \
+      python3 "$ROOT_DIR/scripts/demo/generate_v17_media_history.py" \
         --output "$view_data_home/plasma-ai-usage-monitor/usage_history.db" \
         --scenario analyst-insufficient
       ;;
@@ -488,13 +488,14 @@ FIXTURE_SHA="$(
   cd "$ROOT_DIR"
   sha256sum \
     scripts/demo/showcase_preset.json \
-    scripts/demo/generate_v16_media_history.py \
+    scripts/demo/generate_v17_media_history.py \
     package/contents/ui/components/MediaDailyState.qml \
     | sha256sum | cut -d' ' -f1
 )"
 SOURCE_TREE_SHA="$(
   cd "$ROOT_DIR"
-  git ls-files --cached --others --exclude-standard -- VERSION package scripts/demo \
+  git ls-files --cached --others --exclude-standard -- \
+    VERSION CMakeLists.txt package plugin scripts/demo \
     | sort \
     | while IFS= read -r path; do
         [[ -f "$path" ]] && sha256sum "$path"
@@ -559,7 +560,7 @@ jq -n \
       "panel-lowest-quota.png": "media-panel"
     },
     assets: $assets}' \
-  >"${OUTPUT_DIR}/v16-media-manifest.json"
+  >"${OUTPUT_DIR}/v17-media-manifest.json"
 
 python3 "$ROOT_DIR/scripts/check_release_media.py"
-echo "v16 media capture complete: $OUTPUT_DIR"
+echo "v17 media capture complete: $OUTPUT_DIR"

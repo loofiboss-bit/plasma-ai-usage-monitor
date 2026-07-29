@@ -1,6 +1,7 @@
 #include "sourcedetailmodel.h"
 
 #include "dailystatemodel.h"
+#include "scopebreakdownquery.h"
 #include "usagedatabase.h"
 
 #include <KLocalizedString>
@@ -16,7 +17,19 @@ const QStringList kRoleNames{
     QStringLiteral("currency"), QStringLiteral("source"),
     QStringLiteral("quality"),  QStringLiteral("semantic"),
     QStringLiteral("scope"),    QStringLiteral("window"),
-    QStringLiteral("resetAt")};
+    QStringLiteral("resetAt"),
+    QStringLiteral("modelScope"),
+    QStringLiteral("modelScopeAvailable"),
+    QStringLiteral("projectScope"),
+    QStringLiteral("projectScopeAvailable"),
+    QStringLiteral("projectDisplayKind"),
+    QStringLiteral("projectDisplaySuffix"),
+    QStringLiteral("serviceTierScope"),
+    QStringLiteral("serviceTierAvailable"),
+    QStringLiteral("lineItemScope"),
+    QStringLiteral("lineItemAvailable"),
+    QStringLiteral("aggregationLevel"),
+    QStringLiteral("valueClass")};
 
 bool availableMetric(const QVariantMap &metric) {
   const QVariant value = metric.value(QStringLiteral("value"));
@@ -87,6 +100,9 @@ QVariantList SourceDetailModel::quotaWindows() const {
   return m_source.value(QStringLiteral("quotaWindows")).toList();
 }
 QVariantMap SourceDetailModel::coverage() const { return m_coverage; }
+QVariantMap SourceDetailModel::scopeBreakdown() const {
+  return m_scopeBreakdown;
+}
 QVariantMap SourceDetailModel::recentHistory() const { return m_recentHistory; }
 bool SourceDetailModel::historyLoading() const { return m_historyLoading; }
 QString SourceDetailModel::historyId() const {
@@ -180,7 +196,9 @@ void SourceDetailModel::rebuild() {
   m_source = m_dailyState && !m_sourceId.isEmpty()
                  ? m_dailyState->source(m_sourceId)
                  : QVariantMap();
-  m_metrics = m_source.value(QStringLiteral("detailMetrics")).toList();
+  m_scopeBreakdown = ScopeBreakdownQuery::run(
+      m_source.value(QStringLiteral("detailMetrics")).toList());
+  m_metrics = m_scopeBreakdown.value(QStringLiteral("rows")).toList();
   endResetModel();
 
   int available = 0;

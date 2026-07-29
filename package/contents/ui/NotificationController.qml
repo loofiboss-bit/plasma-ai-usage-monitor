@@ -11,6 +11,7 @@ Item {
     required property var configuration
     required property var registry
     required property var dailyState
+    required property var guardrails
     required property var usageDatabase
     required property var webhookNotifier
 
@@ -56,6 +57,14 @@ Item {
         eventId: "providerReconnected"
         title: i18n("AI Usage Monitor")
         iconName: notifications.brandedNotificationIcon
+    }
+
+    Notification {
+        id: guardrailNotification
+        componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
+        eventId: "guardrailTransition"
+        title: i18n("AI Usage Monitor")
+        iconName: notifications.warningNotificationIcon
     }
 
     Notification {
@@ -214,16 +223,14 @@ Item {
             return budgetNotification;
         case "recovery":
             return recoveryNotification;
+        case "guardrail":
+            return guardrailNotification;
         default:
             return stateNotification;
         }
     }
 
-    function deliver(payload) {
-        if (!canNotify(payload.eventKey)) {
-            return false;
-        }
-
+    function deliverPrepared(payload) {
         notificationPrepared(payload);
         if (!deliveryEnabled) {
             return true;
@@ -235,14 +242,24 @@ Item {
         target.urgency = payload.critical
             ? Notification.CriticalUrgency
             : (payload.type === "recovery"
+               || payload.transition === "recovered"
                ? Notification.LowUrgency
                : Notification.NormalUrgency);
         target.sendEvent();
-        webhookNotifier.sendAlert(payload.eventKey,
-                                  payload.title,
-                                  payload.message,
-                                  payload.critical);
+        if (payload.type === "guardrail"
+                && webhookNotifier.sendGuardrailEvent) {
+            webhookNotifier.sendGuardrailEvent(payload);
+        } else {
+            webhookNotifier.sendAlert(payload.eventKey,
+                                      payload.title,
+                                      payload.message,
+                                      payload.critical);
+        }
         return true;
+    }
+
+    function deliver(payload) {
+        return canNotify(payload.eventKey) ? deliverPrepared(payload) : false;
     }
 
     function quotaPayload(row) {
@@ -421,6 +438,147 @@ Item {
         }
     }
 
+    function guardrailSource(forecast) {
+        if (!registry || !registry.providerByConfigKey) {
+            return null;
+        }
+        return registry.providerByConfigKey(forecast.sourceId);
+    }
+
+    function guardrailSourceEnabled(forecast) {
+        if (forecast.sourceKind !== "provider") {
+            return false;
+        }
+        var source = guardrailSource(forecast);
+        return !!source && source.enabled && source.notificationsEnabled;
+    }
+
+    function guardrailWithinLeadTime(forecast) {
+        var predicted = new Date(forecast.predictedAt);
+        if (isNaN(predicted.getTime())) {
+            return false;
+        }
+        var leadHours = Number(configuration.forecastLeadTimeHours);
+        if ([1, 6, 24, 48].indexOf(leadHours) < 0) {
+            return false;
+        }
+        return predicted.getTime() - Date.now() <= leadHours * 60 * 60 * 1000;
+    }
+
+    function guardrailKindLabel(kind) {
+        return kind === "budget_overrun"
+            ? i18n("monthly budget pacing")
+            : i18n("quota runway");
+    }
+
+    function guardrailValueLabel(forecast) {
+        if (!isFiniteNonNegative(forecast.projectedValue)) {
+            return "";
+        }
+        if (forecast.currency) {
+            return i18n("%1 %2 projected",
+                        Number(forecast.projectedValue).toFixed(2),
+                        forecast.currency);
+        }
+        return i18n("%1 %2 projected",
+                    Number(forecast.projectedValue).toFixed(0),
+                    forecast.unit || "");
+    }
+
+    function guardrailPayload(forecast, transition) {
+        var source = guardrailSource(forecast);
+        var sourceName = source ? (source.label || source.name) : forecast.sourceId;
+        var kind = guardrailKindLabel(forecast.kind);
+        var critical = transition === "critical";
+        var predicted = resetLabel(forecast.predictedAt);
+        var message;
+        if (transition === "recovered") {
+            message = forecast.state === "safe"
+                ? i18n("%1 %2 returned to a safe state.", sourceName, kind)
+                : i18n("%1 %2 is no longer asserted; the current forecast is unavailable.",
+                       sourceName, kind);
+        } else {
+            var value = guardrailValueLabel(forecast);
+            message = predicted !== ""
+                ? i18n("%1 %2 is %3. The projected event time is %4.",
+                       sourceName, kind, transition, predicted)
+                : i18n("%1 %2 is %3.", sourceName, kind, transition);
+            if (value !== "") {
+                message += " " + value + ".";
+            }
+        }
+        return {
+            type: "guardrail",
+            eventKey: "guardrail_" + forecast.stableId + "_" + transition,
+            sourceId: forecast.sourceId,
+            kind: forecast.kind,
+            state: forecast.state,
+            transition: transition,
+            predictedAt: forecast.predictedAt,
+            periodEnd: forecast.periodEnd,
+            evidenceGrade: forecast.evidenceGrade,
+            methodId: forecast.methodId,
+            valueClass: forecast.valueClass,
+            title: transition === "recovered"
+                ? i18n("%1 guardrail recovered", sourceName)
+                : (critical
+                   ? i18n("%1 guardrail critical", sourceName)
+                   : i18n("%1 guardrail warning", sourceName)),
+            message: message,
+            critical: critical
+        };
+    }
+
+    function processGuardrail(forecast) {
+        if (!forecast || !forecast.stableId
+                || !configuration.alertsEnabled
+                || !configuration.forecastNotificationsEnabled
+                || !guardrailSourceEnabled(forecast)
+                || !usageDatabase
+                || !usageDatabase.recordGuardrailTransition
+                || !usageDatabase.lastGuardrailTransition) {
+            return false;
+        }
+
+        var transition = "";
+        if ((forecast.state === "warning" || forecast.state === "critical")
+                && guardrailWithinLeadTime(forecast)) {
+            transition = forecast.state;
+        } else if (forecast.state === "safe"
+                   || forecast.state === "unavailable") {
+            var previous = usageDatabase.lastGuardrailTransition(
+                forecast.stableId);
+            if (previous.transition === "warning"
+                    || previous.transition === "critical") {
+                transition = "recovered";
+            }
+        }
+        if (transition === "") {
+            return false;
+        }
+
+        var payload = guardrailPayload(forecast, transition);
+        if (!canNotify(payload.eventKey)) {
+            return false;
+        }
+        if (!usageDatabase.recordGuardrailTransition(
+                    forecast, transition)) {
+            delete lastNotificationTimes[payload.eventKey];
+            return false;
+        }
+        return deliverPrepared(payload);
+    }
+
+    function processGuardrails() {
+        if (!guardrails || !guardrails.forecasts) {
+            return;
+        }
+        var forecasts = guardrails.forecasts;
+        for (var i = 0; i < forecasts.length; i++) {
+            processGuardrail(forecasts[i]);
+        }
+    }
+
     function sendUpdateAvailable(latestVersion, releaseUrl) {
         if (!configuration.notifyOnUpdate) {
             return;
@@ -443,5 +601,16 @@ Item {
         }
     }
 
-    Component.onCompleted: Qt.callLater(synchronizeSources)
+    Connections {
+        target: notifications.guardrails
+
+        function onForecastsChanged() {
+            notifications.processGuardrails();
+        }
+    }
+
+    Component.onCompleted: {
+        Qt.callLater(synchronizeSources);
+        Qt.callLater(processGuardrails);
+    }
 }

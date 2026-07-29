@@ -1,28 +1,34 @@
 # Roadmap
 
-**Current release:** 16.0.1, Control Loop
+**Current release:** 17.0.0, Runway Guardrails
 
-**Last updated:** 2026-07-26
+**Last updated:** 2026-07-29
 
-AI Usage Monitor remains a desktop-native, local-first Plasma widget. v16 makes
-the path from status to explanation and action direct without widening the
-local-first boundary.
+AI Usage Monitor remains a desktop-native, local-first Plasma widget. v17 adds
+deterministic forward-looking guardrails without widening the read-only
+provider or local-first boundary.
 
 ## Current release
 
-### 16.0.1 Control Loop
+### 17.0.0 Runway Guardrails
 
-- Consolidate repeated Overview facts into one daily focus and source-first drill-down.
-- Correct Analyst UTC range semantics and improve responsive History and Analyst layouts.
-- Add optional Anthropic Admin API usage and cost reporting without weakening secret handling.
-- Make QML lint and release-media evidence trustworthy, reproducible release gates.
-- Preserve v15 configuration, KWallet secrets, schema-v4 history, package identity, and metric truth boundaries.
-- Restore all localized Settings and widget text through Plasma's supported QML
-  translation context and guard that runtime contract in the release gate.
+- Make OpenAI usage and daily/monthly cost pagination bounded, cursor-complete,
+  and failure-safe before forecasts consume totals.
+- Add Forecast Contract v1, transactional schema v5, deterministic quota runway,
+  and completed-UTC-day monthly budget pacing.
+- Show provider-reported model, project, workspace, service-tier, and line-item
+  detail without inferring dimensions or double counting aggregates.
+- Integrate guardrails into Daily Focus, Source Detail, Analyst, and Settings
+  without a fourth primary tab.
+- Add opt-in, transition-only, restart-deduplicated notifications and
+  aggregate-only Prometheus guardrail metrics.
+- Preserve v16 configuration, KWallet secrets, observation history, package
+  identity, actual/estimated separation, and currency boundaries.
 
 The implementation plan is
-[`docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md).
-Phases 0 through 5 and the public release readback are complete.
+[`docs/plans/PLASMA_AI_USAGE_MONITOR_V17_CODEX_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V17_CODEX_PLAN.md).
+Phases 0 through 6 are complete in the local release candidate. Public
+publication remains a separately authorized operation.
 
 ## Current priorities
 
@@ -57,6 +63,7 @@ Phases 0 through 5 and the public release readback are complete.
 
 | Release | Result |
 | --- | --- |
+| 17.0.0 Runway Guardrails | Complete OpenAI pagination, deterministic quota and budget forecasts, provider-reported scope detail, schema v5, and private restart-safe integrations |
 | 16.0.1 Control Loop | Restore localized Settings and widget text and add a release-blocking QML localization contract |
 | 16.0.0 Control Loop | Daily Focus, Source Detail, responsive History and Analyst, exact UTC periods, optional Anthropic Admin reporting, and reproducible release evidence |
 | 15.0.0 Daily Control | Shared daily source state, action-first Overview, truthful compact modes, retained History, evidence-bound Analyst, unified notifications, and performance/accessibility gates |

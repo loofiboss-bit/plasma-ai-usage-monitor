@@ -7,6 +7,10 @@ History is local and optional. Enable only the outputs you plan to use.
 
 Open **Settings → History** to enable recording and choose a retention period from 7 to 365 days. The default is 90 days.
 
+Runway calculations use the same local observations. Enabling forecast
+notifications also enables the local database for the minimum observation and
+transition evidence even when the general History switch is off.
+
 The popup provides:
 
 - a detail view for one provider or subscription tool
@@ -63,7 +67,10 @@ History settings can also write JSON or CSV on a schedule.
 
 Choose a directory you own. Scheduled export writes atomically so a partial run does not replace the last complete file.
 
-Exports contain usage observations and source metadata. They do not contain API keys, browser cookies, personal access tokens, or webhook URLs.
+Schema-v5 exports contain usage observations, source metadata, and the separate
+guardrail transition log. They do not contain API keys, browser cookies,
+personal access tokens, or webhook URLs. Explicit local exports can contain raw
+provider scope identifiers, so review them before sharing.
 
 ## Configuration backup
 
@@ -83,6 +90,12 @@ curl http://127.0.0.1:9464/metrics
 
 Use a local Prometheus instance or an explicitly configured local forwarder. The widget does not expose the endpoint on other network interfaces.
 
+Runway metrics are aggregate-only. `ai_usage_guardrail_risk_state` uses
+`0` unavailable, `1` safe, `2` warning, and `3` critical.
+`ai_usage_guardrail_seconds_until_event` appears only when a predicted event
+exists. Their labels are limited to provider, risk kind, and actual/estimated
+value class.
+
 ## Slack and Discord webhooks
 
 Webhooks use the same alert pipeline as KDE notifications.
@@ -95,6 +108,16 @@ Webhooks use the same alert pipeline as KDE notifications.
 
 Webhook URLs are stored in KWallet. Alerts can contain provider names, status, and usage or budget context, so treat the destination as part of your data boundary.
 
+Forecast alerts are configured separately under **Settings → Guardrails** and
+are off by default. They fire only when entering warning, entering critical, or
+leaving a prior risk state. Persisted schema-v5 transition evidence suppresses
+the same state after refresh or restart. Raw model, project, workspace,
+line-item, and API-key identifiers are not sent.
+
 ## Alert tuning
 
 Start with provider disconnect, reconnect, and API errors. Add budget warnings only for providers with compatible spend data. Set Do Not Disturb hours and a cooldown to avoid repeated notifications during a provider outage.
+
+For runway alerts, choose a 1-, 6-, 24-, or 48-hour lead time. The risk is not
+recorded as delivered until it enters that horizon. Existing global alert,
+Do Not Disturb, cooldown, and per-provider switches still apply.

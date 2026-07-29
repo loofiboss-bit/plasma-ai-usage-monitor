@@ -26,6 +26,7 @@ public:
     QString model;
     QString project;
     QString serviceTier;
+    QString lineItem;
     qint64 microUsd = 0;
   };
 

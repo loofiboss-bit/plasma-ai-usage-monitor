@@ -55,6 +55,20 @@ bool metricAvailable(const QVariantMap &metric) {
          value.isValid() && !value.isNull();
 }
 
+bool aggregateMetric(const QVariantMap &metric) {
+  const QString level =
+      metric.value(QStringLiteral("aggregationLevel")).toString();
+  if (level == QLatin1String("aggregate"))
+    return true;
+  if (level == QLatin1String("scoped"))
+    return false;
+  return metric.value(QStringLiteral("modelScope")).toString().isEmpty() &&
+         metric.value(QStringLiteral("projectScope")).toString().isEmpty() &&
+         !metric.value(QStringLiteral("scope"))
+              .toString()
+              .startsWith(QLatin1String("organization_scoped"));
+}
+
 bool finiteNumber(const QVariant &value) {
   bool ok = false;
   const double number = value.toDouble(&ok);
@@ -355,7 +369,7 @@ QVariantList preferredCosts(const QVariantList &metrics) {
   for (const QVariant &entry : metrics) {
     const QVariantMap metric = entry.toMap();
     if (metric.value(QStringLiteral("kind")) == QLatin1String("cost") &&
-        metricAvailable(metric))
+        metricAvailable(metric) && aggregateMetric(metric))
       available.append(metric);
   }
   if (available.isEmpty())
@@ -387,7 +401,7 @@ QVariantMap costTotals(const QVariantList &metrics, const QString &window) {
     const QVariantMap metric = entry.toMap();
     if (metric.value(QStringLiteral("kind")) != QLatin1String("cost") ||
         metric.value(QStringLiteral("window")) != window ||
-        !metricAvailable(metric) ||
+        !metricAvailable(metric) || !aggregateMetric(metric) ||
         !actualSource(metric.value(QStringLiteral("source")).toString()))
       continue;
     addCurrency(totals, metric.value(QStringLiteral("currency")).toString(),

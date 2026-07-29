@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
+import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
@@ -44,7 +45,13 @@ QQC2.ScrollView {
             Layout.fillWidth: true
             Layout.margins: Kirigami.Units.smallSpacing
             presentation: overviewState
+            guardrails: overview.monitor.guardrails
+            forecastsEnabled: Plasmoid.configuration.forecastUiEnabled
             onActionRequested: function(stableId, actionKey, sourceKind) {
+                if (actionKey === "review_runway") {
+                    overview.sourceRequested(stableId);
+                    return;
+                }
                 overview.monitor.fixOverviewSource(stableId, actionKey,
                                                     sourceKind);
             }

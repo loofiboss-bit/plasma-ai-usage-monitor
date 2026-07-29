@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKER = ROOT / "scripts" / "check_version_policy.py"
-FILES = (
+BASE_FILES = (
     "VERSION",
     "ROADMAP.md",
     "SECURITY.md",
@@ -20,7 +20,6 @@ FILES = (
     "package/contents/catalog/subscriptions-v1.json",
     "plasma-ai-usage-monitor.spec",
     "com.github.loofi.aiusagemonitor.metainfo.xml",
-    "docs/plans/PLASMA_AI_USAGE_MONITOR_V16_PLAN.md",
 )
 
 
@@ -35,7 +34,20 @@ def run(root: Path) -> subprocess.CompletedProcess[str]:
 
 with tempfile.TemporaryDirectory(prefix="ai-monitor-version-policy-") as temp:
     fixture = Path(temp)
-    for relative in FILES:
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    major = int(version.split(".", 1)[0])
+    plan_candidates = (
+        f"docs/plans/PLASMA_AI_USAGE_MONITOR_V{major}_PLAN.md",
+        f"docs/plans/PLASMA_AI_USAGE_MONITOR_V{major}_CODEX_PLAN.md",
+    )
+    plan = next(
+        (relative for relative in plan_candidates if (ROOT / relative).is_file()),
+        None,
+    )
+    if plan is None:
+        raise SystemExit(f"Version policy test fixture missing v{major} plan")
+
+    for relative in (*BASE_FILES, plan):
         target = fixture / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(ROOT / relative, target)
@@ -44,8 +56,6 @@ with tempfile.TemporaryDirectory(prefix="ai-monitor-version-policy-") as temp:
     if baseline.returncode != 0:
         raise SystemExit(baseline.stdout + baseline.stderr)
 
-    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    major = int(version.split(".", 1)[0])
     previous = f"{major - 1}.0.0"
     mutations = {
         "roadmap": ("ROADMAP.md", f"**Current release:** {version}", f"**Current release:** {previous}"),

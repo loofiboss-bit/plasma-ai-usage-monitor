@@ -14,14 +14,14 @@
     <p>
       AI Usage Monitor is a Plasma 6 widget for provider-reported usage and spend,
       synchronized coding-tool quota, local activity, balances, rate limits, and
-      read-only connection checks. Control Loop connects one Daily Focus to
-      source-specific evidence, actions, and compatible History.
+      read-only connection checks. Runway Guardrails adds deterministic quota
+      runway and monthly budget pacing from compatible local history.
     </p>
     <p>
       The widget stores secrets in KWallet and history on the local computer. Actual
       data, estimates, fixed fees, balances, connectivity, unavailable values, and
-      currencies stay separate. Disabled-source history remains selectable and Analyst
-      explains its coverage and sample requirements. The KDE Store frontend requires
+      currencies stay separate. Forecasts expose evidence and unavailable reasons,
+      scoped identifiers remain local, and notifications are opt-in. The KDE Store frontend requires
       the matching compiled plugin from the Fedora COPR package or a source build.
     </p>
   </description>
@@ -76,6 +76,15 @@
 
   <releases>
 
+    <release version="17.0.0" date="2026-07-29">
+      <description>
+        <ul>
+          <li>Add deterministic quota runway and monthly budget pacing with explicit evidence and unavailable states.</li>
+          <li>Complete OpenAI usage and cost pagination and add provider-reported scope detail without double counting.</li>
+          <li>Add transactional schema v5 and opt-in, restart-deduplicated guardrail notifications.</li>
+        </ul>
+      </description>
+    </release>
     <release version="16.0.1" date="2026-07-26">
       <description>
         <ul>

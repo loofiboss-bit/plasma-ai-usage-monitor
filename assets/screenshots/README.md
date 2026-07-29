@@ -1,10 +1,10 @@
-# v16 screenshot playbook
+# v17 screenshot playbook
 
 Capture the v16 set only after runtime, strings, documentation, and version
 metadata are final:
 
 ```bash
-scripts/demo/capture_v16_media.sh build/debug assets/screenshots
+scripts/demo/capture_v17_media.sh build/debug assets/screenshots
 python3 scripts/check_release_media.py
 ```
 
@@ -33,7 +33,7 @@ published plan cap as live quota, or hide the disabled/history-only label.
 ## Session contract
 
 All files use Breeze Dark at 100% scale in one Fedora KDE Plasma session. The
-generated `v16-media-manifest.json` records:
+generated `v17-media-manifest.json` records:
 
 - release version
 - session ID

@@ -11,6 +11,9 @@ KCM.SimpleKCM {
     id: budgetPage
 
     // Config stores cents (Int). SpinBox value is also cents.
+    property bool cfg_forecastUiEnabled
+    property bool cfg_forecastNotificationsEnabled
+    property int cfg_forecastLeadTimeHours
     property int cfg_openaiDailyBudget
     property int cfg_openaiMonthlyBudget
     property int cfg_anthropicDailyBudget
@@ -59,8 +62,51 @@ KCM.SimpleKCM {
     Kirigami.FormLayout {
         anchors.fill: parent
 
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: i18n("Runway forecasts")
+        }
+
+        QQC2.CheckBox {
+            Kirigami.FormData.label: i18n("Forecasts:")
+            text: i18n("Show deterministic runway guardrails")
+            checked: budgetPage.cfg_forecastUiEnabled
+            onToggled: budgetPage.cfg_forecastUiEnabled = checked
+            Accessible.name: text
+        }
+
+        QQC2.CheckBox {
+            Kirigami.FormData.label: i18n("Notifications:")
+            text: i18n("Notify only when a guardrail state changes")
+            checked: budgetPage.cfg_forecastNotificationsEnabled
+            onToggled: budgetPage.cfg_forecastNotificationsEnabled = checked
+            Accessible.name: text
+        }
+
+        QQC2.ComboBox {
+            id: leadTimeCombo
+            Kirigami.FormData.label: i18n("Lead time:")
+            model: [
+                { label: i18np("%1 hour", "%1 hours", 1), value: 1 },
+                { label: i18np("%1 hour", "%1 hours", 6), value: 6 },
+                { label: i18np("%1 hour", "%1 hours", 24), value: 24 },
+                { label: i18np("%1 hour", "%1 hours", 48), value: 48 }
+            ]
+            textRole: "label"
+            valueRole: "value"
+            currentIndex: {
+                var values = [1, 6, 24, 48];
+                var index = values.indexOf(
+                    budgetPage.cfg_forecastLeadTimeHours);
+                return index >= 0 ? index : 1;
+            }
+            onActivated: budgetPage.cfg_forecastLeadTimeHours =
+                Number(currentValue)
+            Accessible.name: i18n("Forecast notification lead time")
+        }
+
         QQC2.Label {
-            text: i18n("Budgets are stored in USD. Set a value to zero to disable it. A budget is automatically disabled when observed data uses another currency.")
+            text: i18n("Forecasts use deterministic local history only. Notifications are off by default. Budgets are stored in USD; a currency mismatch makes pacing unavailable.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -69,7 +115,7 @@ KCM.SimpleKCM {
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
-            Kirigami.FormData.label: i18n("Warning Threshold")
+            Kirigami.FormData.label: i18n("Current budget threshold")
         }
 
         ColumnLayout {

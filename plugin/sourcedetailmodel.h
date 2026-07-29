@@ -20,6 +20,7 @@ class SourceDetailModel : public QAbstractListModel {
   Q_PROPERTY(QString actionLabel READ actionLabel NOTIFY sourceChanged)
   Q_PROPERTY(QVariantList quotaWindows READ quotaWindows NOTIFY sourceChanged)
   Q_PROPERTY(QVariantMap coverage READ coverage NOTIFY sourceChanged)
+  Q_PROPERTY(QVariantMap scopeBreakdown READ scopeBreakdown NOTIFY sourceChanged)
   Q_PROPERTY(QVariantMap recentHistory READ recentHistory NOTIFY historyChanged)
   Q_PROPERTY(bool historyLoading READ historyLoading NOTIFY historyChanged)
   Q_PROPERTY(QString historyId READ historyId NOTIFY sourceChanged)
@@ -37,7 +38,19 @@ public:
     SemanticRole,
     ScopeRole,
     WindowRole,
-    ResetAtRole
+    ResetAtRole,
+    ModelScopeRole,
+    ModelScopeAvailableRole,
+    ProjectScopeRole,
+    ProjectScopeAvailableRole,
+    ProjectDisplayKindRole,
+    ProjectDisplaySuffixRole,
+    ServiceTierScopeRole,
+    ServiceTierAvailableRole,
+    LineItemScopeRole,
+    LineItemAvailableRole,
+    AggregationLevelRole,
+    ValueClassRole
   };
   Q_ENUM(Role)
 
@@ -53,6 +66,7 @@ public:
   QString actionLabel() const;
   QVariantList quotaWindows() const;
   QVariantMap coverage() const;
+  QVariantMap scopeBreakdown() const;
   QVariantMap recentHistory() const;
   bool historyLoading() const;
   QString historyId() const;
@@ -79,6 +93,7 @@ private:
   QVariantMap m_source;
   QVariantList m_metrics;
   QVariantMap m_coverage;
+  QVariantMap m_scopeBreakdown;
   QVariantMap m_recentHistory;
   QString m_historyRequestId;
   bool m_historyLoading = false;

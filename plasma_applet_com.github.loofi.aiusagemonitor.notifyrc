@@ -21,6 +21,12 @@ Comment=A provider has exceeded its daily or monthly budget limit
 Flags=Popup
 Action=Popup
 
+[Event/guardrailTransition]
+Name=Runway Guardrail
+Comment=A deterministic runway or budget pacing state changed
+Flags=Popup
+Action=Popup
+
 [Event/providerDisconnected]
 Name=Provider Disconnected
 Comment=A provider has become unreachable after consecutive errors
