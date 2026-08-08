@@ -265,7 +265,7 @@ def main() -> None:
     parser.add_argument("--request-log", type=Path, required=True)
     parser.add_argument("--session-log", type=Path, required=True)
     parser.add_argument("--pid", type=int, required=True)
-    parser.add_argument("--timeout", type=float, default=20.0)
+    parser.add_argument("--timeout", type=float, default=35.0)
     args = parser.parse_args()
 
     compact_prefix = "AI Usage Monitor:"
