@@ -263,8 +263,13 @@ def run_panel_session(
         "function bindWindow(window) {\n"
         "    if (Number(window.pid) !== targetPid) return;\n"
         "    workspace.activeWindow = window;\n"
-        "    print('AI_USAGE_OUTER_WINDOW_BOUND ' + window.internalId"
-        " + ' ' + window.pid);\n"
+        "    callDBus(\n"
+        "        'com.github.loofi.aiusagemonitor.Phase0Binding',\n"
+        "        '/Phase0Binding',\n"
+        "        'com.github.loofi.aiusagemonitor.Phase0Binding',\n"
+        "        'WindowBound',\n"
+        "        String(window.internalId), String(window.pid)\n"
+        "    );\n"
         "}\n"
         "workspace.windowList().forEach(bindWindow);\n"
         "workspace.windowAdded.connect(bindWindow);\n",
@@ -297,12 +302,14 @@ setsid kwin_wayland --wayland-display "$OUTER_WAYLAND_DISPLAY" -s "$1" \
   --width 1600 --height 900 --scale 1 --xwayland --no-lockscreen \
   --no-global-shortcuts --exit-with-session /usr/bin/plasmashell >"$4" 2>&1 &
 kwin_pid=$!
+binding_pid=""
 cleanup() {
   for service in org.kde.kded6 org.kde.ActivityManager; do
     service_pid="$(busctl --user status "$service" 2>/dev/null \
       | sed -n 's/^PID=//p' | head -n 1)"
     [[ -n "$service_pid" ]] && kill -TERM "$service_pid" >/dev/null 2>&1 || true
   done
+  [[ -n "$binding_pid" ]] && kill -TERM "$binding_pid" >/dev/null 2>&1 || true
   kill -TERM -- "-$kwin_pid" >/dev/null 2>&1 || true
   kill -TERM "$a11y_pid" >/dev/null 2>&1 || true
   kill -TERM "$a11y_registry_pid" >/dev/null 2>&1 || true
@@ -319,11 +326,25 @@ for _ in $(seq 1 45); do
 done
 [[ "$ready" -eq 1 ]] || { echo "Nested Plasma panel did not become ready" >&2; exit 1; }
 sleep 2
-[[ -n "${AI_USAGE_PHASE0_OUTER_LOG:-}" ]] || {
-  echo "Outer KWin log path is unavailable" >&2
+sed "s/__TARGET_PID__/$kwin_pid/" "$8" >"$9"
+binding_output="${9}.bound"
+binding_ready="${9}.ready"
+DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
+  python3 "${10}" --pid "$kwin_pid" --output "$binding_output" \
+  --ready "$binding_ready" >>"$4" 2>&1 &
+binding_pid=$!
+for _ in $(seq 1 40); do
+  [[ -s "$binding_ready" ]] && break
+  kill -0 "$binding_pid" >/dev/null 2>&1 || {
+    echo "Outer window binding service exited before readiness" >&2
+    exit 1
+  }
+  sleep 0.05
+done
+[[ -s "$binding_ready" ]] || {
+  echo "Outer window binding service did not become ready" >&2
   exit 1
 }
-sed "s/__TARGET_PID__/$kwin_pid/" "$8" >"$9"
 DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
   busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
   unloadScript s ai-monitor-phase0-window-binding >/dev/null 2>&1 || true
@@ -340,10 +361,10 @@ DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
 window_id=""
 window_info=""
 for _ in $(seq 1 80); do
-  window_id="$(rg "AI_USAGE_OUTER_WINDOW_BOUND [^ ]+ $kwin_pid$" \
-    "$AI_USAGE_PHASE0_OUTER_LOG" | tail -n 1 \
-    | sed -n "s/.*AI_USAGE_OUTER_WINDOW_BOUND \([^ ]*\) $kwin_pid$/\1/p" \
-    || true)"
+  if [[ -s "$binding_output" ]]; then
+    read -r window_id bound_pid <"$binding_output"
+    [[ "$bound_pid" == "$kwin_pid" ]] || window_id=""
+  fi
   if [[ -n "$window_id" ]]; then
     window_info="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
       busctl --user call org.kde.KWin /KWin org.kde.KWin \
@@ -382,6 +403,7 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
                 str(nested_log), str(request_log), str(measurement_log),
                 str(measurement_error), str(binding_template),
                 str(binding_script),
+                str(ROOT / "scripts/demo/kwin_window_binding_service.py"),
             ],
             cwd=ROOT,
             env=env,
