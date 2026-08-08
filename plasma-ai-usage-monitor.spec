@@ -30,11 +30,11 @@ Requires:       kf6-kcmutils
 Requires:       qt6-qtbase
 
 %description
-A native KDE Plasma 6 plasmoid that prioritizes AI usage, synchronized quota,
+A native KDE Plasma 6 widget that prioritizes AI usage, synchronized quota,
 reset windows, costs, budgets, balances, and local coding-tool activity across
 multiple providers including
 OpenAI, Azure OpenAI, AWS Bedrock, Anthropic (Claude), Google Gemini,
-Mistral AI, DeepSeek, Groq, xAI (Grok), Ollama Cloud, OpenRouter,
+Mistral AI, DeepSeek, Groq, Grok, Ollama Cloud, OpenRouter,
 Together AI, Cohere, Google Veo, LiteLLM Proxy, Cerebras Inference,
 Fireworks AI, and Perplexity API.
 
@@ -55,7 +55,8 @@ Features:
 - Collapsible provider cards with accessibility support
 - Data export (CSV/JSON) and non-secret configuration portability
 - Trust Center diagnostics for catalog review, KWallet, and local readiness
-- Compact panel modes for attention, lowest quota, next reset, spend, and sources
+- Compact panel modes for attention, lowest quota, next reset, spend,
+  and sources
 - HTTPS security warnings for custom base URLs
 
 %prep
