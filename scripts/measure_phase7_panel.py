@@ -77,6 +77,15 @@ ACCESSIBLE_ACTIVATION_INSTRUMENTATION = {
     ),
 }
 
+UPDATE_CHECKER_INSTRUMENTATION = (
+    '        currentVersion: (Plasmoid["metaData"]\n'
+    '                         && Plasmoid["metaData"]["version"])\n'
+    '                        ? Plasmoid["metaData"]["version"]\n'
+    '                        : AppInfo.version\n',
+    '        // Phase 0 measurement copy: suppress unrelated release network work.\n'
+    '        currentVersion: ""\n',
+)
+
 
 def write_isolated_session_config(config_root: Path) -> None:
     """Disable unrelated first-run and update work in a temporary Plasma profile."""
@@ -294,6 +303,8 @@ setsid /usr/bin/plasmashell >>"$4" 2>&1 &
 plasmashell_pid=$!
 binding_pid=""
 cleanup() {
+  cleanup_status=$?
+  set +e
   [[ -n "$binding_pid" ]] && kill -TERM "$binding_pid" >/dev/null 2>&1 || true
   kill -TERM "$plasmashell_pid" >/dev/null 2>&1 || true
   for _ in $(seq 1 40); do
@@ -308,6 +319,7 @@ cleanup() {
       | sed -n 's/^PID=//p' | head -n 1)"
     [[ -n "$service_pid" ]] && kill -TERM "$service_pid" >/dev/null 2>&1 || true
   done
+  return "$cleanup_status"
 }
 trap cleanup EXIT
 ready=0
@@ -379,8 +391,12 @@ DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
   exit 1
 }
 printf 'AI_USAGE_OUTER_WINDOW_INFO %s\n' "$window_info" >>"$4"
+set +e
 timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
   --pid "$plasmashell_pid" >"$6" 2>"$7"
+probe_status=$?
+printf 'AI_USAGE_PROBE_EXIT %s\n' "$probe_status" >>"$4"
+exit "$probe_status"
 """
     env = dict(env)
     env["PLASMA_AI_MONITOR_PERF_TRACE"] = str(trace_path)
@@ -461,6 +477,17 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
         qml_path.write_text(
             qml_source.replace(target, replacement, 1), encoding="utf-8"
         )
+    native_monitor = plasmoid_root / "contents/ui/NativeMonitor.qml"
+    native_monitor_source = native_monitor.read_text(encoding="utf-8")
+    update_target, update_replacement = UPDATE_CHECKER_INSTRUMENTATION
+    if native_monitor_source.count(update_target) != 1:
+        raise RuntimeError(
+            f"update checker instrumentation target is invalid: {native_monitor}"
+        )
+    native_monitor.write_text(
+        native_monitor_source.replace(update_target, update_replacement, 1),
+        encoding="utf-8",
+    )
     env.update(
         {
             "OUTER_WAYLAND_DISPLAY": os.environ.get(
@@ -688,6 +715,7 @@ def main() -> None:
                 + json.dumps(
                     ACCESSIBLE_ACTIVATION_INSTRUMENTATION, sort_keys=True
                 )
+                + json.dumps(UPDATE_CHECKER_INSTRUMENTATION)
             ).encode()
         ).hexdigest(),
         "buildDirectories": {
