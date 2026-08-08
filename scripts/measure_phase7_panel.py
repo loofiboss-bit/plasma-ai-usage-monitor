@@ -281,7 +281,7 @@ sleep 0.25
 a11y_registry_pid=$!
 setsid kwin_wayland --wayland-display "$OUTER_WAYLAND_DISPLAY" -s "$1" \
   --width 1600 --height 900 --scale 1 --xwayland --no-lockscreen \
-  --no-global-shortcuts --exit-with-session /usr/bin/plasmashell >"$4" 2>&1 &
+  --no-global-shortcuts --exit-with-session /usr/bin/plasmashell >>"$4" 2>&1 &
 kwin_pid=$!
 binding_pid=""
 cleanup() {
