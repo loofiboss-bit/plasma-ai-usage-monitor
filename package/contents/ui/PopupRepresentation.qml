@@ -38,7 +38,7 @@ PlasmaExtras.Representation {
     }
 
     Timer {
-        interval: 250
+        interval: 500
         running: true
         onTriggered: {
             popupContent.setSource(
