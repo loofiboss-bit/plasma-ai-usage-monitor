@@ -1,0 +1,1291 @@
+{
+  "schema": 2,
+  "valid": true,
+  "bootId": "b0a28650-a0fa-4cdc-982a-e898c58cf0dc",
+  "outerSession": "2",
+  "environment": {
+    "platform": "Linux-7.1.6-201.fc44.x86_64-x86_64-with-glibc2.43",
+    "plasma": "plasma-workspace 6.7.4-1.fc44"
+  },
+  "commits": {
+    "baseline": "28bf157a0548d19f5fea5a3b1650c0349003e41c",
+    "candidate": "eb26b365abb83cfe3d4c258a8b131ba9519afb7a"
+  },
+  "instrumentationSha256": "59b9c990673792520b5ab6f493416d23bb884c66c5f8d2de228949f8e7f64298",
+  "buildDirectories": {
+    "baseline": "/tmp/plasma-ai-v17-abba.f9axd3/build/release",
+    "candidate": "/home/loofi/Skrivbord/Loofi Work/plasma-ai-usage-monitor/build/release"
+  },
+  "runs": 20,
+  "warmups": 3,
+  "runtimeReuse": "isolated-prefix-config-cache-per-variant",
+  "sequence": [
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate",
+    "candidate",
+    "baseline",
+    "baseline",
+    "candidate"
+  ],
+  "warmupSamples": [
+    {
+      "first_panel_popup_ms": 170,
+      "warm_panel_popup_ms": 39,
+      "startup_network_requests": 4,
+      "fresh_popup_network_requests": 0,
+      "trace": {
+        "events": {},
+        "qml_component_creation_ms": null,
+        "database_queries_ms": null,
+        "guardrail_queries_ms": null,
+        "chart_preparation_ms": null,
+        "first_rendered_frame_ms": null
+      },
+      "variant": "baseline",
+      "sample": 0,
+      "warmup": true,
+      "valid": true
+    },
+    {
+      "first_panel_popup_ms": 56,
+      "warm_panel_popup_ms": 39,
+      "startup_network_requests": 4,
+      "fresh_popup_network_requests": 0,
+      "trace": {
+        "events": {
+          "database_init_start": 187.0,
+          "database_init_end": 187.0,
+          "guardrail_query_start": 1022.0,
+          "guardrail_query_end": 1022.0,
+          "full_representation_created": 5991.0,
+          "destination_component_loaded": 5999.0,
+          "first_rendered_frame": 6110.0
+        },
+        "qml_component_creation_ms": 8.0,
+        "database_queries_ms": 0.0,
+        "guardrail_queries_ms": 0.0,
+        "chart_preparation_ms": 111.0,
+        "first_rendered_frame_ms": 6110.0
+      },
+      "variant": "candidate",
+      "sample": 0,
+      "warmup": true,
+      "valid": true
+    },
+    {
+      "first_panel_popup_ms": 39,
+      "warm_panel_popup_ms": 47,
+      "startup_network_requests": 4,
+      "fresh_popup_network_requests": 0,
+      "trace": {
+        "events": {
+          "database_init_start": 168.0,
+          "database_init_end": 168.0,
+          "guardrail_query_start": 1080.0,
+          "guardrail_query_end": 1081.0,
+          "full_representation_created": 5961.0,
+          "destination_component_loaded": 5968.0,
+          "first_rendered_frame": 6067.0
+        },
+        "qml_component_creation_ms": 7.0,
+        "database_queries_ms": 0.0,
+        "guardrail_queries_ms": 1.0,
+        "chart_preparation_ms": 99.0,
+        "first_rendered_frame_ms": 6067.0
+      },
+      "variant": "candidate",
+      "sample": 1,
+      "warmup": true,
+      "valid": true
+    },
+    {
+      "first_panel_popup_ms": 169,
+      "warm_panel_popup_ms": 44,
+      "startup_network_requests": 4,
+      "fresh_popup_network_requests": 0,
+      "trace": {
+        "events": {},
+        "qml_component_creation_ms": null,
+        "database_queries_ms": null,
+        "guardrail_queries_ms": null,
+        "chart_preparation_ms": null,
+        "first_rendered_frame_ms": null
+      },
+      "variant": "baseline",
+      "sample": 1,
+      "warmup": true,
+      "valid": true
+    },
+    {
+      "first_panel_popup_ms": 157,
+      "warm_panel_popup_ms": 48,
+      "startup_network_requests": 4,
+      "fresh_popup_network_requests": 0,
+      "trace": {
+        "events": {},
+        "qml_component_creation_ms": null,
+        "database_queries_ms": null,
+        "guardrail_queries_ms": null,
+        "chart_preparation_ms": null,
+        "first_rendered_frame_ms": null
+      },
+      "variant": "baseline",
+      "sample": 2,
+      "warmup": true,
+      "valid": true
+    },
+    {
+      "first_panel_popup_ms": 43,
+      "warm_panel_popup_ms": 43,
+      "startup_network_requests": 4,
+      "fresh_popup_network_requests": 0,
+      "trace": {
+        "events": {
+          "database_init_start": 141.0,
+          "database_init_end": 141.0,
+          "guardrail_query_start": 947.0,
+          "guardrail_query_end": 947.0,
+          "full_representation_created": 6010.0,
+          "destination_component_loaded": 6018.0,
+          "first_rendered_frame": 6122.0
+        },
+        "qml_component_creation_ms": 8.0,
+        "database_queries_ms": 0.0,
+        "guardrail_queries_ms": 0.0,
+        "chart_preparation_ms": 104.0,
+        "first_rendered_frame_ms": 6122.0
+      },
+      "variant": "candidate",
+      "sample": 2,
+      "warmup": true,
+      "valid": true
+    }
+  ],
+  "errors": [],
+  "baseline": {
+    "variant": "baseline",
+    "samples": [
+      {
+        "first_panel_popup_ms": 154,
+        "warm_panel_popup_ms": 45,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 3,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 184,
+        "warm_panel_popup_ms": 41,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 4,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 160,
+        "warm_panel_popup_ms": 45,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 5,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 159,
+        "warm_panel_popup_ms": 40,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 6,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 168,
+        "warm_panel_popup_ms": 53,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 7,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 161,
+        "warm_panel_popup_ms": 37,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 8,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 156,
+        "warm_panel_popup_ms": 34,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 9,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 160,
+        "warm_panel_popup_ms": 35,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 10,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 161,
+        "warm_panel_popup_ms": 44,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 11,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 156,
+        "warm_panel_popup_ms": 44,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 12,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 164,
+        "warm_panel_popup_ms": 43,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 13,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 160,
+        "warm_panel_popup_ms": 39,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 14,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 154,
+        "warm_panel_popup_ms": 44,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 15,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 163,
+        "warm_panel_popup_ms": 36,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 16,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 162,
+        "warm_panel_popup_ms": 36,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 17,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 165,
+        "warm_panel_popup_ms": 44,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 18,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 166,
+        "warm_panel_popup_ms": 38,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 19,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 162,
+        "warm_panel_popup_ms": 40,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 20,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 174,
+        "warm_panel_popup_ms": 34,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 21,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 156,
+        "warm_panel_popup_ms": 42,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {},
+          "qml_component_creation_ms": null,
+          "database_queries_ms": null,
+          "guardrail_queries_ms": null,
+          "chart_preparation_ms": null,
+          "first_rendered_frame_ms": null
+        },
+        "variant": "baseline",
+        "sample": 22,
+        "warmup": false,
+        "valid": true
+      }
+    ],
+    "first_ms": [
+      154,
+      184,
+      160,
+      159,
+      168,
+      161,
+      156,
+      160,
+      161,
+      156,
+      164,
+      160,
+      154,
+      163,
+      162,
+      165,
+      166,
+      162,
+      174,
+      156
+    ],
+    "first_median_ms": 161.0,
+    "first_p95_ms": 174.5,
+    "warm_ms": [
+      45,
+      41,
+      45,
+      40,
+      53,
+      37,
+      34,
+      35,
+      44,
+      44,
+      43,
+      39,
+      44,
+      36,
+      36,
+      44,
+      38,
+      40,
+      34,
+      42
+    ],
+    "warm_median_ms": 40.5,
+    "warm_p95_ms": 45.4,
+    "startup_network_requests": [
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4
+    ],
+    "fresh_popup_network_requests": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "candidate": {
+    "variant": "candidate",
+    "samples": [
+      {
+        "first_panel_popup_ms": 43,
+        "warm_panel_popup_ms": 43,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 130.0,
+            "database_init_end": 130.0,
+            "guardrail_query_start": 903.0,
+            "guardrail_query_end": 904.0,
+            "full_representation_created": 5952.0,
+            "destination_component_loaded": 5959.0,
+            "first_rendered_frame": 6053.0
+          },
+          "qml_component_creation_ms": 7.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 94.0,
+          "first_rendered_frame_ms": 6053.0
+        },
+        "variant": "candidate",
+        "sample": 3,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 43,
+        "warm_panel_popup_ms": 38,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 137.0,
+            "database_init_end": 137.0,
+            "guardrail_query_start": 872.0,
+            "guardrail_query_end": 873.0,
+            "full_representation_created": 5959.0,
+            "destination_component_loaded": 5967.0,
+            "first_rendered_frame": 6063.0
+          },
+          "qml_component_creation_ms": 8.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 96.0,
+          "first_rendered_frame_ms": 6063.0
+        },
+        "variant": "candidate",
+        "sample": 4,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 45,
+        "warm_panel_popup_ms": 43,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 140.0,
+            "database_init_end": 140.0,
+            "guardrail_query_start": 915.0,
+            "guardrail_query_end": 916.0,
+            "full_representation_created": 5945.0,
+            "destination_component_loaded": 5953.0,
+            "first_rendered_frame": 6049.0
+          },
+          "qml_component_creation_ms": 8.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 96.0,
+          "first_rendered_frame_ms": 6049.0
+        },
+        "variant": "candidate",
+        "sample": 5,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 42,
+        "warm_panel_popup_ms": 31,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 159.0,
+            "database_init_end": 159.0,
+            "guardrail_query_start": 1102.0,
+            "guardrail_query_end": 1102.0,
+            "full_representation_created": 6002.0,
+            "destination_component_loaded": 6010.0,
+            "first_rendered_frame": 6115.0
+          },
+          "qml_component_creation_ms": 8.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 0.0,
+          "chart_preparation_ms": 105.0,
+          "first_rendered_frame_ms": 6115.0
+        },
+        "variant": "candidate",
+        "sample": 6,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 48,
+        "warm_panel_popup_ms": 44,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 135.0,
+            "database_init_end": 135.0,
+            "guardrail_query_start": 908.0,
+            "guardrail_query_end": 909.0,
+            "full_representation_created": 5960.0,
+            "destination_component_loaded": 5969.0,
+            "first_rendered_frame": 6073.0
+          },
+          "qml_component_creation_ms": 9.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 104.0,
+          "first_rendered_frame_ms": 6073.0
+        },
+        "variant": "candidate",
+        "sample": 7,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 41,
+        "warm_panel_popup_ms": 48,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 138.0,
+            "database_init_end": 138.0,
+            "guardrail_query_start": 905.0,
+            "guardrail_query_end": 906.0,
+            "full_representation_created": 5984.0,
+            "destination_component_loaded": 5991.0,
+            "first_rendered_frame": 6088.0
+          },
+          "qml_component_creation_ms": 7.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 97.0,
+          "first_rendered_frame_ms": 6088.0
+        },
+        "variant": "candidate",
+        "sample": 8,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 43,
+        "warm_panel_popup_ms": 32,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 150.0,
+            "database_init_end": 150.0,
+            "guardrail_query_start": 910.0,
+            "guardrail_query_end": 911.0,
+            "full_representation_created": 5951.0,
+            "destination_component_loaded": 5960.0,
+            "first_rendered_frame": 6058.0
+          },
+          "qml_component_creation_ms": 9.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 98.0,
+          "first_rendered_frame_ms": 6058.0
+        },
+        "variant": "candidate",
+        "sample": 9,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 45,
+        "warm_panel_popup_ms": 68,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 135.0,
+            "database_init_end": 135.0,
+            "guardrail_query_start": 894.0,
+            "guardrail_query_end": 894.0,
+            "full_representation_created": 5968.0,
+            "destination_component_loaded": 5979.0,
+            "first_rendered_frame": 6082.0
+          },
+          "qml_component_creation_ms": 11.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 0.0,
+          "chart_preparation_ms": 103.0,
+          "first_rendered_frame_ms": 6082.0
+        },
+        "variant": "candidate",
+        "sample": 10,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 39,
+        "warm_panel_popup_ms": 42,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 147.0,
+            "database_init_end": 148.0,
+            "guardrail_query_start": 990.0,
+            "guardrail_query_end": 991.0,
+            "full_representation_created": 5972.0,
+            "destination_component_loaded": 5979.0,
+            "first_rendered_frame": 6078.0
+          },
+          "qml_component_creation_ms": 7.0,
+          "database_queries_ms": 1.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 99.0,
+          "first_rendered_frame_ms": 6078.0
+        },
+        "variant": "candidate",
+        "sample": 11,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 44,
+        "warm_panel_popup_ms": 73,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 163.0,
+            "database_init_end": 163.0,
+            "guardrail_query_start": 1033.0,
+            "guardrail_query_end": 1033.0,
+            "full_representation_created": 6063.0,
+            "destination_component_loaded": 6073.0,
+            "first_rendered_frame": 6179.0
+          },
+          "qml_component_creation_ms": 10.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 0.0,
+          "chart_preparation_ms": 106.0,
+          "first_rendered_frame_ms": 6179.0
+        },
+        "variant": "candidate",
+        "sample": 12,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 43,
+        "warm_panel_popup_ms": 37,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 139.0,
+            "database_init_end": 140.0,
+            "guardrail_query_start": 917.0,
+            "guardrail_query_end": 918.0,
+            "full_representation_created": 5958.0,
+            "destination_component_loaded": 5966.0,
+            "first_rendered_frame": 6064.0
+          },
+          "qml_component_creation_ms": 8.0,
+          "database_queries_ms": 1.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 98.0,
+          "first_rendered_frame_ms": 6064.0
+        },
+        "variant": "candidate",
+        "sample": 13,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 40,
+        "warm_panel_popup_ms": 32,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 169.0,
+            "database_init_end": 169.0,
+            "guardrail_query_start": 1239.0,
+            "guardrail_query_end": 1239.0,
+            "full_representation_created": 5962.0,
+            "destination_component_loaded": 5969.0,
+            "first_rendered_frame": 6067.0
+          },
+          "qml_component_creation_ms": 7.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 0.0,
+          "chart_preparation_ms": 98.0,
+          "first_rendered_frame_ms": 6067.0
+        },
+        "variant": "candidate",
+        "sample": 14,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 38,
+        "warm_panel_popup_ms": 32,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 192.0,
+            "database_init_end": 193.0,
+            "guardrail_query_start": 1049.0,
+            "guardrail_query_end": 1066.0,
+            "full_representation_created": 5939.0,
+            "destination_component_loaded": 5949.0,
+            "first_rendered_frame": 6056.0
+          },
+          "qml_component_creation_ms": 10.0,
+          "database_queries_ms": 1.0,
+          "guardrail_queries_ms": 17.0,
+          "chart_preparation_ms": 107.0,
+          "first_rendered_frame_ms": 6056.0
+        },
+        "variant": "candidate",
+        "sample": 15,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 43,
+        "warm_panel_popup_ms": 32,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 182.0,
+            "database_init_end": 183.0,
+            "guardrail_query_start": 1034.0,
+            "guardrail_query_end": 1035.0,
+            "full_representation_created": 5964.0,
+            "destination_component_loaded": 5970.0,
+            "first_rendered_frame": 6064.0
+          },
+          "qml_component_creation_ms": 6.0,
+          "database_queries_ms": 1.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 94.0,
+          "first_rendered_frame_ms": 6064.0
+        },
+        "variant": "candidate",
+        "sample": 16,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 45,
+        "warm_panel_popup_ms": 36,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 139.0,
+            "database_init_end": 139.0,
+            "guardrail_query_start": 903.0,
+            "guardrail_query_end": 904.0,
+            "full_representation_created": 5947.0,
+            "destination_component_loaded": 5954.0,
+            "first_rendered_frame": 6052.0
+          },
+          "qml_component_creation_ms": 7.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 98.0,
+          "first_rendered_frame_ms": 6052.0
+        },
+        "variant": "candidate",
+        "sample": 17,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 43,
+        "warm_panel_popup_ms": 32,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 138.0,
+            "database_init_end": 138.0,
+            "guardrail_query_start": 892.0,
+            "guardrail_query_end": 892.0,
+            "full_representation_created": 5966.0,
+            "destination_component_loaded": 5976.0,
+            "first_rendered_frame": 6082.0
+          },
+          "qml_component_creation_ms": 10.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 0.0,
+          "chart_preparation_ms": 106.0,
+          "first_rendered_frame_ms": 6082.0
+        },
+        "variant": "candidate",
+        "sample": 18,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 50,
+        "warm_panel_popup_ms": 43,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 147.0,
+            "database_init_end": 147.0,
+            "guardrail_query_start": 1078.0,
+            "guardrail_query_end": 1079.0,
+            "full_representation_created": 5973.0,
+            "destination_component_loaded": 5981.0,
+            "first_rendered_frame": 6085.0
+          },
+          "qml_component_creation_ms": 8.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 104.0,
+          "first_rendered_frame_ms": 6085.0
+        },
+        "variant": "candidate",
+        "sample": 19,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 41,
+        "warm_panel_popup_ms": 40,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 185.0,
+            "database_init_end": 186.0,
+            "guardrail_query_start": 1020.0,
+            "guardrail_query_end": 1021.0,
+            "full_representation_created": 5850.0,
+            "destination_component_loaded": 5858.0,
+            "first_rendered_frame": 5957.0
+          },
+          "qml_component_creation_ms": 8.0,
+          "database_queries_ms": 1.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 99.0,
+          "first_rendered_frame_ms": 5957.0
+        },
+        "variant": "candidate",
+        "sample": 20,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 42,
+        "warm_panel_popup_ms": 36,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 154.0,
+            "database_init_end": 154.0,
+            "guardrail_query_start": 942.0,
+            "guardrail_query_end": 943.0,
+            "full_representation_created": 5965.0,
+            "destination_component_loaded": 5972.0,
+            "first_rendered_frame": 6079.0
+          },
+          "qml_component_creation_ms": 7.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 1.0,
+          "chart_preparation_ms": 107.0,
+          "first_rendered_frame_ms": 6079.0
+        },
+        "variant": "candidate",
+        "sample": 21,
+        "warmup": false,
+        "valid": true
+      },
+      {
+        "first_panel_popup_ms": 42,
+        "warm_panel_popup_ms": 32,
+        "startup_network_requests": 4,
+        "fresh_popup_network_requests": 0,
+        "trace": {
+          "events": {
+            "database_init_start": 159.0,
+            "database_init_end": 159.0,
+            "guardrail_query_start": 1140.0,
+            "guardrail_query_end": 1140.0,
+            "full_representation_created": 5980.0,
+            "destination_component_loaded": 5990.0,
+            "first_rendered_frame": 6089.0
+          },
+          "qml_component_creation_ms": 10.0,
+          "database_queries_ms": 0.0,
+          "guardrail_queries_ms": 0.0,
+          "chart_preparation_ms": 99.0,
+          "first_rendered_frame_ms": 6089.0
+        },
+        "variant": "candidate",
+        "sample": 22,
+        "warmup": false,
+        "valid": true
+      }
+    ],
+    "first_ms": [
+      43,
+      43,
+      45,
+      42,
+      48,
+      41,
+      43,
+      45,
+      39,
+      44,
+      43,
+      40,
+      38,
+      43,
+      45,
+      43,
+      50,
+      41,
+      42,
+      42
+    ],
+    "first_median_ms": 43.0,
+    "first_p95_ms": 48.1,
+    "warm_ms": [
+      43,
+      38,
+      43,
+      31,
+      44,
+      48,
+      32,
+      68,
+      42,
+      73,
+      37,
+      32,
+      32,
+      32,
+      36,
+      32,
+      43,
+      40,
+      36,
+      32
+    ],
+    "warm_median_ms": 37.5,
+    "warm_p95_ms": 68.25,
+    "startup_network_requests": [
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4,
+      4
+    ],
+    "fresh_popup_network_requests": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  },
+  "gates": {
+    "first_median_max_125": true,
+    "warm_median_max_125": true,
+    "first_p95_max_180": true,
+    "warm_p95_max_180": true,
+    "first_no_regression": true,
+    "warm_no_regression": true,
+    "fresh_popup_zero_network": true,
+    "startup_network_matches_baseline": true,
+    "candidate_trace_complete": true
+  },
+  "passed": true
+}
