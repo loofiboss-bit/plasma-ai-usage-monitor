@@ -158,24 +158,18 @@ def press(node) -> None:
     raise RuntimeError(f"Accessible node {node.get_name()!r} has no usable press action")
 
 
-def press_and_wait_for_event(node, pid: int, event_suffix: str, timeout: float) -> int:
+def press_and_wait_for_event(node, pid: int, event_type: str, timeout: float) -> int:
     matched = False
-    observed: list[str] = []
 
     def callback(event, *_user_data) -> None:
         nonlocal matched
-        if process_id(event.source) != pid:
-            return
-        if len(observed) < 80:
-            observed.append(event.type)
-        if event_suffix in event.type:
+        if process_id(event.source) == pid:
             matched = True
             Atspi.event_quit()
 
     listener = Atspi.EventListener.new(callback)
-    event_family = "object"
-    if not listener.register(event_family):
-        raise RuntimeError(f"Could not register AT-SPI event {event_family}")
+    if not listener.register(event_type):
+        raise RuntimeError(f"Could not register AT-SPI event {event_type}")
     timer = threading.Timer(timeout, Atspi.event_quit)
     timer.start()
     started = time.monotonic()
@@ -184,11 +178,10 @@ def press_and_wait_for_event(node, pid: int, event_suffix: str, timeout: float) 
         Atspi.event_main()
     finally:
         timer.cancel()
-        listener.deregister(event_family)
+        listener.deregister(event_type)
     if not matched:
         raise RuntimeError(
-            f"Timed out waiting for children-changed:{event_suffix} "
-            f"from plasmashell PID {pid}; observed={observed}"
+            f"Timed out waiting for {event_type} from plasmashell PID {pid}"
         )
     return round((time.monotonic() - started) * 1000)
 
@@ -201,14 +194,18 @@ def request_count(path: Path) -> int:
 
 def open_popup(compact_prefix: str, pid: int, timeout: float) -> int:
     compact = wait_for_node(compact_prefix, pid, timeout)
-    elapsed = press_and_wait_for_event(compact, pid, ":add", timeout)
+    elapsed = press_and_wait_for_event(
+        compact, pid, "object:children-changed:add", timeout
+    )
     wait_for_popup(pid, timeout)
     return elapsed
 
 
 def close_popup(compact_prefix: str, pid: int, timeout: float) -> None:
     compact = wait_for_node(compact_prefix, pid, timeout)
-    press_and_wait_for_event(compact, pid, ":remove", timeout)
+    press_and_wait_for_event(
+        compact, pid, "object:state-changed:defunct", timeout
+    )
     wait_for_node(compact_prefix, pid, timeout)
 
 
