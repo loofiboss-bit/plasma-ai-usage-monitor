@@ -36,11 +36,18 @@ def process_id(node) -> int:
 
 def is_showing(node) -> bool:
     try:
-        states = node.get_state_set()
-        # VISIBLE and cached extents survive while Plasma keeps the popup
-        # component instantiated. SHOWING is the only state that proves the
-        # popup is currently mapped on the virtual output.
-        return states.contains(Atspi.StateType.SHOWING)
+        current = node
+        for _ in range(12):
+            states = current.get_state_set()
+            # Plasma applies SHOWING to the popup ancestor rather than every
+            # child. VISIBLE and cached extents survive after the popup closes.
+            if states.contains(Atspi.StateType.SHOWING):
+                return True
+            parent = current.get_parent()
+            if parent is None or parent == current:
+                break
+            current = parent
+        return False
     except Exception:
         return False
 
