@@ -305,11 +305,6 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
         source.replace(target, POPUP_INSTRUMENTATION, 1),
         encoding="utf-8",
     )
-    config_home = Path(env["XDG_CONFIG_HOME"])
-    config_home.mkdir(parents=True, exist_ok=True)
-    (config_home / "kdeglobals").write_text(
-        "[KDE]\nAnimationDurationFactor=0\n", encoding="utf-8"
-    )
     env.update(
         {
             "OUTER_WAYLAND_DISPLAY": os.environ.get("WAYLAND_DISPLAY", "wayland-0"),
@@ -323,7 +318,6 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
             "QT_ACCESSIBILITY": "1",
             "QT_ASSUME_STDERR_HAS_CONSOLE": "1",
             "QT_FORCE_STDERR_LOGGING": "1",
-            "KDE_KWIN_ANIMATIONS_ENABLED": "0",
         }
     )
     return env
