@@ -284,6 +284,7 @@ setsid kwin_wayland --wayland-display "$OUTER_WAYLAND_DISPLAY" -s "$1" \
   --no-global-shortcuts --exit-with-session /usr/bin/plasmashell >>"$4" 2>&1 &
 kwin_pid=$!
 binding_pid=""
+plasmashell_pid=""
 cleanup() {
   for service in org.kde.kded6 org.kde.ActivityManager; do
     service_pid="$(busctl --user status "$service" 2>/dev/null \
@@ -291,7 +292,22 @@ cleanup() {
     [[ -n "$service_pid" ]] && kill -TERM "$service_pid" >/dev/null 2>&1 || true
   done
   [[ -n "$binding_pid" ]] && kill -TERM "$binding_pid" >/dev/null 2>&1 || true
-  kill -TERM -- "-$kwin_pid" >/dev/null 2>&1 || true
+  [[ -n "$plasmashell_pid" ]] \
+    && kill -TERM "$plasmashell_pid" >/dev/null 2>&1 || true
+  for _ in $(seq 1 40); do
+    kill -0 "$kwin_pid" >/dev/null 2>&1 || break
+    sleep 0.05
+  done
+  if kill -0 "$kwin_pid" >/dev/null 2>&1; then
+    kill -TERM -- "-$kwin_pid" >/dev/null 2>&1 || true
+    for _ in $(seq 1 20); do
+      kill -0 "$kwin_pid" >/dev/null 2>&1 || break
+      sleep 0.05
+    done
+  fi
+  kill -0 "$kwin_pid" >/dev/null 2>&1 \
+    && kill -KILL -- "-$kwin_pid" >/dev/null 2>&1 || true
+  wait "$kwin_pid" >/dev/null 2>&1 || true
   kill -TERM "$a11y_pid" >/dev/null 2>&1 || true
   kill -TERM "$a11y_registry_pid" >/dev/null 2>&1 || true
 }
@@ -452,9 +468,14 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
         qml_path.write_text(
             qml_source.replace(target, replacement, 1), encoding="utf-8"
         )
+    outer_display = os.environ.get("WAYLAND_DISPLAY", "wayland-0")
+    if not outer_display.startswith("/"):
+        outer_display = str(
+            Path(os.environ["XDG_RUNTIME_DIR"]) / outer_display
+        )
     env.update(
         {
-            "OUTER_WAYLAND_DISPLAY": os.environ.get("WAYLAND_DISPLAY", "wayland-0"),
+            "OUTER_WAYLAND_DISPLAY": outer_display,
             "OUTER_DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", ""),
             "PLASMA_AI_MONITOR_DEMO": "1",
             "AIUSAGE_MONITOR_CATALOG_DIR": str(
@@ -478,6 +499,8 @@ def run_sample(
     warmup: bool,
 ) -> dict[str, Any]:
     sample_root.mkdir(mode=0o700, parents=True)
+    runtime_dir = sample_root / "runtime"
+    runtime_dir.mkdir(mode=0o700)
     port = available_port()
     request_log = sample_root / "requests.jsonl"
     trace_path = sample_root / "performance.jsonl"
@@ -497,6 +520,7 @@ def run_sample(
     )
     try:
         sample_env = dict(env)
+        sample_env["XDG_RUNTIME_DIR"] = str(runtime_dir)
         sample_env["PLASMA_AI_MONITOR_DEMO_BASE_URL"] = (
             f"http://127.0.0.1:{port}"
         )

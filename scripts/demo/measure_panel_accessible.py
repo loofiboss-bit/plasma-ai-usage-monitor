@@ -325,8 +325,10 @@ def main() -> None:
                 "startup_network_requests": startup_requests,
                 "fresh_popup_network_requests": fresh_popup_requests,
             }
-        )
+        ),
+        flush=True,
     )
+    Atspi.exit()
 
 
 if __name__ == "__main__":
