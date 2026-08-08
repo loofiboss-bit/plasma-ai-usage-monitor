@@ -38,7 +38,12 @@ POPUP_INSTRUMENTATION = r'''
             });
         }
 '''
-ACCESSIBILITY_BRIDGE = "    Accessible.onPressAction: Plasmoid.activated()\n"
+ACCESSIBILITY_HANDLER = "    Accessible.onPressAction: Plasmoid.activated()\n"
+ACCESSIBILITY_BRIDGE = r'''    Accessible.onPressAction: {
+        console.warn("AI_USAGE_ACCESSIBLE_PRESS");
+        Plasmoid.activated();
+    }
+'''
 
 
 def run_in_virtual_outer(arguments: list[str]) -> int:
@@ -263,7 +268,14 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
         raise RuntimeError("installed CompactRepresentation.qml was not found")
     compact_representation = compact_files[0]
     compact_source = compact_representation.read_text(encoding="utf-8")
-    if ACCESSIBILITY_BRIDGE not in compact_source:
+    if ACCESSIBILITY_HANDLER in compact_source:
+        compact_representation.write_text(
+            compact_source.replace(
+                ACCESSIBILITY_HANDLER, ACCESSIBILITY_BRIDGE, 1
+            ),
+            encoding="utf-8",
+        )
+    elif ACCESSIBILITY_BRIDGE not in compact_source:
         activation = "    onClicked: Plasmoid.activated()\n"
         if compact_source.count(activation) != 1:
             raise RuntimeError("accessible activation target is invalid")
