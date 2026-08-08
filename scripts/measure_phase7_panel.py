@@ -7,10 +7,12 @@ import argparse
 import json
 import os
 import platform
+import shlex
 import shutil
 import socket
 import statistics
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -21,6 +23,57 @@ from measure_phase7_runtime import candidate_environment
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
+
+
+def run_in_virtual_outer(arguments: list[str]) -> int:
+    """Run the whole ABBA sequence on a headless virtual KWin output."""
+    with tempfile.TemporaryDirectory(prefix="ai-monitor-v18-phase0-outer-") as temporary:
+        virtual_root = Path(temporary)
+        runtime_dir = virtual_root / "runtime"
+        runtime_dir.mkdir(mode=0o700)
+        wrapper = virtual_root / "phase0-run"
+        command = [sys.executable, str(Path(__file__).resolve()), *arguments]
+        wrapper.write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "exec env AI_USAGE_PHASE0_VIRTUAL=1 QT_IM_MODULE= GTK_IM_MODULE= "
+            "QT_VIRTUALKEYBOARD_DISABLE=1 " + shlex.join(command) + "\n",
+            encoding="utf-8",
+        )
+        wrapper.chmod(0o700)
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "XDG_RUNTIME_DIR": str(runtime_dir),
+                "QT_IM_MODULE": "",
+                "GTK_IM_MODULE": "",
+                "QT_VIRTUALKEYBOARD_DISABLE": "1",
+            }
+        )
+        completed = subprocess.run(
+            [
+                "dbus-run-session",
+                "--",
+                "kwin_wayland",
+                "--virtual",
+                "--socket",
+                "wayland-v18-phase0",
+                "--width",
+                "1920",
+                "--height",
+                "1200",
+                "--scale",
+                "1",
+                "--no-lockscreen",
+                "--no-global-shortcuts",
+                "--exit-with-session",
+                str(wrapper),
+            ],
+            cwd=ROOT,
+            env=environment,
+            check=False,
+        )
+        return completed.returncode
 
 
 def available_port() -> int:
@@ -88,7 +141,8 @@ def run_panel_session(
     )
     inner = r"""
 set -euo pipefail
-export QT_IM_MODULE=compose
+export QT_IM_MODULE=
+export GTK_IM_MODULE=
 export QT_VIRTUALKEYBOARD_DISABLE=1
 /usr/libexec/at-spi-bus-launcher --launch-immediately >>"$4" 2>&1 &
 a11y_pid=$!
@@ -129,11 +183,13 @@ while IFS= read -r candidate_id; do
     break
   fi
 done < <(printf '%s\n' "$match_output" | rg -o '"0_\{[^\"]+\}"' | tr -d '"' || true)
-if [[ -n "$match_id" ]]; then
-  DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
-    busctl --user call org.kde.KWin /WindowsRunner org.kde.krunner1 \
-    Run ss "$match_id" "" >/dev/null 2>&1 || true
-fi
+[[ -n "$match_id" ]] || {
+  echo "Outer KWin could not bind the exact nested compositor PID" >&2
+  exit 1
+}
+DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
+  busctl --user call org.kde.KWin /WindowsRunner org.kde.krunner1 \
+  Run ss "$match_id" "" >/dev/null
 sleep 1
 plasmashell_pid="$(pgrep -P "$kwin_pid" -x plasmashell | head -n 1 || true)"
 if [[ -z "$plasmashell_pid" ]]; then
@@ -235,12 +291,17 @@ def summarize(name: str, samples: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def main() -> None:
+    if os.environ.get("AI_USAGE_PHASE0_VIRTUAL") != "1":
+        raise SystemExit(run_in_virtual_outer(sys.argv[1:]))
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline-build-dir", type=Path, required=True)
     parser.add_argument("--candidate-build-dir", type=Path, required=True)
     parser.add_argument("--runs", type=int, default=DEFAULT_RUNS)
     parser.add_argument("--warmups", type=int, default=DEFAULT_WARMUPS)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--baseline-commit", required=True)
+    parser.add_argument("--candidate-commit", required=True)
     args = parser.parse_args()
     if args.runs < 1 or args.warmups < 0:
         parser.error("--runs must be positive and --warmups non-negative")
@@ -249,17 +310,60 @@ def main() -> None:
     if missing:
         parser.error("Missing commands: " + ", ".join(missing))
 
+    baseline_commit = subprocess.run(
+        ["git", "rev-parse", f"{args.baseline_commit}^{{commit}}"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        check=True,
+    ).stdout.strip()
+    candidate_commit = subprocess.run(
+        ["git", "rev-parse", f"{args.candidate_commit}^{{commit}}"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        check=True,
+    ).stdout.strip()
+    tagged_v17_commit = subprocess.run(
+        ["git", "rev-parse", "v17.0.0^{commit}"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        check=True,
+    ).stdout.strip()
+    current_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        check=True,
+    ).stdout.strip()
+    if baseline_commit != tagged_v17_commit:
+        parser.error("baseline commit must resolve to the exact annotated v17.0.0 tag")
+    if candidate_commit != current_commit:
+        parser.error("candidate commit must resolve to the current clean checkout")
+    if subprocess.run(
+        ["git", "status", "--porcelain"], cwd=ROOT,
+        text=True, stdout=subprocess.PIPE, check=True,
+    ).stdout:
+        parser.error("candidate checkout must be clean before final ABBA measurement")
+
     boot_id = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="utf-8").strip()
     measured: dict[str, list[dict[str, Any]]] = {"baseline": [], "candidate": []}
+    warmup_samples: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
+    sequence: list[str] = []
     total = args.warmups + args.runs
     for index in range(total):
         order = ("baseline", "candidate") if index % 2 == 0 else ("candidate", "baseline")
         for variant in order:
+            sequence.append(variant)
             build = args.baseline_build_dir if variant == "baseline" else args.candidate_build_dir
             try:
                 item = run_sample(variant, build, index, index < args.warmups)
-                if index >= args.warmups:
+                if index < args.warmups:
+                    warmup_samples.append(item)
+                else:
                     measured[variant].append(item)
             except Exception as error:  # invalid samples are evidence, never discarded
                 errors.append({"variant": variant, "sample": index, "error": str(error)})
@@ -271,8 +375,15 @@ def main() -> None:
         "bootId": boot_id,
         "outerSession": os.environ.get("XDG_SESSION_ID", ""),
         "environment": {"platform": platform.platform(), "plasma": subprocess.run(["plasmashell", "--version"], text=True, stdout=subprocess.PIPE, check=False).stdout.strip()},
+        "commits": {"baseline": baseline_commit, "candidate": candidate_commit},
+        "buildDirectories": {
+            "baseline": str(args.baseline_build_dir.resolve()),
+            "candidate": str(args.candidate_build_dir.resolve()),
+        },
         "runs": args.runs,
         "warmups": args.warmups,
+        "sequence": sequence,
+        "warmupSamples": warmup_samples,
         "errors": errors,
     }
     if valid:
@@ -285,7 +396,27 @@ def main() -> None:
             "warm_p95_max_180": candidate["warm_p95_ms"] <= 180,
             "first_no_regression": candidate["first_median_ms"] <= baseline["first_median_ms"],
             "warm_no_regression": candidate["warm_median_ms"] <= baseline["warm_median_ms"],
-            "fresh_popup_zero_network": all(value == 0 for value in candidate["fresh_popup_network_requests"]),
+            "fresh_popup_zero_network": all(
+                value == 0
+                for value in candidate["fresh_popup_network_requests"]
+                + baseline["fresh_popup_network_requests"]
+            ),
+            "startup_network_matches_baseline": (
+                candidate["startup_network_requests"]
+                == baseline["startup_network_requests"]
+            ),
+            "candidate_trace_complete": all(
+                {
+                    "full_representation_created",
+                    "destination_component_loaded",
+                    "database_init_start",
+                    "database_init_end",
+                    "guardrail_query_start",
+                    "guardrail_query_end",
+                    "first_rendered_frame",
+                }.issubset(item["trace"]["events"])
+                for item in candidate["samples"]
+            ),
         }
         result.update({"baseline": baseline, "candidate": candidate, "gates": gates, "passed": all(gates.values())})
     else:
