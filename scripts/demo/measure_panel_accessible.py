@@ -66,6 +66,37 @@ def named_nodes(prefix: str, pid: int):
             continue
 
 
+def action_names(node) -> list[str]:
+    try:
+        actions = node.get_action_iface()
+        return [
+            actions.get_action_name(index).lower()
+            for index in range(actions.get_n_actions())
+        ]
+    except Exception:
+        return []
+
+
+def node_details(node) -> dict:
+    details = {
+        "name": node.get_name() or "",
+        "role": node.get_role_name() or "",
+        "pid": process_id(node),
+        "actions": action_names(node),
+    }
+    try:
+        extents = node.get_component_iface().get_extents(Atspi.CoordType.SCREEN)
+        details["extents"] = {
+            "x": extents.x,
+            "y": extents.y,
+            "width": extents.width,
+            "height": extents.height,
+        }
+    except Exception:
+        details["extents"] = None
+    return details
+
+
 def exactly_named_nodes(name: str, role: str, pid: int, showing_only: bool = False):
     desktop = Atspi.get_desktop(0)
     for node in descendants(desktop):
@@ -84,21 +115,22 @@ def exactly_named_nodes(name: str, role: str, pid: int, showing_only: bool = Fal
 def wait_for_node(prefix: str, pid: int, timeout: float):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        node = next(named_nodes(prefix, pid), None)
-        if node is not None:
-            return node
+        candidates = list(named_nodes(prefix, pid))
+        actionable = [
+            node for node in candidates
+            if any(action in {"press", "click"} for action in action_names(node))
+        ]
+        if len(actionable) == 1:
+            return actionable[0]
         time.sleep(0.025)
-    candidates = []
-    for node in descendants(Atspi.get_desktop(0)):
-        try:
-            name = node.get_name() or ""
-            if name.startswith(prefix):
-                candidates.append({"name": name, "pid": process_id(node)})
-        except Exception:
-            continue
+    candidates = [
+        node_details(node)
+        for node in descendants(Atspi.get_desktop(0))
+        if (node.get_name() or "").startswith(prefix)
+    ]
     raise RuntimeError(
         f"Timed out waiting for accessible node {prefix!r} from PID {pid}; "
-        f"candidates={candidates}"
+        f"candidates={json.dumps(candidates, sort_keys=True)}"
     )
 
 
