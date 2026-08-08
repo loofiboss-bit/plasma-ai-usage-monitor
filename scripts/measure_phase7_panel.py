@@ -27,7 +27,9 @@ DEFAULT_WARMUPS = 3
 
 def run_in_virtual_outer(arguments: list[str]) -> int:
     """Run the whole ABBA sequence on a headless virtual KWin output."""
-    with tempfile.TemporaryDirectory(prefix="ai-monitor-v18-phase0-outer-") as temporary:
+    with tempfile.TemporaryDirectory(
+        prefix="ai-monitor-v18-phase0-outer-", ignore_cleanup_errors=True
+    ) as temporary:
         virtual_root = Path(temporary)
         runtime_dir = virtual_root / "runtime"
         runtime_dir.mkdir(mode=0o700)
@@ -48,6 +50,8 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
                 "QT_IM_MODULE": "",
                 "GTK_IM_MODULE": "",
                 "QT_VIRTUALKEYBOARD_DISABLE": "1",
+                "QT_NO_XDG_DESKTOP_PORTAL": "1",
+                "GTK_USE_PORTAL": "0",
             }
         )
         completed = subprocess.run(

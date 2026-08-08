@@ -188,9 +188,8 @@ def open_popup(compact_prefix: str, pid: int, timeout: float) -> int:
 
 def close_popup(compact_prefix: str, pid: int, timeout: float) -> None:
     compact = wait_for_node(compact_prefix, pid, timeout)
-    press_and_wait_for_event(
-        compact, pid, "object:children-changed:remove", timeout
-    )
+    press(compact)
+    wait_for_popup_closed(pid, timeout)
     wait_for_node(compact_prefix, pid, timeout)
 
 
