@@ -25,11 +25,14 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
-    Component.onCompleted: console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY")
+    Component.onCompleted: {
+        console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY");
+        perfFirstTimer.start();
+    }
 
     Timer {
+        id: perfFirstTimer
         interval: 8000
-        running: true
         repeat: false
         onTriggered: {
             console.time("AI_USAGE_POPUP_FIRST_FRAME");
