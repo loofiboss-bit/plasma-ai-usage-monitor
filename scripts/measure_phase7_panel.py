@@ -257,6 +257,7 @@ def run_panel_session(
         "const targetPid = __TARGET_PID__;\n"
         "function bindWindow(window) {\n"
         "    if (Number(window.pid) !== targetPid) return;\n"
+        "    if (Number(window.height) <= 0 || Number(window.height) > 300) return;\n"
         "    workspace.activeWindow = window;\n"
         "    callDBus(\n"
         "        'com.github.loofi.aiusagemonitor.Phase0Binding',\n"

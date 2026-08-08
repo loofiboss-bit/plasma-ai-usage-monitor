@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -253,6 +254,20 @@ def wait_for_log_duration(
     )
 
 
+def wait_for_log_text(path: Path, marker: str, timeout: float) -> None:
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if path.exists() and marker in path.read_text(
+            encoding="utf-8", errors="replace"
+        ):
+            return
+        time.sleep(0.025)
+    detail = path.read_text(encoding="utf-8", errors="replace")[-4000:]
+    raise RuntimeError(
+        f"Timed out waiting for log marker {marker!r}; log tail={detail}"
+    )
+
+
 def open_popup(
     compact_prefix: str, pid: int, session_log: Path, timeout: float
 ) -> int:
@@ -290,7 +305,11 @@ def main() -> None:
     compact_prefix = "AI Usage Monitor:"
     wait_for_node(compact_prefix, args.pid, args.timeout)
     probe_progress("compact-ready")
-    time.sleep(1)
+    wait_for_log_text(
+        args.session_log, "AI_USAGE_RUNTIME_STATE ready", args.timeout
+    )
+    probe_progress("runtime-ready")
+    time.sleep(0.25)
     startup_requests = request_count(args.request_log)
 
     before_popup = request_count(args.request_log)
@@ -328,7 +347,9 @@ def main() -> None:
         ),
         flush=True,
     )
-    Atspi.exit()
+    # The outer harness owns the shared isolated AT-SPI registry. Exit this
+    # short-lived client after its flushed result without finalizing that bus.
+    os._exit(0)
 
 
 if __name__ == "__main__":
