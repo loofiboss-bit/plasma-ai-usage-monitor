@@ -26,27 +26,29 @@ DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
 
-    Connections {
-        target: fullRoot.Window.window
+    readonly property bool perfParent1Visible: !!fullRoot.parent && fullRoot.parent.visible
+    readonly property bool perfParent2Visible: !!fullRoot.parent?.parent && fullRoot.parent.parent.visible
+    readonly property bool perfParent3Visible: !!fullRoot.parent?.parent?.parent && fullRoot.parent.parent.parent.visible
+    readonly property bool perfParent4Visible: !!fullRoot.parent?.parent?.parent?.parent && fullRoot.parent.parent.parent.parent.visible
+    readonly property bool perfParent5Visible: !!fullRoot.parent?.parent?.parent?.parent?.parent && fullRoot.parent.parent.parent.parent.parent.visible
+    readonly property bool perfParent6Visible: !!fullRoot.parent?.parent?.parent?.parent?.parent?.parent && fullRoot.parent.parent.parent.parent.parent.parent.visible
 
-        function recordFirstFrame() {
+    function recordPopupVisibility(visible, level) {
+        if (visible) {
             Qt.callLater(function() {
-                console.warn("AI_USAGE_POPUP_FIRST_FRAME");
+                console.warn("AI_USAGE_POPUP_FIRST_FRAME level=" + level);
             });
-        }
-
-        function onVisibleChanged() {
-            if (target && target.visible) {
-                recordFirstFrame();
-            } else {
-                console.warn("AI_USAGE_POPUP_CLOSED");
-            }
-        }
-
-        Component.onCompleted: {
-            if (target && target.visible) recordFirstFrame();
+        } else {
+            console.warn("AI_USAGE_POPUP_CLOSED level=" + level);
         }
     }
+
+    onPerfParent1VisibleChanged: recordPopupVisibility(perfParent1Visible, 1)
+    onPerfParent2VisibleChanged: recordPopupVisibility(perfParent2Visible, 2)
+    onPerfParent3VisibleChanged: recordPopupVisibility(perfParent3Visible, 3)
+    onPerfParent4VisibleChanged: recordPopupVisibility(perfParent4Visible, 4)
+    onPerfParent5VisibleChanged: recordPopupVisibility(perfParent5Visible, 5)
+    onPerfParent6VisibleChanged: recordPopupVisibility(perfParent6Visible, 6)
 '''
 
 
