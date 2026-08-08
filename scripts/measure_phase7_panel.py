@@ -152,6 +152,7 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
             {
                 **{key: str(value) for key, value in isolated_directories.items()},
                 "XDG_RUNTIME_DIR": str(runtime_dir),
+                "WAYLAND_DISPLAY": "wayland-v18-phase0",
                 "XDG_DATA_DIRS": "/usr/local/share:/usr/share",
                 "XDG_CONFIG_DIRS": "/etc/xdg",
                 "PAM_KWALLET5_LOGIN": "",
