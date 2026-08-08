@@ -354,6 +354,12 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
             ).strip()
             if measurement_error_text:
                 detail += "\n" + measurement_error_text
+        if measurement_log.exists():
+            measurement_output = measurement_log.read_text(
+                encoding="utf-8"
+            ).strip()
+            if measurement_output:
+                detail += "\nProbe stdout:\n" + measurement_output
         if nested_log.exists():
             detail += "\n" + nested_log.read_text(encoding="utf-8")[-20000:]
         raise RuntimeError(detail.strip())
