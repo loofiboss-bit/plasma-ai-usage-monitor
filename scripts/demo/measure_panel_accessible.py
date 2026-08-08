@@ -96,7 +96,12 @@ def wait_for_node(prefix: str, pid: int, timeout: float):
 def wait_for_popup(pid: int, timeout: float):
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
-        node = next(exactly_named_nodes("AI Usage Monitor", "heading", pid), None)
+        node = next(
+            exactly_named_nodes(
+                "AI Usage Monitor", "heading", pid, showing_only=True
+            ),
+            None,
+        )
         if node is not None:
             return node
         time.sleep(0.025)
@@ -179,11 +184,17 @@ def request_count(path: Path) -> int:
 
 def open_popup(compact_prefix: str, pid: int, timeout: float) -> int:
     compact = wait_for_node(compact_prefix, pid, timeout)
-    elapsed = press_and_wait_for_event(
-        compact, pid, "object:children-changed:add", timeout
-    )
+    if next(
+        exactly_named_nodes(
+            "AI Usage Monitor", "heading", pid, showing_only=True
+        ),
+        None,
+    ) is not None:
+        raise RuntimeError("A stale popup was showing before the sample")
+    started = time.monotonic()
+    press(compact)
     wait_for_popup(pid, timeout)
-    return elapsed
+    return round((time.monotonic() - started) * 1000)
 
 
 def close_popup(compact_prefix: str, pid: int, timeout: float) -> None:
