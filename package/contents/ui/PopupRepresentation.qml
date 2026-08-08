@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
+import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
@@ -39,7 +40,7 @@ PlasmaExtras.Representation {
 
     Timer {
         interval: 500
-        running: true
+        running: Plasmoid.expanded && popupContent.status === Loader.Null
         onTriggered: {
             popupContent.setSource(
                 Qt.resolvedUrl("FullRepresentation.qml"),
