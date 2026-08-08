@@ -568,6 +568,7 @@ jq -n \
   --arg sessionId "$SESSION_ID" \
   --arg fixtureSha256 "$FIXTURE_SHA" \
   --arg sourceTreeSha256 "$SOURCE_TREE_SHA" \
+  --arg archiveSourceTreeSha256 "$SOURCE_TREE_SHA" \
   --arg sourceTreeCommit "$SOURCE_TREE_COMMIT" \
   --arg sourceTreeMode "$SOURCE_TREE_MODE" \
   --arg plasmaSession "Fedora KDE Plasma" \
@@ -581,6 +582,7 @@ jq -n \
   --argjson assets "$ASSETS_JSON" \
   '{version: $version, sessionId: $sessionId, fixtureSha256: $fixtureSha256,
     sourceTreeSha256: $sourceTreeSha256,
+    archiveSourceTreeSha256: $archiveSourceTreeSha256,
     sourceTreeCommit: $sourceTreeCommit,
     sourceTreeMode: $sourceTreeMode,
     plasmaSession: $plasmaSession, theme: $theme, environment: $environment,

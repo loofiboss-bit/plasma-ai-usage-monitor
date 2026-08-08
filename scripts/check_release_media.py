@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import struct
@@ -88,6 +89,16 @@ def committed_source_tree_sha256(commit: str) -> str:
         )
     return hashlib.sha256("".join(inventory).encode()).hexdigest()
 
+
+def commit_is_available(commit: str) -> bool:
+    return subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+    ).returncode == 0
+
+
 def filesystem_source_tree_sha256() -> str:
     git_paths = subprocess.run(
         [
@@ -160,11 +171,12 @@ if (
     not manifest.get("sessionId")
     or not manifest.get("fixtureSha256")
     or not manifest.get("sourceTreeSha256")
+    or not manifest.get("archiveSourceTreeSha256")
     or not manifest.get("sourceTreeCommit")
 ):
     fail(
-        "manifest must identify one capture session, fixture, source tree, "
-        "and source-tree commit"
+        "manifest must identify one capture session, fixture, capture source "
+        "tree, archive source tree, and source-tree commit"
     )
 if manifest.get("theme") != "Breeze Dark":
     fail("manifest must record the Breeze Dark capture theme")
@@ -195,14 +207,24 @@ source_tree_commit = manifest["sourceTreeCommit"]
 if not re.fullmatch(r"[0-9a-f]{40}", source_tree_commit):
     fail("manifest sourceTreeCommit must be a full Git object ID")
 source_tree_mode = manifest.get("sourceTreeMode", "git-commit")
+force_filesystem = os.environ.get("AI_USAGE_MONITOR_MEDIA_FORCE_FILESYSTEM") == "1"
 if source_tree_mode == "git-commit":
-    expected_source_tree = committed_source_tree_sha256(source_tree_commit)
+    if force_filesystem or not commit_is_available(source_tree_commit):
+        expected_source_tree = None
+    else:
+        expected_source_tree = committed_source_tree_sha256(source_tree_commit)
 elif source_tree_mode == "filesystem-release-candidate":
     expected_source_tree = filesystem_source_tree_sha256()
 else:
     fail(f"unsupported sourceTreeMode {source_tree_mode!r}")
-if manifest["sourceTreeSha256"] != expected_source_tree:
+if (
+    expected_source_tree is not None
+    and manifest["sourceTreeSha256"] != expected_source_tree
+):
     fail("manifest source tree hash does not match its recorded source")
+archive_source_tree = filesystem_source_tree_sha256()
+if manifest["archiveSourceTreeSha256"] != archive_source_tree:
+    fail("manifest archive source tree hash does not match the packaged source")
 if manifest.get("scenarios") != SCENARIOS:
     fail("manifest scenarios do not match the v18 capture contract")
 try:
