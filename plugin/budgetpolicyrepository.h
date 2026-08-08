@@ -43,6 +43,13 @@ public:
   Q_INVOKABLE bool migrateLegacyBudgets(const QVariantList &legacyBudgets);
   Q_INVOKABLE QVariantMap validatePolicy(const QVariantMap &policy) const;
   Q_INVOKABLE QVariantList exportPolicies() const;
+  Q_INVOKABLE QVariantMap parseMajorAmount(const QString &text,
+                                           const QString &currency) const;
+  Q_INVOKABLE QString formatMinorAmount(qint64 minor,
+                                        const QString &currency) const;
+  Q_INVOKABLE QDateTime nextPeriodStart(
+      const QVariantMap &policy,
+      const QDateTime &generatedAt = QDateTime::currentDateTimeUtc()) const;
 
 Q_SIGNALS:
   void ownerIdChanged();

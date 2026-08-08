@@ -50,12 +50,12 @@ run_smoke() {
   fi
 }
 
-for view in overview source-detail history analyst onboarding; do
+for view in overview source-detail history analyst onboarding settings; do
   run_smoke "$view" "$view" "$qml_path"
 done
 
-for scale_factor in 1.25 1.5 2; do
-  for view in overview source-detail history analyst onboarding; do
+for scale_factor in 1.25 1.4 1.5 2; do
+  for view in overview source-detail history analyst onboarding settings; do
     run_smoke "${view}-scale-${scale_factor//./-}" "$view" "$qml_path" "$scale_factor"
   done
 done
@@ -71,4 +71,4 @@ run_smoke "plugin-unavailable" "overview" "${FIXTURE_DIR}/plugin-unavailable:${q
 run_smoke "plugin-older" "overview" "${FIXTURE_DIR}/plugin-older:${qml_path}"
 run_smoke "plugin-newer" "overview" "${FIXTURE_DIR}/plugin-newer:${qml_path}"
 
-echo "Full plasmoid smoke passed: Overview, Source Detail, History, Analyst, and onboarding at 100/125/150/200%, light/dark/high-contrast themes, and plugin recovery modes"
+echo "Full plasmoid smoke passed: Overview, Source Detail, History, Insights, onboarding, and Budget Control at 100/125/140/150/200%, light/dark/high-contrast themes, and plugin recovery modes"

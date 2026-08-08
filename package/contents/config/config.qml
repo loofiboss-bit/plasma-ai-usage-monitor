@@ -18,7 +18,7 @@ ConfigModel {
         source: "configAlerts.qml"
     }
     ConfigCategory {
-        name: i18n("Guardrails")
+        name: i18n("Budget Control")
         icon: "security-high"
         source: "configBudget.qml"
     }

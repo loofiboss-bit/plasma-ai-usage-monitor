@@ -15,6 +15,7 @@ QQC2.ScrollView {
 
     property var monitor: null
     property string sourceId: ""
+    property bool showAllScopes: false
     readonly property bool mediaMode: AppInfo.demoMode
         && AppInfo.smokeView === "media-source-detail"
     readonly property var mediaSource: mediaMode && monitor
@@ -32,6 +33,8 @@ QQC2.ScrollView {
     readonly property var runwayData: runwayRows()
     readonly property var scopeData: mediaMode
         ? [] : scopeRows()
+    readonly property int totalScopeRows: mediaMode
+        ? 0 : (detailModel.scopeBreakdown.scopedRows || []).length
     signal backRequested()
     signal actionRequested(string stableId, string actionKey, string sourceKind)
     signal settingsRequested(string stableId)
@@ -152,8 +155,10 @@ QQC2.ScrollView {
         rows.sort(function(left, right) {
             return Number(right.value || 0) - Number(left.value || 0);
         });
-        return rows.slice(0, 8);
+        return showAllScopes ? rows : rows.slice(0, 8);
     }
+
+    onSourceIdChanged: showAllScopes = false
 
     onMonitorChanged: configureModel()
 
@@ -526,6 +531,17 @@ QQC2.ScrollView {
                     }
                 }
             }
+        }
+
+        PlasmaComponents.Button {
+            Layout.alignment: Qt.AlignHCenter
+            visible: detail.totalScopeRows > 8 && !detail.showAllScopes
+            text: i18np("Show all %1 scope", "Show all %1 scopes",
+                        detail.totalScopeRows)
+            icon.name: "view-list-details"
+            activeFocusOnTab: true
+            Accessible.name: text
+            onClicked: detail.showAllScopes = true
         }
 
         PlasmaExtras.Heading {

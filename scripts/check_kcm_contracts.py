@@ -119,6 +119,50 @@ def validate_source_choice_settings() -> None:
         fail("per-source intervals must be advanced-only and limited to enabled sources")
 
 
+def validate_budget_control() -> None:
+    page = (UI / "configBudget.qml").read_text(encoding="utf-8")
+    store = (UI / "components" / "BudgetPolicyDraftStore.qml").read_text(
+        encoding="utf-8"
+    )
+    editor = (UI / "components" / "BudgetPolicyEditor.qml").read_text(
+        encoding="utf-8"
+    )
+    config_model = (ROOT / "package" / "contents" / "config" / "config.qml").read_text(
+        encoding="utf-8"
+    )
+
+    if 'name: i18n("Budget Control")' not in config_model:
+        fail("the budget settings category must be visibly named Budget Control")
+    for token in (
+        "BudgetPolicyRepository",
+        "BudgetPolicyDraftStore",
+        "function saveConfig()",
+        "Component.onDestruction: policyDrafts.discard()",
+        "deleteDialog.open()",
+        "activeFocusOnTab: true",
+        "Accessible.name",
+    ):
+        if token not in page:
+            fail(f"Budget Control is missing its staged editor contract: {token}")
+    for retired in ("DailyBudget", "MonthlyBudget"):
+        if re.search(rf"\bcfg_[A-Za-z0-9_]*{retired}\b", page):
+            fail(f"Budget Control still binds the hidden legacy {retired} inventory")
+    if "replacePolicies(payload)" not in store or "function apply()" not in store:
+        fail("BudgetPolicyDraftStore lacks its atomic Apply boundary")
+    if re.search(r"repository\.(?:createPolicy|updatePolicy|deletePolicy|setPolicyEnabled)\s*\(", editor):
+        fail("BudgetPolicyEditor writes through the repository during field navigation")
+    for token in (
+        "supportedBudgetScopes",
+        "Live threshold preview",
+        "scopeIdentity",
+        "warningPercent",
+        "criticalPercent",
+        "setSnoozedUntilNextPeriod",
+    ):
+        if token not in editor:
+            fail(f"Budget policy editor is missing: {token}")
+
+
 def main() -> None:
     try:
         catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
@@ -144,14 +188,13 @@ def main() -> None:
     require_bindings(providers, "notifications", "configAlerts.qml")
     require_bindings(providers, "enabled", "configProviders.qml")
     require_bindings(providers, "model", "configProviders.qml")
-    require_bindings(providers, "dailyBudget", "configBudget.qml", capability="cost")
-    require_bindings(providers, "monthlyBudget", "configBudget.qml", capability="cost")
     validate_secret_pages()
     validate_diagnostics()
     validate_source_choice_settings()
+    validate_budget_control()
 
     print(
-        f"KCM contract check OK: {len(providers)} providers, transactional secrets, safe diagnostics"
+        f"KCM contract check OK: {len(providers)} providers, staged budget policies, transactional secrets, safe diagnostics"
     )
 
 

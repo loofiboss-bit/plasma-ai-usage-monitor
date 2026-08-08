@@ -78,8 +78,8 @@ def main() -> None:
     )
     errors += require(
         "package/contents/ui/AnalystTab.qml",
-        'i18n("Analyst view loading")',
-        'i18n("Analyst view ready")',
+        'i18n("Insights view loading")',
+        'i18n("Insights view ready")',
     )
     errors += require(
         "package/contents/ui/RuntimeCoordinator.qml",

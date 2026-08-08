@@ -12,10 +12,10 @@ Kirigami.ScrollablePage {
     id: analystPage
     required property var monitor
 
-    title: i18n("The Analyst")
+    title: i18n("Insights")
     Accessible.name: analystState.loading
-        ? i18n("Analyst view loading")
-        : i18n("Analyst view ready")
+        ? i18n("Insights view loading")
+        : i18n("Insights view ready")
 
     readonly property bool mediaScenario: AppInfo.demoMode
         && AppInfo.smokeView.indexOf("media-analyst") === 0

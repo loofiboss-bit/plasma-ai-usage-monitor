@@ -10,6 +10,7 @@ Kirigami.Card {
 
     required property var forecast
     property bool showHistoryAction: false
+    readonly property bool budgetForecast: forecast.kind === "budget_overrun"
     signal historyRequested(string metric)
 
     Accessible.role: Accessible.Grouping
@@ -26,8 +27,8 @@ Kirigami.Card {
         Kirigami.Heading {
             Layout.fillWidth: true
             level: 4
-            text: card.forecast.kind === "budget_overrun"
-                ? i18n("Monthly budget pacing")
+            text: card.budgetForecast
+                ? i18n("Budget pacing")
                 : i18n("Quota runway")
             elide: Text.ElideRight
         }
@@ -35,7 +36,8 @@ Kirigami.Card {
             objectName: "runwayStateLabel"
             text: card.stateLabel()
             font.bold: true
-            color: card.forecast.state === "critical"
+            color: card.forecast.state === "exceeded"
+                || card.forecast.state === "critical"
                 ? Kirigami.Theme.negativeTextColor
                 : card.forecast.state === "warning"
                   ? Kirigami.Theme.neutralTextColor
@@ -65,16 +67,22 @@ Kirigami.Card {
             Repeater {
                 model: [
                     {
-                        label: i18n("Current"),
-                        value: card.forecast.currentValue
+                        label: card.budgetForecast ? i18n("Spent") : i18n("Current"),
+                        value: card.forecast.currentValue,
+                        minor: null
                     },
                     {
-                        label: i18n("Projected"),
-                        value: card.forecast.projectedValue
+                        label: card.budgetForecast ? i18n("Remaining") : i18n("Projected"),
+                        value: card.budgetForecast ? null
+                            : card.forecast.projectedValue,
+                        minor: card.budgetForecast
+                            ? card.forecast.remainingMinor : null
                     },
                     {
-                        label: i18n("Limit"),
-                        value: card.forecast.limitValue
+                        label: card.budgetForecast ? i18n("Safe today") : i18n("Limit"),
+                        value: null,
+                        minor: card.budgetForecast
+                            ? card.forecast.safeTodayMinor : null
                     }
                 ]
 
@@ -92,7 +100,10 @@ Kirigami.Card {
                     }
                     QQC2.Label {
                         Layout.fillWidth: true
-                        text: card.formatValue(valueColumn.modelData.value)
+                        text: valueColumn.modelData.minor !== null
+                            && valueColumn.modelData.minor !== undefined
+                            ? card.formatMinor(valueColumn.modelData.minor)
+                            : card.formatValue(valueColumn.modelData.value)
                         font.bold: true
                         elide: Text.ElideRight
                     }
@@ -106,6 +117,16 @@ Kirigami.Card {
                            card.forecast.periodEnd))
             visible: card.forecast.periodEnd !== undefined
                 && card.forecast.periodEnd !== null
+            color: Kirigami.Theme.disabledTextColor
+            wrapMode: Text.WordWrap
+        }
+
+        QQC2.Label {
+            Layout.fillWidth: true
+            visible: card.budgetForecast
+                && card.forecast.previousPeriodSpentMinor !== undefined
+                && card.forecast.previousPeriodSpentMinor !== null
+            text: card.previousPeriodText()
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
         }
@@ -146,6 +167,7 @@ Kirigami.Card {
 
     function stateIcon() {
         switch (forecast.state) {
+        case "exceeded": return "dialog-error-symbolic";
         case "critical": return "dialog-error-symbolic";
         case "warning": return "dialog-warning-symbolic";
         case "safe": return "dialog-ok-symbolic";
@@ -155,6 +177,7 @@ Kirigami.Card {
 
     function stateLabel() {
         switch (forecast.state) {
+        case "exceeded": return i18n("Exceeded");
         case "critical": return i18n("Critical");
         case "warning": return i18n("Warning");
         case "safe": return i18n("Safe");
@@ -173,6 +196,8 @@ Kirigami.Card {
     function summaryText() {
         if (forecast.state === "unavailable")
             return forecast.reasonText || i18n("A compatible forecast is not available.");
+        if (forecast.kind === "budget_overrun" && forecast.state === "exceeded")
+            return i18n("Reported spend has reached or exceeded the local policy limit.");
         if (forecast.predictedAt !== undefined
                 && forecast.predictedAt !== null) {
             return forecast.kind === "budget_overrun"
@@ -182,7 +207,7 @@ Kirigami.Card {
                        formatDate(forecast.predictedAt));
         }
         return forecast.kind === "budget_overrun"
-            ? i18n("Projected month-end spend stays within the configured budget.")
+            ? i18n("Projected period-end spend stays within the configured budget.")
             : i18n("No exhaustion is projected before this quota resets.");
     }
 
@@ -191,7 +216,7 @@ Kirigami.Card {
         var number = Number(value);
         if (!Number.isFinite(number)) return "—";
         var formatted = number.toLocaleString(
-            Qt.locale(), "f", forecast.currency ? 2 : 0);
+            Qt.locale(), "f", forecast.currency ? currencyDigits() : 0);
         return forecast.currency
             ? i18n("%1 %2", forecast.currency, formatted)
             : i18n("%1 %2", formatted, forecast.unit || "");
@@ -202,6 +227,42 @@ Kirigami.Card {
         var date = new Date(value);
         return isNaN(date.getTime()) ? "—"
                                     : date.toLocaleString(Qt.locale());
+    }
+
+    function formatMinor(minor) {
+        var factor = minorToMajorFactor();
+        if (!Number.isFinite(Number(minor)) || !Number.isFinite(factor))
+            return "\u2014";
+        return formatValue(Number(minor) * factor);
+    }
+
+    function previousPeriodText() {
+        var spent = formatMinor(forecast.previousPeriodSpentMinor);
+        if (forecast.previousPeriodChangePercent === undefined
+                || forecast.previousPeriodChangePercent === null)
+            return i18n("Previous period: %1", spent);
+        return i18n("Previous period: %1 · change %2%", spent,
+                    Number(forecast.previousPeriodChangePercent)
+                        .toLocaleString(Qt.locale(), "f", 1));
+    }
+
+    function currencyDigits() {
+        var factor = minorToMajorFactor();
+        if (!Number.isFinite(factor) || factor <= 0) return 2;
+        var ratio = 1 / factor;
+        var digits = Math.round(Math.log(ratio) / Math.LN10);
+        return digits >= 0 && digits <= 4 ? digits : 2;
+    }
+
+    function minorToMajorFactor() {
+        var spentMinor = Number(forecast.spentMinor || 0);
+        var spentMajor = Number(forecast.currentValue);
+        if (spentMinor > 0 && Number.isFinite(spentMajor))
+            return spentMajor / spentMinor;
+        var limitMinor = spentMinor + Number(forecast.remainingMinor || 0);
+        var limitMajor = Number(forecast.limitValue);
+        return limitMinor > 0 && Number.isFinite(limitMajor)
+            ? limitMajor / limitMinor : NaN;
     }
 
     function quotaMetric() {

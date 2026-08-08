@@ -147,4 +147,42 @@ TestCase {
         wait(0);
         verify(card.Accessible.name.indexOf("Safe") >= 0);
     }
+
+    function test_exceededBudgetOutranksFutureQuotaRisk() {
+        var budget = forecast("exceeded", {
+            kind: "budget_overrun",
+            sourceId: "anthropic",
+            currentValue: 125,
+            limitValue: 100
+        });
+        budget.currency = "USD";
+        budget.unit = "USD";
+        budget.consumedPercent = 125;
+        budget.spentMinor = 12500;
+        budget.remainingMinor = 0;
+        budget.safeTodayMinor = 0;
+        budget.previousPeriodSpentMinor = 8000;
+        budget.previousPeriodChangePercent = 56.25;
+        guardrails.forecasts = [forecast("critical"), budget];
+
+        var focus = createTemporaryObject(dailyFocusComponent, testCase, {
+            presentation: presentation,
+            guardrails: guardrails
+        });
+        verify(focus);
+        compare(focus.runwayRisk.sourceId, "anthropic");
+        compare(focus.headlineText(), "Budget policy exceeded");
+        compare(focus.effectiveActionLabel(), "Review budget");
+        compare(focus.effectiveFacts().length, 3);
+        verify(focus.effectiveFacts()[1].label.indexOf("remaining") >= 0);
+
+        var card = createTemporaryObject(runwayCardComponent, testCase, {
+            forecast: budget,
+            width: 640
+        });
+        verify(card);
+        compare(card.stateLabel(), "Exceeded");
+        verify(card.summaryText().indexOf("reached or exceeded") >= 0);
+        verify(card.formatMinor(8000).indexOf("80") >= 0);
+    }
 }

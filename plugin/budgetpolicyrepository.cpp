@@ -1,11 +1,14 @@
 #include "budgetpolicyrepository.h"
 
+#include "billingcycleresolver.h"
 #include "budgetpolicyschema.h"
+#include "currencyminorunits.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
 #include <QDir>
 #include <QFileInfo>
+#include <QLocale>
 #include <QRegularExpression>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -254,6 +257,44 @@ BudgetPolicyRepository::validatePolicy(const QVariantMap &policy) const {
   QString error;
   const QVariantMap normalized = normalizedPolicy(policy, true, &error);
   return result(error.isEmpty(), error, normalized);
+}
+
+QVariantMap BudgetPolicyRepository::parseMajorAmount(
+    const QString &text, const QString &currency) const {
+  bool ok = false;
+  double major = QLocale().toDouble(text.trimmed(), &ok);
+  if (!ok)
+    major = QLocale::c().toDouble(text.trimmed(), &ok);
+  const std::optional<qint64> minor =
+      ok ? CurrencyMinorUnits::fromMajor(major, currency) : std::nullopt;
+  return {{QStringLiteral("ok"), minor.has_value() && *minor > 0},
+          {QStringLiteral("minor"),
+           minor ? QVariant::fromValue(*minor) : QVariant()},
+          {QStringLiteral("error"),
+           !ok ? QStringLiteral("invalid-amount")
+               : !minor ? QStringLiteral("unknown-currency")
+                        : *minor <= 0 ? QStringLiteral("non-positive-amount")
+                                      : QString()}};
+}
+
+QString BudgetPolicyRepository::formatMinorAmount(
+    qint64 minor, const QString &currency) const {
+  const std::optional<int> digits = CurrencyMinorUnits::digits(currency);
+  const std::optional<double> major =
+      CurrencyMinorUnits::toMajor(minor, currency);
+  return digits && major ? QLocale().toString(*major, 'f', *digits) : QString();
+}
+
+QDateTime BudgetPolicyRepository::nextPeriodStart(
+    const QVariantMap &policy, const QDateTime &generatedAt) const {
+  BillingCycleResolver::Request request;
+  request.periodType = policy.value(QStringLiteral("periodType")).toString();
+  request.anchorDay = policy.value(QStringLiteral("anchorDay")).toInt();
+  request.timeZoneId = policy.value(QStringLiteral("timeZoneId")).toString();
+  request.generatedAt = generatedAt.toUTC();
+  const BillingCycleResolver::Cycle cycle =
+      BillingCycleResolver::resolve(request);
+  return cycle.isValid() ? cycle.endUtc : QDateTime();
 }
 
 bool BudgetPolicyRepository::writePolicy(const QVariantMap &p, bool update) {

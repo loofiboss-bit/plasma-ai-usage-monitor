@@ -187,7 +187,7 @@ QtObject {
         var reportCoverage = reportSnapshot.coverage || ({});
         var currency = reportSnapshot.currency || "";
         var lines = [];
-        lines.push(i18n("AI Usage Monitor Analyst Report (%1 days)", days));
+        lines.push(i18n("AI Usage Monitor Insights Report (%1 days)", days));
         lines.push(i18n("Generated: %1", new Date(reportSnapshot.generatedAt).toLocaleString()));
         lines.push(i18n("Period: %1 through %2",
                         formatDate(reportSnapshot.from),
@@ -267,7 +267,7 @@ QtObject {
 
     function writtenSummary() {
         if (!hasSnapshot) {
-            return i18n("No Analyst snapshot is available.");
+            return i18n("No Insights snapshot is available.");
         }
         var parts = [];
         var average = kpi("averageDailySpend");

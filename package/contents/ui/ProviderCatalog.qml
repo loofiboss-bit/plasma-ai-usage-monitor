@@ -18,6 +18,7 @@ QtObject {
             var entry = catalogProviders[i];
             var config = entry.config || {};
             result.push({
+                displayName: entry.displayName,
                 name: entry.displayName,
                 label: entry.displayName,
                 dbName: entry.dbName,
@@ -39,7 +40,10 @@ QtObject {
                 probePolicy: entry.probePolicy || "manual_only",
                 requiresApiKey: (entry.auth?.credentialSlots || []).length > 0,
                 supportsBudget: (entry.capabilities || []).indexOf("cost") >= 0,
+                budgetPolicyContractVersion: entry.budgetPolicyContractVersion || "",
                 supportedBudgetScopes: entry.supportedBudgetScopes || ["aggregate"],
+                supportedBillingCycles: entry.supportedBillingCycles
+                    || ["calendar_day", "iso_week", "calendar_month", "anchored_month"],
                 enabledConfigKey: config.enabled,
                 modelConfigKey: config.model,
                 customBaseUrlConfigKey: (config.key || entry.stableId) + "CustomBaseUrl",

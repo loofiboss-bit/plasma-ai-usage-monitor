@@ -93,7 +93,7 @@ PlasmaExtras.Representation {
                     }
                 },
                 Kirigami.Action {
-                    text: i18n("Analyst")
+                    text: i18n("Insights")
                     icon.name: "office-chart-line"
                     checkable: true
                     checked: !fullRoot.sourceDetailVisible

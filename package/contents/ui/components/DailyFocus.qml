@@ -28,13 +28,15 @@ Rectangle {
 
     implicitHeight: content.implicitHeight + Kirigami.Units.largeSpacing * 2
     radius: Kirigami.Units.cornerRadius
-    color: Qt.alpha(effectiveActionRow.attentionSeverity === "critical"
+    color: Qt.alpha(effectiveActionRow.attentionSeverity === "exceeded"
+                    || effectiveActionRow.attentionSeverity === "critical"
                     ? Kirigami.Theme.negativeBackgroundColor
                     : effectiveActionRow.attentionSeverity === "warning"
                       ? Kirigami.Theme.neutralBackgroundColor
                       : Kirigami.Theme.highlightColor, 0.12)
     border.width: 1
-    border.color: Qt.alpha(effectiveActionRow.attentionSeverity === "critical"
+    border.color: Qt.alpha(effectiveActionRow.attentionSeverity === "exceeded"
+                           || effectiveActionRow.attentionSeverity === "critical"
                            ? Kirigami.Theme.negativeTextColor
                            : effectiveActionRow.attentionSeverity === "warning"
                              ? Kirigami.Theme.neutralTextColor
@@ -147,9 +149,9 @@ Rectangle {
         var top = null;
         for (var i = 0; i < rows.length; ++i) {
             var row = rows[i] || {};
-            if (row.state !== "critical" && row.state !== "warning") continue;
-            if (!top || row.state === "critical" && top.state !== "critical"
-                    || row.state === top.state
+            if (riskRank(row.state) === 0) continue;
+            if (!top || riskRank(row.state) > riskRank(top.state)
+                    || riskRank(row.state) === riskRank(top.state)
                     && new Date(row.predictedAt).getTime()
                        < new Date(top.predictedAt).getTime()) {
                 top = row;
@@ -160,14 +162,21 @@ Rectangle {
 
     function headlineText() {
         if (!showingRunway) return presentation.headline();
+        if (runwayRisk.kind === "budget_overrun"
+                && runwayRisk.state === "exceeded")
+            return i18n("Budget policy exceeded");
         return runwayRisk.kind === "budget_overrun"
-            ? i18n("Monthly budget pacing needs attention")
+            ? i18n("Budget pacing needs attention")
             : i18n("Quota runway needs attention");
     }
 
     function explanationText() {
         if (!showingRunway) return presentation.explanation();
         var predicted = new Date(runwayRisk.predictedAt);
+        if (runwayRisk.kind === "budget_overrun"
+                && runwayRisk.state === "exceeded")
+            return i18n("%1 has reached or exceeded its local policy limit.",
+                        runwayRisk.sourceId);
         if (runwayRisk.kind === "budget_overrun")
             return i18n("%1 is projected to exceed its configured budget on %2.",
                         runwayRisk.sourceId,
@@ -178,12 +187,35 @@ Rectangle {
     }
 
     function effectiveActionLabel() {
-        return showingRunway ? i18n("Review runway")
+        return showingRunway && runwayRisk.kind === "budget_overrun"
+            ? i18n("Review budget")
+            : showingRunway ? i18n("Review runway")
                              : presentation.actionLabel(effectiveActionRow);
     }
 
     function effectiveFacts() {
         if (!showingRunway) return presentation.focusFacts();
+        if (runwayRisk.kind === "budget_overrun") {
+            return [{
+                icon: runwayRisk.state === "warning"
+                    ? "dialog-warning-symbolic" : "dialog-error-symbolic",
+                value: riskLabel(runwayRisk.state),
+                label: i18n("%1% consumed",
+                            Number(runwayRisk.consumedPercent || 0)
+                                .toLocaleString(Qt.locale(), "f", 0))
+            }, {
+                icon: "wallet-open-symbolic",
+                value: i18n("%1 / %2",
+                            formatBudgetValue(runwayRisk.currentValue),
+                            formatBudgetMinor(runwayRisk.remainingMinor)),
+                label: i18n("Spent / remaining")
+            }, {
+                icon: "chronometer",
+                value: formatBudgetMinor(runwayRisk.safeTodayMinor),
+                label: i18n("Safe today · resets %1",
+                            formatShortDate(runwayRisk.periodEnd))
+            }];
+        }
         var result = [{
             icon: runwayRisk.state === "critical"
                 ? "dialog-error-symbolic" : "dialog-warning-symbolic",
@@ -206,5 +238,62 @@ Rectangle {
                             .toLocaleString(Qt.locale(), "f", 0))
         }];
         return result;
+    }
+
+    function riskRank(state) {
+        switch (state) {
+        case "exceeded": return 3;
+        case "critical": return 2;
+        case "warning": return 1;
+        default: return 0;
+        }
+    }
+
+    function riskLabel(state) {
+        switch (state) {
+        case "exceeded": return i18n("Exceeded");
+        case "critical": return i18n("Critical");
+        case "warning": return i18n("Warning");
+        default: return i18n("Safe");
+        }
+    }
+
+    function formatBudgetValue(value) {
+        var number = Number(value);
+        if (!Number.isFinite(number)) return "\u2014";
+        return i18n("%1 %2", runwayRisk.currency || runwayRisk.unit || "",
+                    number.toLocaleString(Qt.locale(), "f", budgetCurrencyDigits()));
+    }
+
+    function formatBudgetMinor(minor) {
+        var factor = budgetMinorToMajorFactor();
+        if (!Number.isFinite(Number(minor)) || !Number.isFinite(factor))
+            return "\u2014";
+        return formatBudgetValue(Number(minor) * factor);
+    }
+
+    function budgetCurrencyDigits() {
+        var factor = budgetMinorToMajorFactor();
+        if (!Number.isFinite(factor) || factor <= 0) return 2;
+        var ratio = 1 / factor;
+        var digits = Math.round(Math.log(ratio) / Math.LN10);
+        return digits >= 0 && digits <= 4 ? digits : 2;
+    }
+
+    function budgetMinorToMajorFactor() {
+        var spentMinor = Number(runwayRisk.spentMinor || 0);
+        var spentMajor = Number(runwayRisk.currentValue);
+        if (spentMinor > 0 && Number.isFinite(spentMajor))
+            return spentMajor / spentMinor;
+        var limitMinor = spentMinor + Number(runwayRisk.remainingMinor || 0);
+        var limitMajor = Number(runwayRisk.limitValue);
+        return limitMinor > 0 && Number.isFinite(limitMajor)
+            ? limitMajor / limitMinor : NaN;
+    }
+
+    function formatShortDate(value) {
+        var date = new Date(value);
+        return isNaN(date.getTime()) ? i18n("unknown")
+                                    : date.toLocaleDateString(Qt.locale());
     }
 }

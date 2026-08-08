@@ -6,9 +6,11 @@ set(TEST_USAGE_DB_SRC
 )
 
 set(TEST_BUDGET_POLICY_SRC
+    ${CMAKE_SOURCE_DIR}/plugin/billingcycleresolver.cpp
     ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyschema.cpp
     ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyrepository.cpp
     ${CMAKE_SOURCE_DIR}/plugin/budgetpolicymodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/currencyminorunits.cpp
 )
 
 set(TEST_CATALOG_SRC
@@ -317,6 +319,46 @@ add_test(
 add_executable(test_providersettings_qml
     test_providersettings_qml.cpp
 )
+
+add_executable(test_budgetui_qml
+    test_budgetui_qml.cpp
+)
+target_link_libraries(test_budgetui_qml PRIVATE Qt6::QuickTest)
+foreach(scale IN ITEMS 1 1.25 1.4 1.5 2)
+    string(REPLACE "." "_" scale_label "${scale}")
+    set(test_name "budgetui_scale_${scale_label}_qml")
+    add_test(
+        NAME "${test_name}"
+        COMMAND test_budgetui_qml
+                -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/budgetui"
+                -platform offscreen
+    )
+    set_tests_properties("${test_name}" PROPERTIES
+        ENVIRONMENT
+            "QT_SCALE_FACTOR=${scale};QML_IMPORT_PATH=${CMAKE_BINARY_DIR}/plugin;QML2_IMPORT_PATH=${CMAKE_BINARY_DIR}/plugin"
+    )
+endforeach()
+
+foreach(theme IN ITEMS light dark high_contrast)
+    if(theme STREQUAL "light")
+        set(color_scheme "/usr/share/color-schemes/BreezeLight.colors")
+    elseif(theme STREQUAL "dark")
+        set(color_scheme "/usr/share/color-schemes/BreezeDark.colors")
+    else()
+        set(color_scheme "${CMAKE_SOURCE_DIR}/scripts/fixtures/accessibility/HighContrast.colors")
+    endif()
+    set(test_name "budgetui_theme_${theme}_qml")
+    add_test(
+        NAME "${test_name}"
+        COMMAND test_budgetui_qml
+                -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/budgetui"
+                -platform offscreen
+    )
+    set_tests_properties("${test_name}" PROPERTIES
+        ENVIRONMENT
+            "KDE_COLOR_SCHEME_PATH=${color_scheme};QML_IMPORT_PATH=${CMAKE_BINARY_DIR}/plugin;QML2_IMPORT_PATH=${CMAKE_BINARY_DIR}/plugin"
+    )
+endforeach()
 target_link_libraries(test_providersettings_qml PRIVATE Qt6::QuickTest)
 add_test(
     NAME providersettings_qml
@@ -437,6 +479,7 @@ set(QML_TEST_TARGETS
     test_dependencybootstrap_qml
     test_guidedsetup_qml
     test_providersettings_qml
+    test_budgetui_qml
     test_overview_qml
     test_dailytruth_qml
     test_dailycontrol_qml
@@ -642,6 +685,7 @@ add_test(NAME no_hardcoded_versions COMMAND ${CMAKE_SOURCE_DIR}/scripts/check_no
 add_test(NAME provider_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_provider_catalog.py)
 add_test(NAME config_defaults_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_config_defaults_exist_in_catalog.py)
 add_test(NAME provider_ui_catalog_models COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_provider_ui_catalog_models.py)
+add_test(NAME budget_ui_contract COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_budget_ui_contract.py)
 add_test(NAME subscription_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_subscription_catalog.py)
 add_test(NAME no_hardcoded_pricing COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_no_hardcoded_pricing.py)
 add_test(NAME non_invasive_monitoring COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_non_invasive_monitoring.py)

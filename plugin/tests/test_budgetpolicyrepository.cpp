@@ -58,6 +58,7 @@ private Q_SLOTS:
   void legacyMigrationIsIdempotentAndDeletionIsPermanent();
   void replaceIsAtomic();
   void injectedMigrationFailureRollsBack();
+  void currencyEditingAndNextPeriodBoundary();
 };
 
 void BudgetPolicyRepositoryTest::crudDuplicateValidationAndIsolation() {
@@ -255,6 +256,53 @@ void BudgetPolicyRepositoryTest::injectedMigrationFailureRollsBack() {
   recovered.setDatabasePath(path);
   recovered.setOwnerId(QStringLiteral("applet:failure"));
   QVERIFY2(recovered.init(), qPrintable(recovered.errorString()));
+}
+
+void BudgetPolicyRepositoryTest::currencyEditingAndNextPeriodBoundary() {
+  BudgetPolicyRepository repository;
+  repository.setOwnerId(QStringLiteral("applet:editing"));
+
+  const QVariantMap usd =
+      repository.parseMajorAmount(QStringLiteral("12.34"), QStringLiteral("USD"));
+  QVERIFY(usd.value(QStringLiteral("ok")).toBool());
+  QCOMPARE(usd.value(QStringLiteral("minor")).toLongLong(), 1234);
+  const QVariantMap large = repository.parseMajorAmount(
+      QStringLiteral("123456789012.34"), QStringLiteral("USD"));
+  QVERIFY(large.value(QStringLiteral("ok")).toBool());
+  QCOMPARE(large.value(QStringLiteral("minor")).toLongLong(),
+           qint64(12345678901234));
+
+  const QString formattedUsd =
+      repository.formatMinorAmount(1234, QStringLiteral("USD"));
+  QCOMPARE(repository.parseMajorAmount(formattedUsd, QStringLiteral("USD"))
+               .value(QStringLiteral("minor"))
+               .toLongLong(),
+           1234);
+  const QString formattedJpy =
+      repository.formatMinorAmount(1234, QStringLiteral("JPY"));
+  QCOMPARE(repository.parseMajorAmount(formattedJpy, QStringLiteral("JPY"))
+               .value(QStringLiteral("minor"))
+               .toLongLong(),
+           1234);
+  QVERIFY(repository.formatMinorAmount(100, QStringLiteral("XAU")).isEmpty());
+  QCOMPARE(repository.parseMajorAmount(QStringLiteral("1"),
+                                       QStringLiteral("XAU"))
+               .value(QStringLiteral("error"))
+               .toString(),
+           QStringLiteral("unknown-currency"));
+
+  QVariantMap daily = validPolicy();
+  daily[QStringLiteral("periodType")] = QStringLiteral("calendar_day");
+  daily[QStringLiteral("timeZoneId")] = QStringLiteral("Europe/Stockholm");
+  const QDateTime generatedAt =
+      QDateTime::fromString(QStringLiteral("2026-03-29T00:30:00Z"), Qt::ISODate);
+  QCOMPARE(repository.nextPeriodStart(daily, generatedAt),
+           QDateTime::fromString(QStringLiteral("2026-03-29T22:00:00Z"),
+                                 Qt::ISODate));
+
+  QVariantMap reset = daily;
+  reset[QStringLiteral("periodType")] = QStringLiteral("provider_reset");
+  QVERIFY(!repository.nextPeriodStart(reset, generatedAt).isValid());
 }
 
 QTEST_MAIN(BudgetPolicyRepositoryTest)
