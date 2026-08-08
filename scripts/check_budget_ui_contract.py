@@ -29,7 +29,7 @@ def main() -> None:
         "PopupRepresentation.qml",
         "asynchronous: true",
         "interval: 500",
-        "running: Plasmoid.expanded && popupContent.status === Loader.Null",
+        'running: !!Plasmoid["expanded"]',
         'Qt.resolvedUrl("FullRepresentation.qml")',
         '{ "monitor": popupRoot.monitor }',
         'i18n("Loading Overview…")',

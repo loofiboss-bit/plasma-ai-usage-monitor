@@ -40,7 +40,11 @@ PlasmaExtras.Representation {
 
     Timer {
         interval: 500
-        running: Plasmoid.expanded && popupContent.status === Loader.Null
+        // Plasma's attached qmltypes omit the runtime expanded member.
+        // qmllint disable missing-property
+        running: !!Plasmoid["expanded"]
+                 && popupContent.status === Loader.Null
+        // qmllint enable missing-property
         onTriggered: {
             popupContent.setSource(
                 Qt.resolvedUrl("FullRepresentation.qml"),
