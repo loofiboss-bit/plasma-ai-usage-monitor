@@ -232,6 +232,11 @@ timeout 55s python3 "$3" --request-log "$5" --pid "$plasmashell_pid" >"$6" 2>"$7
 
 def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]:
     env = candidate_environment(build_dir.resolve(), runtime_root)
+    config_home = Path(env["XDG_CONFIG_HOME"])
+    config_home.mkdir(parents=True, exist_ok=True)
+    (config_home / "kdeglobals").write_text(
+        "[KDE]\nAnimationDurationFactor=0\n", encoding="utf-8"
+    )
     env.update(
         {
             "OUTER_WAYLAND_DISPLAY": os.environ.get("WAYLAND_DISPLAY", "wayland-0"),
@@ -239,6 +244,7 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
             "PLASMA_AI_MONITOR_DEMO": "1",
             "QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "1",
             "QT_ACCESSIBILITY": "1",
+            "KDE_KWIN_ANIMATIONS_ENABLED": "0",
         }
     )
     return env
