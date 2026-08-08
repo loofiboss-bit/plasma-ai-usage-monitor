@@ -27,6 +27,19 @@ PlasmaExtras.Representation {
     property string historyMetric: ""
     property int historyRangeDays: 7
 
+    function startGuidedSetupAgain() {
+        Plasmoid.configuration.setupWizardDismissed = false;
+        Plasmoid.configuration.setupWizardInProgress = true;
+        Plasmoid.configuration.setupWizardStep = 0;
+        Plasmoid.configuration.setupWizardGoal = "";
+        Plasmoid.configuration.setupWizardSourceId = "";
+    }
+
+    function resumeGuidedSetup() {
+        Plasmoid.configuration.setupWizardDismissed = false;
+        Plasmoid.configuration.setupWizardInProgress = true;
+    }
+
     readonly property bool hasConfiguration: {
         if (AppInfo.smokeView.indexOf("onboarding") === 0) return false;
         var providers = fullRoot.monitor.allProviders || [];
@@ -131,7 +144,7 @@ PlasmaExtras.Representation {
                     activeFocusOnTab: true
                     icon.name: "tools-wizard"
                     Accessible.name: i18n("Run guided setup again")
-                    onClicked: onboardingFlow.startAgain()
+                    onClicked: fullRoot.startGuidedSetupAgain()
                     PlasmaComponents.ToolTip {
                         text: i18n("Run guided setup again")
                     }
@@ -146,16 +159,19 @@ PlasmaExtras.Representation {
             }
         }
 
-        Onboarding.OnboardingFlow {
-            id: onboardingFlow
+        Loader {
+            id: onboardingLoader
             Layout.fillWidth: true
             Layout.fillHeight: true
+            active: fullRoot.showGuidedSetup
             visible: fullRoot.showGuidedSetup
-            runtime: fullRoot.monitor
-            readinessModel: fullRoot.monitor.sourceReadiness
-            secretStore: fullRoot.monitor.secretsManager
-            configuration: Plasmoid.configuration
-            previewState: AppInfo.smokeView
+            sourceComponent: Onboarding.OnboardingFlow {
+                runtime: fullRoot.monitor
+                readinessModel: fullRoot.monitor.sourceReadiness
+                secretStore: fullRoot.monitor.secretsManager
+                configuration: Plasmoid.configuration
+                previewState: AppInfo.smokeView
+            }
         }
 
         RowLayout {
@@ -174,7 +190,7 @@ PlasmaExtras.Representation {
                 text: i18n("Resume setup")
                 activeFocusOnTab: true
                 Accessible.name: i18n("Resume guided setup")
-                onClicked: onboardingFlow.resume()
+                onClicked: fullRoot.resumeGuidedSetup()
             }
         }
 

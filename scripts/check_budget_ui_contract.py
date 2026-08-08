@@ -28,8 +28,8 @@ def main() -> None:
     labels = re.findall(r'text:\s*i18n\("([^"]+)"\)', tab_block)
     if labels != ["Overview", "History", "Insights"]:
         fail(f"popup tabs must be exactly Overview, History, Insights; got {labels}")
-    if representation.count("Loader {") != 1:
-        fail("popup destinations must share exactly one lazy Loader")
+    if representation.count("Loader {") != 2:
+        fail("popup destinations and onboarding must use two lazy Loaders")
     for path in UI.rglob("*.qml"):
         text = path.read_text(encoding="utf-8")
         if re.search(r'i18n\("[^"]*Analyst', text):
@@ -41,6 +41,7 @@ def main() -> None:
         'fullRoot.destination === 1 ? "views/HistoryView.qml"',
         ': "views/AnalystView.qml"',
         "asynchronous: true",
+        "active: fullRoot.showGuidedSetup",
     )
 
     detail = (UI / "views" / "SourceDetailView.qml").read_text(encoding="utf-8")
