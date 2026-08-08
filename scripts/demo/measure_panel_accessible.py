@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import time
 from pathlib import Path
 
@@ -13,6 +14,10 @@ import gi
 
 gi.require_version("Atspi", "2.0")
 from gi.repository import Atspi  # noqa: E402
+
+
+def probe_progress(message: str) -> None:
+    print(f"AI_USAGE_ATSPI_PROBE {message}", file=sys.stderr, flush=True)
 
 
 def descendants(node):
@@ -182,6 +187,7 @@ def wait_for_popup_closed(pid: int, timeout: float) -> None:
 
 
 def focus(node) -> None:
+    probe_progress("focus-start")
     actions = node.get_action_iface()
     focus_index = next(
         (
@@ -195,6 +201,7 @@ def focus(node) -> None:
         raise RuntimeError(
             f"Accessible node {node.get_name()!r} could not receive exact focus"
         )
+    probe_progress("focus-complete")
     time.sleep(0.1)
 
 
@@ -268,8 +275,10 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=35.0)
     args = parser.parse_args()
 
+    probe_progress("started")
     compact_prefix = "AI Usage Monitor:"
     wait_for_node(compact_prefix, args.pid, args.timeout)
+    probe_progress("compact-ready")
     time.sleep(1)
     startup_requests = request_count(args.request_log)
 
@@ -277,6 +286,7 @@ def main() -> None:
     first_open_ms, sequence_offset = open_popup(
         compact_prefix, args.pid, args.session_log, args.timeout
     )
+    probe_progress("first-open-complete")
     time.sleep(1)
     fresh_popup_requests = request_count(args.request_log) - before_popup
 
@@ -290,6 +300,7 @@ def main() -> None:
         sequence_offset,
         args.timeout,
     )
+    probe_progress("warm-open-complete")
 
     print(
         json.dumps(
