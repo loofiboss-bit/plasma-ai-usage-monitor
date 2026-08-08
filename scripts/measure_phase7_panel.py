@@ -25,17 +25,17 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
-    property bool perfExpanded: false
-
-    onClicked: {
-        Plasmoid.activated();
-        compactRoot.perfExpanded = !compactRoot.perfExpanded;
-        Qt.callLater(function() {
-            console.warn(compactRoot.perfExpanded
-                ? "AI_USAGE_POPUP_FIRST_FRAME"
-                : "AI_USAGE_POPUP_CLOSED");
-        });
-    }
+        popupOpen: !!Plasmoid["expanded"]
+        onPopupOpenChanged: {
+            const expanded = popupOpen;
+            // Use the next event-loop turn so both versions have created and
+            // polished the representation selected by PlasmoidItem.
+            Qt.callLater(function() {
+                console.warn(expanded
+                    ? "AI_USAGE_POPUP_FIRST_FRAME"
+                    : "AI_USAGE_POPUP_CLOSED");
+            });
+        }
 '''
 
 
@@ -250,17 +250,17 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
     installed = list(
         (runtime_root / "prefix").glob(
             "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
-            "contents/ui/CompactRepresentation.qml"
+            "contents/ui/NativeMonitor.qml"
         )
     )
     if len(installed) != 1:
-        raise RuntimeError("installed CompactRepresentation.qml was not found")
-    compact_representation = installed[0]
-    source = compact_representation.read_text(encoding="utf-8")
-    target = "    onClicked: Plasmoid.activated()\n"
+        raise RuntimeError("installed NativeMonitor.qml was not found")
+    native_monitor = installed[0]
+    source = native_monitor.read_text(encoding="utf-8")
+    target = '        popupOpen: !!Plasmoid["expanded"]\n'
     if source.count(target) != 1 or "AI_USAGE_POPUP_FIRST_FRAME" in source:
         raise RuntimeError("popup instrumentation target is invalid")
-    compact_representation.write_text(
+    native_monitor.write_text(
         source.replace(target, POPUP_INSTRUMENTATION, 1),
         encoding="utf-8",
     )
