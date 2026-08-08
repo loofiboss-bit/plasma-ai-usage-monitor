@@ -246,6 +246,7 @@ def run_panel_session(
     env: dict[str, str], runtime_root: Path, request_log: Path, trace_path: Path
 ) -> dict[str, Any]:
     nested_log = runtime_root / "nested-plasma.log"
+    session_shell_log = runtime_root / "nested-session-shell.log"
     measurement_log = runtime_root / "panel-measurement.json"
     measurement_error = runtime_root / "panel-measurement.log"
     socket_name = f"wayland-ai-monitor-v18-{os.getpid()}-{time.time_ns()}"
@@ -330,28 +331,28 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
 """
     env = dict(env)
     env["PLASMA_AI_MONITOR_PERF_TRACE"] = str(trace_path)
-    result = subprocess.run(
-        [
-            "dbus-run-session", "--", "bash", "-c", inner, "v18-panel",
-            socket_name, panel_script,
-            str(ROOT / "scripts/demo/measure_panel_accessible.py"),
-            str(nested_log), str(request_log), str(measurement_log),
-            str(measurement_error),
-        ],
-        cwd=ROOT,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        timeout=120,
-        check=False,
-    )
+    with session_shell_log.open("w", encoding="utf-8") as session_stream:
+        result = subprocess.run(
+            [
+                "dbus-run-session", "--", "bash", "-c", inner, "v18-panel",
+                socket_name, panel_script,
+                str(ROOT / "scripts/demo/measure_panel_accessible.py"),
+                str(nested_log), str(request_log), str(measurement_log),
+                str(measurement_error),
+            ],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            stdout=session_stream,
+            stderr=subprocess.STDOUT,
+            timeout=120,
+            check=False,
+        )
     if result.returncode != 0 or not measurement_log.exists():
         detail = f"Panel measurement failed with exit status {result.returncode}"
-        if result.stderr.strip():
-            detail += "\nSession stderr:\n" + result.stderr.strip()
-        if result.stdout.strip():
-            detail += "\nSession stdout:\n" + result.stdout.strip()
+        session_output = session_shell_log.read_text(encoding="utf-8").strip()
+        if session_output:
+            detail += "\nSession output:\n" + session_output
         if measurement_error.exists():
             measurement_error_text = measurement_error.read_text(
                 encoding="utf-8"
