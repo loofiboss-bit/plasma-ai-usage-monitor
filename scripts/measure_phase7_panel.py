@@ -121,7 +121,10 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
                 "XDG_RUNTIME_DIR": str(runtime_dir),
                 "XDG_DATA_DIRS": "/usr/local/share:/usr/share",
                 "XDG_CONFIG_DIRS": "/etc/xdg",
-                "KDEHOME": str(virtual_root / "kde-home"),
+                "PAM_KWALLET5_LOGIN": "",
+                "SSH_AUTH_SOCK": "",
+                "SESSION_MANAGER": "",
+                "XAUTHORITY": "",
                 "QT_IM_MODULE": "",
                 "GTK_IM_MODULE": "",
                 "QT_VIRTUALKEYBOARD_DISABLE": "1",
@@ -302,7 +305,7 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
     if result.returncode != 0 or not measurement_log.exists():
         detail = measurement_error.read_text(encoding="utf-8").strip() if measurement_error.exists() else ""
         if nested_log.exists():
-            detail += "\n" + nested_log.read_text(encoding="utf-8")[-4000:]
+            detail += "\n" + nested_log.read_text(encoding="utf-8")[-20000:]
         raise RuntimeError(
             detail.strip()
             or f"Panel measurement failed with exit status {result.returncode}"
@@ -318,6 +321,12 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
     autostart_dir.mkdir(parents=True, exist_ok=True)
     (autostart_dir / "org.kde.discover.notifier.desktop").write_text(
         "[Desktop Entry]\nHidden=true\n",
+        encoding="utf-8",
+    )
+    feedback_dir = runtime_root / "config" / "KDE"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    (feedback_dir / "UserFeedback.conf").write_text(
+        "[UserFeedback]\nLastEncouragement=2100-01-01T00:00:00Z\n",
         encoding="utf-8",
     )
     installed = list(
