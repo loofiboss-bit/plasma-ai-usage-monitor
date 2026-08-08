@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [18.0.0] — 2026-08-08
+
 ### Added
 
 - Add applet-owned typed budget policies with transactional schema-v6 storage,
@@ -936,7 +938,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v17.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v18.0.0...HEAD
+[18.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v17.0.0...v18.0.0
 [17.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v16.0.1...v17.0.0
 [16.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v16.0.0...v16.0.1
 [16.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v15.0.0...v16.0.0

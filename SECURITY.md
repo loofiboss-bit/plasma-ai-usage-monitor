@@ -20,8 +20,8 @@ The project aims to acknowledge reports within 48 hours. Fix timing depends on s
 
 | Release line | Security updates |
 | --- | --- |
-| 17.x | Supported |
-| 16.x and older | Upgrade to the current 17.x release |
+| 18.x | Supported |
+| 17.x and older | Upgrade to the current 18.x release |
 
 ## In scope
 

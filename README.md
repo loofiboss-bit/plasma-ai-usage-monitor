@@ -6,13 +6,10 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **17.0.0 (Runway Guardrails)** adds local deterministic quota runway,
-monthly budget pacing, provider-reported scope detail, and transition-only
-guardrail notifications without adding inference or provider writes.
-
-The v18 Budget Control release candidate replaces fixed daily/monthly settings
-with typed local policies for real billing periods, scoped cost, safe-to-spend
+Version **18.0.0 (Budget Control)** replaces fixed daily/monthly settings with
+typed local policies for real billing periods, scoped cost, safe-to-spend
 guidance, previous-period comparison and persist-before-delivery transitions.
+It preserves the read-only provider boundary and performs no inference.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 

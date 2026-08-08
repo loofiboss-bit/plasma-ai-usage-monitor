@@ -1,19 +1,16 @@
 # Roadmap
 
-**Current release:** 17.0.0, Runway Guardrails
+**Current release:** 18.0.0, Budget Control
 
-**Last updated:** 2026-07-29
+**Last updated:** 2026-08-08
 
-AI Usage Monitor remains a desktop-native, local-first Plasma widget. v17 adds
-deterministic forward-looking guardrails without widening the read-only
-provider or local-first boundary.
-
-The v18 Budget Control candidate builds on that foundation with typed,
+AI Usage Monitor remains a desktop-native, local-first Plasma widget. v18 adds
+typed,
 applet-owned policies, real billing periods, scoped attribution, safe-to-spend
 guidance and transition persistence. It does not add provider writes, FX,
 inference or a fourth popup tab.
 
-## Next release candidate
+## Current release
 
 ### 18.0.0 Budget Control
 
@@ -25,10 +22,10 @@ inference or a fourth popup tab.
 - Persist warning, critical, exceeded, recovery and reset transitions before
   delivery, with restart deduplication and period snooze.
 - Keep external payloads allow-listed and Prometheus labels low-cardinality.
-- Complete exact v17/v18 popup comparison, Fedora lifecycle, reproducible
-  artifacts and public readback before publication.
+- Preserve exact v17/v18 popup evidence, Fedora lifecycle, reproducible
+  artifacts and public readback as release-blocking proof.
 
-## Current release
+## Previous release
 
 ### 17.0.0 Runway Guardrails
 
@@ -46,9 +43,9 @@ inference or a fourth popup tab.
   identity, actual/estimated separation, and currency boundaries.
 
 The implementation plan is
-[`docs/plans/PLASMA_AI_USAGE_MONITOR_V17_CODEX_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V17_CODEX_PLAN.md).
-Phases 0 through 6 are complete in the local release candidate. Public
-publication remains a separately authorized operation.
+[`docs/plans/PLASMA_AI_USAGE_MONITOR_V18_CODEX_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V18_CODEX_PLAN.md).
+Phases 0 through 6 and local Phase 7 qualification are complete. Public
+publication requires exact-tag artifacts and readback from every named surface.
 
 ## Current priorities
 

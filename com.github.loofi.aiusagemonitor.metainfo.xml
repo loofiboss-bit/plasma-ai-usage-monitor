@@ -78,6 +78,15 @@
 
   <releases>
 
+    <release version="18.0.0" date="2026-08-08">
+      <description>
+        <ul>
+          <li>Add typed local Budget Control policies for real billing periods and provider-supported scopes.</li>
+          <li>Add deterministic safe-to-spend guidance, previous-period comparison and explicit unavailable reasons.</li>
+          <li>Add transactional schema v6, config schema v3 and persist-before-delivery policy transitions.</li>
+        </ul>
+      </description>
+    </release>
     <release version="17.0.0" date="2026-07-29">
       <description>
         <ul>

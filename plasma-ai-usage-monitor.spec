@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        17.0.0
+Version:        18.0.0
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget for truthful AI usage, quota, resets, and spend
 License:        GPL-3.0-or-later
@@ -82,6 +82,11 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Sat Aug 08 2026 Loofi <loofi@github.com> - 18.0.0-1
+- Add typed Budget Control policies and billing-cycle-aware pacing
+- Reconcile provider-supported cost scopes without aggregate double counting
+- Add schema-v6 persistence, config-v3 restore and durable policy transitions
+
 * Wed Jul 29 2026 Loofi <loofi@github.com> - 17.0.0-1
 - Add deterministic runway and monthly budget pacing
 - Complete OpenAI usage and cost pagination
