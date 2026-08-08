@@ -37,12 +37,10 @@ def process_id(node) -> int:
 def is_showing(node) -> bool:
     try:
         states = node.get_state_set()
-        if states.contains(Atspi.StateType.SHOWING) or states.contains(
-            Atspi.StateType.VISIBLE
-        ):
-            return True
-        rect = node.get_component_iface().get_extents(Atspi.CoordType.SCREEN)
-        return rect.width > 0 and rect.height > 0
+        # VISIBLE and cached extents survive while Plasma keeps the popup
+        # component instantiated. SHOWING is the only state that proves the
+        # popup is currently mapped on the virtual output.
+        return states.contains(Atspi.StateType.SHOWING)
     except Exception:
         return False
 
