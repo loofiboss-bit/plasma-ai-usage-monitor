@@ -160,15 +160,20 @@ def press(node) -> None:
 
 def press_and_wait_for_event(node, pid: int, event_suffix: str, timeout: float) -> int:
     matched = False
+    observed: list[str] = []
 
     def callback(event, *_user_data) -> None:
         nonlocal matched
-        if process_id(event.source) == pid and event.type.endswith(event_suffix):
+        if process_id(event.source) != pid:
+            return
+        if len(observed) < 80:
+            observed.append(event.type)
+        if event_suffix in event.type:
             matched = True
             Atspi.event_quit()
 
     listener = Atspi.EventListener.new(callback)
-    event_family = "object:children-changed"
+    event_family = "object"
     if not listener.register(event_family):
         raise RuntimeError(f"Could not register AT-SPI event {event_family}")
     timer = threading.Timer(timeout, Atspi.event_quit)
@@ -183,7 +188,7 @@ def press_and_wait_for_event(node, pid: int, event_suffix: str, timeout: float) 
     if not matched:
         raise RuntimeError(
             f"Timed out waiting for children-changed:{event_suffix} "
-            f"from plasmashell PID {pid}"
+            f"from plasmashell PID {pid}; observed={observed}"
         )
     return round((time.monotonic() - started) * 1000)
 
