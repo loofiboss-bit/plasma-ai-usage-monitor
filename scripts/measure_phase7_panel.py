@@ -25,32 +25,16 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
-
-    // Plasma's qmltypes omit the injected expanded property's notifier.
-    // Polling the actual attached runtime value avoids an inferred UI state.
     property bool perfExpanded: false
 
-    Timer {
-        interval: 2
-        repeat: true
-        running: true
-
-        onTriggered: {
-            const expanded = !!Plasmoid["expanded"];
-            if (expanded === root.perfExpanded) {
-                return;
-            }
-            root.perfExpanded = expanded;
-            if (expanded) {
-                // Use the next event-loop turn so both versions have created
-                // and polished the representation selected by PlasmoidItem.
-                Qt.callLater(function() {
-                    console.warn("AI_USAGE_POPUP_FIRST_FRAME");
-                });
-            } else {
-                console.warn("AI_USAGE_POPUP_CLOSED");
-            }
-        }
+    onClicked: {
+        Plasmoid.activated();
+        compactRoot.perfExpanded = !compactRoot.perfExpanded;
+        Qt.callLater(function() {
+            console.warn(compactRoot.perfExpanded
+                ? "AI_USAGE_POPUP_FIRST_FRAME"
+                : "AI_USAGE_POPUP_CLOSED");
+        });
     }
 '''
 
@@ -266,18 +250,18 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
     installed = list(
         (runtime_root / "prefix").glob(
             "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
-            "contents/ui/main.qml"
+            "contents/ui/CompactRepresentation.qml"
         )
     )
     if len(installed) != 1:
-        raise RuntimeError("installed main.qml was not found")
-    main_qml = installed[0]
-    source = main_qml.read_text(encoding="utf-8")
-    closing = source.rfind("}")
-    if closing < 0 or "AI_USAGE_POPUP_FIRST_FRAME" in source:
+        raise RuntimeError("installed CompactRepresentation.qml was not found")
+    compact_representation = installed[0]
+    source = compact_representation.read_text(encoding="utf-8")
+    target = "    onClicked: Plasmoid.activated()\n"
+    if source.count(target) != 1 or "AI_USAGE_POPUP_FIRST_FRAME" in source:
         raise RuntimeError("popup instrumentation target is invalid")
-    main_qml.write_text(
-        source[:closing] + POPUP_INSTRUMENTATION + source[closing:],
+    compact_representation.write_text(
+        source.replace(target, POPUP_INSTRUMENTATION, 1),
         encoding="utf-8",
     )
     config_home = Path(env["XDG_CONFIG_HOME"])
