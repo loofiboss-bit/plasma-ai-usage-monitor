@@ -66,14 +66,22 @@ History settings can also write JSON or CSV on a schedule.
 
 Choose a directory you own. Scheduled export writes atomically so a partial run does not replace the last complete file.
 
-Schema-v5 exports contain usage observations, source metadata, and the separate
-guardrail transition log. They do not contain API keys, browser cookies,
-personal access tokens, or webhook URLs. Explicit local exports can contain raw
-provider scope identifiers, so review them before sharing.
+Schema-v6 exports contain usage observations, source metadata, legacy guardrail
+transitions and policy transition evidence. They do not contain API keys,
+browser cookies, personal access tokens or webhook URLs. Explicit local history
+exports can contain raw provider scope identifiers, so review them before
+sharing.
 
 ## Configuration backup
 
-Open **Settings → Diagnostics** to export or import non-secret settings. The schema v2 file covers provider toggles, models, refresh settings, budgets, history, alerts, and subscription preferences.
+Open **Settings → Diagnostics** to export or import non-secret settings. Schema
+v3 includes settings and the current applet's policies; schema v2 remains a
+settings-only import. All objects are validated before Apply and policy
+replacement is atomic.
+
+Policy scope identities can appear in an explicit schema-v3 backup because they
+are needed for exact restore. Treat the file as sensitive and do not attach it
+to public diagnostics or bug reports.
 
 Secrets remain in KWallet and must be configured separately on a new computer.
 
@@ -89,8 +97,9 @@ curl http://127.0.0.1:9464/metrics
 
 Use a local Prometheus instance or an explicitly configured local forwarder. The widget does not expose the endpoint on other network interfaces.
 
-Runway metrics are aggregate-only. `ai_usage_guardrail_risk_state` uses
-`0` unavailable, `1` safe, `2` warning, and `3` critical.
+Guardrail metrics use fixed source/risk/value-class labels.
+`ai_usage_guardrail_risk_state` uses `0` unavailable, `1` safe, `2` warning,
+`3` critical and `4` exceeded.
 `ai_usage_guardrail_seconds_until_event` appears only when a predicted event
 exists. Their labels are limited to provider, risk kind, and actual/estimated
 value class.
@@ -107,16 +116,16 @@ Webhooks use the same alert pipeline as KDE notifications.
 
 Webhook URLs are stored in KWallet. Alerts can contain provider names, status, and usage or budget context, so treat the destination as part of your data boundary.
 
-Forecast alerts are configured separately under **Settings → Guardrails** and
-are off by default. They fire only when entering warning, entering critical, or
-leaving a prior risk state. Persisted schema-v5 transition evidence suppresses
-the same state after refresh or restart. Raw model, project, workspace,
-line-item, and API-key identifiers are not sent.
+Policy alerts are configured per policy under **Settings → Budget Control**.
+They fire only for warning, critical, exceeded, real recovery and period reset.
+Schema-v6 state/events persist before delivery and suppress the same transition
+after refresh or restart. DND, cooldown and failed delivery remain pending or
+suppressed rather than disappearing. Raw model, project, workspace, line-item,
+policy and API-key identifiers are not sent.
 
 ## Alert tuning
 
 Start with provider disconnect, reconnect, and API errors. Add budget warnings only for providers with compatible spend data. Set Do Not Disturb hours and a cooldown to avoid repeated notifications during a provider outage.
 
-For runway alerts, choose a 1-, 6-, 24-, or 48-hour lead time. The risk is not
-recorded as delivered until it enters that horizon. Existing global alert,
-Do Not Disturb, cooldown, and per-provider switches still apply.
+Existing global alert, Do Not Disturb, cooldown and per-provider switches still
+apply. A policy snooze ends automatically when its next period begins.

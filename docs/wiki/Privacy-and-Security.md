@@ -12,19 +12,21 @@ AI Usage Monitor is local-first. It has no telemetry, account service, hosted da
 | Widget preferences | Plasma configuration |
 | Export files | Directory selected by the user |
 
-Configuration exports exclude keys, tokens, cookies, personal access tokens, and webhook URLs.
+Configuration exports exclude keys, tokens, cookies, personal access tokens and
+webhook URLs. Explicit schema-v3 backups can contain policy scope identities
+needed for restoration; they are sensitive local backups, not diagnostics.
 
 Anthropic's standard and Admin API keys are separate KWallet entries. The
-widget never copies one into the other. Provider report rows may include model,
-project, workspace, service-tier, or line-item identifiers. Those raw scopes
-stay in local schema-v5 history and are excluded from diagnostics, support
-reports, configuration exports, webhook payloads, and default Prometheus
-labels.
+widget never copies one into the other. Provider report rows and policies may
+include model, project, workspace, service-tier or line-item identifiers. Those
+raw scopes stay in local schema-v6 data and are excluded from diagnostics,
+support reports, standard reports, webhook payloads and Prometheus labels.
 
-Schema v5 adds `guardrail_events`, which stores only warning, critical, and
-recovered transition evidence. Forecast rows remain ephemeral and are never
-written into raw observation history as provider facts. Migration from schema
-v4 is transactional and creates a `.v17-backup` before changing the database.
+Schema v6 adds owner-isolated policy definitions, one-shot migration markers,
+current policy state and persist-before-delivery policy events for warning,
+critical, exceeded, recovered and reset. Forecast rows remain ephemeral and
+are never written into raw observation history as provider facts. Migration
+from schema v5 is transactional and creates a `.v18-backup` first.
 
 ## Network traffic
 
@@ -41,11 +43,14 @@ by provider, risk kind, and actual/estimated value class; they do not add model,
 project, workspace, scope, stable-ID, or API-key labels.
 
 Slack and Discord webhooks send alert content to the configured webhook service.
-Guardrail notifications use an allow-listed typed payload with provider,
-risk, state, transition, timing, evidence, method, and value class. Daily and
-guardrail alerts do not include endpoint URLs, account or raw scope
-identifiers, credentials, cookies, unrestricted backend errors, or wallet
-contents. Guardrail notifications are off by default.
+Policy notifications use an allow-listed payload containing provider display
+name, risk, coarse percentage class, period and local link text. Daily and
+policy alerts do not include endpoint URLs, account, raw scope or policy
+identifiers, credentials, cookies, unrestricted backend errors or wallet
+contents.
+
+Budget Control performs no provider-side mutation. It cannot switch models,
+write provider budgets or credentials, revoke keys or start billable inference.
 
 ## KWallet
 

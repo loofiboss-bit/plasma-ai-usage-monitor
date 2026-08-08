@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add applet-owned typed budget policies with transactional schema-v6 storage,
+  deterministic legacy migration, config schema-v3 backup/restore and staged
+  CRUD through Budget Control.
+- Add calendar day, Monday ISO week, calendar month, anchored month and verified
+  provider-reset cycle resolution with saved IANA time zones and exact UTC
+  half-open intervals.
+- Add `budget-pacing-v2` minor-unit results for spent, remaining, consumed,
+  projected period end, predicted overrun, safe today, remaining allowance,
+  evidence, coverage and compatible previous-period comparison.
+- Add scoped OpenAI, Anthropic and validated LiteLLM cost policies, safe label
+  snapshots and explicit `Unattributed` reconciliation.
+- Add persist-before-delivery warning, critical, exceeded, recovery and reset
+  transitions with restart deduplication, DND/cooldown pending state and snooze
+  expiry at period reset.
+
+### Changed
+
+- Keep exactly three lazy popup tabs and make Budget Control a searchable,
+  accessible master/detail editor with Apply/Cancel and live preview.
+- Split quota, observation, cycle and pacing queries into focused native units;
+  add policy/observation revision caching and lazy secondary popup work.
+- Move budget capability, supported scopes/cycles, review metadata and provider
+  notification keys into catalog v6.
+- Restrict webhook policy events to an explicit allowlist and keep policy/scope
+  IDs out of bounded Prometheus labels, diagnostics and standard reports.
+
+### Fixed
+
+- Prevent missing data, unknown currency precision, mixed value classes,
+  currencies or scopes, unstable provider resets and scoped-over-aggregate
+  mismatches from becoming fabricated budget guidance.
+- Prevent risky-to-unavailable and unavailable-to-safe changes from becoming
+  false recoveries, and prevent DND, cooldown or failed delivery from losing a
+  policy transition.
+
 ## [17.0.0] — 2026-07-29
 
 ### Added

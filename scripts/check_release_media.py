@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the canonical v17 screenshot set and its capture manifest."""
+"""Validate the canonical v18 screenshot set and its capture manifest."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ REQUIRED = (
     "analyst-sufficient.png",
     "analyst-insufficient.png",
     "guided-first-success.png",
-    "provider-settings.png",
+    "budget-control.png",
     "plugin-recovery.png",
     "panel-lowest-quota.png",
 )
@@ -34,7 +34,7 @@ SCENARIOS = {
     "analyst-sufficient.png": "media-analyst-sufficient",
     "analyst-insufficient.png": "media-analyst-insufficient",
     "guided-first-success.png": "onboarding-source",
-    "provider-settings.png": "settings",
+    "budget-control.png": "budget-settings",
     "plugin-recovery.png": "plugin-recovery",
     "panel-lowest-quota.png": "media-panel",
 }
@@ -60,7 +60,6 @@ def committed_source_tree_sha256(commit: str) -> str:
             "--name-only",
             commit,
             "--",
-            "VERSION",
             "CMakeLists.txt",
             "package",
             "plugin",
@@ -98,7 +97,6 @@ def filesystem_source_tree_sha256() -> str:
             "--others",
             "--exclude-standard",
             "--",
-            "VERSION",
             "CMakeLists.txt",
             "package",
             "plugin",
@@ -124,7 +122,7 @@ def filesystem_source_tree_sha256() -> str:
             and "__pycache__" not in path.parts
             and path.suffix not in {".pyc", ".pyo"}
         ]
-        paths.extend(("VERSION", "CMakeLists.txt"))
+        paths.append("CMakeLists.txt")
 
     inventory = []
     for relative in sorted(paths):
@@ -138,12 +136,26 @@ def filesystem_source_tree_sha256() -> str:
 
 
 version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-manifest_path = SCREENSHOTS / "v17-media-manifest.json"
+release_target_path = ROOT / "RELEASE_TARGET"
+expected_version = (
+    release_target_path.read_text(encoding="utf-8").strip()
+    if release_target_path.is_file()
+    else version
+)
+if release_target_path.is_file():
+    current_major, current_minor, current_patch = map(int, version.split("."))
+    target_major, target_minor, target_patch = map(int, expected_version.split("."))
+    if (target_major, target_minor, target_patch) != (current_major + 1, 0, 0):
+        fail("RELEASE_TARGET must be the next major .0.0 while VERSION remains unbumped")
+manifest_path = SCREENSHOTS / "v18-media-manifest.json"
 if not manifest_path.is_file():
-    fail("assets/screenshots/v17-media-manifest.json is missing")
+    fail("assets/screenshots/v18-media-manifest.json is missing")
 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-if manifest.get("version") != version:
-    fail(f"manifest version {manifest.get('version')!r} does not match VERSION {version}")
+if manifest.get("version") != expected_version:
+    fail(
+        f"manifest version {manifest.get('version')!r} does not match "
+        f"release target {expected_version}"
+    )
 if (
     not manifest.get("sessionId")
     or not manifest.get("fixtureSha256")
@@ -177,7 +189,7 @@ expected_fixture = hashlib.sha256(
     ).encode()
 ).hexdigest()
 if manifest["fixtureSha256"] != expected_fixture:
-    fail("manifest fixture hash does not match the v17 media fixtures")
+    fail("manifest fixture hash does not match the v18 media fixtures")
 
 source_tree_commit = manifest["sourceTreeCommit"]
 if not re.fullmatch(r"[0-9a-f]{40}", source_tree_commit):
@@ -192,7 +204,7 @@ else:
 if manifest["sourceTreeSha256"] != expected_source_tree:
     fail("manifest source tree hash does not match its recorded source")
 if manifest.get("scenarios") != SCENARIOS:
-    fail("manifest scenarios do not match the v17 capture contract")
+    fail("manifest scenarios do not match the v18 capture contract")
 try:
     validate_capture_evidence(manifest.get("captureEvidence"), REQUIRED)
 except EvidenceError as error:

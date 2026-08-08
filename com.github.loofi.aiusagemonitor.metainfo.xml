@@ -14,14 +14,16 @@
     <p>
       AI Usage Monitor is a Plasma 6 widget for provider-reported usage and spend,
       synchronized coding-tool quota, local activity, balances, rate limits, and
-      read-only connection checks. Runway Guardrails adds deterministic quota
-      runway and monthly budget pacing from compatible local history.
+      read-only connection checks. Budget Control adds typed local cost
+      policies, real billing periods, deterministic safe-to-spend guidance and
+      quota runway from compatible local history.
     </p>
     <p>
       The widget stores secrets in KWallet and history on the local computer. Actual
       data, estimates, fixed fees, balances, connectivity, unavailable values, and
       currencies stay separate. Forecasts expose evidence and unavailable reasons,
-      scoped identifiers remain local, and notifications are opt-in. The KDE Store frontend requires
+      scoped identifiers remain local, and policy transitions persist before
+      delivery. The KDE Store frontend requires
       the matching compiled plugin from the Fedora COPR package or a source build.
     </p>
   </description>
@@ -61,8 +63,8 @@
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/guided-first-success.png</image>
     </screenshot>
     <screenshot>
-      <caption>Source-focused provider settings</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/provider-settings.png</image>
+      <caption>Searchable staged Budget Control policy editor</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/budget-control.png</image>
     </screenshot>
     <screenshot>
       <caption>Deterministic recovery for a missing native plugin</caption>

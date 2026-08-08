@@ -106,14 +106,27 @@ Some settings pages offer an explicit manual inference test. That action may use
 
 ## Budgets
 
-Set budgets only when the card has compatible spend data. A budget based on estimated pricing remains an estimate. Connectivity-only providers cannot produce a meaningful spend warning.
+Create policies only when the source has compatible spend data and a reviewed
+Budget Policy v2 catalog contract. A policy based on estimated pricing remains
+an estimate. Connectivity-only providers cannot produce meaningful guidance.
+
+Policy limits and results use checked ISO-currency minor units. Actual and
+estimated values, currencies and aggregate/scoped dimensions never mix. An
+unknown currency precision, missing observation, unstable reset or incompatible
+scope is unavailable rather than zero.
+
+Calendar policies keep their saved IANA time zone and resolve local boundaries
+to exact UTC half-open intervals. Safe today and remaining daily allowance use
+remaining local calendar time; completed-day forecasting excludes the current
+incomplete UTC day. See [Budget Control and runway guardrails](runway-guardrails.md).
 
 ## Runway guardrails
 
 Runway is a deterministic interpretation of compatible local history, not a
 provider promise. Quota runway projects whether remaining requests or tokens
-reach zero before the reported reset. Monthly budget pacing projects
-completed-day spend through the end of the UTC calendar month.
+reach zero before the reported reset. Budget pacing projects compatible
+completed-day spend through the policy's resolved day, ISO week, calendar
+month or anchored-month period.
 
 The current day is excluded from budget baselines, missing days are never
 filled with zero, and actual and estimated spend remain separate. A warning or

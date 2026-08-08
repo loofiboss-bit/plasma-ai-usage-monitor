@@ -8,6 +8,26 @@ AI Usage Monitor remains a desktop-native, local-first Plasma widget. v17 adds
 deterministic forward-looking guardrails without widening the read-only
 provider or local-first boundary.
 
+The v18 Budget Control candidate builds on that foundation with typed,
+applet-owned policies, real billing periods, scoped attribution, safe-to-spend
+guidance and transition persistence. It does not add provider writes, FX,
+inference or a fourth popup tab.
+
+## Next release candidate
+
+### 18.0.0 Budget Control
+
+- Replace fixed runtime budgets with validated aggregate or scoped policies.
+- Add schema v6, config schema v3, calendar/time-zone-aware billing cycles and
+  deterministic minor-unit pacing.
+- Show safe today, remaining daily allowance, projection, previous period and
+  `Unattributed` scope reconciliation.
+- Persist warning, critical, exceeded, recovery and reset transitions before
+  delivery, with restart deduplication and period snooze.
+- Keep external payloads allow-listed and Prometheus labels low-cardinality.
+- Complete exact v17/v18 popup comparison, Fedora lifecycle, reproducible
+  artifacts and public readback before publication.
+
 ## Current release
 
 ### 17.0.0 Runway Guardrails
@@ -63,6 +83,7 @@ publication remains a separately authorized operation.
 
 | Release | Result |
 | --- | --- |
+| 18.0.0 Budget Control | Typed local policies, billing-cycle-aware pacing, scoped cost reconciliation, staged editing, persistent transitions, schema v6 and catalog v6 |
 | 17.0.0 Runway Guardrails | Complete OpenAI pagination, deterministic quota and budget forecasts, provider-reported scope detail, schema v5, and private restart-safe integrations |
 | 16.0.1 Control Loop | Restore localized Settings and widget text and add a release-blocking QML localization contract |
 | 16.0.0 Control Loop | Daily Focus, Source Detail, responsive History and Analyst, exact UTC periods, optional Anthropic Admin reporting, and reproducible release evidence |

@@ -41,12 +41,13 @@ Fireworks AI, and Perplexity API.
 Features:
 - Action-first daily status shared by the panel, Overview, and notifications
 - Capability-aware quota and reset monitoring where sources expose live pairs
-- Deterministic quota runway and monthly budget pacing with explicit evidence
+- Typed budget policies for real billing periods and provider-supported scopes
+- Safe-today, remaining allowance and deterministic quota/budget projections
 - Provider-reported scope detail without aggregate double counting
 - Usage and cost tracking with retained disabled-source history and real gaps
 - Evidence-bound Analyst snapshots with explicit sample requirements
 - Catalog-backed cost estimation with local JSON metadata
-- Budget management with daily/monthly limits
+- Staged Budget Control policy editing with validation, snooze and transitions
 - SQLite-based usage history with chart visualization
 - Secure API key storage via KDE Wallet
 - Configurable alerts plus opt-in restart-safe guardrail transitions

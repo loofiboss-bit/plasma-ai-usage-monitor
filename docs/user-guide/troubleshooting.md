@@ -89,7 +89,7 @@ This can be correct. Many provider APIs expose model discovery but no account us
 
 Connectivity-only responses do not create fake usage rows.
 
-## Runway forecast is unavailable
+## Budget policy or runway forecast is unavailable
 
 Open Source Detail or Analyst and read the unavailable reason, samples,
 coverage, period end, and method.
@@ -97,25 +97,29 @@ coverage, period end, and method.
 - Wait for at least four compatible quota observations spanning 15 minutes.
 - Confirm the newest quota observation is no more than 15 minutes old and the
   provider still reports the same reset, limit, unit, and window.
-- For monthly pacing, wait for five completed UTC days and at least 70 percent
-  elapsed-day coverage.
-- Configure a positive monthly budget under **Settings → Guardrails**.
+- For policy pacing, wait for the minimum completed compatible UTC-day samples
+  and coverage shown by the result.
+- Open **Settings → Budget Control**, validate the limit, ISO currency, period,
+  saved time zone, value class and catalog-supported scope, then Apply.
 - Keep actual and estimated values separate and use the same ISO currency as
   the budget; the widget never converts currencies.
+- A provider reset must be authenticated, stable and catalog-declared. A
+  removed scope or scoped-over-aggregate mismatch remains unavailable.
 
 An unavailable result is not zero and does not mean a budget or quota is safe.
 
 ## Guardrail notification did not arrive
 
-- Enable global alerts and **Settings → Guardrails → Notify only when a
-  guardrail state changes**.
+- Enable global alerts and notifications on the policy under **Settings →
+  Budget Control**.
 - Confirm notifications are enabled for that provider.
-- Check that the predicted event is inside the selected lead-time horizon.
 - Check Do Not Disturb and cooldown settings.
+- Check whether the policy is snoozed until its next period.
 
-An unchanged warning or critical state is intentionally suppressed after
-refresh and restart. A new notification appears only on the next meaningful
-state transition.
+An unchanged warning, critical or exceeded state is intentionally suppressed
+after refresh and restart. Risk becoming unavailable is not a recovery, and
+unavailable becoming safe is not a recovery. DND/cooldown/delivery failures
+retain pending or suppressed evidence for retry.
 
 ## Browser Sync Labs fails
 

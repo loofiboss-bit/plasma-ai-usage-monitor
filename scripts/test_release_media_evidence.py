@@ -53,7 +53,7 @@ except EvidenceError:
 else:
     raise SystemExit("Release-media evidence accepted the wrong AT-SPI process")
 
-capture_script = (ROOT / "scripts/demo/capture_v17_media.sh").read_text(
+capture_script = (ROOT / "scripts/demo/capture_v18_media.sh").read_text(
     encoding="utf-8"
 )
 capture_contract = {
@@ -63,6 +63,8 @@ capture_contract = {
     "controlled wallpaper": 'wallpaperPlugin = \\"org.kde.image\\"',
     "PID-bound accessibility": '--pid "$WINDOW_PID" --window "$match_query"',
     "manifest evidence": "captureEvidence: $captureEvidence",
+    "virtual parent compositor": "kwin_wayland --virtual",
+    "input method disabled": "QT_IM_MODULE=",
 }
 missing = [
     label for label, token in capture_contract.items() if token not in capture_script

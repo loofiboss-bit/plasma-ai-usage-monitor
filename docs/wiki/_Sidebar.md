@@ -7,7 +7,7 @@
 - [Understanding the data](Understanding-the-Data)
 - [Providers](Providers)
 - [Subscription tools](Subscription-Tools)
-- [Runway guardrails](Runway-Guardrails)
+- [Budget Control and runway guardrails](Runway-Guardrails)
 - [History and integrations](History-and-Integrations)
 - [Troubleshooting](Troubleshooting)
 - [Privacy and security](Privacy-and-Security)

@@ -10,6 +10,10 @@ Version **17.0.0 (Runway Guardrails)** adds local deterministic quota runway,
 monthly budget pacing, provider-reported scope detail, and transition-only
 guardrail notifications without adding inference or provider writes.
 
+The v18 Budget Control release candidate replaces fixed daily/monthly settings
+with typed local policies for real billing periods, scoped cost, safe-to-spend
+guidance, previous-period comparison and persist-before-delivery transitions.
+
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 
 ## Install on Fedora
@@ -43,7 +47,7 @@ For source builds and other installation details, read the [installation guide](
 - [Understand actual, estimated, and unavailable values](docs/user-guide/understanding-data.md)
 - [Configure API providers](docs/user-guide/providers.md)
 - [Track subscription tools and Browser Sync Labs](docs/user-guide/subscriptions.md)
-- [Use deterministic runway guardrails](docs/user-guide/runway-guardrails.md)
+- [Use Budget Control and deterministic runway guardrails](docs/user-guide/runway-guardrails.md)
 - [Use history, exports, Prometheus, and webhooks](docs/user-guide/history-and-integrations.md)
 - [Fix common problems](docs/user-guide/troubleshooting.md)
 - [Review privacy and security behavior](docs/user-guide/privacy-and-security.md)
@@ -76,14 +80,16 @@ The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilo
 - Provider usage, spend, balances, limits, and connection state where the provider exposes them
 - Retained local history for enabled, disabled, and history-only sources, with explicit chart gaps
 - Analyst snapshots with documented sample requirements, coverage, spend trends, activity, anomalies, and compatible drivers
-- Deterministic quota runway and monthly budget pacing with explicit evidence and unavailable reasons
+- Typed Budget Control policies for day, ISO week, month, anchored month and reviewed provider reset periods
+- Deterministic safe-today, remaining allowance, period projection and previous-period comparison
+- Deterministic quota runway with explicit evidence and unavailable reasons
 - Provider-reported model, project, workspace, service-tier, and line-item detail without aggregate double counting
 - Compact panel modes for attention, lowest live quota, next reset, actual spend, and active sources
-- Daily and monthly current-threshold warnings
-- Opt-in transition-only guardrail notifications through KDE and optional Slack or Discord webhooks
+- Scoped OpenAI and Anthropic budget policies plus compatible aggregate LiteLLM/OpenRouter policies
+- Persist-before-delivery warning, critical, exceeded, recovery and reset notifications with snooze
 - Scheduled JSON or CSV exports
 - A loopback-only Prometheus endpoint
-- Configuration export that excludes keys, tokens, cookies, and webhook URLs
+- Configuration schema-v3 backup for settings and policies; keys, tokens, cookies and webhook URLs remain excluded
 - Native Diagnostics for the loaded plugin, install layers, database, source readiness, KWallet, catalogs, and browser profiles
 - No telemetry or hosted backend
 
@@ -93,7 +99,10 @@ Scheduled provider refreshes do not run inference requests. Explicit inference t
 
 Secrets stay in KWallet. Usage history stays in a local SQLite database. Browser Sync Labs and Antigravity monitoring are off by default and depend on version-sensitive local or service contracts. The Antigravity CSRF value stays in memory, is sent only to the validated loopback daemon, and is never included in logs, diagnostics, history, or exports.
 
-Read [Understanding the data](docs/user-guide/understanding-data.md) before setting budgets or treating a provider card as a billing record.
+Read [Understanding the data](docs/user-guide/understanding-data.md) before
+creating policies or treating a provider card as a billing record. Explicit
+configuration backups can contain local policy scope identities and should be
+handled as sensitive files.
 
 ## Screenshots
 
@@ -106,7 +115,7 @@ Read [Understanding the data](docs/user-guide/understanding-data.md) before sett
 | Analyst with sufficient data | ![Analyst snapshot with documented coverage and compatible spend](assets/screenshots/analyst-sufficient.png) |
 | Analyst with insufficient data | ![Analyst explaining unavailable results when samples are insufficient](assets/screenshots/analyst-insufficient.png) |
 | Guided setup | ![Guided first success source selection](assets/screenshots/guided-first-success.png) |
-| Provider settings | ![Source-focused provider settings](assets/screenshots/provider-settings.png) |
+| Budget Control | ![Searchable staged Budget Control policy editor](assets/screenshots/budget-control.png) |
 | Plugin recovery | ![Native plugin recovery with matching-package instructions](assets/screenshots/plugin-recovery.png) |
 | Panel lowest quota | ![Compact panel showing the lowest provider-reported or synchronized quota](assets/screenshots/panel-lowest-quota.png) |
 
@@ -140,7 +149,8 @@ Contributor setup, architecture, code conventions, and release checks live in [C
 | --- | --- |
 | [User guide](docs/user-guide/README.md) | Task-based help for installation, setup, daily use, and troubleshooting |
 | [Provider capabilities](docs/provider-capabilities.md) | Generated provider monitoring contract |
-| [Architecture](docs/architecture/reliability-core.md) | Runtime, data, secret, and distribution boundaries |
+| [Architecture](docs/architecture/reliability-core.md) | Runtime, schema, policy, secret, and distribution boundaries |
+| [Configuration reference](docs/configuration-reference.md) | Config schema, policy fields, import/export and rollback compatibility |
 | [Changelog](CHANGELOG.md) | Release history |
 | [Roadmap](ROADMAP.md) | Current product direction and next work |
 | [Security policy](SECURITY.md) | Vulnerability reporting and supported releases |

@@ -1,7 +1,11 @@
 <!-- Generated from docs/user-guide/README.md by scripts/generate_wiki_docs.py; do not edit. -->
 # User guide
 
-Install both required parts, verify one useful source in **Guided first success**, and learn what the result can prove before adding alerts or integrations. Runway Guardrails then keeps current attention, deterministic quota runway, budget pacing, retained history, and analysis coverage consistent across the popup.
+Install both required parts, verify one useful source in **Guided first
+success**, and learn what the result can prove before adding alerts or
+integrations. Budget Control then keeps current attention, typed cost policies,
+deterministic quota runway, retained history and analysis coverage consistent
+across the popup.
 
 ## Set up the widget
 
@@ -16,7 +20,7 @@ Install both required parts, verify one useful source in **Guided first success*
 
 ## Use the data
 
-- [Runway guardrails](Runway-Guardrails)
+- [Budget Control and runway guardrails](Runway-Guardrails)
 - [History, exports, Prometheus, and webhooks](History-and-Integrations)
 - [Troubleshooting](Troubleshooting)
 - [Privacy and security](Privacy-and-Security)

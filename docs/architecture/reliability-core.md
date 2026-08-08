@@ -18,7 +18,10 @@ Each metric carries its kind, nullable value, unit, source, quality, scope, time
 
 Unavailable values stay null. Connectivity cannot create zero usage. Published limits cannot become live remaining quota. Mixed currencies stay separate.
 
-ProviderManager and Catalog v5 descriptors own stable identity, adapter type, authentication slots, endpoints, models, capability claims, source expectations, and safe refresh policy. QML reads this catalog instead of maintaining a second provider truth table.
+ProviderManager and Catalog v6 descriptors own stable identity, adapter type,
+authentication slots, endpoints, models, capability claims, budget policy
+contracts, source expectations and safe refresh policy. QML reads this catalog
+instead of maintaining a second provider truth table.
 
 The generated [provider capability matrix](../provider-capabilities.md) is checked against the shipped catalog during validation.
 
@@ -113,17 +116,18 @@ freshness, and normalized quota windows; one source produces at most one
 grouped quota notification per cooldown. Stale snapshots suppress cached quota
 changes. Recovery is emitted only after a real failed readiness state.
 
-Runway notifications observe `GuardrailModel` separately. They are opt-in,
-lead-time bounded, and use schema-v5 transition persistence as the delivery
-gate. KDE, Slack, and Discord receive one source-explicit typed semantic event;
-the webhook boundary allow-lists fields and excludes raw scope identifiers.
+Policy notifications observe `GuardrailModel` separately. Schema-v6 policy
+state and events are committed atomically before delivery. KDE actions keep the
+local policy identity internal; Slack and Discord receive only provider display
+name, risk, coarse percentage class, period and local link text. DND, cooldown,
+snooze and failed delivery retain pending/suppressed evidence.
 
 ## Daily presentation contract
 
 `SourceDetailModel` is the typed projection for one selected source. It
 observes `DailyStateModel`, exposes typed metric roles, quota windows, freshness,
 source-specific action, provenance, and coverage, and requests a bounded
-compatible seven-day series through the asynchronous schema-v5 History
+compatible seven-day series through the asynchronous schema-v6 History
 boundary. Its canonical History identity comes from the provider `dbName` or
 subscription-tool `name`; internal stable IDs are never substituted for stored
 database identities.
@@ -163,20 +167,29 @@ project identifiers, credentials, cookies, webhook URLs, wallet contents, and
 free-form backend errors are excluded. The frontend-only bootstrap produces a
 separate minimal report for missing or mismatched native plugins.
 
-## SQLite schema v5
+## SQLite schema v6
 
-History stays local and uses WAL mode. Schema v5 preserves the normalized,
-nullable v4 observations and adds a separate `guardrail_events` table.
-Migration from v4 is transactional, idempotent, and creates a `.v17-backup`
-before schema changes. An injected migration failure leaves `user_version=4`
-and existing observations unchanged.
+History stays local and uses WAL mode. Schema v6 preserves nullable
+observations and the v5 `guardrail_events` table, then adds:
 
-`guardrail_events` stores warning, critical, and recovered transitions only.
-Its stable identity covers source, risk, window, scope, actual/estimated value
-class, and normalized currency. Forecast results remain ephemeral and are never
-inserted into observations as provider facts. JSON export includes a separate
-guardrail array, CSV export uses a separate file, and normal retention pruning
-applies to transition timestamps.
+- `budget_policies` for owner-isolated typed policy definitions
+- `budget_policy_migrations` for one-shot applet/key legacy markers
+- `budget_policy_state` for current period/risk and delivery timing
+- `budget_policy_events` for deduplicated pending, delivered or suppressed
+  warning, critical, exceeded, recovery and reset transitions
+
+Indexes cover applet owner, source, scope, enabled state and transition
+identity. Migration from v5 is transactional and idempotent after a separate
+`.v18-backup`; an injected failure leaves schema and data unchanged. Legacy
+KConfig daily/monthly keys are not part of the database transaction and remain
+unchanged for v17 rollback. Policy replacement commits before KConfig Apply so
+a repository failure leaves permanent applet settings unchanged.
+
+Policy state and event are persisted atomically before any notification call.
+Forecast results remain ephemeral and never enter observations as provider
+facts. Normal retention applies to transition evidence. Config export schema v3
+serializes settings and policies; raw scope identities are allowed only in that
+explicit local backup and are excluded from diagnostics and integrations.
 
 Phase 3 history discovery uses the union of configured provider descriptors,
 configured subscription tools, retained provider observations, and retained tool
@@ -199,30 +212,46 @@ window, or currency changes start a separate series. Multi-source comparisons
 fail closed when units, semantics, or currencies differ. Rolling tool quota is
 a gauge and is never summed or relabeled as calendar-day usage.
 
-The Analyst output/input query retains the schema-v5 compatibility projection
+The Analyst output/input query retains the schema-v6 compatibility projection
 and returns only days with positive total input. It does not synthesize ratios
 for missing input and does not interpret the ratio as prompt quality.
 
-## Forecast Contract v1 and runway queries
+## Forecast Contract v2 and focused runway queries
 
-`ForecastContract::Result` is the single representation shared by
-`RunwayQuery`, `GuardrailModel`, QML cards, persistence, notifications, and
-integrations. It requires source/risk/window/scope identity, explicit optional
-values, unit/currency, period end, samples, coverage, evidence, method,
-generation time, and actual/estimated value class. Missing values stay null and
-numeric zero stays numeric.
+`budget-pacing-v2` is the policy representation shared by focused observation,
+cycle and pacing queries, `GuardrailModel`, QML cards, persistence,
+notifications and integrations. It carries policy identity, exact period,
+spent/remaining minor units, consumed percent, projected period end, predicted
+overrun, safe today, remaining allowance, samples, coverage, grade,
+previous-period comparison and typed unavailable reason. Missing values stay
+null and numeric zero stays numeric.
 
-`RunwayQuery` performs short-lived read-only SQLite work outside the UI thread.
+`RunwayQuery` remains a compatibility facade. `QuotaRunwayQuery`,
+`BudgetObservationQuery`, `BillingCycleResolver` and `BudgetPacingQuery` own
+focused work on short-lived read-only SQLite connections outside the UI thread.
 Quota runway accepts one compatible remaining/limit series with at least four
 samples, 15 minutes of span, 15-minute freshness, stable reset metadata, and
 adequate coverage. A bounded deterministic Theil–Sen slope projects exhaustion;
 changed reset or non-monotonic remaining values fail closed.
 
-Monthly budget pacing uses completed UTC days only, at least five represented
-days, and at least 70 percent elapsed-day coverage. The median completed day is
-projected over the remaining calendar month. Missing days are not zero-filled;
-actual and estimated observations, currencies, and budget currency must match
-without conversion.
+Budget cycles resolve calendar day, Monday ISO week, calendar month, anchor
+1–28 and authenticated stable catalog-declared provider reset to exact UTC
+half-open intervals. Calendar policies persist an IANA time zone. Pacing uses
+complete compatible UTC days only and excludes the incomplete current day.
+Missing days are not zero-filled; actual/estimated class, currency and scope
+must match without conversion.
+
+Limits and results use integer minor units through a checked ISO precision
+table. Risk precedence is unavailable, exceeded, critical, warning and safe.
+Safe today is the smaller of remaining budget and remaining pro-rata room,
+clamped at zero; remaining daily allowance includes today's local calendar day.
+Previous period uses the same policy, scope, currency and value class.
+
+Catalog v6 declares `budgetPolicyContractVersion`, supported scopes/cycles and
+review dates for each budget-capable source. OpenAI cost never receives model
+scope. Compatible aggregate and scoped totals reconcile through
+`ScopeBreakdownQuery`; a shortfall is `Unattributed`, while scoped-over-
+aggregate is unavailable.
 
 `GuardrailModel` supersedes older generations, ignores late completion, and
 releases worker watchers and query connections. UI surfaces consume its shared
@@ -296,7 +325,7 @@ boundary.
 `ProviderRuntimeRegistration.qml` is the single runtime wiring boundary. It
 registers native backends, configures catalog-created descriptor backends, and
 connects catalog providers and local tools to readiness and Daily State models.
-`ProviderRegistry.qml` still projects the authoritative Catalog v5 descriptors;
+`ProviderRegistry.qml` still projects the authoritative Catalog v6 descriptors;
 the extraction does not create a second provider inventory.
 
 Calendar totals include only compatible interval-total observations. Gauges, cumulative counters, and rolling windows are not relabeled as calendar totals. Queries preserve ISO currency and source quality.
