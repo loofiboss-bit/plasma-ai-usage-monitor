@@ -287,6 +287,8 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
             "PLASMA_AI_MONITOR_DEMO": "1",
             "QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "1",
             "QT_ACCESSIBILITY": "1",
+            "QT_LOGGING_TO_CONSOLE": "1",
+            "QT_ASSUME_STDERR_HAS_CONSOLE": "1",
             "KDE_KWIN_ANIMATIONS_ENABLED": "0",
         }
     )
