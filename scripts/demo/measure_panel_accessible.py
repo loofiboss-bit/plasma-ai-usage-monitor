@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
-import threading
 import time
 from pathlib import Path
 
@@ -159,59 +157,27 @@ def press(node) -> None:
     raise RuntimeError(f"Accessible node {node.get_name()!r} has no usable press action")
 
 
-def press_and_wait_for_event(node, pid: int, expected_type: str, timeout: float) -> int:
-    matched = False
-
-    def callback(event, *_user_data) -> None:
-        nonlocal matched
-        if process_id(event.source) == pid and event.type == expected_type:
-            matched = True
-            Atspi.event_quit()
-
-    listener = Atspi.EventListener.new(callback)
-    event_family = "object"
-    if not listener.register(event_family):
-        raise RuntimeError(f"Could not register AT-SPI event {event_family}")
-    timer = threading.Timer(timeout, Atspi.event_quit)
-    timer.start()
-    started = time.monotonic()
-    try:
-        press(node)
-        Atspi.event_main()
-    finally:
-        timer.cancel()
-        listener.deregister(event_family)
-    if not matched:
-        raise RuntimeError(
-            f"Timed out waiting for {expected_type} from plasmashell PID {pid}"
-        )
-    return round((time.monotonic() - started) * 1000)
-
-
 def request_count(path: Path) -> int:
     if not path.exists():
         return 0
     return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line)
 
 
-def wait_for_kwin_popup(
-    path: Path, pid: int, event_name: str, offset: int, timeout: float
+def wait_for_log_marker(
+    path: Path, marker: str, offset: int, timeout: float
 ) -> int:
-    marker = re.compile(
-        rf"AI_USAGE_POPUP event={re.escape(event_name)} pid={pid}(?:\s|$)"
-    )
     started = time.monotonic()
     deadline = started + timeout
     while time.monotonic() < deadline:
         if path.exists():
             with path.open("r", encoding="utf-8", errors="replace") as stream:
                 stream.seek(offset)
-                if any(marker.search(line) for line in stream):
+                if any(marker in line for line in stream):
                     return round((time.monotonic() - started) * 1000)
         time.sleep(0.005)
     detail = path.read_text(encoding="utf-8", errors="replace")[-4000:]
     raise RuntimeError(
-        f"Timed out waiting for KWin popup {event_name} from PID {pid}; "
+        f"Timed out waiting for {marker!r}; "
         f"log tail={detail}"
     )
 
@@ -222,7 +188,9 @@ def open_popup(
     compact = wait_for_node(compact_prefix, pid, timeout)
     offset = kwin_log.stat().st_size if kwin_log.exists() else 0
     press(compact)
-    elapsed = wait_for_kwin_popup(kwin_log, pid, "added", offset, timeout)
+    elapsed = wait_for_log_marker(
+        kwin_log, "AI_USAGE_POPUP_FIRST_FRAME", offset, timeout
+    )
     wait_for_popup(pid, timeout)
     return elapsed
 
@@ -233,7 +201,7 @@ def close_popup(
     compact = wait_for_node(compact_prefix, pid, timeout)
     offset = kwin_log.stat().st_size if kwin_log.exists() else 0
     press(compact)
-    wait_for_kwin_popup(kwin_log, pid, "removed", offset, timeout)
+    wait_for_log_marker(kwin_log, "AI_USAGE_POPUP_CLOSED", offset, timeout)
     wait_for_node(compact_prefix, pid, timeout)
 
 

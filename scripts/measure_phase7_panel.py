@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import platform
@@ -23,6 +24,30 @@ from measure_phase7_runtime import candidate_environment
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
+POPUP_INSTRUMENTATION = r'''
+
+    Connections {
+        target: Plasmoid
+
+        function recordFirstFrame() {
+            Qt.callLater(function() {
+                console.warn("AI_USAGE_POPUP_FIRST_FRAME");
+            });
+        }
+
+        function onExpandedChanged() {
+            if (Plasmoid.expanded) {
+                recordFirstFrame();
+            } else {
+                console.warn("AI_USAGE_POPUP_CLOSED");
+            }
+        }
+
+        Component.onCompleted: {
+            if (Plasmoid.expanded) recordFirstFrame();
+        }
+    }
+'''
 
 
 def run_in_virtual_outer(arguments: list[str]) -> int:
@@ -200,9 +225,6 @@ if [[ -z "$plasmashell_pid" ]]; then
   plasmashell_pid="$(pgrep -n -x plasmashell)"
 fi
 [[ -n "$plasmashell_pid" ]] || { echo "Nested plasmashell PID not found" >&2; exit 1; }
-busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
-  loadScript ss "$8" "ai-usage-popup-measure" >/dev/null
-busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting start >/dev/null
 timeout 55s python3 "$3" --request-log "$5" --kwin-log "$4" \
   --pid "$plasmashell_pid" >"$6" 2>"$7"
 """
@@ -215,7 +237,6 @@ timeout 55s python3 "$3" --request-log "$5" --kwin-log "$4" \
             str(ROOT / "scripts/demo/measure_panel_accessible.py"),
             str(nested_log), str(request_log), str(measurement_log),
             str(measurement_error),
-            str(ROOT / "scripts/demo/kwin_measure_popup.js"),
         ],
         cwd=ROOT,
         env=env,
@@ -237,6 +258,23 @@ timeout 55s python3 "$3" --request-log "$5" --kwin-log "$4" \
 
 def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]:
     env = candidate_environment(build_dir.resolve(), runtime_root)
+    installed = list(
+        (runtime_root / "prefix").glob(
+            "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
+            "contents/ui/FullRepresentation.qml"
+        )
+    )
+    if len(installed) != 1:
+        raise RuntimeError("installed FullRepresentation.qml was not found")
+    full_representation = installed[0]
+    source = full_representation.read_text(encoding="utf-8")
+    closing = source.rfind("}")
+    if closing < 0 or "AI_USAGE_POPUP_FIRST_FRAME" in source:
+        raise RuntimeError("popup instrumentation target is invalid")
+    full_representation.write_text(
+        source[:closing] + POPUP_INSTRUMENTATION + source[closing:],
+        encoding="utf-8",
+    )
     config_home = Path(env["XDG_CONFIG_HOME"])
     config_home.mkdir(parents=True, exist_ok=True)
     (config_home / "kdeglobals").write_text(
@@ -391,6 +429,9 @@ def main() -> None:
         "outerSession": os.environ.get("XDG_SESSION_ID", ""),
         "environment": {"platform": platform.platform(), "plasma": subprocess.run(["plasmashell", "--version"], text=True, stdout=subprocess.PIPE, check=False).stdout.strip()},
         "commits": {"baseline": baseline_commit, "candidate": candidate_commit},
+        "instrumentationSha256": hashlib.sha256(
+            POPUP_INSTRUMENTATION.encode()
+        ).hexdigest(),
         "buildDirectories": {
             "baseline": str(args.baseline_build_dir.resolve()),
             "candidate": str(args.candidate_build_dir.resolve()),
