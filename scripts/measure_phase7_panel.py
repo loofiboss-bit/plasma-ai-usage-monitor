@@ -27,9 +27,16 @@ DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
     Component.onCompleted: {
         console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY");
-        perfFirstTimer.start();
+        root.armPerfTimer();
     }
+    onRuntimeReadyChanged: root.armPerfTimer()
     property string perfFrameMarker: ""
+
+    function armPerfTimer() {
+        if (root.runtimeReady && !perfFirstTimer.running) {
+            perfFirstTimer.start();
+        }
+    }
 
     FrameAnimation {
         id: perfFrameClock
@@ -47,7 +54,7 @@ POPUP_INSTRUMENTATION = r'''
 
     Timer {
         id: perfFirstTimer
-        interval: 15000
+        interval: 8000
         repeat: false
         onTriggered: {
             root.perfFrameMarker = "AI_USAGE_POPUP_FIRST_FRAME";
@@ -58,7 +65,7 @@ POPUP_INSTRUMENTATION = r'''
 
     Timer {
         id: perfCloseTimer
-        interval: 1000
+        interval: 3000
         repeat: false
         onTriggered: {
             Plasmoid.expanded = false;
