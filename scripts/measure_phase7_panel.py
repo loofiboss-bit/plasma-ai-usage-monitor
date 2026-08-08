@@ -197,7 +197,8 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
                 ],
                 cwd=ROOT,
                 env=environment,
-                stderr=outer_stream,
+                stdout=outer_stream,
+                stderr=subprocess.STDOUT,
                 check=False,
             )
         if completed.returncode != 0:
