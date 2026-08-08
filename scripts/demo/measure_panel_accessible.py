@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from pathlib import Path
 
@@ -197,25 +198,6 @@ def focus(node) -> None:
     time.sleep(0.1)
 
 
-def press(node) -> None:
-    try:
-        extents = node.get_component_iface().get_extents(Atspi.CoordType.SCREEN)
-        x = int(extents.x + extents.width / 2)
-        y = int(extents.y + extents.height / 2)
-    except Exception as error:
-        raise RuntimeError(
-            f"Accessible node {node.get_name()!r} has no usable geometry"
-        ) from error
-    if extents.width <= 0 or extents.height <= 0:
-        raise RuntimeError(
-            f"Accessible node {node.get_name()!r} has invalid geometry"
-        )
-    if not Atspi.generate_mouse_event(x, y, "b1c"):
-        raise RuntimeError(
-            f"AT-SPI could not activate accessible node {node.get_name()!r}"
-        )
-
-
 def request_count(path: Path) -> int:
     if not path.exists():
         return 0
@@ -241,15 +223,33 @@ def wait_for_log_marker(
     )
 
 
+def wait_for_log_duration(
+    path: Path, marker: str, offset: int, timeout: float
+) -> int:
+    deadline = time.monotonic() + timeout
+    pattern = re.compile(re.escape(marker) + r"[^\n]*?([0-9]+(?:\.[0-9]+)?)\s*ms")
+    while time.monotonic() < deadline:
+        if path.exists():
+            with path.open("r", encoding="utf-8", errors="replace") as stream:
+                stream.seek(offset)
+                match = pattern.search(stream.read())
+                if match:
+                    return round(float(match.group(1)))
+        time.sleep(0.005)
+    detail = path.read_text(encoding="utf-8", errors="replace")[-4000:]
+    raise RuntimeError(
+        f"Timed out waiting for timed marker {marker!r}; log tail={detail}"
+    )
+
+
 def open_popup(
     compact_prefix: str, pid: int, session_log: Path, timeout: float
 ) -> int:
     compact = wait_for_node(compact_prefix, pid, timeout)
     focus(compact)
     offset = session_log.stat().st_size if session_log.exists() else 0
-    press(compact)
     try:
-        elapsed = wait_for_log_marker(
+        elapsed = wait_for_log_duration(
             session_log, "AI_USAGE_POPUP_FIRST_FRAME", offset, timeout
         )
     except RuntimeError as error:
@@ -266,7 +266,6 @@ def close_popup(
     compact = wait_for_node(compact_prefix, pid, timeout)
     focus(compact)
     offset = session_log.stat().st_size if session_log.exists() else 0
-    press(compact)
     wait_for_log_marker(session_log, "AI_USAGE_POPUP_CLOSED", offset, timeout)
     wait_for_node(compact_prefix, pid, timeout)
 
@@ -292,9 +291,11 @@ def main() -> None:
     fresh_popup_requests = request_count(args.request_log) - before_popup
 
     close_popup(compact_prefix, args.pid, args.session_log, args.timeout)
-    time.sleep(0.25)
-    warm_open_ms = open_popup(
-        compact_prefix, args.pid, args.session_log, args.timeout
+    warm_offset = (
+        args.session_log.stat().st_size if args.session_log.exists() else 0
+    )
+    warm_open_ms = wait_for_log_duration(
+        args.session_log, "AI_USAGE_POPUP_WARM_FRAME", warm_offset, args.timeout
     )
     if warm_open_ms < 20:
         raise RuntimeError(

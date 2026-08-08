@@ -27,22 +27,52 @@ DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
         popupOpen: !!Plasmoid["expanded"]
         Component.onCompleted: console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY")
-        onPopupOpenChanged: {
-            const expanded = popupOpen;
-            // Use the next event-loop turn so both versions have created and
-            // polished the representation selected by PlasmoidItem.
-            Qt.callLater(function() {
-                console.warn(expanded
-                    ? "AI_USAGE_POPUP_FIRST_FRAME"
-                    : "AI_USAGE_POPUP_CLOSED");
-            });
+        property int perfStage: 0
+
+        Timer {
+            interval: 8000
+            running: true
+            repeat: false
+            onTriggered: {
+                refreshScheduler.perfStage = 1;
+                console.time("AI_USAGE_POPUP_FIRST_FRAME");
+                Plasmoid.expanded = true;
+            }
         }
-'''
-ACCESSIBILITY_HANDLER = "    Accessible.onPressAction: Plasmoid.activated()\n"
-ACCESSIBILITY_BRIDGE = r'''    Accessible.onPressAction: {
-        console.warn("AI_USAGE_ACCESSIBLE_PRESS");
-        Plasmoid.activated();
-    }
+
+        Timer {
+            id: perfCloseTimer
+            interval: 1000
+            repeat: false
+            onTriggered: Plasmoid.expanded = false
+        }
+
+        Timer {
+            id: perfWarmTimer
+            interval: 250
+            repeat: false
+            onTriggered: {
+                console.time("AI_USAGE_POPUP_WARM_FRAME");
+                Plasmoid.expanded = true;
+            }
+        }
+
+        onPopupOpenChanged: {
+            if (popupOpen && perfStage === 1) {
+                Qt.callLater(function() {
+                    console.timeEnd("AI_USAGE_POPUP_FIRST_FRAME");
+                    perfCloseTimer.start();
+                });
+            } else if (!popupOpen && perfStage === 1) {
+                perfStage = 2;
+                console.warn("AI_USAGE_POPUP_CLOSED");
+                perfWarmTimer.start();
+            } else if (popupOpen && perfStage === 2) {
+                Qt.callLater(function() {
+                    console.timeEnd("AI_USAGE_POPUP_WARM_FRAME");
+                });
+            }
+        }
 '''
 
 
@@ -258,33 +288,6 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
 
 def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]:
     env = candidate_environment(build_dir.resolve(), runtime_root)
-    compact_files = list(
-        (runtime_root / "prefix").glob(
-            "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
-            "contents/ui/CompactRepresentation.qml"
-        )
-    )
-    if len(compact_files) != 1:
-        raise RuntimeError("installed CompactRepresentation.qml was not found")
-    compact_representation = compact_files[0]
-    compact_source = compact_representation.read_text(encoding="utf-8")
-    if ACCESSIBILITY_HANDLER in compact_source:
-        compact_representation.write_text(
-            compact_source.replace(
-                ACCESSIBILITY_HANDLER, ACCESSIBILITY_BRIDGE, 1
-            ),
-            encoding="utf-8",
-        )
-    elif ACCESSIBILITY_BRIDGE not in compact_source:
-        activation = "    onClicked: Plasmoid.activated()\n"
-        if compact_source.count(activation) != 1:
-            raise RuntimeError("accessible activation target is invalid")
-        compact_representation.write_text(
-            compact_source.replace(
-                activation, activation + ACCESSIBILITY_BRIDGE, 1
-            ),
-            encoding="utf-8",
-        )
     installed = list(
         (runtime_root / "prefix").glob(
             "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
@@ -463,7 +466,7 @@ def main() -> None:
         "environment": {"platform": platform.platform(), "plasma": subprocess.run(["plasmashell", "--version"], text=True, stdout=subprocess.PIPE, check=False).stdout.strip()},
         "commits": {"baseline": baseline_commit, "candidate": candidate_commit},
         "instrumentationSha256": hashlib.sha256(
-            (POPUP_INSTRUMENTATION + ACCESSIBILITY_BRIDGE).encode()
+            POPUP_INSTRUMENTATION.encode()
         ).hexdigest(),
         "buildDirectories": {
             "baseline": str(args.baseline_build_dir.resolve()),
