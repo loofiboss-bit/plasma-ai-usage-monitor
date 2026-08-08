@@ -27,7 +27,7 @@ DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
 
     Connections {
-        target: Plasmoid
+        target: fullRoot.Window.window
 
         function recordFirstFrame() {
             Qt.callLater(function() {
@@ -35,8 +35,8 @@ POPUP_INSTRUMENTATION = r'''
             });
         }
 
-        function onExpandedChanged() {
-            if (Plasmoid.expanded) {
+        function onVisibleChanged() {
+            if (target && target.visible) {
                 recordFirstFrame();
             } else {
                 console.warn("AI_USAGE_POPUP_CLOSED");
@@ -44,7 +44,7 @@ POPUP_INSTRUMENTATION = r'''
         }
 
         Component.onCompleted: {
-            if (Plasmoid.expanded) recordFirstFrame();
+            if (target && target.visible) recordFirstFrame();
         }
     }
 '''
@@ -268,6 +268,10 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
         raise RuntimeError("installed FullRepresentation.qml was not found")
     full_representation = installed[0]
     source = full_representation.read_text(encoding="utf-8")
+    if "import QtQuick.Window" not in source:
+        source = source.replace(
+            "import QtQuick\n", "import QtQuick\nimport QtQuick.Window\n", 1
+        )
     closing = source.rfind("}")
     if closing < 0 or "AI_USAGE_POPUP_FIRST_FRAME" in source:
         raise RuntimeError("popup instrumentation target is invalid")
@@ -287,8 +291,8 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
             "PLASMA_AI_MONITOR_DEMO": "1",
             "QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "1",
             "QT_ACCESSIBILITY": "1",
-            "QT_LOGGING_TO_CONSOLE": "1",
             "QT_ASSUME_STDERR_HAS_CONSOLE": "1",
+            "QT_FORCE_STDERR_LOGGING": "1",
             "KDE_KWIN_ANIMATIONS_ENABLED": "0",
         }
     )
