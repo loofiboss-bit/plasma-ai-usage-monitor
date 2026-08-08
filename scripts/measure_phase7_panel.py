@@ -47,7 +47,7 @@ POPUP_INSTRUMENTATION = r'''
 
     Timer {
         id: perfFirstTimer
-        interval: 8000
+        interval: 15000
         repeat: false
         onTriggered: {
             root.perfFrameMarker = "AI_USAGE_POPUP_FIRST_FRAME";
