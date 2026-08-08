@@ -158,18 +158,19 @@ def press(node) -> None:
     raise RuntimeError(f"Accessible node {node.get_name()!r} has no usable press action")
 
 
-def press_and_wait_for_event(node, pid: int, event_type: str, timeout: float) -> int:
+def press_and_wait_for_event(node, pid: int, expected_type: str, timeout: float) -> int:
     matched = False
 
     def callback(event, *_user_data) -> None:
         nonlocal matched
-        if process_id(event.source) == pid:
+        if process_id(event.source) == pid and event.type == expected_type:
             matched = True
             Atspi.event_quit()
 
     listener = Atspi.EventListener.new(callback)
-    if not listener.register(event_type):
-        raise RuntimeError(f"Could not register AT-SPI event {event_type}")
+    event_family = "object"
+    if not listener.register(event_family):
+        raise RuntimeError(f"Could not register AT-SPI event {event_family}")
     timer = threading.Timer(timeout, Atspi.event_quit)
     timer.start()
     started = time.monotonic()
@@ -178,10 +179,10 @@ def press_and_wait_for_event(node, pid: int, event_type: str, timeout: float) ->
         Atspi.event_main()
     finally:
         timer.cancel()
-        listener.deregister(event_type)
+        listener.deregister(event_family)
     if not matched:
         raise RuntimeError(
-            f"Timed out waiting for {event_type} from plasmashell PID {pid}"
+            f"Timed out waiting for {expected_type} from plasmashell PID {pid}"
         )
     return round((time.monotonic() - started) * 1000)
 
