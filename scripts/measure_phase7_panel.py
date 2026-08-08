@@ -341,13 +341,17 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
         cwd=ROOT,
         env=env,
         text=True,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         timeout=120,
         check=False,
     )
     if result.returncode != 0 or not measurement_log.exists():
         detail = f"Panel measurement failed with exit status {result.returncode}"
+        if result.stderr.strip():
+            detail += "\nSession stderr:\n" + result.stderr.strip()
+        if result.stdout.strip():
+            detail += "\nSession stdout:\n" + result.stdout.strip()
         if measurement_error.exists():
             measurement_error_text = measurement_error.read_text(
                 encoding="utf-8"
