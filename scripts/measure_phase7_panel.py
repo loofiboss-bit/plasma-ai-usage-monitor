@@ -29,18 +29,30 @@ POPUP_INSTRUMENTATION = r'''
         console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY");
         perfFirstTimer.start();
     }
+    property string perfFrameMarker: ""
+
+    FrameAnimation {
+        id: perfFrameClock
+        running: false
+        onTriggered: {
+            const marker = root.perfFrameMarker;
+            const elapsed = Math.max(0, Math.round(elapsedTime * 1000));
+            stop();
+            console.warn(marker + " " + elapsed + " ms");
+            if (marker === "AI_USAGE_POPUP_FIRST_FRAME") {
+                perfCloseTimer.start();
+            }
+        }
+    }
 
     Timer {
         id: perfFirstTimer
         interval: 8000
         repeat: false
         onTriggered: {
-            console.time("AI_USAGE_POPUP_FIRST_FRAME");
+            root.perfFrameMarker = "AI_USAGE_POPUP_FIRST_FRAME";
+            perfFrameClock.restart();
             Plasmoid.expanded = true;
-            Qt.callLater(function() {
-                console.timeEnd("AI_USAGE_POPUP_FIRST_FRAME");
-                perfCloseTimer.start();
-            });
         }
     }
 
@@ -60,11 +72,9 @@ POPUP_INSTRUMENTATION = r'''
         interval: 250
         repeat: false
         onTriggered: {
-            console.time("AI_USAGE_POPUP_WARM_FRAME");
+            root.perfFrameMarker = "AI_USAGE_POPUP_WARM_FRAME";
+            perfFrameClock.restart();
             Plasmoid.expanded = true;
-            Qt.callLater(function() {
-                console.timeEnd("AI_USAGE_POPUP_WARM_FRAME");
-            });
         }
     }
 '''

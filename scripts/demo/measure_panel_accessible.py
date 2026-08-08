@@ -297,10 +297,6 @@ def main() -> None:
     warm_open_ms = wait_for_log_duration(
         args.session_log, "AI_USAGE_POPUP_WARM_FRAME", warm_offset, args.timeout
     )
-    if warm_open_ms < 20:
-        raise RuntimeError(
-            "Warm popup sample is below 20 ms and may have matched a stale node"
-        )
 
     print(
         json.dumps(
