@@ -28,7 +28,8 @@ def main() -> None:
         popup,
         "PopupRepresentation.qml",
         "asynchronous: true",
-        'source: "FullRepresentation.qml"',
+        'Qt.resolvedUrl("FullRepresentation.qml")',
+        '{ "monitor": popupRoot.monitor }',
         'i18n("Loading Overview…")',
     )
     require(

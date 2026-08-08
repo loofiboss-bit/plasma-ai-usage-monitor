@@ -35,8 +35,10 @@ PlasmaExtras.Representation {
         id: popupContent
         anchors.fill: parent
         asynchronous: true
-        source: "FullRepresentation.qml"
-        onLoaded: item.monitor = popupRoot.monitor
+        Component.onCompleted: setSource(
+            Qt.resolvedUrl("FullRepresentation.qml"),
+            { "monitor": popupRoot.monitor }
+        )
     }
 
     PlasmaComponents.Label {
