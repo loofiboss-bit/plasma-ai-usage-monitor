@@ -64,6 +64,16 @@ POPUP_INSTRUMENTATION = r'''
     }
 
     Timer {
+        interval: 5000
+        running: true
+        repeat: false
+        onTriggered: console.warn(
+            "AI_USAGE_RUNTIME_STATE " + dependencyController.stateName
+            + " " + dependencyController.errorDetail
+        )
+    }
+
+    Timer {
         id: perfCloseTimer
         interval: 3000
         repeat: false
@@ -130,8 +140,16 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
         wrapper.write_text(
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
-            "exec env AI_USAGE_PHASE0_VIRTUAL=1 QT_IM_MODULE= GTK_IM_MODULE= "
-            "QT_VIRTUALKEYBOARD_DISABLE=1 " + shlex.join(command) + "\n",
+            "set +e\n"
+            "env AI_USAGE_PHASE0_VIRTUAL=1 QT_IM_MODULE= GTK_IM_MODULE= "
+            "QT_VIRTUALKEYBOARD_DISABLE=1 " + shlex.join(command) + "\n"
+            "status=$?\n"
+            "for service in org.kde.kded6 org.kde.ActivityManager; do\n"
+            "  pid=$(busctl --user status \"$service\" 2>/dev/null "
+            "| sed -n 's/^PID=//p' | head -n 1)\n"
+            "  [[ -n \"$pid\" ]] && kill -TERM \"$pid\" 2>/dev/null || true\n"
+            "done\n"
+            "exit \"$status\"\n",
             encoding="utf-8",
         )
         wrapper.chmod(0o700)
@@ -256,6 +274,11 @@ setsid kwin_wayland --wayland-display "$OUTER_WAYLAND_DISPLAY" -s "$1" \
   --no-global-shortcuts --exit-with-session /usr/bin/plasmashell >"$4" 2>&1 &
 kwin_pid=$!
 cleanup() {
+  for service in org.kde.kded6 org.kde.ActivityManager; do
+    service_pid="$(busctl --user status "$service" 2>/dev/null \
+      | sed -n 's/^PID=//p' | head -n 1)"
+    [[ -n "$service_pid" ]] && kill -TERM "$service_pid" >/dev/null 2>&1 || true
+  done
   kill -TERM -- "-$kwin_pid" >/dev/null 2>&1 || true
   kill -TERM "$a11y_pid" >/dev/null 2>&1 || true
   kill -TERM "$a11y_registry_pid" >/dev/null 2>&1 || true
@@ -439,7 +462,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.runs < 1 or args.warmups < 0:
         parser.error("--runs must be positive and --warmups non-negative")
-    missing = [name for name in ("bash", "busctl", "dbus-run-session", "kwin_wayland", "pgrep", "plasmashell", "rg", "setsid", "timeout") if shutil.which(name) is None]
+    missing = [name for name in ("bash", "busctl", "dbus-run-session", "kwin_wayland", "pgrep", "plasmashell", "rg", "rpm", "setsid", "timeout") if shutil.which(name) is None]
     missing += [str(path) for path in (Path("/usr/libexec/at-spi-bus-launcher"), Path("/usr/libexec/at-spi2-registryd")) if not path.is_file()]
     if missing:
         parser.error("Missing commands: " + ", ".join(missing))
@@ -508,7 +531,15 @@ def main() -> None:
         "valid": valid,
         "bootId": boot_id,
         "outerSession": os.environ.get("XDG_SESSION_ID", ""),
-        "environment": {"platform": platform.platform(), "plasma": subprocess.run(["plasmashell", "--version"], text=True, stdout=subprocess.PIPE, check=False).stdout.strip()},
+        "environment": {
+            "platform": platform.platform(),
+            "plasma": "plasma-workspace " + subprocess.run(
+                ["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "plasma-workspace"],
+                text=True,
+                stdout=subprocess.PIPE,
+                check=True,
+            ).stdout.strip(),
+        },
         "commits": {"baseline": baseline_commit, "candidate": candidate_commit},
         "instrumentationSha256": hashlib.sha256(
             POPUP_INSTRUMENTATION.encode()
