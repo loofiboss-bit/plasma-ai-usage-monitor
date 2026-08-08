@@ -198,13 +198,22 @@ def focus(node) -> None:
 
 
 def press(node) -> None:
-    actions = node.get_action_iface()
-
-    for index in range(actions.get_n_actions()):
-        action = actions.get_action_name(index).lower()
-        if action in {"press", "click"} and actions.do_action(index):
-            return
-    raise RuntimeError(f"Accessible node {node.get_name()!r} has no usable press action")
+    try:
+        extents = node.get_component_iface().get_extents(Atspi.CoordType.SCREEN)
+        x = int(extents.x + extents.width / 2)
+        y = int(extents.y + extents.height / 2)
+    except Exception as error:
+        raise RuntimeError(
+            f"Accessible node {node.get_name()!r} has no usable geometry"
+        ) from error
+    if extents.width <= 0 or extents.height <= 0:
+        raise RuntimeError(
+            f"Accessible node {node.get_name()!r} has invalid geometry"
+        )
+    if not Atspi.generate_mouse_event(x, y, "b1c"):
+        raise RuntimeError(
+            f"AT-SPI could not activate accessible node {node.get_name()!r}"
+        )
 
 
 def request_count(path: Path) -> int:
