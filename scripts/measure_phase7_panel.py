@@ -347,13 +347,16 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
         check=False,
     )
     if result.returncode != 0 or not measurement_log.exists():
-        detail = measurement_error.read_text(encoding="utf-8").strip() if measurement_error.exists() else ""
+        detail = f"Panel measurement failed with exit status {result.returncode}"
+        if measurement_error.exists():
+            measurement_error_text = measurement_error.read_text(
+                encoding="utf-8"
+            ).strip()
+            if measurement_error_text:
+                detail += "\n" + measurement_error_text
         if nested_log.exists():
             detail += "\n" + nested_log.read_text(encoding="utf-8")[-20000:]
-        raise RuntimeError(
-            detail.strip()
-            or f"Panel measurement failed with exit status {result.returncode}"
-        )
+        raise RuntimeError(detail.strip())
     measurement = json.loads(measurement_log.read_text(encoding="utf-8"))
     measurement["trace"] = trace_summary(trace_path)
     return measurement
