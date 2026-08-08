@@ -108,7 +108,7 @@ def wait_for_popup(pid: int, timeout: float):
     while time.monotonic() < deadline:
         node = next(
             exactly_named_nodes(
-                "AI Usage Monitor", "heading", pid, showing_only=True
+                "AI Usage Monitor", "heading", pid
             ),
             None,
         )
@@ -158,18 +158,19 @@ def press(node) -> None:
     raise RuntimeError(f"Accessible node {node.get_name()!r} has no usable press action")
 
 
-def press_and_wait_for_event(node, pid: int, event_type: str, timeout: float) -> int:
+def press_and_wait_for_event(node, pid: int, event_suffix: str, timeout: float) -> int:
     matched = False
 
     def callback(event, *_user_data) -> None:
         nonlocal matched
-        if process_id(event.source) == pid:
+        if process_id(event.source) == pid and event.type.endswith(event_suffix):
             matched = True
             Atspi.event_quit()
 
     listener = Atspi.EventListener.new(callback)
-    if not listener.register(event_type):
-        raise RuntimeError(f"Could not register AT-SPI event {event_type}")
+    event_family = "object:children-changed"
+    if not listener.register(event_family):
+        raise RuntimeError(f"Could not register AT-SPI event {event_family}")
     timer = threading.Timer(timeout, Atspi.event_quit)
     timer.start()
     started = time.monotonic()
@@ -178,10 +179,11 @@ def press_and_wait_for_event(node, pid: int, event_type: str, timeout: float) ->
         Atspi.event_main()
     finally:
         timer.cancel()
-        listener.deregister(event_type)
+        listener.deregister(event_family)
     if not matched:
         raise RuntimeError(
-            f"Timed out waiting for {event_type} from plasmashell PID {pid}"
+            f"Timed out waiting for children-changed:{event_suffix} "
+            f"from plasmashell PID {pid}"
         )
     return round((time.monotonic() - started) * 1000)
 
@@ -194,23 +196,14 @@ def request_count(path: Path) -> int:
 
 def open_popup(compact_prefix: str, pid: int, timeout: float) -> int:
     compact = wait_for_node(compact_prefix, pid, timeout)
-    if next(
-        exactly_named_nodes(
-            "AI Usage Monitor", "heading", pid, showing_only=True
-        ),
-        None,
-    ) is not None:
-        raise RuntimeError("A stale popup was showing before the sample")
-    started = time.monotonic()
-    press(compact)
+    elapsed = press_and_wait_for_event(compact, pid, ":add", timeout)
     wait_for_popup(pid, timeout)
-    return round((time.monotonic() - started) * 1000)
+    return elapsed
 
 
 def close_popup(compact_prefix: str, pid: int, timeout: float) -> None:
     compact = wait_for_node(compact_prefix, pid, timeout)
-    press(compact)
-    wait_for_popup_closed(pid, timeout)
+    press_and_wait_for_event(compact, pid, ":remove", timeout)
     wait_for_node(compact_prefix, pid, timeout)
 
 
