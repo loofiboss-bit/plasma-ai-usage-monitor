@@ -194,15 +194,6 @@ def press(node) -> None:
         raise RuntimeError(
             f"Accessible node {node.get_name()!r} could not receive exact focus"
         )
-    focus_deadline = time.monotonic() + 2
-    while time.monotonic() < focus_deadline:
-        if node.get_state_set().contains(Atspi.StateType.FOCUSED):
-            break
-        time.sleep(0.01)
-    else:
-        raise RuntimeError(
-            f"Accessible node {node.get_name()!r} did not report focused state"
-        )
 
     for index in range(actions.get_n_actions()):
         action = actions.get_action_name(index).lower()
