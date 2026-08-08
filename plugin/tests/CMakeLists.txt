@@ -2,6 +2,13 @@ set(TEST_USAGE_DB_SRC
     ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyschema.cpp
+)
+
+set(TEST_BUDGET_POLICY_SRC
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyschema.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyrepository.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpolicymodel.cpp
 )
 
 set(TEST_CATALOG_SRC
@@ -60,6 +67,7 @@ set(TEST_INTEGRATION_SRC
     ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyschema.cpp
     ${CMAKE_SOURCE_DIR}/plugin/awssigv4signer.cpp
 )
 
@@ -82,6 +90,14 @@ target_link_libraries(test_forecastcontract
 )
 
 add_test(NAME forecastcontract COMMAND test_forecastcontract)
+
+add_executable(test_budgetpolicyrepository
+    test_budgetpolicyrepository.cpp
+    ${TEST_BUDGET_POLICY_SRC}
+)
+target_include_directories(test_budgetpolicyrepository PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_budgetpolicyrepository PRIVATE Qt6::Core Qt6::Test Qt6::Sql)
+add_test(NAME budgetpolicyrepository COMMAND test_budgetpolicyrepository)
 
 # --- Deterministic asynchronous runway engine ---
 add_executable(test_runwayquery
@@ -492,6 +508,7 @@ add_executable(test_dailystatemodel
     ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyschema.cpp
 )
 target_include_directories(test_dailystatemodel PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
 target_link_libraries(test_dailystatemodel PRIVATE

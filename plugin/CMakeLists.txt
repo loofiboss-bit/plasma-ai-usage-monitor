@@ -27,6 +27,9 @@ set(aiusagemonitor_SRCS
     cohereprovider.cpp
     googleveoprovider.cpp
     forecastcontract.cpp
+    budgetpolicyschema.cpp
+    budgetpolicyrepository.cpp
+    budgetpolicymodel.cpp
     runwayquery.cpp
     guardrailmodel.cpp
     scopebreakdownquery.cpp
@@ -79,6 +82,9 @@ set(aiusagemonitor_HDRS
     cohereprovider.h
     googleveoprovider.h
     forecastcontract.h
+    budgetpolicyschema.h
+    budgetpolicyrepository.h
+    budgetpolicymodel.h
     runwayquery.h
     guardrailmodel.h
     scopebreakdownquery.h

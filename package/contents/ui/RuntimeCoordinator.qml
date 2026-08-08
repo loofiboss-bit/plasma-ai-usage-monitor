@@ -28,7 +28,6 @@ Item {
 
     function buildGuardrailQuery() {
         var quotaSources = [];
-        var budgets = [];
         var providers = registry.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
@@ -80,26 +79,10 @@ Item {
                 });
             }
 
-            var monthlyBudgetCents = Number(
-                configuration[provider.monthlyBudgetKey] || 0);
-            if (monthlyBudgetCents > 0) {
-                var valueClass = backend.isEstimatedCost
-                    ? "estimated" : "actual";
-                budgets.push({
-                    sourceId: provider.configKey,
-                    sourceKind: "provider",
-                    provider: provider.dbName,
-                    window: "calendar_month",
-                    scope: "organization",
-                    budget: monthlyBudgetCents / 100.0,
-                    budgetCurrency: backend.budgetCurrency || "USD",
-                    valueClass: valueClass
-                });
-            }
         }
         return {
             quotaSources: quotaSources,
-            budgets: budgets
+            budgets: []
         };
     }
 
@@ -577,8 +560,6 @@ Item {
             if (backend.model !== undefined)
                 backend.model = runtime.configuration[configKey + "Model"] || "";
             backend.customBaseUrl = runtime.configuration[configKey + "CustomBaseUrl"] || "";
-            backend.dailyBudget = (runtime.configuration[configKey + "DailyBudget"] || 0) / 100.0;
-            backend.monthlyBudget = (runtime.configuration[configKey + "MonthlyBudget"] || 0) / 100.0;
             if (shouldRefresh)
                 runtime.loadProviderApiKey(configKey, runtime.scheduler.refreshConfigurationChanged, true);
         }
@@ -610,29 +591,7 @@ Item {
         function onCerebrasCustomBaseUrlChanged() { syncDescriptorProvider("cerebras", true); }
         function onFireworksCustomBaseUrlChanged() { syncDescriptorProvider("fireworks", true); }
         function onPerplexityCustomBaseUrlChanged() { syncDescriptorProvider("perplexity", true); }
-        function onLitellmDailyBudgetChanged() { syncDescriptorProvider("litellm", false); }
-        function onLitellmMonthlyBudgetChanged() { syncDescriptorProvider("litellm", false); }
-        function onCerebrasDailyBudgetChanged() { syncDescriptorProvider("cerebras", false); }
-        function onCerebrasMonthlyBudgetChanged() { syncDescriptorProvider("cerebras", false); }
-        function onFireworksDailyBudgetChanged() { syncDescriptorProvider("fireworks", false); }
-        function onFireworksMonthlyBudgetChanged() { syncDescriptorProvider("fireworks", false); }
-        function onPerplexityDailyBudgetChanged() { syncDescriptorProvider("perplexity", false); }
-        function onPerplexityMonthlyBudgetChanged() { syncDescriptorProvider("perplexity", false); }
         function onForecastUiEnabledChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onOpenaiMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onAnthropicMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onGoogleMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onMistralMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onDeepseekMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onGroqMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onXaiMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onOllamaMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onOpenrouterMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onTogetherMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onCohereMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onGoogleveoMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onAzureMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
-        function onBedrockMonthlyBudgetChanged() { runtime.scheduleGuardrailRefresh(); }
         function onHistoryEnabledChanged() { runtime.scheduleGuardrailRefresh(); }
 
         function onClaudeCodeEnabledChanged() {

@@ -28,11 +28,24 @@ KCM.SimpleKCM {
     readonly property var databaseInfo: AppInfo.databaseDiagnostics()
     readonly property var sourceSnapshot: parseSourceSnapshot()
     property string recoverySelectionMessage: ""
+    property string configImportMessage: ""
 
     SecretsManager { id: secrets }
     BrowserSyncService { id: syncDetector }
     ProviderCatalog { id: providerCatalog }
     ClipboardHelper { id: clipboard }
+    UsageDatabase { id: configUsageDatabase; enabled: false }
+    BudgetPolicyRepository {
+        id: budgetPolicyRepository
+        // Plasma's attached qmltypes omit the stable applet instance id.
+        // qmllint disable unresolved-type
+        ownerId: "applet:" + String(Plasmoid["id"])
+        // qmllint enable unresolved-type
+        Component.onCompleted: {
+            configUsageDatabase.init();
+            init();
+        }
+    }
 
     // Helpers to detect CLI tools
     ClaudeCodeMonitor { id: claudeDetector; Component.onCompleted: checkToolInstalled() }
@@ -568,11 +581,12 @@ KCM.SimpleKCM {
             settings[key] = Plasmoid.configuration[key];
         }
         return {
-            schemaVersion: 2,
+            schemaVersion: 3,
             app: "com.github.loofi.aiusagemonitor",
             exportedByVersion: AppInfo.version,
             includesSecrets: false,
-            settings: settings
+            settings: settings,
+            budgetPolicies: budgetPolicyRepository.exportPolicies()
         };
     }
 
@@ -588,20 +602,32 @@ KCM.SimpleKCM {
             return;
         }
 
-        if (configData.general) {
-            if (configData.general.refreshInterval !== undefined) Plasmoid.configuration.refreshInterval = configData.general.refreshInterval;
-            if (configData.general.compactDisplayMode !== undefined) Plasmoid.configuration.compactDisplayMode = configData.general.compactDisplayMode;
-        }
-        var legacyKeys = [
-            "openaiEnabled", "openaiModel", "anthropicEnabled", "anthropicModel",
-            "googleEnabled", "googleModel", "ollamaEnabled"
-        ];
-        for (var j = 0; j < legacyKeys.length; j++) {
-            var legacyKey = legacyKeys[j];
-            if (configData[legacyKey] !== undefined) {
-                Plasmoid.configuration[legacyKey] = configData[legacyKey];
+        if (configData.schemaVersion === 3) {
+            var currentSettings = {};
+            for (var currentIndex = 0; currentIndex < portableConfigKeys.length; ++currentIndex) {
+                var currentKey = portableConfigKeys[currentIndex];
+                currentSettings[currentKey] = Plasmoid.configuration[currentKey];
             }
+            var staged = ConfigPortability.schemaV3Payload(
+                configData, portableConfigKeys, currentSettings);
+            if (!staged.ok) {
+                configImportMessage = staged.error;
+                return false;
+            }
+            if (!budgetPolicyRepository.replacePolicies(staged.budgetPolicies)) {
+                configImportMessage = budgetPolicyRepository.errorString;
+                return false;
+            }
+            var stagedKeys = Object.keys(staged.settings);
+            for (var stagedIndex = 0; stagedIndex < stagedKeys.length; ++stagedIndex) {
+                var stagedKey = stagedKeys[stagedIndex];
+                Plasmoid.configuration[stagedKey] = staged.settings[stagedKey];
+            }
+            configImportMessage = "";
+            return true;
         }
+
+        return false;
     }
 
     function enabledProviderCount() {

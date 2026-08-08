@@ -306,6 +306,7 @@ private:
     bool migrateToObservationSchemaV3();
     bool migrateToObservationSchemaV4();
     bool migrateToSchemaV5();
+    bool migrateToSchemaV6();
     bool recordObservations(const QString &provider,
                             const QString &model,
                             qint64 inputTokens,

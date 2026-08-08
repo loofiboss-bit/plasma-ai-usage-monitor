@@ -31,9 +31,6 @@ QtObject {
             backend["model"] = configuration[modelKey] || "";
         // qmllint enable missing-property
         backend.customBaseUrl = configuration[urlKey] || "";
-        backend.dailyBudget = (configuration[configKey + "DailyBudget"] || 0) / 100.0;
-        backend.monthlyBudget = (configuration[configKey + "MonthlyBudget"] || 0) / 100.0;
-        backend.budgetWarningPercent = configuration.budgetWarningPercent;
     }
 
     function initialize() {

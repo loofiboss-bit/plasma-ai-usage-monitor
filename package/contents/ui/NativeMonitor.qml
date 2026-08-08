@@ -82,6 +82,7 @@ Item {
     property alias sourceReadiness: sourceReadinessModel
     property alias dailyState: dailyStateModel
     property alias guardrails: guardrailModel
+    property alias budgetPolicies: budgetPolicyRepository
     readonly property var presentationDailyState: mediaDailyState.active
         ? mediaDailyState : dailyStateModel
     property alias secretsManager: secrets
@@ -311,6 +312,41 @@ Item {
         refreshScheduler.refreshAntigravity(true);
     }
 
+    function migrateLegacyBudgets() {
+        var rows = [];
+        var providers = policyCatalog.budgetProviders || [];
+        var warning = Number(Plasmoid.configuration.budgetWarningPercent || 80);
+        for (var i = 0; i < providers.length; ++i) {
+            var provider = providers[i];
+            var periods = [
+                { key: provider.dailyBudgetConfigKey, type: "calendar_day" },
+                { key: provider.monthlyBudgetConfigKey, type: "calendar_month" }
+            ];
+            for (var periodIndex = 0; periodIndex < periods.length; ++periodIndex) {
+                var period = periods[periodIndex];
+                if (!period.key) continue;
+                rows.push({
+                    legacyKey: period.key,
+                    sourceId: provider.configKey,
+                    sourceKind: "provider",
+                    scopeMode: "aggregate",
+                    scopeKind: "",
+                    scopeIdentity: "",
+                    scopeLabel: "",
+                    valueClass: "actual",
+                    limitMinor: Number(Plasmoid.configuration[period.key] || 0),
+                    currency: "USD",
+                    periodType: period.type,
+                    timeZoneId: "UTC",
+                    warningPercent: warning,
+                    notifyEnabled: true,
+                    enabled: true
+                });
+            }
+        }
+        return budgetPolicyRepository.migrateLegacyBudgets(rows);
+    }
+
     SecretsManager {
         id: secrets
     }
@@ -326,14 +362,21 @@ Item {
         retentionDays: Plasmoid.configuration.historyRetentionDays
     }
 
+    ProviderCatalog { id: policyCatalog }
+
+    BudgetPolicyRepository {
+        id: budgetPolicyRepository
+        // Plasma's attached qmltypes omit the stable applet instance id.
+        // qmllint disable unresolved-type
+        ownerId: "applet:" + String(Plasmoid["id"])
+        // qmllint enable unresolved-type
+    }
+
     OpenAIProvider {
         id: openaiBackend
         model: Plasmoid.configuration.openaiModel
         projectId: Plasmoid.configuration.openaiProjectId
         customBaseUrl: Plasmoid.configuration.openaiCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.openaiDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.openaiMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     AzureOpenAIProvider {
@@ -341,9 +384,6 @@ Item {
         model: Plasmoid.configuration.azureModel
         deploymentId: Plasmoid.configuration.azureDeploymentId
         customBaseUrl: Plasmoid.configuration.azureCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.azureDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.azureMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     BedrockProvider {
@@ -351,18 +391,12 @@ Item {
         region: Plasmoid.configuration.bedrockRegion
         model: Plasmoid.configuration.bedrockModel
         customBaseUrl: Plasmoid.configuration.bedrockCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.bedrockDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.bedrockMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     AnthropicProvider {
         id: anthropicBackend
         model: Plasmoid.configuration.anthropicModel
         customBaseUrl: Plasmoid.configuration.anthropicCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.anthropicDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.anthropicMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     GoogleProvider {
@@ -370,81 +404,54 @@ Item {
         model: Plasmoid.configuration.googleModel
         tier: Plasmoid.configuration.googleTier
         customBaseUrl: Plasmoid.configuration.googleCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.googleDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.googleMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     MistralProvider {
         id: mistralBackend
         model: Plasmoid.configuration.mistralModel
         customBaseUrl: Plasmoid.configuration.mistralCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.mistralDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.mistralMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     DeepSeekProvider {
         id: deepseekBackend
         model: Plasmoid.configuration.deepseekModel
         customBaseUrl: Plasmoid.configuration.deepseekCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.deepseekDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.deepseekMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     GroqProvider {
         id: groqBackend
         model: Plasmoid.configuration.groqModel
         customBaseUrl: Plasmoid.configuration.groqCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.groqDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.groqMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     XAIProvider {
         id: xaiBackend
         model: Plasmoid.configuration.xaiModel
         customBaseUrl: Plasmoid.configuration.xaiCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.xaiDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.xaiMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     OllamaCloudProvider {
         id: ollamaBackend
         model: Plasmoid.configuration.ollamaModel
         customBaseUrl: Plasmoid.configuration.ollamaCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.ollamaDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.ollamaMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     OpenRouterProvider {
         id: openrouterBackend
         model: Plasmoid.configuration.openrouterModel
         customBaseUrl: Plasmoid.configuration.openrouterCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.openrouterDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.openrouterMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     TogetherProvider {
         id: togetherBackend
         model: Plasmoid.configuration.togetherModel
         customBaseUrl: Plasmoid.configuration.togetherCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.togetherDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.togetherMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     CohereProvider {
         id: cohereBackend
         model: Plasmoid.configuration.cohereModel
         customBaseUrl: Plasmoid.configuration.cohereCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.cohereDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.cohereMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     GoogleVeoProvider {
@@ -452,9 +459,6 @@ Item {
         model: Plasmoid.configuration.googleveoModel
         tier: Plasmoid.configuration.googleveoTier
         customBaseUrl: Plasmoid.configuration.googleveoCustomBaseUrl
-        dailyBudget: Plasmoid.configuration.googleveoDailyBudget / 100.0
-        monthlyBudget: Plasmoid.configuration.googleveoMonthlyBudget / 100.0
-        budgetWarningPercent: Plasmoid.configuration.budgetWarningPercent
     }
 
     ProviderManager {
@@ -775,6 +779,9 @@ Item {
     }
 
     Component.onCompleted: {
+        usageDatabase.init();
+        if (!budgetPolicyRepository.init() || !root.migrateLegacyBudgets())
+            console.error("Budget policy initialization failed:", budgetPolicyRepository.errorString);
         providerRuntimeRegistration.initialize();
         root.scheduleDiagnosticsSnapshot();
         root.processSettingsVerificationRequest();

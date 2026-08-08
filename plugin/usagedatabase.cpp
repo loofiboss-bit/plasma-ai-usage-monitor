@@ -1,4 +1,6 @@
 #include "usagedatabase.h"
+
+#include "budgetpolicyschema.h"
 #include "analystquery.h"
 #include "forecastcontract.h"
 #include <QDebug>
@@ -549,6 +551,10 @@ void UsageDatabase::createTables()
     if (!migrateToSchemaV5()) {
         qWarning() << "UsageDatabase: schema v5 migration failed; v4 history "
                       "remains intact";
+        return;
+    }
+    if (!migrateToSchemaV6()) {
+        qWarning() << "UsageDatabase: schema v6 migration failed; v5 history remains intact";
     }
 }
 
@@ -764,6 +770,17 @@ bool UsageDatabase::migrateToSchemaV5()
         return false;
     }
     return m_db.commit();
+}
+
+bool UsageDatabase::migrateToSchemaV6()
+{
+    QString error;
+    const bool inject = qEnvironmentVariableIntValue("PLASMA_AI_MONITOR_INJECT_SCHEMA_V6_FAILURE") != 0;
+    if (!BudgetPolicySchema::migrate(m_db, &error, inject)) {
+        qWarning() << "UsageDatabase: v6 migration failed" << error;
+        return false;
+    }
+    return true;
 }
 
 void UsageDatabase::ensureColumnExists(const QString &table,
@@ -2630,9 +2647,7 @@ void UsageDatabase::requestExportAll(const QString &requestId,
 
 void UsageDatabase::init()
 {
-    if (m_enabled) {
-        initDatabase();
-    }
+    initDatabase();
 }
 
 void UsageDatabase::pruneOldData()

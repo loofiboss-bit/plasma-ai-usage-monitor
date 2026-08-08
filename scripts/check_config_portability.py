@@ -71,6 +71,10 @@ def main() -> None:
     qml = DIAGNOSTICS_QML.read_text(encoding="utf-8")
     if "ConfigPortability.schemaV2Settings(" not in qml:
         fail("schema-v2 imports must use the portable settings filter")
+    if "ConfigPortability.schemaV3Payload(" not in qml:
+        fail("schema-v3 imports must validate settings and policies before mutation")
+    if "budgetPolicyRepository.replacePolicies(staged.budgetPolicies)" not in qml:
+        fail("schema-v3 policy restore must use the repository transaction boundary")
 
     print(
         "Config portability check OK: "
