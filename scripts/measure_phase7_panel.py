@@ -27,10 +27,10 @@ DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
 
     Connections {
-        target: root
+        target: Plasmoid
 
         function onExpandedChanged() {
-            if (root.expanded) {
+            if (Plasmoid["expanded"]) {
                 // Use the next event-loop turn so both versions have created
                 // and polished the representation selected by PlasmoidItem.
                 Qt.callLater(function() {
@@ -279,6 +279,10 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
             "OUTER_WAYLAND_DISPLAY": os.environ.get("WAYLAND_DISPLAY", "wayland-0"),
             "OUTER_DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", ""),
             "PLASMA_AI_MONITOR_DEMO": "1",
+            "AIUSAGE_MONITOR_CATALOG_DIR": str(
+                runtime_root
+                / "prefix/share/plasma/plasmoids/com.github.loofi.aiusagemonitor/contents/catalog"
+            ),
             "QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "1",
             "QT_ACCESSIBILITY": "1",
             "QT_ASSUME_STDERR_HAS_CONSOLE": "1",
