@@ -183,7 +183,7 @@ PlasmaExtras.Representation {
             Layout.fillWidth: true
             Layout.fillHeight: true
             active: !fullRoot.showGuidedSetup
-            asynchronous: fullRoot.destination !== 0
+            asynchronous: true
             source: fullRoot.sourceDetailVisible ? "views/SourceDetailView.qml"
                   : fullRoot.destination === 0 ? "views/OverviewView.qml"
                   : fullRoot.destination === 1 ? "views/HistoryView.qml"

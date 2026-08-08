@@ -40,7 +40,7 @@ def main() -> None:
         'fullRoot.destination === 0 ? "views/OverviewView.qml"',
         'fullRoot.destination === 1 ? "views/HistoryView.qml"',
         ': "views/AnalystView.qml"',
-        "asynchronous: fullRoot.destination !== 0",
+        "asynchronous: true",
     )
 
     detail = (UI / "views" / "SourceDetailView.qml").read_text(encoding="utf-8")
