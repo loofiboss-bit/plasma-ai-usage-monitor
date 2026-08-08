@@ -220,9 +220,14 @@ def open_popup(
     compact = wait_for_node(compact_prefix, pid, timeout)
     offset = session_log.stat().st_size if session_log.exists() else 0
     press(compact)
-    elapsed = wait_for_log_marker(
-        session_log, "AI_USAGE_POPUP_FIRST_FRAME", offset, timeout
-    )
+    try:
+        elapsed = wait_for_log_marker(
+            session_log, "AI_USAGE_POPUP_FIRST_FRAME", offset, timeout
+        )
+    except RuntimeError as error:
+        raise RuntimeError(
+            f"{error}; selected={json.dumps(node_details(compact), sort_keys=True)}"
+        ) from error
     wait_for_popup(pid, timeout)
     return elapsed
 

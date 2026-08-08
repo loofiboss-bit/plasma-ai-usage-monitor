@@ -26,6 +26,7 @@ DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
         popupOpen: !!Plasmoid["expanded"]
+        Component.onCompleted: console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY")
         onPopupOpenChanged: {
             const expanded = popupOpen;
             // Use the next event-loop turn so both versions have created and
