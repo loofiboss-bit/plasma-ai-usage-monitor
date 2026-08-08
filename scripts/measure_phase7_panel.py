@@ -38,6 +38,7 @@ POPUP_INSTRUMENTATION = r'''
             });
         }
 '''
+ACCESSIBILITY_BRIDGE = "    Accessible.onPressAction: Plasmoid.activated()\n"
 
 
 def run_in_virtual_outer(arguments: list[str]) -> int:
@@ -252,6 +253,26 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
 
 def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]:
     env = candidate_environment(build_dir.resolve(), runtime_root)
+    compact_files = list(
+        (runtime_root / "prefix").glob(
+            "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
+            "contents/ui/CompactRepresentation.qml"
+        )
+    )
+    if len(compact_files) != 1:
+        raise RuntimeError("installed CompactRepresentation.qml was not found")
+    compact_representation = compact_files[0]
+    compact_source = compact_representation.read_text(encoding="utf-8")
+    if ACCESSIBILITY_BRIDGE not in compact_source:
+        activation = "    onClicked: Plasmoid.activated()\n"
+        if compact_source.count(activation) != 1:
+            raise RuntimeError("accessible activation target is invalid")
+        compact_representation.write_text(
+            compact_source.replace(
+                activation, activation + ACCESSIBILITY_BRIDGE, 1
+            ),
+            encoding="utf-8",
+        )
     installed = list(
         (runtime_root / "prefix").glob(
             "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
@@ -430,7 +451,7 @@ def main() -> None:
         "environment": {"platform": platform.platform(), "plasma": subprocess.run(["plasmashell", "--version"], text=True, stdout=subprocess.PIPE, check=False).stdout.strip()},
         "commits": {"baseline": baseline_commit, "candidate": candidate_commit},
         "instrumentationSha256": hashlib.sha256(
-            POPUP_INSTRUMENTATION.encode()
+            (POPUP_INSTRUMENTATION + ACCESSIBILITY_BRIDGE).encode()
         ).hexdigest(),
         "buildDirectories": {
             "baseline": str(args.baseline_build_dir.resolve()),

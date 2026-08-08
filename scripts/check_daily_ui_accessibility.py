@@ -27,8 +27,13 @@ def main() -> None:
         "package/contents/ui/CompactRepresentation.qml",
         "Accessible.role: Accessible.Button",
         "Accessible.name: i18n(\"AI Usage Monitor: %1\", accessibleText())",
+        "Accessible.onPressAction: Plasmoid.activated()",
         'objectName: "compactSeveritySymbol"',
         'text: "!"',
+    )
+    errors += require(
+        "package/contents/ui/main.qml",
+        'Accessible.onPressAction: root.plasmoid["activated"]()',
     )
     errors += require(
         "package/contents/ui/components/CompactMetricState.qml",
