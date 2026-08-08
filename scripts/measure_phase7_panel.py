@@ -101,7 +101,6 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
             "XDG_CONFIG_HOME": virtual_root / "config",
             "XDG_CACHE_HOME": virtual_root / "cache",
             "XDG_STATE_HOME": virtual_root / "state",
-            "XDG_CONFIG_DIRS": virtual_root / "config-dirs",
         }
         for directory in isolated_directories.values():
             directory.mkdir(mode=0o700)
@@ -121,6 +120,7 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
                 **{key: str(value) for key, value in isolated_directories.items()},
                 "XDG_RUNTIME_DIR": str(runtime_dir),
                 "XDG_DATA_DIRS": "/usr/local/share:/usr/share",
+                "XDG_CONFIG_DIRS": "/etc/xdg",
                 "KDEHOME": str(virtual_root / "kde-home"),
                 "QT_IM_MODULE": "",
                 "GTK_IM_MODULE": "",
@@ -213,7 +213,6 @@ def run_panel_session(
         "var panel=new Panel;"
         'panel.location="bottom";'
         "panel.height=58;"
-        'panel.addWidget("org.kde.plasma.kickoff");'
         'panel.addWidget("com.github.loofi.aiusagemonitor");'
         'panel.addWidget("org.kde.plasma.panelspacer");'
         'panel.addWidget("org.kde.plasma.digitalclock");'
@@ -304,7 +303,10 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
         detail = measurement_error.read_text(encoding="utf-8").strip() if measurement_error.exists() else ""
         if nested_log.exists():
             detail += "\n" + nested_log.read_text(encoding="utf-8")[-4000:]
-        raise RuntimeError(detail.strip() or "Panel measurement returned no JSON")
+        raise RuntimeError(
+            detail.strip()
+            or f"Panel measurement failed with exit status {result.returncode}"
+        )
     measurement = json.loads(measurement_log.read_text(encoding="utf-8"))
     measurement["trace"] = trace_summary(trace_path)
     return measurement
@@ -312,6 +314,12 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
 
 def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]:
     env = candidate_environment(build_dir.resolve(), runtime_root)
+    autostart_dir = runtime_root / "config" / "autostart"
+    autostart_dir.mkdir(parents=True, exist_ok=True)
+    (autostart_dir / "org.kde.discover.notifier.desktop").write_text(
+        "[Desktop Entry]\nHidden=true\n",
+        encoding="utf-8",
+    )
     installed = list(
         (runtime_root / "prefix").glob(
             "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
