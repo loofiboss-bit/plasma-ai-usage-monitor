@@ -41,9 +41,12 @@ def is_showing(node) -> bool:
             if current.get_role_name() in {"application", "desktop frame"}:
                 break
             states = current.get_state_set()
-            # Plasma applies SHOWING to the popup ancestor rather than every
-            # child. VISIBLE and cached extents survive after the popup closes.
-            if states.contains(Atspi.StateType.SHOWING):
+            # Plasma may apply SHOWING or VISIBLE to the popup subtree. Cached
+            # geometry survives after close, but both accessibility states are
+            # removed; application-level visibility is excluded above.
+            if states.contains(Atspi.StateType.SHOWING) or states.contains(
+                Atspi.StateType.VISIBLE
+            ):
                 return True
             parent = current.get_parent()
             if parent is None or parent == current:
