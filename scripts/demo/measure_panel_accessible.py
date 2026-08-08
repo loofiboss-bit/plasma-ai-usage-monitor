@@ -180,7 +180,7 @@ def wait_for_popup_closed(pid: int, timeout: float) -> None:
     raise RuntimeError(f"Timed out waiting for the panel popup to close; nodes={details}")
 
 
-def press(node) -> None:
+def focus(node) -> None:
     actions = node.get_action_iface()
     focus_index = next(
         (
@@ -194,6 +194,11 @@ def press(node) -> None:
         raise RuntimeError(
             f"Accessible node {node.get_name()!r} could not receive exact focus"
         )
+    time.sleep(0.1)
+
+
+def press(node) -> None:
+    actions = node.get_action_iface()
 
     for index in range(actions.get_n_actions()):
         action = actions.get_action_name(index).lower()
@@ -231,6 +236,7 @@ def open_popup(
     compact_prefix: str, pid: int, session_log: Path, timeout: float
 ) -> int:
     compact = wait_for_node(compact_prefix, pid, timeout)
+    focus(compact)
     offset = session_log.stat().st_size if session_log.exists() else 0
     press(compact)
     try:
@@ -249,6 +255,7 @@ def close_popup(
     compact_prefix: str, pid: int, session_log: Path, timeout: float
 ) -> None:
     compact = wait_for_node(compact_prefix, pid, timeout)
+    focus(compact)
     offset = session_log.stat().st_size if session_log.exists() else 0
     press(compact)
     wait_for_log_marker(session_log, "AI_USAGE_POPUP_CLOSED", offset, timeout)
