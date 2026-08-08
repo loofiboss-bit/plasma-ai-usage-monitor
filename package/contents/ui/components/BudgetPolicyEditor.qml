@@ -226,6 +226,7 @@ QQC2.ScrollView {
             QQC2.ComboBox {
                 id: sourceCombo
                 Kirigami.FormData.label: i18n("Source:")
+                Layout.minimumWidth: Kirigami.Units.gridUnit * 11
                 model: editor.providerCatalog
                     ? editor.providerCatalog.budgetProviders || [] : []
                 textRole: "displayName"
@@ -244,6 +245,7 @@ QQC2.ScrollView {
             QQC2.ComboBox {
                 id: scopeModeCombo
                 Kirigami.FormData.label: i18n("Scope:")
+                Layout.minimumWidth: Kirigami.Units.gridUnit * 11
                 model: [
                     { value: "aggregate", label: i18n("All reported spend") },
                     { value: "scoped", label: i18n("One reported dimension") }
@@ -299,6 +301,7 @@ QQC2.ScrollView {
 
             QQC2.ComboBox {
                 Kirigami.FormData.label: i18n("Value class:")
+                Layout.minimumWidth: Kirigami.Units.gridUnit * 11
                 model: [
                     { value: "actual", label: i18n("Actual provider cost") },
                     { value: "estimated", label: i18n("Local estimate") }
@@ -358,6 +361,7 @@ QQC2.ScrollView {
             QQC2.ComboBox {
                 id: periodCombo
                 Kirigami.FormData.label: i18n("Period:")
+                Layout.minimumWidth: Kirigami.Units.gridUnit * 11
                 model: editor.periodOptions()
                 textRole: "label"
                 valueRole: "value"
@@ -390,6 +394,7 @@ QQC2.ScrollView {
 
             QQC2.SpinBox {
                 Kirigami.FormData.label: i18n("Warning:")
+                Layout.minimumWidth: Kirigami.Units.gridUnit * 5
                 from: 1
                 to: 100
                 value: Number(editor.policy.warningPercent || 80)
@@ -401,6 +406,7 @@ QQC2.ScrollView {
 
             QQC2.SpinBox {
                 Kirigami.FormData.label: i18n("Critical:")
+                Layout.minimumWidth: Kirigami.Units.gridUnit * 5
                 from: 1
                 to: 100
                 value: Number(editor.policy.criticalPercent || 90)

@@ -32,7 +32,16 @@ KCM.SimpleKCM {
         // qmllint enable unresolved-type
         Component.onCompleted: {
             init();
-            Qt.callLater(budgetPage.selectRequestedPolicy);
+            Qt.callLater(function() {
+                budgetPage.selectRequestedPolicy();
+                if (AppInfo.demoMode
+                        && AppInfo.smokeView === "budget-settings"
+                        && policyDrafts.policies.length === 0) {
+                    policyDrafts.createPolicy(
+                        providerCatalog.budgetProviders[0]?.configKey || "openai",
+                        "calendar_month");
+                }
+            });
         }
     }
     Components.BudgetPolicyDraftStore {

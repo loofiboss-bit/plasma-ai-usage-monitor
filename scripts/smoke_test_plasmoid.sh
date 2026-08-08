@@ -50,12 +50,12 @@ run_smoke() {
   fi
 }
 
-for view in overview source-detail history analyst onboarding settings; do
+for view in overview source-detail history analyst onboarding settings budget-settings; do
   run_smoke "$view" "$view" "$qml_path"
 done
 
 for scale_factor in 1.25 1.4 1.5 2; do
-  for view in overview source-detail history analyst onboarding settings; do
+  for view in overview source-detail history analyst onboarding settings budget-settings; do
     run_smoke "${view}-scale-${scale_factor//./-}" "$view" "$qml_path" "$scale_factor"
   done
 done

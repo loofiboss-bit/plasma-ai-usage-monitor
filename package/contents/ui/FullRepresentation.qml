@@ -247,7 +247,8 @@ PlasmaExtras.Representation {
         Qt.callLater(function() {
             AppInfo.performanceMark("first_rendered_frame");
         });
-        if (AppInfo.smokeView === "settings") {
+        if (AppInfo.smokeView === "settings"
+                || AppInfo.smokeView === "budget-settings") {
             Qt.callLater(function() {
                 var configureAction = Plasmoid.internalAction("configure");
                 if (configureAction) configureAction.trigger();

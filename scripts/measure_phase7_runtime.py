@@ -179,7 +179,7 @@ def main() -> None:
                     target = (
                         "History view ready"
                         if args.view == "history"
-                        else "Analyst view ready"
+                        else "Insights view ready"
                     )
                     ready_ms.append(wait_accessible(target, 15, env))
                 if run == args.runs - 1:

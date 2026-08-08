@@ -395,7 +395,7 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            text: i18n("Exports schema v2 non-secret settings only. API keys, tokens, cookies, PATs, and webhook URLs remain in KWallet and are never written to the file.")
+            text: i18n("Exports schema v3 settings and budget policies. Policy scope identities may be sensitive. API keys, tokens, cookies, PATs, and webhook URLs remain in KWallet and are never written to the file. Schema v2 imports remain supported as settings-only backups.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             opacity: 0.6
             wrapMode: Text.WordWrap
