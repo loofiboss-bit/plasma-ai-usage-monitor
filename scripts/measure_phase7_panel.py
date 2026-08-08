@@ -477,7 +477,7 @@ def run_sample(
     sample: int,
     warmup: bool,
 ) -> dict[str, Any]:
-    sample_root.mkdir(mode=0o700)
+    sample_root.mkdir(mode=0o700, parents=True)
     port = available_port()
     request_log = sample_root / "requests.jsonl"
     trace_path = sample_root / "performance.jsonl"
