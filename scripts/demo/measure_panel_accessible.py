@@ -205,29 +205,26 @@ def focus(node) -> None:
     time.sleep(0.1)
 
 
+def press(node) -> None:
+    actions = node.get_action_iface()
+    press_index = next(
+        (
+            index
+            for index in range(actions.get_n_actions())
+            if actions.get_action_name(index).lower() in {"press", "click"}
+        ),
+        None,
+    )
+    if press_index is None or not actions.do_action(press_index):
+        raise RuntimeError(
+            f"Accessible node {node.get_name()!r} could not be pressed"
+        )
+
+
 def request_count(path: Path) -> int:
     if not path.exists():
         return 0
     return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line)
-
-
-def wait_for_log_marker(
-    path: Path, marker: str, offset: int, timeout: float
-) -> int:
-    started = time.monotonic()
-    deadline = started + timeout
-    while time.monotonic() < deadline:
-        if path.exists():
-            with path.open("r", encoding="utf-8", errors="replace") as stream:
-                stream.seek(offset)
-                if any(marker in line for line in stream):
-                    return round((time.monotonic() - started) * 1000)
-        time.sleep(0.005)
-    detail = path.read_text(encoding="utf-8", errors="replace")[-4000:]
-    raise RuntimeError(
-        f"Timed out waiting for {marker!r}; "
-        f"log tail={detail}"
-    )
 
 
 def wait_for_log_duration(
@@ -251,10 +248,11 @@ def wait_for_log_duration(
 
 def open_popup(
     compact_prefix: str, pid: int, session_log: Path, timeout: float
-) -> tuple[int, int]:
+) -> int:
     compact = wait_for_node(compact_prefix, pid, timeout)
     focus(compact)
     offset = session_log.stat().st_size if session_log.exists() else 0
+    press(compact)
     try:
         elapsed = wait_for_log_duration(
             session_log, "AI_USAGE_POPUP_FIRST_FRAME", offset, timeout
@@ -264,7 +262,13 @@ def open_popup(
             f"{error}; selected={json.dumps(node_details(compact), sort_keys=True)}"
         ) from error
     wait_for_popup(pid, timeout)
-    return elapsed, offset
+    return elapsed
+
+
+def close_popup(compact_prefix: str, pid: int, timeout: float) -> None:
+    compact = wait_for_node(compact_prefix, pid, timeout)
+    press(compact)
+    wait_for_popup_closed(pid, timeout)
 
 
 def main() -> None:
@@ -283,23 +287,27 @@ def main() -> None:
     startup_requests = request_count(args.request_log)
 
     before_popup = request_count(args.request_log)
-    first_open_ms, sequence_offset = open_popup(
+    first_open_ms = open_popup(
         compact_prefix, args.pid, args.session_log, args.timeout
     )
     probe_progress("first-open-complete")
     time.sleep(1)
     fresh_popup_requests = request_count(args.request_log) - before_popup
 
-    wait_for_log_marker(
-        args.session_log, "AI_USAGE_POPUP_CLOSED", sequence_offset, args.timeout
+    close_popup(compact_prefix, args.pid, args.timeout)
+    compact = wait_for_node(compact_prefix, args.pid, args.timeout)
+    focus(compact)
+    warm_offset = (
+        args.session_log.stat().st_size if args.session_log.exists() else 0
     )
-    wait_for_node(compact_prefix, args.pid, args.timeout)
+    press(compact)
     warm_open_ms = wait_for_log_duration(
         args.session_log,
         "AI_USAGE_POPUP_WARM_FRAME",
-        sequence_offset,
+        warm_offset,
         args.timeout,
     )
+    wait_for_popup(args.pid, args.timeout)
     probe_progress("warm-open-complete")
 
     print(

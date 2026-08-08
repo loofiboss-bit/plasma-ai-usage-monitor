@@ -27,15 +27,18 @@ DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
     Component.onCompleted: {
         console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY");
-        root.armPerfTimer();
     }
-    onRuntimeReadyChanged: root.armPerfTimer()
     property string perfFrameMarker: ""
+    property int perfOpenCount: 0
 
-    function armPerfTimer() {
-        if (root.runtimeReady && !perfFirstTimer.running) {
-            perfFirstTimer.start();
-        }
+    onExpandedChanged: {
+        if (!root.expanded)
+            return;
+        root.perfOpenCount += 1;
+        root.perfFrameMarker = root.perfOpenCount === 1
+            ? "AI_USAGE_POPUP_FIRST_FRAME"
+            : "AI_USAGE_POPUP_WARM_FRAME";
+        perfFrameClock.restart();
     }
 
     FrameAnimation {
@@ -46,20 +49,6 @@ POPUP_INSTRUMENTATION = r'''
             const elapsed = Math.max(0, Math.round(elapsedTime * 1000));
             stop();
             console.warn(marker + " " + elapsed + " ms");
-            if (marker === "AI_USAGE_POPUP_FIRST_FRAME") {
-                perfCloseTimer.start();
-            }
-        }
-    }
-
-    Timer {
-        id: perfFirstTimer
-        interval: 20000
-        repeat: false
-        onTriggered: {
-            root.perfFrameMarker = "AI_USAGE_POPUP_FIRST_FRAME";
-            perfFrameClock.restart();
-            Plasmoid.expanded = true;
         }
     }
 
@@ -73,27 +62,6 @@ POPUP_INSTRUMENTATION = r'''
         )
     }
 
-    Timer {
-        id: perfCloseTimer
-        interval: 3000
-        repeat: false
-        onTriggered: {
-            Plasmoid.expanded = false;
-            console.warn("AI_USAGE_POPUP_CLOSED");
-            perfWarmTimer.start();
-        }
-    }
-
-    Timer {
-        id: perfWarmTimer
-        interval: 250
-        repeat: false
-        onTriggered: {
-            root.perfFrameMarker = "AI_USAGE_POPUP_WARM_FRAME";
-            perfFrameClock.restart();
-            Plasmoid.expanded = true;
-        }
-    }
 '''
 
 

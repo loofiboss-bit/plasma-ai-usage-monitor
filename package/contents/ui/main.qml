@@ -45,7 +45,6 @@ PlasmoidItem {
             // tooling metadata cannot describe that injected instance.
             // qmllint disable missing-property
             onClicked: root.plasmoid["activated"]()
-            Accessible.onPressAction: root.plasmoid["activated"]()
             // qmllint enable missing-property
 
             Kirigami.Icon {

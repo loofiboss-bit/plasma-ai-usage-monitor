@@ -40,7 +40,6 @@ MouseArea {
     Accessible.name: i18n("AI Usage Monitor: %1", accessibleText())
     hoverEnabled: true
     onClicked: Plasmoid.activated()
-    Accessible.onPressAction: Plasmoid.activated()
 
     Kirigami.Icon {
         id: mainIcon
