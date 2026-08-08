@@ -121,10 +121,23 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
         wrapper.write_text(
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
+            "a11y_log=\"${AI_USAGE_PHASE0_OUTER_LOG}.a11y\"\n"
+            "/usr/libexec/at-spi-bus-launcher --launch-immediately "
+            ">>\"$a11y_log\" 2>&1 &\n"
+            "a11y_pid=$!\n"
+            "sleep 0.25\n"
+            "/usr/libexec/at-spi2-registryd --use-gnome-session "
+            ">>\"$a11y_log\" 2>&1 &\n"
+            "a11y_registry_pid=$!\n"
+            "sleep 0.25\n"
             "set +e\n"
             "env AI_USAGE_PHASE0_VIRTUAL=1 QT_IM_MODULE= GTK_IM_MODULE= "
             "QT_VIRTUALKEYBOARD_DISABLE=1 " + shlex.join(command) + "\n"
             "status=$?\n"
+            "kill -TERM \"$a11y_registry_pid\" \"$a11y_pid\" "
+            "2>/dev/null || true\n"
+            "wait \"$a11y_registry_pid\" \"$a11y_pid\" "
+            "2>/dev/null || true\n"
             "for service in org.kde.kded6 org.kde.ActivityManager; do\n"
             "  pid=$(busctl --user status \"$service\" 2>/dev/null "
             "| sed -n 's/^PID=//p' | head -n 1)\n"
@@ -275,20 +288,10 @@ export QT_IM_MODULE=
 export GTK_IM_MODULE=
 export QT_VIRTUALKEYBOARD_DISABLE=1
 export WAYLAND_DISPLAY="$OUTER_WAYLAND_DISPLAY"
-/usr/libexec/at-spi-bus-launcher --launch-immediately >>"$4" 2>&1 &
-a11y_pid=$!
-sleep 0.25
-/usr/libexec/at-spi2-registryd --use-gnome-session >>"$4" 2>&1 &
-a11y_registry_pid=$!
 setsid /usr/bin/plasmashell >>"$4" 2>&1 &
 plasmashell_pid=$!
 binding_pid=""
 cleanup() {
-  for service in org.kde.kded6 org.kde.ActivityManager; do
-    service_pid="$(busctl --user status "$service" 2>/dev/null \
-      | sed -n 's/^PID=//p' | head -n 1)"
-    [[ -n "$service_pid" ]] && kill -TERM "$service_pid" >/dev/null 2>&1 || true
-  done
   [[ -n "$binding_pid" ]] && kill -TERM "$binding_pid" >/dev/null 2>&1 || true
   kill -TERM "$plasmashell_pid" >/dev/null 2>&1 || true
   for _ in $(seq 1 40); do
@@ -298,8 +301,11 @@ cleanup() {
   kill -0 "$plasmashell_pid" >/dev/null 2>&1 \
     && kill -KILL -- "-$plasmashell_pid" >/dev/null 2>&1 || true
   wait "$plasmashell_pid" >/dev/null 2>&1 || true
-  kill -TERM "$a11y_pid" >/dev/null 2>&1 || true
-  kill -TERM "$a11y_registry_pid" >/dev/null 2>&1 || true
+  for service in org.kde.kded6 org.kde.ActivityManager; do
+    service_pid="$(busctl --user status "$service" 2>/dev/null \
+      | sed -n 's/^PID=//p' | head -n 1)"
+    [[ -n "$service_pid" ]] && kill -TERM "$service_pid" >/dev/null 2>&1 || true
+  done
 }
 trap cleanup EXIT
 ready=0
@@ -379,7 +385,7 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
     with session_shell_log.open("w", encoding="utf-8") as session_stream:
         result = subprocess.run(
             [
-                "dbus-run-session", "--", "bash", "-c", inner, "v18-panel",
+                "bash", "-c", inner, "v18-panel",
                 socket_name, panel_script,
                 str(ROOT / "scripts/demo/measure_panel_accessible.py"),
                 str(nested_log), str(request_log), str(measurement_log),
@@ -453,14 +459,11 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
         qml_path.write_text(
             qml_source.replace(target, replacement, 1), encoding="utf-8"
         )
-    outer_display = os.environ.get("WAYLAND_DISPLAY", "wayland-0")
-    if not outer_display.startswith("/"):
-        outer_display = str(
-            Path(os.environ["XDG_RUNTIME_DIR"]) / outer_display
-        )
     env.update(
         {
-            "OUTER_WAYLAND_DISPLAY": outer_display,
+            "OUTER_WAYLAND_DISPLAY": os.environ.get(
+                "WAYLAND_DISPLAY", "wayland-0"
+            ),
             "OUTER_DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", ""),
             "PLASMA_AI_MONITOR_DEMO": "1",
             "AIUSAGE_MONITOR_CATALOG_DIR": str(
@@ -484,8 +487,6 @@ def run_sample(
     warmup: bool,
 ) -> dict[str, Any]:
     sample_root.mkdir(mode=0o700, parents=True)
-    runtime_dir = sample_root / "runtime"
-    runtime_dir.mkdir(mode=0o700)
     port = available_port()
     request_log = sample_root / "requests.jsonl"
     trace_path = sample_root / "performance.jsonl"
@@ -505,7 +506,6 @@ def run_sample(
     )
     try:
         sample_env = dict(env)
-        sample_env["XDG_RUNTIME_DIR"] = str(runtime_dir)
         sample_env["PLASMA_AI_MONITOR_DEMO_BASE_URL"] = (
             f"http://127.0.0.1:{port}"
         )
