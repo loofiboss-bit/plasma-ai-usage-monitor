@@ -35,10 +35,19 @@ PlasmaExtras.Representation {
         id: popupContent
         anchors.fill: parent
         asynchronous: true
-        Component.onCompleted: setSource(
-            Qt.resolvedUrl("FullRepresentation.qml"),
-            { "monitor": popupRoot.monitor }
-        )
+    }
+
+    FrameAnimation {
+        running: true
+        onTriggered: {
+            stop();
+            Qt.callLater(function() {
+                popupContent.setSource(
+                    Qt.resolvedUrl("FullRepresentation.qml"),
+                    { "monitor": popupRoot.monitor }
+                );
+            });
+        }
     }
 
     PlasmaComponents.Label {
