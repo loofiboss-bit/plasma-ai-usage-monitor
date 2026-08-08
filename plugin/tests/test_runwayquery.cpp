@@ -135,6 +135,7 @@ private Q_SLOTS:
     void budgetActualEstimatedSeparation();
     void databaseQueryAndConnectionCleanup();
     void asynchronousSupersessionAndCleanup();
+    void cacheHitAndInvalidation();
     void localizedReasonsAreComplete();
     void performanceAtOneHundredThousandObservations();
 };
@@ -472,6 +473,32 @@ void RunwayQueryTest::asynchronousSupersessionAndCleanup()
     QTRY_COMPARE_WITH_TIMEOUT(model.pendingWorkerCount(), 0, 5000);
     QVERIFY(!model.isBusy());
     QCOMPARE(runwayConnectionCount(), 0);
+}
+
+void RunwayQueryTest::cacheHitAndInvalidation()
+{
+    GuardrailModel model;
+    QSignalSpy completedSpy(&model, &GuardrailModel::completed);
+    RunwayQuery::BudgetRequest request = budgetRequest();
+    const QVariantMap query {
+        { QStringLiteral("generatedAt"), Now },
+        { QStringLiteral("budgetSeries"), QVariantList { budgetMap(request) } },
+        { QStringLiteral("observationRevision"), 1 },
+        { QStringLiteral("policyRevision"), 1 },
+    };
+
+    model.refreshWithQuery(query);
+    QTRY_COMPARE_WITH_TIMEOUT(completedSpy.count(), 1, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(model.pendingWorkerCount(), 0, 3000);
+
+    model.refreshWithQuery(query);
+    QCOMPARE(completedSpy.count(), 2);
+    QCOMPARE(model.pendingWorkerCount(), 0);
+
+    model.invalidateCache();
+    model.refreshWithQuery(query);
+    QTRY_COMPARE_WITH_TIMEOUT(completedSpy.count(), 3, 3000);
+    QTRY_COMPARE_WITH_TIMEOUT(model.pendingWorkerCount(), 0, 3000);
 }
 
 void RunwayQueryTest::localizedReasonsAreComplete()

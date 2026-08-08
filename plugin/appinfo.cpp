@@ -216,7 +216,7 @@ const QSet<QString> &nextActions()
 }
 } // namespace
 
-AppInfo::AppInfo(QObject *parent) : QObject(parent) {}
+AppInfo::AppInfo(QObject *parent) : QObject(parent) { m_performanceTimer.start(); }
 
 QString AppInfo::version() const { return QStringLiteral(AIUSAGE_MONITOR_VERSION); }
 
@@ -227,6 +227,25 @@ bool AppInfo::demoMode() const { return qEnvironmentVariableIsSet("PLASMA_AI_MON
 QString AppInfo::smokeView() const
 {
     return qEnvironmentVariable("PLASMA_AI_MONITOR_SMOKE_VIEW").trimmed().toLower();
+}
+
+void AppInfo::performanceMark(const QString &name) const
+{
+    const QString path = qEnvironmentVariable("PLASMA_AI_MONITOR_PERF_TRACE").trimmed();
+    const QString safeName = name.trimmed();
+    if (path.isEmpty() || safeName.isEmpty()) {
+        return;
+    }
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        return;
+    }
+    const QJsonObject event {
+        { QStringLiteral("name"), safeName },
+        { QStringLiteral("elapsedMs"), static_cast<double>(m_performanceTimer.elapsed()) },
+    };
+    file.write(QJsonDocument(event).toJson(QJsonDocument::Compact));
+    file.write("\n");
 }
 
 QVariantMap AppInfo::inspectInstallation(const QString &frontendVersion,

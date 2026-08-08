@@ -2,6 +2,7 @@
 #define APPINFO_H
 
 #include <QObject>
+#include <QElapsedTimer>
 #include <QString>
 #include <QStringList>
 #include <QVariantMap>
@@ -32,6 +33,7 @@ public:
 
     Q_INVOKABLE bool exportConfig(const QString &jsonConfig, const QString &filePath) const;
     Q_INVOKABLE QString importConfig(const QString &filePath) const;
+    Q_INVOKABLE void performanceMark(const QString &name) const;
 
     static QVariantMap inspectInstallation(const QString &frontendVersion,
                                            const QString &userDataRoot,
@@ -41,6 +43,9 @@ public:
     static QVariantMap inspectDatabase(const QString &databasePath);
     static QString formatSupportReport(const QVariantMap &systemContext,
                                        const QVariantMap &runtimeContext);
+
+private:
+    mutable QElapsedTimer m_performanceTimer;
 };
 
 #endif // APPINFO_H

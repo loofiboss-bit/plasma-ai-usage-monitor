@@ -67,6 +67,7 @@ public:
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void refreshWithQuery(const QVariantMap &query);
     Q_INVOKABLE void cancel();
+    Q_INVOKABLE void invalidateCache();
     Q_INVOKABLE QString localizedReason(const QString &reasonKey) const;
 
 Q_SIGNALS:
@@ -80,6 +81,7 @@ Q_SIGNALS:
 private:
     struct Work {
         int generation = 0;
+        QByteArray cacheKey;
         std::shared_ptr<std::atomic_bool> cancelled;
         QFutureWatcher<QVariantList> *watcher = nullptr;
     };
@@ -87,12 +89,15 @@ private:
     void start(const QVariantMap &query);
     void finish(const std::shared_ptr<Work> &work);
     QVariantMap decorated(const QVariantMap &forecast) const;
+    QByteArray cacheKey(const QVariantMap &query) const;
 
     QVariantMap m_query;
     QVariantList m_forecasts;
     int m_generation = 0;
     int m_pendingWorkerCount = 0;
     QList<std::shared_ptr<Work>> m_work;
+    QHash<QByteArray, QVariantList> m_cache;
+    QList<QByteArray> m_cacheOrder;
 };
 
 #endif // GUARDRAILMODEL_H

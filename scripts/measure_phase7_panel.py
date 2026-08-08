@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Measure a real Plasma panel popup in an isolated nested session."""
+"""Compare exact v17 and candidate panel popup performance in isolated sessions."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import platform
 import shutil
 import socket
 import statistics
@@ -13,25 +14,67 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 from measure_phase7_runtime import candidate_environment
 
 ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_RUNS = 20
+DEFAULT_WARMUPS = 3
 
 
 def available_port() -> int:
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
-        return listener.getsockname()[1]
+        return int(listener.getsockname()[1])
+
+
+def percentile95(values: list[int]) -> float:
+    ordered = sorted(values)
+    if not ordered:
+        raise ValueError("cannot calculate p95 without samples")
+    position = 0.95 * (len(ordered) - 1)
+    lower = int(position)
+    upper = min(lower + 1, len(ordered) - 1)
+    fraction = position - lower
+    return round(ordered[lower] + (ordered[upper] - ordered[lower]) * fraction, 2)
+
+
+def trace_summary(path: Path) -> dict[str, Any]:
+    events: dict[str, float] = {}
+    if path.exists():
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            event = json.loads(line)
+            events[str(event["name"])] = float(event["elapsedMs"])
+
+    def duration(start: str, end: str) -> float | None:
+        if start not in events or end not in events:
+            return None
+        return max(0.0, round(events[end] - events[start], 2))
+
+    return {
+        "events": events,
+        "qml_component_creation_ms": duration(
+            "full_representation_created", "destination_component_loaded"
+        ),
+        "database_queries_ms": duration("database_init_start", "database_init_end"),
+        "guardrail_queries_ms": duration("guardrail_query_start", "guardrail_query_end"),
+        "chart_preparation_ms": duration(
+            "destination_component_loaded", "first_rendered_frame"
+        ),
+        "first_rendered_frame_ms": events.get("first_rendered_frame"),
+    }
 
 
 def run_panel_session(
-    env: dict[str, str], runtime_root: Path, request_log: Path
-) -> dict[str, int]:
+    env: dict[str, str], runtime_root: Path, request_log: Path, trace_path: Path
+) -> dict[str, Any]:
     nested_log = runtime_root / "nested-plasma.log"
     measurement_log = runtime_root / "panel-measurement.json"
     measurement_error = runtime_root / "panel-measurement.log"
-    socket_name = f"wayland-ai-monitor-phase7-{os.getpid()}-{time.time_ns()}"
+    socket_name = f"wayland-ai-monitor-v18-{os.getpid()}-{time.time_ns()}"
     panel_script = (
         "var existing=panels();"
         "for(var i=0;i<existing.length;++i)existing[i].remove();"
@@ -45,17 +88,16 @@ def run_panel_session(
     )
     inner = r"""
 set -euo pipefail
-/usr/libexec/at-spi-bus-launcher --launch-immediately \
-  >>"$4" 2>&1 &
+export QT_IM_MODULE=compose
+export QT_VIRTUALKEYBOARD_DISABLE=1
+/usr/libexec/at-spi-bus-launcher --launch-immediately >>"$4" 2>&1 &
 a11y_pid=$!
 sleep 0.25
-/usr/libexec/at-spi2-registryd --use-gnome-session \
-  >>"$4" 2>&1 &
+/usr/libexec/at-spi2-registryd --use-gnome-session >>"$4" 2>&1 &
 a11y_registry_pid=$!
 setsid kwin_wayland --wayland-display "$OUTER_WAYLAND_DISPLAY" -s "$1" \
   --width 1600 --height 900 --scale 1 --xwayland --no-lockscreen \
-  --no-global-shortcuts --exit-with-session /usr/bin/plasmashell \
-  >"$4" 2>&1 &
+  --no-global-shortcuts --exit-with-session /usr/bin/plasmashell >"$4" 2>&1 &
 kwin_pid=$!
 cleanup() {
   kill -TERM -- "-$kwin_pid" >/dev/null 2>&1 || true
@@ -72,12 +114,7 @@ for _ in $(seq 1 45); do
   fi
   sleep 1
 done
-if [[ "$ready" -ne 1 ]]; then
-  echo "Nested Plasma panel did not become ready" >&2
-  exit 1
-fi
-busctl --user set-property org.kde.plasmashell /PlasmaShell \
-  org.kde.PlasmaShell editMode b false >/dev/null 2>&1 || true
+[[ "$ready" -eq 1 ]] || { echo "Nested Plasma panel did not become ready" >&2; exit 1; }
 sleep 2
 match_output="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
   busctl --user call org.kde.KWin /WindowsRunner org.kde.krunner1 \
@@ -91,33 +128,30 @@ while IFS= read -r candidate_id; do
     match_id="$candidate_id"
     break
   fi
-done < <(printf '%s\n' "$match_output" \
-  | rg -o '"0_\{[^"]+\}"' | tr -d '"' || true)
+done < <(printf '%s\n' "$match_output" | rg -o '"0_\{[^\"]+\}"' | tr -d '"' || true)
 if [[ -n "$match_id" ]]; then
   DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
     busctl --user call org.kde.KWin /WindowsRunner org.kde.krunner1 \
     Run ss "$match_id" "" >/dev/null 2>&1 || true
 fi
-sleep 2
-timeout 55s python3 "$3" --request-log "$5" >"$6" 2>"$7"
+sleep 1
+plasmashell_pid="$(pgrep -P "$kwin_pid" -x plasmashell | head -n 1 || true)"
+if [[ -z "$plasmashell_pid" ]]; then
+  plasmashell_pid="$(pgrep -n -x plasmashell)"
+fi
+[[ -n "$plasmashell_pid" ]] || { echo "Nested plasmashell PID not found" >&2; exit 1; }
+timeout 55s python3 "$3" --request-log "$5" --pid "$plasmashell_pid" >"$6" 2>"$7"
 """
-    command = [
-        "dbus-run-session",
-        "--",
-        "bash",
-        "-c",
-        inner,
-        "phase7-panel",
-        socket_name,
-        panel_script,
-        str(ROOT / "scripts/demo/measure_panel_accessible.py"),
-        str(nested_log),
-        str(request_log),
-        str(measurement_log),
-        str(measurement_error),
-    ]
+    env = dict(env)
+    env["PLASMA_AI_MONITOR_PERF_TRACE"] = str(trace_path)
     result = subprocess.run(
-        command,
+        [
+            "dbus-run-session", "--", "bash", "-c", inner, "v18-panel",
+            socket_name, panel_script,
+            str(ROOT / "scripts/demo/measure_panel_accessible.py"),
+            str(nested_log), str(request_log), str(measurement_log),
+            str(measurement_error),
+        ],
         cwd=ROOT,
         env=env,
         text=True,
@@ -126,152 +160,143 @@ timeout 55s python3 "$3" --request-log "$5" >"$6" 2>"$7"
         timeout=120,
         check=False,
     )
-    if result.returncode != 0:
-        detail = (
-            measurement_error.read_text(encoding="utf-8").strip()
-            if measurement_error.exists()
-            else ""
-        )
+    if result.returncode != 0 or not measurement_log.exists():
+        detail = measurement_error.read_text(encoding="utf-8").strip() if measurement_error.exists() else ""
         if nested_log.exists():
             detail += "\n" + nested_log.read_text(encoding="utf-8")[-4000:]
-        raise RuntimeError(detail)
-    if not measurement_log.exists():
-        raise RuntimeError("Panel measurement returned no JSON")
-    return json.loads(measurement_log.read_text(encoding="utf-8"))
+        raise RuntimeError(detail.strip() or "Panel measurement returned no JSON")
+    measurement = json.loads(measurement_log.read_text(encoding="utf-8"))
+    measurement["trace"] = trace_summary(trace_path)
+    return measurement
+
+
+def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]:
+    env = candidate_environment(build_dir.resolve(), runtime_root)
+    env.update(
+        {
+            "OUTER_WAYLAND_DISPLAY": os.environ.get("WAYLAND_DISPLAY", "wayland-0"),
+            "OUTER_DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", ""),
+            "PLASMA_AI_MONITOR_DEMO": "1",
+            "QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "1",
+            "QT_ACCESSIBILITY": "1",
+        }
+    )
+    return env
+
+
+def run_sample(variant: str, build_dir: Path, sample: int, warmup: bool) -> dict[str, Any]:
+    with tempfile.TemporaryDirectory(
+        prefix=f"ai-monitor-v18-{variant}-", ignore_cleanup_errors=True
+    ) as temporary:
+        runtime_root = Path(temporary)
+        env = installed_environment(build_dir, runtime_root)
+        port = available_port()
+        request_log = runtime_root / "requests.jsonl"
+        trace_path = runtime_root / "performance.jsonl"
+        server = subprocess.Popen(
+            ["python3", str(ROOT / "scripts/demo/mock_ai_usage_server.py"), "--port", str(port), "--request-log", str(request_log)],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        try:
+            env["PLASMA_AI_MONITOR_DEMO_BASE_URL"] = f"http://127.0.0.1:{port}"
+            time.sleep(0.25)
+            if server.poll() is not None:
+                raise RuntimeError("Mock server failed to start")
+            result = run_panel_session(env, runtime_root, request_log, trace_path)
+            result.update({"variant": variant, "sample": sample, "warmup": warmup, "valid": True})
+            return result
+        finally:
+            server.terminate()
+            try:
+                server.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait(timeout=3)
+
+
+def summarize(name: str, samples: list[dict[str, Any]]) -> dict[str, Any]:
+    first = [int(item["first_panel_popup_ms"]) for item in samples]
+    warm = [int(item["warm_panel_popup_ms"]) for item in samples]
+    return {
+        "variant": name,
+        "samples": samples,
+        "first_ms": first,
+        "first_median_ms": statistics.median(first),
+        "first_p95_ms": percentile95(first),
+        "warm_ms": warm,
+        "warm_median_ms": statistics.median(warm),
+        "warm_p95_ms": percentile95(warm),
+        "startup_network_requests": [item["startup_network_requests"] for item in samples],
+        "fresh_popup_network_requests": [item["fresh_popup_network_requests"] for item in samples],
+    }
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--mode", choices=("installed", "candidate"), required=True
-    )
-    parser.add_argument("--build-dir", type=Path, default=Path("build/release"))
-    parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--baseline-build-dir", type=Path, required=True)
+    parser.add_argument("--candidate-build-dir", type=Path, required=True)
+    parser.add_argument("--runs", type=int, default=DEFAULT_RUNS)
+    parser.add_argument("--warmups", type=int, default=DEFAULT_WARMUPS)
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    if args.runs < 1:
-        parser.error("--runs must be positive")
-    required = (
-        "bash",
-        "busctl",
-        "dbus-run-session",
-        "kwin_wayland",
-        "plasmashell",
-        "rg",
-        "setsid",
-        "timeout",
-    )
-    missing = [command for command in required if shutil.which(command) is None]
-    for executable in (
-        Path("/usr/libexec/at-spi-bus-launcher"),
-        Path("/usr/libexec/at-spi2-registryd"),
-    ):
-        if not executable.is_file():
-            missing.append(str(executable))
+    if args.runs < 1 or args.warmups < 0:
+        parser.error("--runs must be positive and --warmups non-negative")
+    missing = [name for name in ("bash", "busctl", "dbus-run-session", "kwin_wayland", "pgrep", "plasmashell", "rg", "setsid", "timeout") if shutil.which(name) is None]
+    missing += [str(path) for path in (Path("/usr/libexec/at-spi-bus-launcher"), Path("/usr/libexec/at-spi2-registryd")) if not path.is_file()]
     if missing:
         parser.error("Missing commands: " + ", ".join(missing))
 
-    measurements: list[dict[str, int]] = []
-    with tempfile.TemporaryDirectory(
-        prefix="ai-monitor-phase7-panel-", ignore_cleanup_errors=True
-    ) as temporary:
-        runtime_root = Path(temporary)
-        env = os.environ.copy()
-        if args.mode == "candidate":
-            env = candidate_environment(args.build_dir.resolve(), runtime_root)
-        else:
-            env.update(
-                {
-                    "XDG_DATA_HOME": str(runtime_root / "data"),
-                    "XDG_CONFIG_HOME": str(runtime_root / "config"),
-                    "XDG_CACHE_HOME": str(runtime_root / "cache"),
-                }
-            )
-        env.update(
-            {
-                "OUTER_WAYLAND_DISPLAY": os.environ.get(
-                    "WAYLAND_DISPLAY", "wayland-0"
-                ),
-                "OUTER_DBUS_SESSION_BUS_ADDRESS": os.environ.get(
-                    "DBUS_SESSION_BUS_ADDRESS", ""
-                ),
-                "PLASMA_AI_MONITOR_DEMO": "1",
-                "QT_LINUX_ACCESSIBILITY_ALWAYS_ON": "1",
-                "QT_ACCESSIBILITY": "1",
-            }
-        )
+    boot_id = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="utf-8").strip()
+    measured: dict[str, list[dict[str, Any]]] = {"baseline": [], "candidate": []}
+    errors: list[dict[str, Any]] = []
+    total = args.warmups + args.runs
+    for index in range(total):
+        order = ("baseline", "candidate") if index % 2 == 0 else ("candidate", "baseline")
+        for variant in order:
+            build = args.baseline_build_dir if variant == "baseline" else args.candidate_build_dir
+            try:
+                item = run_sample(variant, build, index, index < args.warmups)
+                if index >= args.warmups:
+                    measured[variant].append(item)
+            except Exception as error:  # invalid samples are evidence, never discarded
+                errors.append({"variant": variant, "sample": index, "error": str(error)})
 
-        for run in range(args.runs):
-            last_error: RuntimeError | None = None
-            for attempt in range(3):
-                port = available_port()
-                request_log = runtime_root / f"requests-{run}-{attempt}.jsonl"
-                server = subprocess.Popen(
-                    [
-                        "python3",
-                        str(ROOT / "scripts/demo/mock_ai_usage_server.py"),
-                        "--port",
-                        str(port),
-                        "--request-log",
-                        str(request_log),
-                    ],
-                    cwd=ROOT,
-                    text=True,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                try:
-                    env["PLASMA_AI_MONITOR_DEMO_BASE_URL"] = (
-                        f"http://127.0.0.1:{port}"
-                    )
-                    time.sleep(0.25)
-                    if server.poll() is not None:
-                        raise RuntimeError("Mock server failed to start")
-                    measurements.append(
-                        run_panel_session(env, runtime_root, request_log)
-                    )
-                    last_error = None
-                    break
-                except RuntimeError as error:
-                    last_error = error
-                finally:
-                    server.terminate()
-                    try:
-                        server.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        server.kill()
-                        server.wait(timeout=3)
-            if last_error is not None:
-                raise last_error
-
-    result = {
-        "schema": 1,
-        "mode": args.mode,
+    valid = not errors and all(len(rows) == args.runs for rows in measured.values())
+    result: dict[str, Any] = {
+        "schema": 2,
+        "valid": valid,
+        "bootId": boot_id,
+        "outerSession": os.environ.get("XDG_SESSION_ID", ""),
+        "environment": {"platform": platform.platform(), "plasma": subprocess.run(["plasmashell", "--version"], text=True, stdout=subprocess.PIPE, check=False).stdout.strip()},
         "runs": args.runs,
-        "first_panel_popup_ms": [
-            item["first_panel_popup_ms"] for item in measurements
-        ],
-        "first_panel_popup_median_ms": statistics.median(
-            item["first_panel_popup_ms"] for item in measurements
-        ),
-        "warm_panel_popup_ms": [
-            item["warm_panel_popup_ms"] for item in measurements
-        ],
-        "warm_panel_popup_median_ms": statistics.median(
-            item["warm_panel_popup_ms"] for item in measurements
-        ),
-        "startup_network_requests": [
-            item["startup_network_requests"] for item in measurements
-        ],
-        "fresh_popup_network_requests": [
-            item["fresh_popup_network_requests"] for item in measurements
-        ],
+        "warmups": args.warmups,
+        "errors": errors,
     }
+    if valid:
+        baseline = summarize("baseline", measured["baseline"])
+        candidate = summarize("candidate", measured["candidate"])
+        gates = {
+            "first_median_max_125": candidate["first_median_ms"] <= 125,
+            "warm_median_max_125": candidate["warm_median_ms"] <= 125,
+            "first_p95_max_180": candidate["first_p95_ms"] <= 180,
+            "warm_p95_max_180": candidate["warm_p95_ms"] <= 180,
+            "first_no_regression": candidate["first_median_ms"] <= baseline["first_median_ms"],
+            "warm_no_regression": candidate["warm_median_ms"] <= baseline["warm_median_ms"],
+            "fresh_popup_zero_network": all(value == 0 for value in candidate["fresh_popup_network_requests"]),
+        }
+        result.update({"baseline": baseline, "candidate": candidate, "gates": gates, "passed": all(gates.values())})
+    else:
+        result["passed"] = False
     rendered = json.dumps(result, indent=2) + "\n"
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered, encoding="utf-8")
     print(rendered, end="")
+    if not result["passed"]:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

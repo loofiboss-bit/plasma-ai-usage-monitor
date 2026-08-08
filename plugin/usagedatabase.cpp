@@ -881,6 +881,7 @@ void UsageDatabase::recordSnapshot(
     } else {
         m_lastWriteTime[provider] = now;
         m_lastWrittenState[provider] = normalizedState;
+        Q_EMIT observationsChanged();
     }
 }
 
@@ -1032,7 +1033,11 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider,
             return false;
         }
     }
-    return m_db.commit();
+    const bool committed = m_db.commit();
+    if (committed) {
+        Q_EMIT observationsChanged();
+    }
+    return committed;
 }
 
 bool UsageDatabase::recordGuardrailTransition(const QVariantMap &forecast, const QString &transition)
@@ -1234,6 +1239,7 @@ void UsageDatabase::recordToolSnapshot(const QString &toolName, int usageCount,
     } else {
         m_lastWriteTime[throttleKey] = now;
         m_lastWrittenState[throttleKey] = normalizedState;
+        Q_EMIT observationsChanged();
     }
 }
 

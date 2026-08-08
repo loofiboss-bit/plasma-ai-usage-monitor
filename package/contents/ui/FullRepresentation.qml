@@ -189,6 +189,7 @@ PlasmaExtras.Representation {
                   : fullRoot.destination === 1 ? "views/HistoryView.qml"
                   : "views/AnalystView.qml"
             onLoaded: {
+                AppInfo.performanceMark("destination_component_loaded");
                 item.monitor = fullRoot.monitor;
                 if (fullRoot.sourceDetailVisible) {
                     item.sourceId = fullRoot.detailSourceId;
@@ -242,6 +243,10 @@ PlasmaExtras.Representation {
     }
 
     Component.onCompleted: {
+        AppInfo.performanceMark("full_representation_created");
+        Qt.callLater(function() {
+            AppInfo.performanceMark("first_rendered_frame");
+        });
         if (AppInfo.smokeView === "settings") {
             Qt.callLater(function() {
                 var configureAction = Plasmoid.internalAction("configure");

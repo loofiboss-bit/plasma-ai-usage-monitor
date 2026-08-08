@@ -1,4 +1,5 @@
 import QtQuick
+import com.github.loofi.aiusagemonitor 1.0 as MonitorPlugin
 
 Item {
     id: runtime
@@ -104,6 +105,7 @@ Item {
 
     function refreshGuardrails() {
         if (!guardrailModel) return;
+        MonitorPlugin.AppInfo.performanceMark("guardrail_query_start");
         if (!configuration.forecastUiEnabled) {
             guardrailModel.refreshWithQuery({});
             return;
@@ -472,7 +474,9 @@ Item {
     Component.onCompleted: {
         connectProviderSignals();
         connectToolSignals();
+        MonitorPlugin.AppInfo.performanceMark("database_init_start");
         usageDatabase.init();
+        MonitorPlugin.AppInfo.performanceMark("database_init_end");
         scheduleGuardrailRefresh();
         syncMetricsPayload();
         startupTimer.start();
@@ -493,7 +497,17 @@ Item {
         target: runtime.guardrailModel
 
         function onForecastsChanged() {
+            MonitorPlugin.AppInfo.performanceMark("guardrail_query_end");
             runtime.syncMetricsPayload();
+        }
+    }
+
+    Connections {
+        target: runtime.usageDatabase
+
+        function onObservationsChanged() {
+            runtime.guardrailModel.invalidateCache();
+            runtime.scheduleGuardrailRefresh();
         }
     }
 

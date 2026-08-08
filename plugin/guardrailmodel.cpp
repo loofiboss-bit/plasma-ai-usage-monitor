@@ -4,6 +4,8 @@
 #include "runwayquery.h"
 
 #include <KLocalizedString>
+#include <QCryptographicHash>
+#include <QJsonDocument>
 #include <QtConcurrentRun>
 
 #include <algorithm>
@@ -98,6 +100,12 @@ void GuardrailModel::cancel()
     }
 }
 
+void GuardrailModel::invalidateCache()
+{
+    m_cache.clear();
+    m_cacheOrder.clear();
+}
+
 QString GuardrailModel::localizedReason(const QString &reasonKey) const
 {
     if (reasonKey == QLatin1String("insufficient_samples")) {
@@ -162,9 +170,21 @@ void GuardrailModel::start(const QVariantMap &query)
         previous->cancelled->store(true);
     }
 
+    const QByteArray key = cacheKey(query);
+    const auto cached = m_cache.constFind(key);
+    if (cached != m_cache.cend()) {
+        beginResetModel();
+        m_forecasts = cached.value();
+        endResetModel();
+        Q_EMIT forecastsChanged();
+        Q_EMIT completed(m_generation);
+        return;
+    }
+
     auto work = std::make_shared<Work>();
     work->generation = m_generation;
     work->cancelled = std::make_shared<std::atomic_bool>(false);
+    work->cacheKey = key;
     work->watcher = new QFutureWatcher<QVariantList>(this);
     m_work.append(work);
     const bool wasBusy = isBusy();
@@ -193,6 +213,12 @@ void GuardrailModel::finish(const std::shared_ptr<Work> &work)
         beginResetModel();
         m_forecasts = forecasts;
         endResetModel();
+        m_cache.insert(work->cacheKey, forecasts);
+        m_cacheOrder.removeAll(work->cacheKey);
+        m_cacheOrder.append(work->cacheKey);
+        while (m_cacheOrder.size() > 16) {
+            m_cache.remove(m_cacheOrder.takeFirst());
+        }
         Q_EMIT forecastsChanged();
         Q_EMIT completed(work->generation);
     }
@@ -205,6 +231,18 @@ void GuardrailModel::finish(const std::shared_ptr<Work> &work)
     if (wasBusy != isBusy()) {
         Q_EMIT busyChanged();
     }
+}
+
+QByteArray GuardrailModel::cacheKey(const QVariantMap &query) const
+{
+    QVariantMap canonical = query;
+    const QDateTime generatedAt = canonical.value(QStringLiteral("generatedAt")).toDateTime();
+    if (generatedAt.isValid()) {
+        const qint64 minuteBucket = generatedAt.toUTC().toSecsSinceEpoch() / 60;
+        canonical.insert(QStringLiteral("generatedAt"), minuteBucket);
+    }
+    return QCryptographicHash::hash(QJsonDocument::fromVariant(canonical).toJson(QJsonDocument::Compact),
+                                    QCryptographicHash::Sha256);
 }
 
 QVariantMap GuardrailModel::decorated(const QVariantMap &forecast) const

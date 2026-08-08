@@ -290,6 +290,7 @@ Q_SIGNALS:
     void enabledChanged();
     void retentionDaysChanged();
     void pendingWorkerCountChanged();
+    void observationsChanged();
     void historyReady(const QString &requestId, const QVariantMap &payload);
     void comparisonReady(const QString &requestId, const QVariantList &series);
     void historyCatalogReady(const QString &requestId, const QVariantList &sources);
