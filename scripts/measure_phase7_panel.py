@@ -296,21 +296,26 @@ for _ in $(seq 1 45); do
 done
 [[ "$ready" -eq 1 ]] || { echo "Nested Plasma panel did not become ready" >&2; exit 1; }
 sleep 2
-match_output="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
-  busctl --user call org.kde.KWin /WindowsRunner org.kde.krunner1 \
-  Match s "KDE Wayland Compositor" 2>/dev/null || true)"
 match_id=""
-while IFS= read -r candidate_id; do
-  candidate_info="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
-    busctl --user call org.kde.KWin /KWin org.kde.KWin \
-    getWindowInfo s "${candidate_id#0_}" 2>/dev/null || true)"
-  if rg -q "\"pid\" [a-z]+ $kwin_pid([[:space:]]|$)" <<<"$candidate_info"; then
-    match_id="$candidate_id"
-    break
-  fi
-done < <(printf '%s\n' "$match_output" | rg -o '"0_\{[^\"]+\}"' | tr -d '"' || true)
+match_output=""
+for _ in $(seq 1 80); do
+  match_output="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
+    busctl --user call org.kde.KWin /WindowsRunner org.kde.krunner1 \
+    Match s "KDE Wayland Compositor" 2>/dev/null || true)"
+  while IFS= read -r candidate_id; do
+    candidate_info="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
+      busctl --user call org.kde.KWin /KWin org.kde.KWin \
+      getWindowInfo s "${candidate_id#0_}" 2>/dev/null || true)"
+    if rg -q "\"pid\" [a-z]+ $kwin_pid([[:space:]]|$)" <<<"$candidate_info"; then
+      match_id="$candidate_id"
+      break
+    fi
+  done < <(printf '%s\n' "$match_output" | rg -o '"0_\{[^\"]+\}"' | tr -d '"' || true)
+  [[ -n "$match_id" ]] && break
+  sleep 0.25
+done
 [[ -n "$match_id" ]] || {
-  echo "Outer KWin could not bind the exact nested compositor PID" >&2
+  echo "Outer KWin could not bind nested compositor PID $kwin_pid: $match_output" >&2
   exit 1
 }
 DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
