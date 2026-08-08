@@ -38,7 +38,14 @@ def main() -> None:
         native_monitor,
         "NativeMonitor.qml",
         "fullRepresentationComponent: PopupRepresentation",
-        'readonly property bool popupExpanded: !!Plasmoid["expanded"]',
+        "property bool popupExpanded: false",
+    )
+    main_qml = (UI / "main.qml").read_text(encoding="utf-8")
+    require(
+        main_qml,
+        "main.qml",
+        'property: "popupExpanded"',
+        "value: root.expanded",
     )
     tab_start = representation.index("Kirigami.NavigationTabBar")
     tab_end = representation.index("QQC2.ToolBar", tab_start)

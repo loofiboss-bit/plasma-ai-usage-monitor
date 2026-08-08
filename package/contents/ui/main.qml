@@ -33,6 +33,13 @@ PlasmoidItem {
         runtimeSource: Qt.resolvedUrl("NativeMonitor.qml")
     }
 
+    Binding {
+        target: root.nativeRoot
+        property: "popupExpanded"
+        value: root.expanded
+        when: root.nativeRoot !== null
+    }
+
     Component {
         id: bootstrapCompactRepresentation
 

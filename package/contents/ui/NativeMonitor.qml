@@ -21,10 +21,7 @@ Item {
         var required = Plasmoid["metaData"]?.["version"] || "";
         return required !== "" && required !== AppInfo.version;
     }
-    // Plasma's attached qmltypes omit the runtime expanded member.
-    // qmllint disable missing-property
-    readonly property bool popupExpanded: !!Plasmoid["expanded"]
-    // qmllint enable missing-property
+    property bool popupExpanded: false
     // qmllint enable unresolved-type
 
     readonly property string toolTipSubText: {
