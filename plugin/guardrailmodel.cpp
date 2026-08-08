@@ -108,6 +108,33 @@ void GuardrailModel::invalidateCache()
 
 QString GuardrailModel::localizedReason(const QString &reasonKey) const
 {
+    if (reasonKey == QLatin1String("no-data")) {
+        return i18n("No compatible cost observations are available");
+    }
+    if (reasonKey == QLatin1String("insufficient-samples")) {
+        return i18n("Not enough complete compatible UTC days are available");
+    }
+    if (reasonKey == QLatin1String("mixed-value-class")) {
+        return i18n("Actual and estimated costs cannot be combined");
+    }
+    if (reasonKey == QLatin1String("mixed-currency")) {
+        return i18n("The policy and observations do not use one currency");
+    }
+    if (reasonKey == QLatin1String("scope-unavailable")) {
+        return i18n("The selected budget scope is unavailable");
+    }
+    if (reasonKey == QLatin1String("unstable-reset")) {
+        return i18n("The provider reset is not stable and authenticated");
+    }
+    if (reasonKey == QLatin1String("invalid-policy")) {
+        return i18n("The budget policy is invalid");
+    }
+    if (reasonKey == QLatin1String("query-failed")) {
+        return i18n("The local budget query failed");
+    }
+    if (reasonKey == QLatin1String("unknown-currency")) {
+        return i18n("The currency minor-unit precision is unknown");
+    }
     if (reasonKey == QLatin1String("insufficient_samples")) {
         return i18n("Not enough compatible observations");
     }

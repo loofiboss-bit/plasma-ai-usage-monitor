@@ -2,6 +2,7 @@
 #define RUNWAYQUERY_H
 
 #include "forecastcontract.h"
+#include "quotarunwayquery.h"
 
 #include <QDateTime>
 #include <QList>
@@ -14,23 +15,8 @@
 
 class RunwayQuery final {
 public:
-    struct QuotaSample {
-        QDateTime observedAt;
-        QDateTime resetAt;
-        std::optional<double> remaining;
-        std::optional<double> limit;
-        QString unit;
-        QString source;
-    };
-
-    struct QuotaRequest {
-        QString sourceId;
-        QString sourceKind;
-        QString window;
-        QString scope;
-        QString unit;
-        QList<QuotaSample> samples;
-    };
+    using QuotaSample = QuotaRunwayQuery::Sample;
+    using QuotaRequest = QuotaRunwayQuery::Request;
 
     struct BudgetDay {
         QDateTime periodStart;
@@ -72,10 +58,10 @@ public:
     static QVariantMap methodContract();
     static QString defaultDatabasePath();
 
-    static constexpr int MinimumQuotaSamples = 4;
-    static constexpr qint64 MinimumQuotaSpanSeconds = 15 * 60;
-    static constexpr qint64 MaximumQuotaAgeSeconds = 15 * 60;
-    static constexpr int MaximumTheilSenSamples = 256;
+    static constexpr int MinimumQuotaSamples = QuotaRunwayQuery::MinimumSamples;
+    static constexpr qint64 MinimumQuotaSpanSeconds = QuotaRunwayQuery::MinimumSpanSeconds;
+    static constexpr qint64 MaximumQuotaAgeSeconds = QuotaRunwayQuery::MaximumAgeSeconds;
+    static constexpr int MaximumTheilSenSamples = QuotaRunwayQuery::MaximumTheilSenSamples;
     static constexpr int MinimumBudgetDays = 5;
     static constexpr double MinimumBudgetCoveragePercent = 70.0;
 };

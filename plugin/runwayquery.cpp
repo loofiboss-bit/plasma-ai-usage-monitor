@@ -1,5 +1,8 @@
 #include "runwayquery.h"
 
+#include "budgetobservationquery.h"
+#include "budgetpacingquery.h"
+
 #include <QMap>
 #include <QSet>
 #include <QSqlDatabase>
@@ -394,6 +397,7 @@ QVariantList queryDatabase(
     const QString connectionName
         = QStringLiteral("aiusagemonitor_runway_%1").arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
     bool databaseOk = true;
+    bool wasCancelled = false;
     {
         QSqlDatabase database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
         database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
@@ -402,6 +406,7 @@ QVariantList queryDatabase(
         if (databaseOk) {
             for (const QVariant &entry : request.value(QStringLiteral("quotaSources")).toList()) {
                 if (cancelled && cancelled->load()) {
+                    wasCancelled = true;
                     break;
                 }
                 bool queryOk = true;
@@ -413,6 +418,7 @@ QVariantList queryDatabase(
             }
             for (const QVariant &entry : request.value(QStringLiteral("budgets")).toList()) {
                 if (cancelled && cancelled->load()) {
+                    wasCancelled = true;
                     break;
                 }
                 bool queryOk = true;
@@ -422,6 +428,15 @@ QVariantList queryDatabase(
                     : unavailableBudget(
                           budgetRequestFromMap(entry.toMap()), generatedAt, QStringLiteral("query_failed"));
                 results.append(result.toVariantMap());
+            }
+            for (const QVariant &entry : request.value(QStringLiteral("budgetPolicies")).toList()) {
+                if (cancelled && cancelled->load()) {
+                    wasCancelled = true;
+                    break;
+                }
+                const BudgetPacingQuery::Request pacingRequest
+                    = BudgetObservationQuery::requestFromPolicy(entry.toMap(), generatedAt, database);
+                results.append(BudgetPacingQuery::evaluate(pacingRequest).toVariantMap());
             }
         }
         database.close();
@@ -440,25 +455,30 @@ QVariantList queryDatabase(
                 unavailableBudget(budgetRequestFromMap(entry.toMap()), generatedAt, QStringLiteral("query_failed"))
                     .toVariantMap());
         }
+        for (const QVariant &entry : request.value(QStringLiteral("budgetPolicies")).toList()) {
+            const BudgetPacingQuery::Request pacingRequest
+                = BudgetObservationQuery::requestFromPolicy(entry.toMap(), generatedAt, QSqlDatabase());
+            results.append(BudgetPacingQuery::evaluate(pacingRequest).toVariantMap());
+        }
     }
-    return results;
+    return wasCancelled ? QVariantList {} : results;
 }
 
 } // namespace
 
-ForecastContract::Result RunwayQuery::quotaRunway(const QuotaRequest &request, const QDateTime &generatedAt)
+ForecastContract::Result QuotaRunwayQuery::evaluate(const Request &request, const QDateTime &generatedAt)
 {
     const QDateTime now = generatedAt.toUTC();
-    QList<QuotaSample> samples = request.samples;
+    QList<Sample> samples = request.samples;
     std::sort(samples.begin(), samples.end(),
-        [](const QuotaSample &left, const QuotaSample &right) { return left.observedAt < right.observedAt; });
+        [](const Sample &left, const Sample &right) { return left.observedAt < right.observedAt; });
 
     if (samples.isEmpty()) {
         return unavailableQuota(request, now, QStringLiteral("missing_value"));
     }
     const QDateTime periodEnd = samples.last().resetAt;
     const QString quotaSource = samples.first().source.trimmed().toLower();
-    for (const QuotaSample &sample : std::as_const(samples)) {
+    for (const Sample &sample : std::as_const(samples)) {
         if (!sample.observedAt.isValid() || !sample.resetAt.isValid() || !sample.remaining || !sample.limit
             || !std::isfinite(*sample.remaining) || !std::isfinite(*sample.limit) || *sample.remaining < 0.0
             || *sample.limit <= 0.0 || *sample.remaining > *sample.limit + Epsilon) {
@@ -539,6 +559,11 @@ ForecastContract::Result RunwayQuery::quotaRunway(const QuotaRequest &request, c
     result.state = now.msecsTo(*result.predictedAt) / 1000.0 <= criticalHorizon ? ForecastContract::State::Critical
                                                                                 : ForecastContract::State::Warning;
     return result;
+}
+
+ForecastContract::Result RunwayQuery::quotaRunway(const QuotaRequest &request, const QDateTime &generatedAt)
+{
+    return QuotaRunwayQuery::evaluate(request, generatedAt);
 }
 
 ForecastContract::Result RunwayQuery::budgetPacing(const BudgetRequest &request, const QDateTime &generatedAt)
@@ -679,7 +704,8 @@ QVariantList RunwayQuery::execute(const QVariantMap &request, const std::atomic_
         results.append(budgetPacing(budgetRequestFromMap(entry.toMap()), generatedAt).toVariantMap());
     }
     const bool hasDatabaseDescriptors = !request.value(QStringLiteral("quotaSources")).toList().isEmpty()
-        || !request.value(QStringLiteral("budgets")).toList().isEmpty();
+        || !request.value(QStringLiteral("budgets")).toList().isEmpty()
+        || !request.value(QStringLiteral("budgetPolicies")).toList().isEmpty();
     QString databasePath = request.value(QStringLiteral("databasePath")).toString();
     if (databasePath.isEmpty() && hasDatabaseDescriptors) {
         databasePath = defaultDatabasePath();
@@ -708,6 +734,8 @@ QVariantMap RunwayQuery::methodContract()
         { QStringLiteral("budgetBaseline"), QStringLiteral("median_compatible_completed_utc_day") },
         { QStringLiteral("budgetCriticalRule"),
             QStringLiteral("already_over_budget_or_projected_at_least_110_percent") },
+        { QStringLiteral("budgetPolicyMethodId"), QStringLiteral("budget-pacing-v2") },
+        { QStringLiteral("budgetPolicyUnits"), QStringLiteral("iso_4217_minor_units") },
         { QStringLiteral("strongEvidence"),
             QStringLiteral("quota_8_samples_80_percent_low_mad_budget_10_days_90_percent_fresh_low_mad") },
     };

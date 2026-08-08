@@ -91,6 +91,18 @@ target_link_libraries(test_forecastcontract
 
 add_test(NAME forecastcontract COMMAND test_forecastcontract)
 
+add_executable(test_budgetpacingquery
+    test_budgetpacingquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/billingcycleresolver.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/currencyminorunits.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpacingquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetobservationquery.cpp
+)
+target_include_directories(test_budgetpacingquery PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_budgetpacingquery PRIVATE Qt6::Core Qt6::Test Qt6::Sql)
+add_test(NAME budgetpacingquery COMMAND test_budgetpacingquery)
+
 add_executable(test_budgetpolicyrepository
     test_budgetpolicyrepository.cpp
     ${TEST_BUDGET_POLICY_SRC}
@@ -105,6 +117,10 @@ add_executable(test_runwayquery
     ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
     ${CMAKE_SOURCE_DIR}/plugin/runwayquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/guardrailmodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/billingcycleresolver.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/currencyminorunits.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpacingquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetobservationquery.cpp
 )
 
 target_include_directories(test_runwayquery

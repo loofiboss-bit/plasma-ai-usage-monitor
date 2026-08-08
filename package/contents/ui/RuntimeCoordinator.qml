@@ -13,6 +13,7 @@ Item {
     required property var secrets
     required property var usageDatabase
     required property var guardrailModel
+    required property var budgetPolicyRepository
     required property var scheduler
     required property var metricsServer
     required property var webhookNotifier
@@ -25,6 +26,7 @@ Item {
     required property var antigravityMonitor
 
     property bool startupRefreshCompleted: false
+    property int observationRevision: 0
 
     function buildGuardrailQuery() {
         var quotaSources = [];
@@ -80,9 +82,22 @@ Item {
             }
 
         }
+        var policies = [];
+        var policyRows = budgetPolicyRepository ? budgetPolicyRepository.policies : [];
+        for (var policyIndex = 0; policyIndex < policyRows.length; ++policyIndex) {
+            var policy = Object.assign({}, policyRows[policyIndex]);
+            if (!policy.enabled) continue;
+            var policyProvider = registry.providerByConfigKey(policy.sourceId);
+            policy.provider = policyProvider ? policyProvider.dbName : policy.sourceId;
+            policy.observationScope = "organization";
+            policies.push(policy);
+        }
         return {
             quotaSources: quotaSources,
-            budgets: []
+            budgets: [],
+            budgetPolicies: policies,
+            policyRevision: budgetPolicyRepository ? budgetPolicyRepository.revision : 0,
+            observationRevision: observationRevision
         };
     }
 
@@ -486,9 +501,18 @@ Item {
     }
 
     Connections {
+        target: runtime.budgetPolicyRepository
+        function onPoliciesChanged() {
+            runtime.guardrailModel.invalidateCache();
+            runtime.scheduleGuardrailRefresh();
+        }
+    }
+
+    Connections {
         target: runtime.usageDatabase
 
         function onObservationsChanged() {
+            runtime.observationRevision += 1;
             runtime.guardrailModel.invalidateCache();
             runtime.scheduleGuardrailRefresh();
         }

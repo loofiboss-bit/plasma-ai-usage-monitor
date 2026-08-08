@@ -737,6 +737,7 @@ Item {
         secrets: secrets
         usageDatabase: usageDatabase
         guardrailModel: guardrailModel
+        budgetPolicyRepository: budgetPolicyRepository
         scheduler: refreshScheduler
         metricsServer: metricsServer
         webhookNotifier: webhookNotifier

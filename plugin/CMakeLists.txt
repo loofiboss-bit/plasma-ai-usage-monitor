@@ -30,6 +30,11 @@ set(aiusagemonitor_SRCS
     budgetpolicyschema.cpp
     budgetpolicyrepository.cpp
     budgetpolicymodel.cpp
+    billingcycleresolver.cpp
+    currencyminorunits.cpp
+    budgetobservationquery.cpp
+    budgetpacingquery.cpp
+    quotarunwayquery.cpp
     runwayquery.cpp
     guardrailmodel.cpp
     scopebreakdownquery.cpp
@@ -85,6 +90,11 @@ set(aiusagemonitor_HDRS
     budgetpolicyschema.h
     budgetpolicyrepository.h
     budgetpolicymodel.h
+    billingcycleresolver.h
+    currencyminorunits.h
+    budgetobservationquery.h
+    budgetpacingquery.h
+    quotarunwayquery.h
     runwayquery.h
     guardrailmodel.h
     scopebreakdownquery.h
