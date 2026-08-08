@@ -29,7 +29,7 @@ def main() -> None:
         "PopupRepresentation.qml",
         "asynchronous: true",
         "interval: 500",
-        'running: !!Plasmoid["expanded"]',
+        "running: !!popupRoot.monitor.popupExpanded",
         'Qt.resolvedUrl("FullRepresentation.qml")',
         '{ "monitor": popupRoot.monitor }',
         'i18n("Loading Overview…")',
@@ -38,6 +38,7 @@ def main() -> None:
         native_monitor,
         "NativeMonitor.qml",
         "fullRepresentationComponent: PopupRepresentation",
+        'readonly property bool popupExpanded: !!Plasmoid["expanded"]',
     )
     tab_start = representation.index("Kirigami.NavigationTabBar")
     tab_end = representation.index("QQC2.ToolBar", tab_start)

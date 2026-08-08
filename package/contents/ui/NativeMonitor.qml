@@ -21,6 +21,10 @@ Item {
         var required = Plasmoid["metaData"]?.["version"] || "";
         return required !== "" && required !== AppInfo.version;
     }
+    // Plasma's attached qmltypes omit the runtime expanded member.
+    // qmllint disable missing-property
+    readonly property bool popupExpanded: !!Plasmoid["expanded"]
+    // qmllint enable missing-property
     // qmllint enable unresolved-type
 
     readonly property string toolTipSubText: {
@@ -715,10 +719,7 @@ Item {
         copilotMonitor: copilotMonitor
         antigravityMonitor: antigravityMonitor
         usageDatabase: usageDatabase
-        // Plasma's attached qmltypes omit the runtime expanded member.
-        // qmllint disable missing-property
-        popupOpen: !!Plasmoid["expanded"]
-        // qmllint enable missing-property
+        popupOpen: root.popupExpanded
     }
 
     RuntimeCoordinator {

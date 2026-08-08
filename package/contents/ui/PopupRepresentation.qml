@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Layouts
-import org.kde.plasma.plasmoid
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
@@ -40,11 +39,8 @@ PlasmaExtras.Representation {
 
     Timer {
         interval: 500
-        // Plasma's attached qmltypes omit the runtime expanded member.
-        // qmllint disable missing-property
-        running: !!Plasmoid["expanded"]
+        running: !!popupRoot.monitor.popupExpanded
                  && popupContent.status === Loader.Null
-        // qmllint enable missing-property
         onTriggered: {
             popupContent.setSource(
                 Qt.resolvedUrl("FullRepresentation.qml"),
