@@ -182,6 +182,28 @@ def wait_for_popup_closed(pid: int, timeout: float) -> None:
 
 def press(node) -> None:
     actions = node.get_action_iface()
+    focus_index = next(
+        (
+            index
+            for index in range(actions.get_n_actions())
+            if actions.get_action_name(index).lower() == "setfocus"
+        ),
+        None,
+    )
+    if focus_index is None or not actions.do_action(focus_index):
+        raise RuntimeError(
+            f"Accessible node {node.get_name()!r} could not receive exact focus"
+        )
+    focus_deadline = time.monotonic() + 2
+    while time.monotonic() < focus_deadline:
+        if node.get_state_set().contains(Atspi.StateType.FOCUSED):
+            break
+        time.sleep(0.01)
+    else:
+        raise RuntimeError(
+            f"Accessible node {node.get_name()!r} did not report focused state"
+        )
+
     for index in range(actions.get_n_actions()):
         action = actions.get_action_name(index).lower()
         if action in {"press", "click"} and actions.do_action(index):
