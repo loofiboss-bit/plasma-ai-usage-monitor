@@ -95,6 +95,16 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
         virtual_root = Path(temporary)
         runtime_dir = virtual_root / "runtime"
         runtime_dir.mkdir(mode=0o700)
+        isolated_directories = {
+            "HOME": virtual_root / "home",
+            "XDG_DATA_HOME": virtual_root / "data",
+            "XDG_CONFIG_HOME": virtual_root / "config",
+            "XDG_CACHE_HOME": virtual_root / "cache",
+            "XDG_STATE_HOME": virtual_root / "state",
+            "XDG_CONFIG_DIRS": virtual_root / "config-dirs",
+        }
+        for directory in isolated_directories.values():
+            directory.mkdir(mode=0o700)
         wrapper = virtual_root / "phase0-run"
         command = [sys.executable, str(Path(__file__).resolve()), *arguments]
         wrapper.write_text(
@@ -108,7 +118,10 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
         environment = os.environ.copy()
         environment.update(
             {
+                **{key: str(value) for key, value in isolated_directories.items()},
                 "XDG_RUNTIME_DIR": str(runtime_dir),
+                "XDG_DATA_DIRS": "/usr/local/share:/usr/share",
+                "KDEHOME": str(virtual_root / "kde-home"),
                 "QT_IM_MODULE": "",
                 "GTK_IM_MODULE": "",
                 "QT_VIRTUALKEYBOARD_DISABLE": "1",
