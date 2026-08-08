@@ -118,6 +118,7 @@ add_test(NAME budgetpolicyrepository COMMAND test_budgetpolicyrepository)
 add_executable(test_runwayquery
     test_runwayquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/quotarunwayquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/runwayquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/guardrailmodel.cpp
     ${CMAKE_SOURCE_DIR}/plugin/billingcycleresolver.cpp

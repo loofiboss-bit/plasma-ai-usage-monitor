@@ -30,7 +30,11 @@ METRIC_SOURCES = {
 PROVIDER_BUDGET_SCOPES = {
     "openai": ["aggregate", "project", "line_item"],
     "anthropic": ["aggregate", "workspace", "model", "service_tier", "line_item"],
+    "openrouter": ["aggregate"],
     "litellm": ["aggregate"],
+}
+SUPPORTED_BILLING_CYCLES = {
+    "calendar_day", "iso_week", "calendar_month", "anchored_month", "provider_reset"
 }
 
 
@@ -66,8 +70,8 @@ def main() -> None:
     except json.JSONDecodeError as exc:
         fail(f"invalid JSON: {exc}")
 
-    if catalog.get("schemaVersion") != 5:
-        fail("schemaVersion must be 5")
+    if catalog.get("schemaVersion") != 6:
+        fail("schemaVersion must be 6")
     if catalog.get("runtimeScraping") is not False:
         fail("runtimeScraping must be false")
 
@@ -118,6 +122,24 @@ def main() -> None:
             fail(f"{key} expectedSources contains an unknown Metric Contract source")
         if key in PROVIDER_BUDGET_SCOPES and provider.get("supportedBudgetScopes") != PROVIDER_BUDGET_SCOPES[key]:
             fail(f"{key} supportedBudgetScopes does not match the validated provider dimensions")
+        if key in PROVIDER_BUDGET_SCOPES:
+            if provider.get("budgetPolicyContractVersion") != "budget-policy-v2":
+                fail(f"{key} must declare budget-policy-v2")
+            cycles = provider.get("supportedBillingCycles")
+            if not isinstance(cycles, list) or not cycles or not set(cycles) <= SUPPORTED_BILLING_CYCLES:
+                fail(f"{key} supportedBillingCycles is missing or invalid")
+            reviewed = require_iso_date(str(provider.get("capabilityReviewedAt", "")), f"{key} capabilityReviewedAt")
+            capability_expiry = require_iso_date(
+                str(provider.get("capabilityReviewExpiresAt", "")),
+                f"{key} capabilityReviewExpiresAt",
+            )
+            if capability_expiry < date.today() or capability_expiry < reviewed:
+                fail(f"{key} budget capability review is expired or precedes its review")
+        elif any(field in provider for field in (
+            "budgetPolicyContractVersion", "supportedBudgetScopes", "supportedBillingCycles",
+            "capabilityReviewedAt", "capabilityReviewExpiresAt",
+        )):
+            fail(f"{key} declares an unreviewed budget policy capability")
         auth = provider["auth"]
         if not isinstance(auth, dict) or not auth.get("scheme") or "credentialSlots" not in auth:
             fail(f"{key} auth must declare scheme and credentialSlots")

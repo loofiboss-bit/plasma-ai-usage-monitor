@@ -39,13 +39,13 @@ class CatalogsTest : public QObject
 
 private Q_SLOTS:
     void providerCatalogLoads();
-    void pricingSchemaV5EstimatesWithoutFalsePrecision();
+    void pricingSchemaV6EstimatesWithoutFalsePrecision();
     void subscriptionCatalogLoads();
     void staleCatalogDetection();
     void invalidCatalogExposesStatus();
 };
 
-void CatalogsTest::pricingSchemaV5EstimatesWithoutFalsePrecision()
+void CatalogsTest::pricingSchemaV6EstimatesWithoutFalsePrecision()
 {
     ProviderPricingCatalog catalog;
     QVariantMap usage{{QStringLiteral("inputTokens"), 250000},
@@ -90,8 +90,8 @@ void CatalogsTest::providerCatalogLoads()
     ProviderPricingCatalog catalog;
 
     QVERIFY(catalog.isValid());
-    QCOMPARE(catalog.schemaVersion(), 5);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.07.13"));
+    QCOMPARE(catalog.schemaVersion(), 6);
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.08.08"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(!catalog.reviewItems().isEmpty());
@@ -117,6 +117,12 @@ void CatalogsTest::providerCatalogLoads()
                           QStringLiteral("line_item")}));
     QVERIFY(!openAi.value(QStringLiteral("supportedBudgetScopes")).toStringList()
                  .contains(QStringLiteral("model")));
+    QCOMPARE(openAi.value(QStringLiteral("budgetPolicyContractVersion")).toString(),
+             QStringLiteral("budget-policy-v2"));
+    QVERIFY(openAi.value(QStringLiteral("supportedBillingCycles")).toStringList()
+                .contains(QStringLiteral("iso_week")));
+    QVERIFY(QDate::fromString(openAi.value(QStringLiteral("capabilityReviewedAt")).toString(), Qt::ISODate).isValid());
+    QVERIFY(QDate::fromString(openAi.value(QStringLiteral("capabilityReviewExpiresAt")).toString(), Qt::ISODate).isValid());
 
     const QVariantMap anthropic = catalog.provider(QStringLiteral("anthropic"));
     const QVariantMap anthropicAuth = anthropic.value(QStringLiteral("auth")).toMap();
@@ -186,7 +192,7 @@ void CatalogsTest::staleCatalogDetection()
     QFile file(dir.filePath(QStringLiteral("providers-v4.json")));
     QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
     file.write(R"JSON({
-        "schemaVersion": 5,
+        "schemaVersion": 6,
         "catalogVersion": "2026.01.01",
         "release": "8.0.0",
         "lastReviewed": "2026-01-01",

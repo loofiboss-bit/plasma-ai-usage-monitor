@@ -52,28 +52,6 @@ double median(QList<double> values)
     return values.at(middle);
 }
 
-ForecastContract::Result unavailableQuota(const RunwayQuery::QuotaRequest &request, const QDateTime &generatedAt,
-    const QString &reasonKey, int sampleCount = 0, double coverage = 0.0, const QDateTime &periodEnd = { })
-{
-    ForecastContract::Result result;
-    result.kind = ForecastContract::Kind::QuotaExhaustion;
-    result.state = ForecastContract::State::Unavailable;
-    result.sourceId = request.sourceId;
-    result.sourceKind = request.sourceKind;
-    result.window = request.window;
-    result.scope = request.scope;
-    result.unit = request.unit.isEmpty() ? QStringLiteral("unknown") : request.unit;
-    result.periodEnd = periodEnd.isValid() ? periodEnd.toUTC() : generatedAt.toUTC();
-    result.sampleCount = sampleCount;
-    result.coveragePercent = coverage;
-    result.evidenceGrade = ForecastContract::EvidenceGrade::Unavailable;
-    result.methodId = QStringLiteral("quota-runway-v1");
-    result.reasonKey = reasonKey;
-    result.generatedAt = generatedAt.toUTC();
-    result.valueClass = ForecastContract::ValueClass::Actual;
-    return result;
-}
-
 ForecastContract::Result unavailableBudget(const RunwayQuery::BudgetRequest &request, const QDateTime &generatedAt,
     const QString &reasonKey, int sampleCount = 0, double coverage = 0.0)
 {
@@ -99,96 +77,6 @@ ForecastContract::Result unavailableBudget(const RunwayQuery::BudgetRequest &req
     result.generatedAt = generatedAt.toUTC();
     result.valueClass = request.valueClass;
     return result;
-}
-
-bool supportedQuotaSource(const QString &source)
-{
-    static const QSet<QString> supported {
-        QStringLiteral("response_headers"),
-        QStringLiteral("usage_api"),
-        QStringLiteral("metrics_api"),
-        QStringLiteral("billing_api"),
-        QStringLiteral("browser_sync"),
-    };
-    return supported.contains(source.trimmed().toLower());
-}
-
-double quotaCoverage(const QList<RunwayQuery::QuotaSample> &samples)
-{
-    if (samples.size() < 2) {
-        return 0.0;
-    }
-    QList<double> gaps;
-    gaps.reserve(samples.size() - 1);
-    for (qsizetype index = 1; index < samples.size(); ++index) {
-        gaps.append(static_cast<double>(samples.at(index - 1).observedAt.secsTo(samples.at(index).observedAt)));
-    }
-    const double typicalGap = median(gaps);
-    const double span = static_cast<double>(samples.first().observedAt.secsTo(samples.last().observedAt));
-    if (span <= 0.0 || typicalGap <= 0.0) {
-        return 0.0;
-    }
-    double covered = 0.0;
-    for (double gap : std::as_const(gaps)) {
-        covered += std::min(gap, typicalGap * 2.0);
-    }
-    return std::clamp(covered / span * 100.0, 0.0, 100.0);
-}
-
-QList<RunwayQuery::QuotaSample> boundedTheilSenSamples(const QList<RunwayQuery::QuotaSample> &samples)
-{
-    if (samples.size() <= RunwayQuery::MaximumTheilSenSamples) {
-        return samples;
-    }
-    QList<RunwayQuery::QuotaSample> selected;
-    selected.reserve(RunwayQuery::MaximumTheilSenSamples);
-    const qsizetype last = samples.size() - 1;
-    for (int index = 0; index < RunwayQuery::MaximumTheilSenSamples; ++index) {
-        const qsizetype sourceIndex = (static_cast<qint64>(index) * last) / (RunwayQuery::MaximumTheilSenSamples - 1);
-        selected.append(samples.at(sourceIndex));
-    }
-    return selected;
-}
-
-double medianConsumptionSlope(const QList<RunwayQuery::QuotaSample> &samples)
-{
-    const QList<RunwayQuery::QuotaSample> selected = boundedTheilSenSamples(samples);
-    QList<double> slopes;
-    slopes.reserve(selected.size() * (selected.size() - 1) / 2);
-    for (qsizetype left = 0; left < selected.size(); ++left) {
-        for (qsizetype right = left + 1; right < selected.size(); ++right) {
-            const qint64 seconds = selected.at(left).observedAt.secsTo(selected.at(right).observedAt);
-            if (seconds <= 0) {
-                continue;
-            }
-            slopes.append(
-                (*selected.at(left).remaining - *selected.at(right).remaining) / static_cast<double>(seconds));
-        }
-    }
-    return median(slopes);
-}
-
-double quotaVolatility(const QList<RunwayQuery::QuotaSample> &samples, double slope)
-{
-    if (samples.size() < 2 || slope <= Epsilon) {
-        return 0.0;
-    }
-    QList<double> adjacentSlopes;
-    adjacentSlopes.reserve(samples.size() - 1);
-    for (qsizetype index = 1; index < samples.size(); ++index) {
-        const qint64 seconds = samples.at(index - 1).observedAt.secsTo(samples.at(index).observedAt);
-        if (seconds <= 0) {
-            continue;
-        }
-        adjacentSlopes.append(
-            (*samples.at(index - 1).remaining - *samples.at(index).remaining) / static_cast<double>(seconds));
-    }
-    QList<double> deviations;
-    deviations.reserve(adjacentSlopes.size());
-    for (double candidate : std::as_const(adjacentSlopes)) {
-        deviations.append(std::abs(candidate - slope));
-    }
-    return median(deviations) / slope;
 }
 
 ForecastContract::ValueClass valueClassFromKey(const QString &key)
@@ -413,7 +301,8 @@ QVariantList queryDatabase(
                 const QVariantMap map = quotaMapForDatabase(entry.toMap(), database, &queryOk);
                 ForecastContract::Result result = queryOk
                     ? RunwayQuery::quotaRunway(quotaRequestFromMap(map), generatedAt)
-                    : unavailableQuota(quotaRequestFromMap(entry.toMap()), generatedAt, QStringLiteral("query_failed"));
+                    : QuotaRunwayQuery::unavailable(
+                          quotaRequestFromMap(entry.toMap()), generatedAt, QStringLiteral("query_failed"));
                 results.append(result.toVariantMap());
             }
             for (const QVariant &entry : request.value(QStringLiteral("budgets")).toList()) {
@@ -447,7 +336,8 @@ QVariantList queryDatabase(
     if (!databaseOk) {
         for (const QVariant &entry : request.value(QStringLiteral("quotaSources")).toList()) {
             results.append(
-                unavailableQuota(quotaRequestFromMap(entry.toMap()), generatedAt, QStringLiteral("query_failed"))
+                QuotaRunwayQuery::unavailable(
+                    quotaRequestFromMap(entry.toMap()), generatedAt, QStringLiteral("query_failed"))
                     .toVariantMap());
         }
         for (const QVariant &entry : request.value(QStringLiteral("budgets")).toList()) {
@@ -465,101 +355,6 @@ QVariantList queryDatabase(
 }
 
 } // namespace
-
-ForecastContract::Result QuotaRunwayQuery::evaluate(const Request &request, const QDateTime &generatedAt)
-{
-    const QDateTime now = generatedAt.toUTC();
-    QList<Sample> samples = request.samples;
-    std::sort(samples.begin(), samples.end(),
-        [](const Sample &left, const Sample &right) { return left.observedAt < right.observedAt; });
-
-    if (samples.isEmpty()) {
-        return unavailableQuota(request, now, QStringLiteral("missing_value"));
-    }
-    const QDateTime periodEnd = samples.last().resetAt;
-    const QString quotaSource = samples.first().source.trimmed().toLower();
-    for (const Sample &sample : std::as_const(samples)) {
-        if (!sample.observedAt.isValid() || !sample.resetAt.isValid() || !sample.remaining || !sample.limit
-            || !std::isfinite(*sample.remaining) || !std::isfinite(*sample.limit) || *sample.remaining < 0.0
-            || *sample.limit <= 0.0 || *sample.remaining > *sample.limit + Epsilon) {
-            return unavailableQuota(request, now, QStringLiteral("missing_value"), samples.size(), 0.0, periodEnd);
-        }
-        if (!supportedQuotaSource(sample.source)) {
-            return unavailableQuota(request, now, QStringLiteral("unsupported_source"), samples.size(), 0.0, periodEnd);
-        }
-        if (sample.resetAt != periodEnd || sample.unit.compare(request.unit, Qt::CaseInsensitive) != 0
-            || sample.source.trimmed().toLower() != quotaSource
-            || std::abs(*sample.limit - *samples.first().limit) > Epsilon) {
-            return unavailableQuota(request, now, QStringLiteral("reset_detected"), samples.size(), 0.0, periodEnd);
-        }
-    }
-
-    const double coverage = quotaCoverage(samples);
-    if (samples.size() < MinimumQuotaSamples) {
-        return unavailableQuota(
-            request, now, QStringLiteral("insufficient_samples"), samples.size(), coverage, periodEnd);
-    }
-    const qint64 span = samples.first().observedAt.secsTo(samples.last().observedAt);
-    if (span < MinimumQuotaSpanSeconds) {
-        return unavailableQuota(request, now, QStringLiteral("insufficient_span"), samples.size(), coverage, periodEnd);
-    }
-    if (samples.last().observedAt.secsTo(now) > MaximumQuotaAgeSeconds || samples.last().observedAt > now.addSecs(1)) {
-        return unavailableQuota(request, now, QStringLiteral("stale_data"), samples.size(), coverage, periodEnd);
-    }
-    if (periodEnd <= now) {
-        return unavailableQuota(
-            request, now, QStringLiteral("incompatible_window"), samples.size(), coverage, periodEnd);
-    }
-    for (qsizetype index = 1; index < samples.size(); ++index) {
-        if (*samples.at(index).remaining > *samples.at(index - 1).remaining + Epsilon) {
-            return unavailableQuota(request, now, QStringLiteral("non_monotonic"), samples.size(), coverage, periodEnd);
-        }
-    }
-
-    const double slope = medianConsumptionSlope(samples);
-    ForecastContract::Result result;
-    result.kind = ForecastContract::Kind::QuotaExhaustion;
-    result.sourceId = request.sourceId;
-    result.sourceKind = request.sourceKind;
-    result.window = request.window;
-    result.scope = request.scope;
-    result.currentValue = *samples.last().remaining;
-    result.limitValue = *samples.last().limit;
-    result.unit = request.unit;
-    result.periodEnd = periodEnd;
-    result.sampleCount = samples.size();
-    result.coveragePercent = coverage;
-    result.methodId = QStringLiteral("quota-runway-v1");
-    result.generatedAt = now;
-    result.valueClass = ForecastContract::ValueClass::Actual;
-    const double volatility = quotaVolatility(samples, slope);
-    result.evidenceGrade = samples.size() >= 8 && coverage >= 80.0 && volatility <= 0.25
-        ? ForecastContract::EvidenceGrade::Strong
-        : ForecastContract::EvidenceGrade::Usable;
-
-    const QDateTime predictionOrigin = samples.last().observedAt;
-    const qint64 remainingWindowSeconds = predictionOrigin.secsTo(periodEnd);
-    if (slope <= Epsilon) {
-        result.state = ForecastContract::State::Safe;
-        result.projectedValue = *samples.last().remaining;
-        return result;
-    }
-
-    const double secondsToExhaustion = *samples.last().remaining / slope;
-    const double projected
-        = std::max(0.0, *samples.last().remaining - slope * static_cast<double>(remainingWindowSeconds));
-    result.projectedValue = projected;
-    if (secondsToExhaustion >= static_cast<double>(remainingWindowSeconds)) {
-        result.state = ForecastContract::State::Safe;
-        return result;
-    }
-
-    result.predictedAt = predictionOrigin.addMSecs(static_cast<qint64>(secondsToExhaustion * 1000.0));
-    const double criticalHorizon = std::max(60.0 * 60.0, static_cast<double>(now.secsTo(periodEnd)) * 0.25);
-    result.state = now.msecsTo(*result.predictedAt) / 1000.0 <= criticalHorizon ? ForecastContract::State::Critical
-                                                                                : ForecastContract::State::Warning;
-    return result;
-}
 
 ForecastContract::Result RunwayQuery::quotaRunway(const QuotaRequest &request, const QDateTime &generatedAt)
 {

@@ -9,7 +9,7 @@ QtObject {
     readonly property string lastReviewed: ProviderPricingCatalog.lastReviewed
     readonly property bool runtimeScraping: ProviderPricingCatalog.runtimeScraping
 
-    // Provider identity, adapter profile, and capabilities come from Catalog v5.
+    // Provider identity, adapter profile, and capabilities come from Catalog v6.
     // Only runtime backend association remains in ProviderRegistry.
     readonly property var providers: {
         var catalogProviders = ProviderPricingCatalog.providers();
@@ -39,18 +39,17 @@ QtObject {
                 adapterType: entry.adapterType || "model_discovery",
                 probePolicy: entry.probePolicy || "manual_only",
                 requiresApiKey: (entry.auth?.credentialSlots || []).length > 0,
-                supportsBudget: (entry.capabilities || []).indexOf("cost") >= 0,
+                supportsBudget: entry.budgetPolicyContractVersion === "budget-policy-v2",
                 budgetPolicyContractVersion: entry.budgetPolicyContractVersion || "",
-                supportedBudgetScopes: entry.supportedBudgetScopes || ["aggregate"],
-                supportedBillingCycles: entry.supportedBillingCycles
-                    || ["calendar_day", "iso_week", "calendar_month", "anchored_month"],
+                supportedBudgetScopes: entry.supportedBudgetScopes || [],
+                supportedBillingCycles: entry.supportedBillingCycles || [],
+                capabilityReviewedAt: entry.capabilityReviewedAt || "",
+                capabilityReviewExpiresAt: entry.capabilityReviewExpiresAt || "",
                 enabledConfigKey: config.enabled,
                 modelConfigKey: config.model,
                 customBaseUrlConfigKey: (config.key || entry.stableId) + "CustomBaseUrl",
                 refreshConfigKey: config.refreshInterval,
                 notificationsConfigKey: config.notifications,
-                dailyBudgetConfigKey: config.dailyBudget,
-                monthlyBudgetConfigKey: config.monthlyBudget,
                 secretKey: (entry.auth?.credentialSlots || [])[0] || ""
             });
         }
@@ -60,4 +59,21 @@ QtObject {
     readonly property var budgetProviders: providers.filter(function(provider) {
         return provider.supportsBudget;
     })
+
+    // Legacy keys are isolated to the one-shot v17 rollback-compatible migration.
+    readonly property var legacyBudgetProviders: {
+        var catalogProviders = ProviderPricingCatalog.providers();
+        var result = [];
+        for (var i = 0; i < catalogProviders.length; ++i) {
+            var entry = catalogProviders[i];
+            var config = entry.config || {};
+            if (!config.dailyBudget && !config.monthlyBudget) continue;
+            result.push({
+                configKey: config.key || entry.stableId,
+                dailyBudgetConfigKey: config.dailyBudget || "",
+                monthlyBudgetConfigKey: config.monthlyBudget || ""
+            });
+        }
+        return result;
+    }
 }

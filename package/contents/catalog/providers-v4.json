@@ -1,6 +1,6 @@
 {
-  "schemaVersion": 5,
-  "catalogVersion": "2026.07.13",
+  "schemaVersion": 6,
+  "catalogVersion": "2026.08.08",
   "release": "17.0.0",
   "lastReviewed": "2026-07-13",
   "runtimeScraping": false,
@@ -241,11 +241,20 @@
         "cost",
         "rateLimits"
       ],
+      "budgetPolicyContractVersion": "budget-policy-v2",
       "supportedBudgetScopes": [
         "aggregate",
         "project",
         "line_item"
       ],
+      "supportedBillingCycles": [
+        "calendar_day",
+        "iso_week",
+        "calendar_month",
+        "anchored_month"
+      ],
+      "capabilityReviewedAt": "2026-08-08",
+      "capabilityReviewExpiresAt": "2026-11-06",
       "expectedSources": [
         "billing_api",
         "usage_api",
@@ -421,6 +430,7 @@
         "usage",
         "cost"
       ],
+      "budgetPolicyContractVersion": "budget-policy-v2",
       "supportedBudgetScopes": [
         "aggregate",
         "workspace",
@@ -428,6 +438,14 @@
         "service_tier",
         "line_item"
       ],
+      "supportedBillingCycles": [
+        "calendar_day",
+        "iso_week",
+        "calendar_month",
+        "anchored_month"
+      ],
+      "capabilityReviewedAt": "2026-08-08",
+      "capabilityReviewExpiresAt": "2026-11-06",
       "expectedSources": [
         "response_headers",
         "connectivity_probe",
@@ -1456,6 +1474,18 @@
         "cost",
         "creditBalance"
       ],
+      "budgetPolicyContractVersion": "budget-policy-v2",
+      "supportedBudgetScopes": [
+        "aggregate"
+      ],
+      "supportedBillingCycles": [
+        "calendar_day",
+        "iso_week",
+        "calendar_month",
+        "anchored_month"
+      ],
+      "capabilityReviewedAt": "2026-08-08",
+      "capabilityReviewExpiresAt": "2026-11-06",
       "expectedSources": [
         "usage_api"
       ],
@@ -1995,9 +2025,18 @@
         "usage",
         "cost"
       ],
+      "budgetPolicyContractVersion": "budget-policy-v2",
       "supportedBudgetScopes": [
         "aggregate"
       ],
+      "supportedBillingCycles": [
+        "calendar_day",
+        "iso_week",
+        "calendar_month",
+        "anchored_month"
+      ],
+      "capabilityReviewedAt": "2026-08-08",
+      "capabilityReviewExpiresAt": "2026-11-06",
       "expectedSources": [
         "usage_api"
       ],

@@ -23,29 +23,13 @@ KCM.SimpleKCM {
     property alias cfg_notifyOnUpdate: updateNotifySwitch.checked
     property alias cfg_updateCheckInterval: updateCheckSpinBox.value
 
-    property bool cfg_openaiNotificationsEnabled: Plasmoid.configuration.openaiNotificationsEnabled
-    property bool cfg_anthropicNotificationsEnabled: Plasmoid.configuration.anthropicNotificationsEnabled
-    property bool cfg_googleNotificationsEnabled: Plasmoid.configuration.googleNotificationsEnabled
-    property bool cfg_mistralNotificationsEnabled: Plasmoid.configuration.mistralNotificationsEnabled
-    property bool cfg_deepseekNotificationsEnabled: Plasmoid.configuration.deepseekNotificationsEnabled
-    property bool cfg_groqNotificationsEnabled: Plasmoid.configuration.groqNotificationsEnabled
-    property bool cfg_xaiNotificationsEnabled: Plasmoid.configuration.xaiNotificationsEnabled
-    property bool cfg_ollamaNotificationsEnabled: Plasmoid.configuration.ollamaNotificationsEnabled
-    property bool cfg_openrouterNotificationsEnabled: Plasmoid.configuration.openrouterNotificationsEnabled
-    property bool cfg_togetherNotificationsEnabled: Plasmoid.configuration.togetherNotificationsEnabled
-    property bool cfg_cohereNotificationsEnabled: Plasmoid.configuration.cohereNotificationsEnabled
-    property bool cfg_googleveoNotificationsEnabled: Plasmoid.configuration.googleveoNotificationsEnabled
-    property bool cfg_azureNotificationsEnabled: Plasmoid.configuration.azureNotificationsEnabled
-    property bool cfg_bedrockNotificationsEnabled: Plasmoid.configuration.bedrockNotificationsEnabled
-    property bool cfg_litellmNotificationsEnabled: Plasmoid.configuration.litellmNotificationsEnabled
-    property bool cfg_cerebrasNotificationsEnabled: Plasmoid.configuration.cerebrasNotificationsEnabled
-    property bool cfg_fireworksNotificationsEnabled: Plasmoid.configuration.fireworksNotificationsEnabled
-    property bool cfg_perplexityNotificationsEnabled: Plasmoid.configuration.perplexityNotificationsEnabled
     property alias cfg_slackWebhookEnabled: slackWebhookSwitch.checked
     property alias cfg_discordWebhookEnabled: discordWebhookSwitch.checked
     property alias cfg_webhookCooldownMinutes: webhookCooldownSlider.value
 
-    readonly property bool unsavedChanges: secretChanges.dirty
+    property var providerNotificationDraft: ({})
+    property bool providerNotificationsDirty: false
+    readonly property bool unsavedChanges: secretChanges.dirty || providerNotificationsDirty
     property string secretStatusMessage: ""
     property bool secretStatusError: false
 
@@ -92,6 +76,13 @@ KCM.SimpleKCM {
     }
 
     function saveConfig() {
+        var providers = providerCatalog.providers || [];
+        for (var providerIndex = 0; providerIndex < providers.length; ++providerIndex) {
+            var notificationKey = providers[providerIndex].notificationsConfigKey;
+            if (notificationKey)
+                Plasmoid.configuration[notificationKey] = !!providerNotificationDraft[notificationKey];
+        }
+        providerNotificationsDirty = false;
         var result = secretChanges.commit();
         secretStatusError = !result.ok;
         if (result.ok) {
@@ -115,11 +106,26 @@ KCM.SimpleKCM {
     }
 
     function notificationEnabled(notificationsConfigKey) {
-        return alertsPage["cfg_" + notificationsConfigKey];
+        return !!providerNotificationDraft[notificationsConfigKey];
     }
 
     function setNotificationEnabled(notificationsConfigKey, enabled) {
-        alertsPage["cfg_" + notificationsConfigKey] = enabled;
+        var next = Object.assign({}, providerNotificationDraft);
+        next[notificationsConfigKey] = enabled;
+        providerNotificationDraft = next;
+        providerNotificationsDirty = true;
+        configurationChanged();
+    }
+
+    function loadProviderNotifications() {
+        var next = {};
+        var providers = providerCatalog.providers || [];
+        for (var index = 0; index < providers.length; ++index) {
+            var key = providers[index].notificationsConfigKey;
+            if (key) next[key] = !!Plasmoid.configuration[key];
+        }
+        providerNotificationDraft = next;
+        providerNotificationsDirty = false;
     }
 
     function buildHourModel() {
@@ -131,10 +137,13 @@ KCM.SimpleKCM {
     }
 
     Component.onCompleted: {
+        loadProviderNotifications();
         if (alertSecrets.walletOpen) {
             loadWebhookSecrets();
         }
     }
+
+    Component.onDestruction: providerNotificationDraft = ({})
 
     Kirigami.FormLayout {
         anchors.fill: parent
@@ -281,7 +290,7 @@ KCM.SimpleKCM {
                 checked: alertsPage.notificationEnabled(modelData.notificationsConfigKey)
                 Kirigami.FormData.label: modelData.label + ":"
                 enabled: alertsSwitch.checked
-                onToggled: alertsPage.setNotificationEnabled(modelData.notificationsConfigKey, checked)
+                onClicked: alertsPage.setNotificationEnabled(modelData.notificationsConfigKey, checked)
             }
         }
 

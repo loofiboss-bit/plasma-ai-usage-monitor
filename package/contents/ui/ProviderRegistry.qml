@@ -101,8 +101,6 @@ QtObject {
                 customBaseUrlKey: providerBaseUrlKey(descriptor),
                 refreshKey: descriptor.refreshConfigKey,
                 notificationsKey: descriptor.notificationsConfigKey,
-                dailyBudgetKey: descriptor.dailyBudgetConfigKey,
-                monthlyBudgetKey: descriptor.monthlyBudgetConfigKey,
                 secretKey: providerSecretKey(descriptor),
                 credentialSlots: descriptor.credentialSlots || [],
                 acceptAnyCredentialSet: descriptor.acceptAnyCredentialSet || [],
@@ -117,6 +115,11 @@ QtObject {
                 requestBudget: descriptor.requestBudget,
                 monitoringLevel: descriptor.monitoringLevel,
                 safeRefresh: descriptor.safeRefresh,
+                budgetPolicyContractVersion: descriptor.budgetPolicyContractVersion,
+                supportedBudgetScopes: descriptor.supportedBudgetScopes,
+                supportedBillingCycles: descriptor.supportedBillingCycles,
+                capabilityReviewedAt: descriptor.capabilityReviewedAt,
+                capabilityReviewExpiresAt: descriptor.capabilityReviewExpiresAt,
                 notificationsEnabled: providerNotificationsEnabled(descriptor)
             });
         }

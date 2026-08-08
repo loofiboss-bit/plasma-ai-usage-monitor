@@ -56,6 +56,10 @@ if(BUILD_TESTING)
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_kcm_contracts.py"
     )
     add_test(
+        NAME budget_catalog_contract
+        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_budget_catalog_contract.py"
+    )
+    add_test(
         NAME wiki_docs
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/generate_wiki_docs.py" --check
     )

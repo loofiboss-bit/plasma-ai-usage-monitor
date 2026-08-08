@@ -5,7 +5,7 @@
 #include <limits>
 
 ProviderPricingCatalog::ProviderPricingCatalog(QObject *parent)
-    : CatalogLoader(QStringLiteral("providers-v4.json"), 5, parent)
+    : CatalogLoader(QStringLiteral("providers-v4.json"), 6, parent)
 {
     load();
 }

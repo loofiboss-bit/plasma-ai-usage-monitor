@@ -13,7 +13,7 @@ Item {
     required property var secrets
     required property var usageDatabase
     required property var guardrailModel
-    required property var budgetPolicyRepository
+    required property var budgetPolicyRuntime
     required property var scheduler
     required property var metricsServer
     required property var webhookNotifier
@@ -82,26 +82,12 @@ Item {
             }
 
         }
-        var policies = [];
-        var policyRows = budgetPolicyRepository ? budgetPolicyRepository.policies : [];
-        for (var policyIndex = 0; policyIndex < policyRows.length; ++policyIndex) {
-            var policy = Object.assign({}, policyRows[policyIndex]);
-            if (!policy.enabled) continue;
-            var policyProvider = registry.providerByConfigKey(policy.sourceId);
-            policy.provider = policyProvider ? policyProvider.dbName : policy.sourceId;
-            policy.observationScope = "organization";
-            policy.catalogSupportedScopes = policyProvider
-                ? policyProvider.supportedBudgetScopes : ["aggregate"];
-            policy.validatedGatewayScopes = policyProvider && policyProvider.backend
-                && policyProvider.backend["validatedBudgetScopes"] !== undefined
-                ? policyProvider.backend["validatedBudgetScopes"] : [];
-            policies.push(policy);
-        }
+        var policies = budgetPolicyRuntime ? budgetPolicyRuntime.queryPolicies() : [];
         return {
             quotaSources: quotaSources,
             budgets: [],
             budgetPolicies: policies,
-            policyRevision: budgetPolicyRepository ? budgetPolicyRepository.revision : 0,
+            policyRevision: budgetPolicyRuntime ? budgetPolicyRuntime.revision : 0,
             observationRevision: observationRevision
         };
     }
@@ -507,8 +493,8 @@ Item {
     }
 
     Connections {
-        target: runtime.budgetPolicyRepository
-        function onPoliciesChanged() {
+        target: runtime.budgetPolicyRuntime
+        function onRevisionChanged() {
             runtime.guardrailModel.invalidateCache();
             runtime.scheduleGuardrailRefresh();
         }

@@ -71,6 +71,20 @@ BudgetObservationQuery::requestFromPolicy(const QVariantMap &policy,
   request.timeZoneId = policy.value(QStringLiteral("timeZoneId")).toString();
   request.generatedAt = generatedAt.toUTC();
 
+  if (policy.value(QStringLiteral("budgetPolicyContractVersion")).toString() !=
+      QLatin1String("budget-policy-v2")) {
+    request.preflightReason = QStringLiteral("invalid-policy");
+    return request;
+  }
+  const QStringList supportedCycles =
+      policy.value(QStringLiteral("catalogSupportedBillingCycles"))
+          .toStringList();
+  if (request.periodType != QLatin1String("provider_reset") &&
+      !supportedCycles.contains(request.periodType)) {
+    request.preflightReason = QStringLiteral("invalid-policy");
+    return request;
+  }
+
   const QString requestedDimension =
       request.scopeMode == QLatin1String("aggregate")
           ? QStringLiteral("aggregate")
@@ -106,6 +120,7 @@ BudgetObservationQuery::requestFromPolicy(const QVariantMap &policy,
   cycleRequest.providerResetAuthenticated =
       policy.value(QStringLiteral("providerResetAuthenticated")).toBool();
   cycleRequest.catalogSupportsProviderReset =
+      supportedCycles.contains(QStringLiteral("provider_reset")) &&
       policy.value(QStringLiteral("catalogSupportsProviderReset")).toBool();
   request.cycle = BillingCycleResolver::resolve(cycleRequest);
   request.previousCycle =

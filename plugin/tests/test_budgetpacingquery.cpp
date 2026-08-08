@@ -67,6 +67,7 @@ private Q_SLOTS:
   void anchorsCoverEveryMonthAndLeapYear();
   void dstBoundaries();
   void providerResetRequiresStableAuthenticatedContract();
+  void catalogContractPreflight();
   void minorUnitTable();
   void pacingFieldsAndRiskRules();
   void unavailablePrecedenceAndCompatibility();
@@ -75,6 +76,36 @@ private Q_SLOTS:
   void providerScopeDimensionsAtDatabaseBoundary();
   void performanceAtOneHundredThousandObservations();
 };
+
+void BudgetPacingQueryTest::catalogContractPreflight() {
+  QVariantMap policy{
+      {QStringLiteral("policyId"), QUuid::createUuid().toString()},
+      {QStringLiteral("sourceId"), QStringLiteral("openai")},
+      {QStringLiteral("sourceKind"), QStringLiteral("provider")},
+      {QStringLiteral("scopeMode"), QStringLiteral("aggregate")},
+      {QStringLiteral("catalogSupportedScopes"),
+       QStringList{QStringLiteral("aggregate")}},
+      {QStringLiteral("valueClass"), QStringLiteral("actual")},
+      {QStringLiteral("limitMinor"), 10000},
+      {QStringLiteral("currency"), QStringLiteral("USD")},
+      {QStringLiteral("periodType"), QStringLiteral("calendar_month")},
+      {QStringLiteral("timeZoneId"), QStringLiteral("UTC")}};
+
+  QCOMPARE(BudgetObservationQuery::requestFromPolicy(policy, Now, {})
+               .preflightReason,
+           QStringLiteral("invalid-policy"));
+  policy[QStringLiteral("budgetPolicyContractVersion")] =
+      QStringLiteral("budget-policy-v2");
+  policy[QStringLiteral("catalogSupportedBillingCycles")] =
+      QStringList{QStringLiteral("calendar_day")};
+  QCOMPARE(BudgetObservationQuery::requestFromPolicy(policy, Now, {})
+               .preflightReason,
+           QStringLiteral("invalid-policy"));
+  policy[QStringLiteral("periodType")] = QStringLiteral("provider_reset");
+  QCOMPARE(BudgetObservationQuery::requestFromPolicy(policy, Now, {})
+               .preflightReason,
+           QStringLiteral("unstable-reset"));
+}
 
 void BudgetPacingQueryTest::calendarCycles_data() {
   QTest::addColumn<QString>("period");
@@ -336,6 +367,10 @@ void BudgetPacingQueryTest::databaseBoundaryAndUnknownCurrency() {
       {QStringLiteral("limitMinor"), 10000},
       {QStringLiteral("currency"), QStringLiteral("USD")},
       {QStringLiteral("periodType"), QStringLiteral("calendar_month")},
+      {QStringLiteral("budgetPolicyContractVersion"),
+       QStringLiteral("budget-policy-v2")},
+      {QStringLiteral("catalogSupportedBillingCycles"),
+       QStringList{QStringLiteral("calendar_month")}},
       {QStringLiteral("timeZoneId"), QStringLiteral("UTC")},
       {QStringLiteral("warningPercent"), 80},
       {QStringLiteral("criticalPercent"), 90}};
@@ -425,6 +460,10 @@ void BudgetPacingQueryTest::providerScopeDimensionsAtDatabaseBoundary() {
         {QStringLiteral("scopeIdentity"), scopeIdentity},
         {QStringLiteral("scopeLabel"), QStringLiteral("Local label")},
         {QStringLiteral("catalogSupportedScopes"), supportedScopes},
+        {QStringLiteral("budgetPolicyContractVersion"),
+         QStringLiteral("budget-policy-v2")},
+        {QStringLiteral("catalogSupportedBillingCycles"),
+         QStringList{QStringLiteral("calendar_month")}},
         {QStringLiteral("valueClass"), QStringLiteral("actual")},
         {QStringLiteral("limitMinor"), 10000},
         {QStringLiteral("currency"), QStringLiteral("USD")},

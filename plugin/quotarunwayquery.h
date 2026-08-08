@@ -28,6 +28,10 @@ public:
 
   static ForecastContract::Result evaluate(const Request &request,
                                            const QDateTime &generatedAt);
+  static ForecastContract::Result
+  unavailable(const Request &request, const QDateTime &generatedAt,
+              const QString &reasonKey, int sampleCount = 0,
+              double coverage = 0.0, const QDateTime &periodEnd = {});
 
   static constexpr int MinimumSamples = 4;
   static constexpr qint64 MinimumSpanSeconds = 15 * 60;

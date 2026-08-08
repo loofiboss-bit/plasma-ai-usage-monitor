@@ -41,6 +41,7 @@ check:
     python3 scripts/check_kcm_contracts.py
     python3 scripts/check_budget_ui_contract.py
     python3 scripts/check_budget_alerts_contract.py
+    python3 scripts/check_budget_catalog_contract.py
     python3 scripts/check_daily_ui_accessibility.py
     python3 scripts/check_qml_localization.py
     python3 scripts/check_qml_registered_types.py
@@ -53,7 +54,7 @@ check:
     python3 scripts/test_release_media_evidence.py
     bash scripts/test_verify_exact_tag.sh
 
-# Regenerate the provider capability matrix from Catalog v5
+# Regenerate the provider capability matrix from Catalog v6
 generate-provider-docs:
     python3 scripts/generate_provider_capabilities.py
 
@@ -93,6 +94,7 @@ release-check: build-debug
     python3 scripts/check_kcm_contracts.py
     python3 scripts/check_budget_ui_contract.py
     python3 scripts/check_budget_alerts_contract.py
+    python3 scripts/check_budget_catalog_contract.py
     python3 scripts/check_daily_ui_accessibility.py
     python3 scripts/check_qml_localization.py
     python3 scripts/check_qml_registered_types.py

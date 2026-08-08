@@ -65,6 +65,23 @@ def validate_secret_pages() -> None:
             fail(f"{name} does not commit from Plasma's saveConfig hook")
 
 
+def validate_catalog_notifications(providers: list[dict]) -> None:
+    text = (UI / "configAlerts.qml").read_text(encoding="utf-8")
+    for token in (
+        "providerCatalog.providers",
+        "notificationsConfigKey",
+        "providerNotificationDraft",
+        "Plasmoid.configuration[notificationKey]",
+    ):
+        if token not in text:
+            fail(f"configAlerts.qml lacks dynamic notification binding: {token}")
+    hardcoded = re.findall(r"\bcfg_[a-z0-9]+NotificationsEnabled\b", text)
+    if hardcoded:
+        fail(f"configAlerts.qml contains hardcoded provider notifications: {', '.join(sorted(set(hardcoded)))}")
+    if any(not provider.get("config", {}).get("notifications") for provider in providers):
+        fail("every provider must declare its notification config key")
+
+
 def validate_diagnostics() -> None:
     text = (UI / "configDiagnostics.qml").read_text(encoding="utf-8")
     forbidden = ("konsole --hold", "sh -c", "install_doctor.sh", "show_installed_versions.sh")
@@ -185,7 +202,7 @@ def main() -> None:
                 fail(f"{provider.get('key')} config.{field} references missing KConfig key {key}")
 
     require_bindings(providers, "refreshInterval", "configGeneral.qml")
-    require_bindings(providers, "notifications", "configAlerts.qml")
+    validate_catalog_notifications(providers)
     require_bindings(providers, "enabled", "configProviders.qml")
     require_bindings(providers, "model", "configProviders.qml")
     validate_secret_pages()

@@ -323,41 +323,6 @@ Item {
         refreshScheduler.refreshAntigravity(true);
     }
 
-    function migrateLegacyBudgets() {
-        var rows = [];
-        var providers = policyCatalog.budgetProviders || [];
-        var warning = Number(Plasmoid.configuration.budgetWarningPercent || 80);
-        for (var i = 0; i < providers.length; ++i) {
-            var provider = providers[i];
-            var periods = [
-                { key: provider.dailyBudgetConfigKey, type: "calendar_day" },
-                { key: provider.monthlyBudgetConfigKey, type: "calendar_month" }
-            ];
-            for (var periodIndex = 0; periodIndex < periods.length; ++periodIndex) {
-                var period = periods[periodIndex];
-                if (!period.key) continue;
-                rows.push({
-                    legacyKey: period.key,
-                    sourceId: provider.configKey,
-                    sourceKind: "provider",
-                    scopeMode: "aggregate",
-                    scopeKind: "",
-                    scopeIdentity: "",
-                    scopeLabel: "",
-                    valueClass: "actual",
-                    limitMinor: Number(Plasmoid.configuration[period.key] || 0),
-                    currency: "USD",
-                    periodType: period.type,
-                    timeZoneId: "UTC",
-                    warningPercent: warning,
-                    notifyEnabled: true,
-                    enabled: true
-                });
-            }
-        }
-        return budgetPolicyRepository.migrateLegacyBudgets(rows);
-    }
-
     SecretsManager {
         id: secrets
     }
@@ -381,6 +346,19 @@ Item {
         // qmllint disable unresolved-type
         ownerId: "applet:" + String(Plasmoid["id"])
         // qmllint enable unresolved-type
+    }
+
+    BudgetPolicyMigration {
+        id: budgetPolicyMigration
+        configuration: Plasmoid.configuration
+        repository: budgetPolicyRepository
+        catalog: policyCatalog
+    }
+
+    BudgetPolicyRuntime {
+        id: budgetPolicyRuntime
+        repository: budgetPolicyRepository
+        registry: providerRegistry
     }
 
     OpenAIProvider {
@@ -750,7 +728,7 @@ Item {
         secrets: secrets
         usageDatabase: usageDatabase
         guardrailModel: guardrailModel
-        budgetPolicyRepository: budgetPolicyRepository
+        budgetPolicyRuntime: budgetPolicyRuntime
         scheduler: refreshScheduler
         metricsServer: metricsServer
         webhookNotifier: webhookNotifier
@@ -794,7 +772,7 @@ Item {
 
     Component.onCompleted: {
         usageDatabase.init();
-        if (!budgetPolicyRepository.init() || !root.migrateLegacyBudgets())
+        if (!budgetPolicyRepository.init() || !budgetPolicyMigration.migrate())
             console.error("Budget policy initialization failed:", budgetPolicyRepository.errorString);
         providerRuntimeRegistration.initialize();
         root.scheduleDiagnosticsSnapshot();
