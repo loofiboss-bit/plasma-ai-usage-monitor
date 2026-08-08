@@ -9,12 +9,10 @@ import org.kde.kirigami as Kirigami
 import com.github.loofi.aiusagemonitor 1.0
 import "onboarding" as Onboarding
 
-PlasmaExtras.Representation {
+Item {
     id: fullRoot
 
     required property var monitor
-    implicitWidth: Kirigami.Units.gridUnit * 28
-    implicitHeight: Kirigami.Units.gridUnit * 28
     property int destination: AppInfo.smokeView === "history"
                               || AppInfo.smokeView.indexOf("media-history") === 0 ? 1
                             : AppInfo.smokeView === "analyst"
@@ -56,24 +54,6 @@ PlasmaExtras.Representation {
         || (!fullRoot.hasConfiguration
             && !Plasmoid.configuration.setupWizardCompleted
             && !Plasmoid.configuration.setupWizardDismissed)
-
-    header: PlasmaExtras.PlasmoidHeading {
-        RowLayout {
-            anchors.fill: parent
-            spacing: Kirigami.Units.smallSpacing
-
-            Kirigami.Icon {
-                source: Qt.resolvedUrl("../icons/logo.png")
-                Layout.preferredWidth: Kirigami.Units.iconSizes.small
-                Layout.preferredHeight: Kirigami.Units.iconSizes.small
-            }
-            PlasmaExtras.Heading {
-                level: 3
-                text: i18n("AI Usage Monitor")
-                Layout.fillWidth: true
-            }
-        }
-    }
 
     ColumnLayout {
         anchors.fill: parent

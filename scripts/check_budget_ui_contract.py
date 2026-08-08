@@ -22,6 +22,20 @@ def require(text: str, label: str, *tokens: str) -> None:
 
 def main() -> None:
     representation = (UI / "FullRepresentation.qml").read_text(encoding="utf-8")
+    popup = (UI / "PopupRepresentation.qml").read_text(encoding="utf-8")
+    native_monitor = (UI / "NativeMonitor.qml").read_text(encoding="utf-8")
+    require(
+        popup,
+        "PopupRepresentation.qml",
+        "asynchronous: true",
+        'source: "FullRepresentation.qml"',
+        'i18n("Loading Overview…")',
+    )
+    require(
+        native_monitor,
+        "NativeMonitor.qml",
+        "fullRepresentationComponent: PopupRepresentation",
+    )
     tab_start = representation.index("Kirigami.NavigationTabBar")
     tab_end = representation.index("QQC2.ToolBar", tab_start)
     tab_block = representation[tab_start:tab_end]

@@ -763,7 +763,7 @@ Item {
         monitor: root
         // qmllint enable unqualified
     }
-    property Component fullRepresentationComponent: FullRepresentation {
+    property Component fullRepresentationComponent: PopupRepresentation {
         // Component boundaries intentionally capture their owning monitor.
         // qmllint disable unqualified
         monitor: root
