@@ -341,8 +341,10 @@ void BudgetPacingQueryTest::databaseBoundaryAndUnknownCurrency() {
       {QStringLiteral("criticalPercent"), 90}};
   auto pacingRequest =
       BudgetObservationQuery::requestFromPolicy(policy, Now, database);
+  QCOMPARE(pacingRequest.periodType, QStringLiteral("calendar_month"));
   const auto result = BudgetPacingQuery::evaluate(pacingRequest);
   QVERIFY2(result.isValid(), qPrintable(result.reasonKey));
+  QCOMPARE(result.window, QStringLiteral("calendar_month"));
   QCOMPARE(result.spentMinor, std::optional<qint64>(1375));
 
   policy[QStringLiteral("currency")] = QStringLiteral("XAU");

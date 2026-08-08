@@ -10,6 +10,7 @@
 #include <QFileInfo>
 #include <QLocale>
 #include <QRegularExpression>
+#include <QSet>
 #include <QSqlError>
 #include <QSqlQuery>
 #include <QStandardPaths>
@@ -259,8 +260,9 @@ BudgetPolicyRepository::validatePolicy(const QVariantMap &policy) const {
   return result(error.isEmpty(), error, normalized);
 }
 
-QVariantMap BudgetPolicyRepository::parseMajorAmount(
-    const QString &text, const QString &currency) const {
+QVariantMap
+BudgetPolicyRepository::parseMajorAmount(const QString &text,
+                                         const QString &currency) const {
   bool ok = false;
   double major = QLocale().toDouble(text.trimmed(), &ok);
   if (!ok)
@@ -271,22 +273,24 @@ QVariantMap BudgetPolicyRepository::parseMajorAmount(
           {QStringLiteral("minor"),
            minor ? QVariant::fromValue(*minor) : QVariant()},
           {QStringLiteral("error"),
-           !ok ? QStringLiteral("invalid-amount")
-               : !minor ? QStringLiteral("unknown-currency")
-                        : *minor <= 0 ? QStringLiteral("non-positive-amount")
-                                      : QString()}};
+           !ok           ? QStringLiteral("invalid-amount")
+           : !minor      ? QStringLiteral("unknown-currency")
+           : *minor <= 0 ? QStringLiteral("non-positive-amount")
+                         : QString()}};
 }
 
-QString BudgetPolicyRepository::formatMinorAmount(
-    qint64 minor, const QString &currency) const {
+QString
+BudgetPolicyRepository::formatMinorAmount(qint64 minor,
+                                          const QString &currency) const {
   const std::optional<int> digits = CurrencyMinorUnits::digits(currency);
   const std::optional<double> major =
       CurrencyMinorUnits::toMajor(minor, currency);
   return digits && major ? QLocale().toString(*major, 'f', *digits) : QString();
 }
 
-QDateTime BudgetPolicyRepository::nextPeriodStart(
-    const QVariantMap &policy, const QDateTime &generatedAt) const {
+QDateTime
+BudgetPolicyRepository::nextPeriodStart(const QVariantMap &policy,
+                                        const QDateTime &generatedAt) const {
   BillingCycleResolver::Request request;
   request.periodType = policy.value(QStringLiteral("periodType")).toString();
   request.anchorDay = policy.value(QStringLiteral("anchorDay")).toInt();
@@ -586,4 +590,398 @@ bool BudgetPolicyRepository::migrateLegacyBudgets(
 
 QVariantList BudgetPolicyRepository::exportPolicies() const {
   return m_policies;
+}
+
+QVariantMap
+BudgetPolicyRepository::prepareTransitions(const QVariantMap &forecast,
+                                           const QString &suppressionReason) {
+  if (!ensureOpen())
+    return {{QStringLiteral("ok"), false},
+            {QStringLiteral("error"), m_errorString},
+            {QStringLiteral("events"), QVariantList()}};
+
+  const QString policyId =
+      forecast.value(QStringLiteral("policyId")).toString();
+  const QString state = forecast.value(QStringLiteral("state")).toString();
+  const QDateTime periodStart =
+      forecast.value(QStringLiteral("periodStart")).toDateTime().toUTC();
+  const QDateTime periodEnd =
+      forecast.value(QStringLiteral("periodEnd")).toDateTime().toUTC();
+  QDateTime generatedAt =
+      forecast.value(QStringLiteral("generatedAt")).toDateTime().toUTC();
+  if (!generatedAt.isValid())
+    generatedAt = QDateTime::currentDateTimeUtc();
+  const QVariantMap policy = policyById(policyId);
+  const QStringList states = {QStringLiteral("unavailable"),
+                              QStringLiteral("safe"), QStringLiteral("warning"),
+                              QStringLiteral("critical"),
+                              QStringLiteral("exceeded")};
+  if (forecast.value(QStringLiteral("contractVersion")).toString() !=
+          QLatin1String("budget-pacing-v2") ||
+      policy.isEmpty() ||
+      policy.value(QStringLiteral("sourceId")).toString() !=
+          forecast.value(QStringLiteral("sourceId")).toString() ||
+      !states.contains(state) || !periodStart.isValid() ||
+      !periodEnd.isValid() || periodStart >= periodEnd) {
+    return {
+        {QStringLiteral("ok"), false},
+        {QStringLiteral("error"), QStringLiteral("invalid-policy-forecast")},
+        {QStringLiteral("events"), QVariantList()}};
+  }
+
+  if (!m_database.transaction()) {
+    setError(m_database.lastError().text());
+    return {{QStringLiteral("ok"), false},
+            {QStringLiteral("error"), m_errorString},
+            {QStringLiteral("events"), QVariantList()}};
+  }
+
+  const QString startText = periodStart.toString(Qt::ISODateWithMs);
+  const QString endText = periodEnd.toString(Qt::ISODateWithMs);
+  const QString nowText = generatedAt.toString(Qt::ISODateWithMs);
+  QString previousState;
+  QString previousStart;
+  QSqlQuery previous(m_database);
+  previous.prepare(QStringLiteral(
+      "SELECT period_start_utc,risk_level FROM budget_policy_state "
+      "WHERE policy_id=?"));
+  previous.addBindValue(policyId);
+  if (!previous.exec()) {
+    setError(previous.lastError().text());
+    m_database.rollback();
+    return {{QStringLiteral("ok"), false},
+            {QStringLiteral("error"), m_errorString},
+            {QStringLiteral("events"), QVariantList()}};
+  }
+  if (previous.next()) {
+    previousStart = previous.value(0).toString();
+    previousState = previous.value(1).toString();
+  }
+  previous.finish();
+
+  const bool periodChanged =
+      !previousStart.isEmpty() &&
+      QDateTime::fromString(previousStart, Qt::ISODateWithMs).toUTC() !=
+          periodStart;
+  const auto risky = [](const QString &value) {
+    return value == QLatin1String("warning") ||
+           value == QLatin1String("critical") ||
+           value == QLatin1String("exceeded");
+  };
+  QStringList transitions;
+  if (periodChanged)
+    transitions.append(QStringLiteral("period_reset"));
+  if (risky(state) &&
+      (previousState.isEmpty() || periodChanged || previousState != state)) {
+    transitions.append(state);
+  } else if (!periodChanged && state == QLatin1String("safe") &&
+             risky(previousState)) {
+    transitions.append(QStringLiteral("recovered"));
+  }
+
+  QString policySuppression = suppressionReason.trimmed();
+  if (!policy.value(QStringLiteral("enabled")).toBool() ||
+      !policy.value(QStringLiteral("notifyEnabled")).toBool()) {
+    policySuppression = QStringLiteral("notifications-disabled");
+  }
+  const QDateTime snoozedUntil =
+      policy.value(QStringLiteral("snoozedUntilUtc")).toDateTime().toUTC();
+  const bool snoozeExpired =
+      snoozedUntil.isValid() && snoozedUntil <= generatedAt;
+  if (snoozedUntil.isValid() && !snoozeExpired)
+    policySuppression = QStringLiteral("snoozed");
+
+  QVariantList events;
+  QSet<qint64> includedEventIds;
+  QString lastDeduplicationKey;
+  for (const QString &transition : transitions) {
+    const QString deduplicationKey =
+        policyId + QLatin1Char('|') + startText + QLatin1Char('|') + transition;
+    lastDeduplicationKey = deduplicationKey;
+    QString deliveryStatus =
+        policySuppression == QLatin1String("dnd") || policySuppression.isEmpty()
+            ? QStringLiteral("pending")
+            : QStringLiteral("suppressed");
+    QString reasonKey = policySuppression;
+    qint64 eventId = 0;
+
+    QSqlQuery existing(m_database);
+    existing.prepare(QStringLiteral(
+        "SELECT id,delivery_status,reason_key FROM budget_policy_events "
+        "WHERE deduplication_key=?"));
+    existing.addBindValue(deduplicationKey);
+    if (!existing.exec()) {
+      setError(existing.lastError().text());
+      m_database.rollback();
+      return {{QStringLiteral("ok"), false},
+              {QStringLiteral("error"), m_errorString},
+              {QStringLiteral("events"), QVariantList()}};
+    }
+    if (existing.next()) {
+      eventId = existing.value(0).toLongLong();
+      deliveryStatus = existing.value(1).toString();
+      reasonKey = existing.value(2).toString();
+      existing.finish();
+      if (deliveryStatus == QLatin1String("pending") &&
+          policySuppression != QLatin1String("dnd") &&
+          !policySuppression.isEmpty()) {
+        QSqlQuery suppress(m_database);
+        suppress.prepare(QStringLiteral(
+            "UPDATE budget_policy_events SET delivery_status='suppressed',"
+            "reason_key=? WHERE id=? AND delivery_status='pending'"));
+        suppress.addBindValue(policySuppression);
+        suppress.addBindValue(eventId);
+        if (!suppress.exec()) {
+          setError(suppress.lastError().text());
+          m_database.rollback();
+          return {{QStringLiteral("ok"), false},
+                  {QStringLiteral("error"), m_errorString},
+                  {QStringLiteral("events"), QVariantList()}};
+        }
+        deliveryStatus = QStringLiteral("suppressed");
+        reasonKey = policySuppression;
+      }
+    } else {
+      existing.finish();
+      QSqlQuery insert(m_database);
+      insert.prepare(QStringLiteral(
+          "INSERT INTO budget_policy_events(policy_id,period_start_utc,"
+          "period_end_utc,transition,deduplication_key,delivery_status,"
+          "created_at_utc,reason_key) VALUES(?,?,?,?,?,?,?,?)"));
+      insert.addBindValue(policyId);
+      insert.addBindValue(startText);
+      insert.addBindValue(endText);
+      insert.addBindValue(transition);
+      insert.addBindValue(deduplicationKey);
+      insert.addBindValue(deliveryStatus);
+      insert.addBindValue(nowText);
+      insert.addBindValue(reasonKey.isEmpty() ? QStringLiteral("") : reasonKey);
+      if (!insert.exec()) {
+        setError(insert.lastError().text());
+        m_database.rollback();
+        return {{QStringLiteral("ok"), false},
+                {QStringLiteral("error"), m_errorString},
+                {QStringLiteral("events"), QVariantList()}};
+      }
+      eventId = insert.lastInsertId().toLongLong();
+    }
+    includedEventIds.insert(eventId);
+
+    events.append(QVariantMap{
+        {QStringLiteral("eventId"), eventId},
+        {QStringLiteral("policyId"), policyId},
+        {QStringLiteral("transition"), transition},
+        {QStringLiteral("deliveryStatus"), deliveryStatus},
+        {QStringLiteral("reasonKey"), reasonKey},
+        {QStringLiteral("periodStart"), periodStart},
+        {QStringLiteral("periodEnd"), periodEnd},
+        {QStringLiteral("deliver"),
+         deliveryStatus == QLatin1String("pending") &&
+             policySuppression.isEmpty()},
+    });
+  }
+
+  QString activeTransition;
+  for (const QString &transition : transitions) {
+    if (transition != QLatin1String("period_reset"))
+      activeTransition = transition;
+  }
+  if (!activeTransition.isEmpty()) {
+    QSqlQuery supersede(m_database);
+    supersede.prepare(QStringLiteral(
+        "UPDATE budget_policy_events SET delivery_status='suppressed',"
+        "reason_key='superseded' WHERE policy_id=? AND period_start_utc=? "
+        "AND delivery_status='pending' AND transition<>? "
+        "AND transition<>'period_reset'"));
+    supersede.addBindValue(policyId);
+    supersede.addBindValue(startText);
+    supersede.addBindValue(activeTransition);
+    if (!supersede.exec()) {
+      setError(supersede.lastError().text());
+      m_database.rollback();
+      return {{QStringLiteral("ok"), false},
+              {QStringLiteral("error"), m_errorString},
+              {QStringLiteral("events"), QVariantList()}};
+    }
+  }
+
+  QSqlQuery pending(m_database);
+  pending.prepare(QStringLiteral(
+      "SELECT id,transition,reason_key FROM budget_policy_events WHERE "
+      "policy_id=? AND period_start_utc=? AND delivery_status='pending' "
+      "ORDER BY id"));
+  pending.addBindValue(policyId);
+  pending.addBindValue(startText);
+  if (!pending.exec()) {
+    setError(pending.lastError().text());
+    m_database.rollback();
+    return {{QStringLiteral("ok"), false},
+            {QStringLiteral("error"), m_errorString},
+            {QStringLiteral("events"), QVariantList()}};
+  }
+  QVariantList pendingRows;
+  while (pending.next()) {
+    pendingRows.append(QVariantMap{
+        {QStringLiteral("eventId"), pending.value(0)},
+        {QStringLiteral("transition"), pending.value(1)},
+        {QStringLiteral("reasonKey"), pending.value(2)},
+    });
+  }
+  pending.finish();
+  for (const QVariant &pendingValue : pendingRows) {
+    const QVariantMap pendingRow = pendingValue.toMap();
+    const qint64 eventId =
+        pendingRow.value(QStringLiteral("eventId")).toLongLong();
+    if (includedEventIds.contains(eventId))
+      continue;
+    QString deliveryStatus = QStringLiteral("pending");
+    QString reasonKey =
+        pendingRow.value(QStringLiteral("reasonKey")).toString();
+    if (policySuppression != QLatin1String("dnd") &&
+        !policySuppression.isEmpty()) {
+      QSqlQuery suppress(m_database);
+      suppress.prepare(QStringLiteral(
+          "UPDATE budget_policy_events SET delivery_status='suppressed',"
+          "reason_key=? WHERE id=?"));
+      suppress.addBindValue(policySuppression);
+      suppress.addBindValue(eventId);
+      if (!suppress.exec()) {
+        setError(suppress.lastError().text());
+        m_database.rollback();
+        return {{QStringLiteral("ok"), false},
+                {QStringLiteral("error"), m_errorString},
+                {QStringLiteral("events"), QVariantList()}};
+      }
+      deliveryStatus = QStringLiteral("suppressed");
+      reasonKey = policySuppression;
+    }
+    events.append(QVariantMap{
+        {QStringLiteral("eventId"), eventId},
+        {QStringLiteral("policyId"), policyId},
+        {QStringLiteral("transition"),
+         pendingRow.value(QStringLiteral("transition")).toString()},
+        {QStringLiteral("deliveryStatus"), deliveryStatus},
+        {QStringLiteral("reasonKey"), reasonKey},
+        {QStringLiteral("periodStart"), periodStart},
+        {QStringLiteral("periodEnd"), periodEnd},
+        {QStringLiteral("deliver"),
+         deliveryStatus == QLatin1String("pending") &&
+             policySuppression.isEmpty()},
+    });
+  }
+
+  QSqlQuery stateQuery(m_database);
+  stateQuery.prepare(QStringLiteral(
+      "INSERT INTO budget_policy_state(policy_id,period_start_utc,"
+      "period_end_utc,risk_level,deduplication_key,updated_at_utc) "
+      "VALUES(?,?,?,?,?,?) ON CONFLICT(policy_id) DO UPDATE SET "
+      "period_start_utc=excluded.period_start_utc,"
+      "period_end_utc=excluded.period_end_utc,"
+      "risk_level=excluded.risk_level,"
+      "deduplication_key=excluded.deduplication_key,"
+      "updated_at_utc=excluded.updated_at_utc"));
+  stateQuery.addBindValue(policyId);
+  stateQuery.addBindValue(startText);
+  stateQuery.addBindValue(endText);
+  stateQuery.addBindValue(state);
+  stateQuery.addBindValue(lastDeduplicationKey.isEmpty()
+                              ? QStringLiteral("")
+                              : lastDeduplicationKey);
+  stateQuery.addBindValue(nowText);
+  if (!stateQuery.exec()) {
+    setError(stateQuery.lastError().text());
+    m_database.rollback();
+    return {{QStringLiteral("ok"), false},
+            {QStringLiteral("error"), m_errorString},
+            {QStringLiteral("events"), QVariantList()}};
+  }
+
+  if (snoozeExpired) {
+    QSqlQuery clearSnooze(m_database);
+    clearSnooze.prepare(QStringLiteral(
+        "UPDATE budget_policies SET snoozed_until_utc=NULL,updated_at_utc=? "
+        "WHERE owner_id=? AND policy_id=?"));
+    clearSnooze.addBindValue(nowText);
+    clearSnooze.addBindValue(m_ownerId);
+    clearSnooze.addBindValue(policyId);
+    if (!clearSnooze.exec()) {
+      setError(clearSnooze.lastError().text());
+      m_database.rollback();
+      return {{QStringLiteral("ok"), false},
+              {QStringLiteral("error"), m_errorString},
+              {QStringLiteral("events"), QVariantList()}};
+    }
+  }
+
+  if (!m_database.commit()) {
+    setError(m_database.lastError().text());
+    m_database.rollback();
+    return {{QStringLiteral("ok"), false},
+            {QStringLiteral("error"), m_errorString},
+            {QStringLiteral("events"), QVariantList()}};
+  }
+  if (snoozeExpired)
+    reload();
+  setError({});
+  return {{QStringLiteral("ok"), true},
+          {QStringLiteral("error"), QString()},
+          {QStringLiteral("events"), events}};
+}
+
+bool BudgetPolicyRepository::updateEventDelivery(qint64 eventId,
+                                                 const QString &status,
+                                                 const QString &reasonKey) {
+  if (!ensureOpen() || eventId <= 0)
+    return false;
+  QSqlQuery query(m_database);
+  query.prepare(QStringLiteral(
+      "UPDATE budget_policy_events SET delivery_status=?,reason_key=?,"
+      "delivered_at_utc=? WHERE id=? AND delivery_status='pending' AND "
+      "policy_id IN (SELECT policy_id FROM budget_policies WHERE owner_id=?)"));
+  query.addBindValue(status);
+  query.addBindValue(reasonKey.isEmpty() ? QStringLiteral("") : reasonKey);
+  query.addBindValue(status == QLatin1String("delivered")
+                         ? QVariant(QDateTime::currentDateTimeUtc().toString(
+                               Qt::ISODateWithMs))
+                         : QVariant());
+  query.addBindValue(eventId);
+  query.addBindValue(m_ownerId);
+  if (!query.exec() || query.numRowsAffected() != 1) {
+    setError(query.lastError().text().isEmpty()
+                 ? QStringLiteral("pending event not found")
+                 : query.lastError().text());
+    return false;
+  }
+  setError({});
+  return true;
+}
+
+bool BudgetPolicyRepository::markEventDelivered(qint64 eventId) {
+  return updateEventDelivery(eventId, QStringLiteral("delivered"), QString());
+}
+
+bool BudgetPolicyRepository::markEventFailed(qint64 eventId,
+                                             const QString &reasonKey) {
+  return updateEventDelivery(eventId, QStringLiteral("failed"),
+                             reasonKey.trimmed().isEmpty()
+                                 ? QStringLiteral("delivery-failed")
+                                 : reasonKey.trimmed());
+}
+
+QDateTime BudgetPolicyRepository::lastDeliveredAt(const QString &policyId) {
+  if (!ensureOpen() || policyById(policyId).isEmpty())
+    return {};
+  QSqlQuery query(m_database);
+  query.prepare(QStringLiteral(
+      "SELECT MAX(delivered_at_utc) FROM budget_policy_events WHERE "
+      "policy_id=? AND delivery_status='delivered'"));
+  query.addBindValue(policyId);
+  if (!query.exec() || !query.next()) {
+    setError(query.lastError().text());
+    return {};
+  }
+  const QDateTime deliveredAt =
+      QDateTime::fromString(query.value(0).toString(), Qt::ISODateWithMs);
+  setError({});
+  return deliveredAt.toUTC();
 }

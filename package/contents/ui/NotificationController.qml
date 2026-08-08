@@ -14,18 +14,22 @@ Item {
     required property var guardrails
     required property var usageDatabase
     required property var webhookNotifier
+    property var budgetPolicyRepository: null
 
     // Tests observe prepared payloads without contacting the desktop
     // notification service or configured webhook endpoints.
     property bool deliveryEnabled: true
+    property bool injectDeliveryFailure: false
     property var lastNotificationTimes: ({})
     property var previousSourceStates: ({})
+    property string actionPolicyId: ""
 
     readonly property string brandedNotificationIcon: "com.github.loofi.aiusagemonitor"
     readonly property string warningNotificationIcon: "dialog-warning"
     readonly property string errorNotificationIcon: "dialog-error"
 
     signal notificationPrepared(var payload)
+    signal policyRequested(string policyId)
 
     Notification {
         id: quotaNotification
@@ -68,6 +72,21 @@ Item {
     }
 
     Notification {
+        id: budgetPolicyNotification
+        componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
+        eventId: "guardrailTransition"
+        title: i18n("AI Usage Monitor")
+        iconName: notifications.warningNotificationIcon
+        actions: NotificationAction {
+            label: i18n("Open Budget Control")
+            onActivated: {
+                if (notifications.actionPolicyId.length > 0)
+                    notifications.policyRequested(notifications.actionPolicyId);
+            }
+        }
+    }
+
+    Notification {
         id: updateNotification
         componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
         eventId: "updateAvailable"
@@ -99,6 +118,36 @@ Item {
 
         lastNotificationTimes[eventKey] = now;
         return true;
+    }
+
+    function dndActive() {
+        var dndStart = Number(configuration.dndStartHour);
+        var dndEnd = Number(configuration.dndEndHour);
+        if (dndStart < 0 || dndEnd < 0) return false;
+        var hour = new Date().getHours();
+        return dndStart < dndEnd
+            ? hour >= dndStart && hour < dndEnd
+            : hour >= dndStart || hour < dndEnd;
+    }
+
+    function policySuppressionReason(forecast) {
+        if (!configuration.alertsEnabled
+                || !configuration.forecastNotificationsEnabled)
+            return "notifications-disabled";
+        if (!guardrailSourceEnabled(forecast)) return "source-disabled";
+        if (dndActive()) return "dnd";
+        var eventKey = "budget_policy_" + forecast.policyId;
+        var cooldown = Math.max(0,
+            Number(configuration.notificationCooldownMinutes || 0)) * 60000;
+        var last = lastNotificationTimes[eventKey] || 0;
+        if (budgetPolicyRepository
+                && budgetPolicyRepository.lastDeliveredAt) {
+            var persisted = new Date(
+                budgetPolicyRepository.lastDeliveredAt(forecast.policyId));
+            if (!isNaN(persisted.getTime()))
+                last = Math.max(last, persisted.getTime());
+        }
+        return Date.now() - last < cooldown ? "cooldown" : "";
     }
 
     function sourceNotificationsEnabled(row) {
@@ -232,11 +281,15 @@ Item {
 
     function deliverPrepared(payload) {
         notificationPrepared(payload);
+        if (injectDeliveryFailure) {
+            return false;
+        }
         if (!deliveryEnabled) {
             return true;
         }
 
-        var target = notificationTarget(payload.type);
+        var target = payload.contractVersion === "budget-pacing-v2"
+            ? budgetPolicyNotification : notificationTarget(payload.type);
         target.title = payload.title;
         target.text = payload.message;
         target.urgency = payload.critical
@@ -245,6 +298,8 @@ Item {
                || payload.transition === "recovered"
                ? Notification.LowUrgency
                : Notification.NormalUrgency);
+        if (payload.contractVersion === "budget-pacing-v2")
+            actionPolicyId = payload.policyId || "";
         target.sendEvent();
         if (payload.type === "guardrail"
                 && webhookNotifier.sendGuardrailEvent) {
@@ -529,7 +584,101 @@ Item {
         };
     }
 
+    function budgetPeriodLabel(forecast) {
+        var periods = ["calendar_day", "iso_week", "calendar_month",
+                       "anchored_month", "provider_reset"];
+        return periods.indexOf(forecast.window) >= 0
+            ? forecast.window : "calendar_month";
+    }
+
+    function budgetPercentClass(forecast) {
+        if (forecast.state === "unavailable") return "unavailable";
+        if (forecast.state === "exceeded") return "exceeded";
+        if (forecast.state === "critical") return "critical";
+        if (forecast.state === "warning") return "warning";
+        return "safe";
+    }
+
+    function budgetPolicyPayload(forecast, event) {
+        var source = guardrailSource(forecast);
+        var sourceName = source ? (source.label || source.name) : i18n("AI provider");
+        var transition = event.transition;
+        var critical = transition === "critical" || transition === "exceeded";
+        var percent = Number(forecast.consumedPercent);
+        var period = budgetPeriodLabel(forecast);
+        var message;
+        if (transition === "period_reset") {
+            message = i18n("%1 started a new budget period.", sourceName);
+        } else if (transition === "recovered") {
+            message = i18n("%1 budget returned to a safe state.", sourceName);
+        } else if (Number.isFinite(percent)) {
+            message = i18n("%1 budget is %2 at %3% for this period.",
+                           sourceName, transition, Math.round(percent));
+        } else {
+            message = i18n("%1 budget is %2 for this period.",
+                           sourceName, transition);
+        }
+        return {
+            type: "guardrail",
+            contractVersion: "budget-pacing-v2",
+            eventKey: "budget-policy-transition-" + transition,
+            policyId: event.policyId,
+            sourceId: forecast.sourceId,
+            providerDisplayName: sourceName,
+            kind: "budget_overrun",
+            state: forecast.state,
+            risk: transition === "period_reset" ? forecast.state : transition,
+            transition: transition,
+            percentClass: budgetPercentClass(forecast),
+            period: period,
+            linkText: i18n("Open Budget Control"),
+            periodStart: event.periodStart,
+            periodEnd: event.periodEnd,
+            title: transition === "recovered"
+                ? i18n("%1 budget recovered", sourceName)
+                : transition === "period_reset"
+                  ? i18n("%1 budget period reset", sourceName)
+                  : i18n("%1 budget %2", sourceName, transition),
+            message: message,
+            critical: critical
+        };
+    }
+
+    function processBudgetPolicy(forecast) {
+        if (!budgetPolicyRepository
+                || !budgetPolicyRepository.prepareTransitions
+                || !budgetPolicyRepository.markEventDelivered
+                || !budgetPolicyRepository.markEventFailed) {
+            return false;
+        }
+        var prepared = budgetPolicyRepository.prepareTransitions(
+            forecast, policySuppressionReason(forecast));
+        if (!prepared || !prepared.ok) return false;
+        var events = prepared.events || [];
+        var delivered = false;
+        for (var i = 0; i < events.length; ++i) {
+            var event = events[i] || {};
+            if (!event.deliver) continue;
+            var payload = budgetPolicyPayload(forecast, event);
+            lastNotificationTimes["budget_policy_" + forecast.policyId]
+                = Date.now();
+            if (deliverPrepared(payload)) {
+                budgetPolicyRepository.markEventDelivered(event.eventId);
+                delivered = true;
+            } else {
+                budgetPolicyRepository.markEventFailed(
+                    event.eventId, "notification-delivery-failed");
+            }
+        }
+        return delivered;
+    }
+
     function processGuardrail(forecast) {
+        if (forecast && forecast.contractVersion === "budget-pacing-v2"
+                && forecast.kind === "budget_overrun"
+                && forecast.policyId) {
+            return processBudgetPolicy(forecast);
+        }
         if (!forecast || !forecast.stableId
                 || !configuration.alertsEnabled
                 || !configuration.forecastNotificationsEnabled
@@ -607,6 +756,16 @@ Item {
         function onForecastsChanged() {
             notifications.processGuardrails();
         }
+    }
+
+    Timer {
+        interval: 60000
+        repeat: true
+        running: !!notifications.budgetPolicyRepository
+            && !!notifications.guardrails
+            && notifications.configuration.alertsEnabled
+            && notifications.configuration.forecastNotificationsEnabled
+        onTriggered: notifications.processGuardrails()
     }
 
     Component.onCompleted: {

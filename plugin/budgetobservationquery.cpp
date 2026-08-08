@@ -67,6 +67,7 @@ BudgetObservationQuery::requestFromPolicy(const QVariantMap &policy,
       policy.value(QStringLiteral("warningPercent"), 80).toInt();
   request.criticalPercent =
       policy.value(QStringLiteral("criticalPercent"), 90).toInt();
+  request.periodType = policy.value(QStringLiteral("periodType")).toString();
   request.timeZoneId = policy.value(QStringLiteral("timeZoneId")).toString();
   request.generatedAt = generatedAt.toUTC();
 
@@ -92,8 +93,7 @@ BudgetObservationQuery::requestFromPolicy(const QVariantMap &policy,
   }
 
   BillingCycleResolver::Request cycleRequest;
-  cycleRequest.periodType =
-      policy.value(QStringLiteral("periodType")).toString();
+  cycleRequest.periodType = request.periodType;
   cycleRequest.anchorDay = policy.value(QStringLiteral("anchorDay")).toInt();
   cycleRequest.timeZoneId = request.timeZoneId;
   cycleRequest.generatedAt = request.generatedAt;

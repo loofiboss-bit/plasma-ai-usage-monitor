@@ -8,6 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 KCFG = ROOT / "package/contents/config/main.xml"
 DIAGNOSTICS_QML = ROOT / "package/contents/ui/configDiagnostics.qml"
 RETIRED_LEGACY_KEYS = {"dashboardMode", "showOnlyProblems"}
+INTERNAL_RUNTIME_KEYS = {"budgetPolicySelectionRequest"}
 
 
 def fail(message: str) -> None:
@@ -44,12 +45,20 @@ def main() -> None:
     expected = kcfg_keys()
     actual = qml_key_list("portableConfigKeys")
     ignored = qml_key_list("ignoredLegacyConfigKeys")
-    missing = expected - actual
+    missing = expected - INTERNAL_RUNTIME_KEYS - actual
     extra = actual - expected
     if missing:
         fail(f"missing KConfig keys in export schema: {', '.join(sorted(missing))}")
     if extra:
         fail(f"unknown keys in export schema: {', '.join(sorted(extra))}")
+    if not INTERNAL_RUNTIME_KEYS <= expected:
+        fail("declared internal runtime keys are missing from KConfig")
+    internal_overlap = actual & INTERNAL_RUNTIME_KEYS
+    if internal_overlap:
+        fail(
+            "internal runtime keys must not be exported: "
+            + ", ".join(sorted(internal_overlap))
+        )
     if ignored != RETIRED_LEGACY_KEYS:
         fail(
             "ignored legacy keys must be exactly: "
@@ -79,7 +88,8 @@ def main() -> None:
     print(
         "Config portability check OK: "
         f"{len(actual)} active non-secret keys; "
-        f"{len(ignored)} legacy keys accepted and ignored"
+        f"{len(ignored)} legacy keys accepted and ignored; "
+        f"{len(INTERNAL_RUNTIME_KEYS)} local runtime key excluded"
     )
 
 

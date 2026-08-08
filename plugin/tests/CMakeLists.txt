@@ -686,6 +686,7 @@ add_test(NAME provider_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check
 add_test(NAME config_defaults_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_config_defaults_exist_in_catalog.py)
 add_test(NAME provider_ui_catalog_models COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_provider_ui_catalog_models.py)
 add_test(NAME budget_ui_contract COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_budget_ui_contract.py)
+add_test(NAME budget_alerts_contract COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_budget_alerts_contract.py)
 add_test(NAME subscription_catalog COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_subscription_catalog.py)
 add_test(NAME no_hardcoded_pricing COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_no_hardcoded_pricing.py)
 add_test(NAME non_invasive_monitoring COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_non_invasive_monitoring.py)

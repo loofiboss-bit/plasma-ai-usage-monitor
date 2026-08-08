@@ -90,6 +90,54 @@ TestCase {
         }
     }
 
+    QtObject {
+        id: fakeBudgetPolicyRepository
+        property int nextEventId: 1
+        property string previousState: ""
+        property var pendingEvent: null
+        property var sequence: []
+        function isRisky(state) {
+            return ["warning", "critical", "exceeded"].indexOf(state) >= 0;
+        }
+        function prepareTransitions(row, suppressionReason) {
+            sequence.push("persist");
+            if (pendingEvent && pendingEvent.status === "pending") {
+                pendingEvent.deliver = suppressionReason === "";
+                return { ok: true, events: [pendingEvent] };
+            }
+            var transition = "";
+            if (isRisky(row.state) && previousState !== row.state)
+                transition = row.state;
+            else if (row.state === "safe" && isRisky(previousState))
+                transition = "recovered";
+            previousState = row.state;
+            if (transition === "") return { ok: true, events: [] };
+            var status = suppressionReason === "" || suppressionReason === "dnd"
+                ? "pending" : "suppressed";
+            pendingEvent = {
+                eventId: nextEventId++,
+                policyId: row.policyId,
+                transition: transition,
+                periodStart: row.periodStart,
+                periodEnd: row.periodEnd,
+                deliveryStatus: status,
+                status: status,
+                deliver: status === "pending" && suppressionReason === ""
+            };
+            return { ok: true, events: [pendingEvent] };
+        }
+        function markEventDelivered(eventId) {
+            sequence.push("delivered");
+            pendingEvent.status = "delivered";
+            return true;
+        }
+        function markEventFailed(eventId, reasonKey) {
+            sequence.push("failed");
+            pendingEvent.status = "failed";
+            return true;
+        }
+    }
+
     Component {
         id: controllerComponent
         Monitor.NotificationController {
@@ -99,7 +147,9 @@ TestCase {
             guardrails: fakeGuardrails
             usageDatabase: fakeUsageDatabase
             webhookNotifier: fakeWebhookNotifier
+            budgetPolicyRepository: fakeBudgetPolicyRepository
             deliveryEnabled: false
+            onNotificationPrepared: fakeBudgetPolicyRepository.sequence.push("notify")
         }
     }
 
@@ -177,6 +227,27 @@ TestCase {
         };
     }
 
+    function budgetPolicyForecast(state, options) {
+        var values = options || {};
+        var start = values.periodStart || new Date("2026-08-01T00:00:00Z");
+        return {
+            contractVersion: "budget-pacing-v2",
+            stableId: "local-stable-hash",
+            policyId: values.policyId || "11111111-1111-4111-8111-111111111111",
+            kind: "budget_overrun",
+            state: state,
+            sourceId: "openai",
+            sourceKind: "provider",
+            window: values.window || "calendar_month",
+            periodStart: start,
+            periodEnd: values.periodEnd || new Date("2026-09-01T00:00:00Z"),
+            generatedAt: new Date("2026-08-20T00:00:00Z"),
+            consumedPercent: values.consumedPercent === undefined
+                ? 85 : values.consumedPercent,
+            valueClass: "actual"
+        };
+    }
+
     function payload(index) {
         return notificationSpy.signalArguments[index][0];
     }
@@ -198,6 +269,10 @@ TestCase {
         fakeUsageDatabase.transitions = ({});
         fakeGuardrails.forecasts = [];
         fakeWebhookNotifier.sentAlerts = 0;
+        fakeBudgetPolicyRepository.nextEventId = 1;
+        fakeBudgetPolicyRepository.previousState = "";
+        fakeBudgetPolicyRepository.pendingEvent = null;
+        fakeBudgetPolicyRepository.sequence = [];
         controller = createTemporaryObject(controllerComponent, testCase);
         verify(controller);
         notificationSpy.target = controller;
@@ -431,5 +506,50 @@ TestCase {
         compare(payload(0).kind, "budget_overrun");
         verify(payload(0).message.indexOf("monthly budget pacing") >= 0);
         verify(payload(0).message.indexOf("quota runway") < 0);
+    }
+
+    function test_budgetPolicyPersistsBeforeDeliveryAndUsesTypedPayload() {
+        verify(controller.processGuardrail(budgetPolicyForecast("warning")));
+        compare(fakeBudgetPolicyRepository.sequence.join(","),
+                "persist,notify,delivered");
+        compare(notificationSpy.count, 1);
+        var event = payload(0);
+        compare(event.contractVersion, "budget-pacing-v2");
+        compare(event.transition, "warning");
+        compare(event.percentClass, "warning");
+        compare(event.period, "calendar_month");
+        compare(event.linkText, "Open Budget Control");
+        verify(event.message.indexOf(event.policyId) < 0);
+    }
+
+    function test_budgetPolicyDndIsPendingAndRetriedWithoutDuplication() {
+        var hour = new Date().getHours();
+        fakeConfiguration.dndStartHour = hour;
+        fakeConfiguration.dndEndHour = (hour + 1) % 24;
+        verify(!controller.processGuardrail(budgetPolicyForecast("warning")));
+        compare(fakeBudgetPolicyRepository.pendingEvent.status, "pending");
+        compare(notificationSpy.count, 0);
+
+        fakeConfiguration.dndStartHour = -1;
+        fakeConfiguration.dndEndHour = -1;
+        verify(controller.processGuardrail(budgetPolicyForecast("warning")));
+        compare(fakeBudgetPolicyRepository.nextEventId, 2);
+        compare(notificationSpy.count, 1);
+    }
+
+    function test_budgetPolicyFailedDeliveryIsPersistedAndTerminal() {
+        controller.injectDeliveryFailure = true;
+        verify(!controller.processGuardrail(budgetPolicyForecast("exceeded", {
+            consumedPercent: 125
+        })));
+        compare(fakeBudgetPolicyRepository.sequence.join(","),
+                "persist,notify,failed");
+        compare(fakeBudgetPolicyRepository.pendingEvent.status, "failed");
+        compare(notificationSpy.count, 1);
+        verify(!controller.processGuardrail(budgetPolicyForecast("exceeded", {
+            consumedPercent: 125
+        })));
+        compare(fakeBudgetPolicyRepository.nextEventId, 2);
+        compare(notificationSpy.count, 1);
     }
 }

@@ -50,6 +50,12 @@ public:
   Q_INVOKABLE QDateTime nextPeriodStart(
       const QVariantMap &policy,
       const QDateTime &generatedAt = QDateTime::currentDateTimeUtc()) const;
+  Q_INVOKABLE QVariantMap
+  prepareTransitions(const QVariantMap &forecast,
+                     const QString &suppressionReason = QString());
+  Q_INVOKABLE bool markEventDelivered(qint64 eventId);
+  Q_INVOKABLE bool markEventFailed(qint64 eventId, const QString &reasonKey);
+  Q_INVOKABLE QDateTime lastDeliveredAt(const QString &policyId);
 
 Q_SIGNALS:
   void ownerIdChanged();
@@ -66,6 +72,8 @@ private:
                                QString *error) const;
   QVariantMap policyById(const QString &policyId) const;
   bool writePolicy(const QVariantMap &policy, bool update);
+  bool updateEventDelivery(qint64 eventId, const QString &status,
+                           const QString &reasonKey);
   static QString deterministicPolicyId(const QString &ownerId,
                                        const QString &legacyKey);
 

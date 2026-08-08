@@ -32,6 +32,7 @@ KCM.SimpleKCM {
         // qmllint enable unresolved-type
         Component.onCompleted: {
             init();
+            Qt.callLater(budgetPage.selectRequestedPolicy);
         }
     }
     Components.BudgetPolicyDraftStore {
@@ -55,6 +56,15 @@ KCM.SimpleKCM {
             : i18n("Budget policies were not saved. Correct the highlighted policy and retry Apply.");
         if (!ok) Qt.callLater(function() { budgetPage.configurationChanged(); });
         return ok;
+    }
+
+    function selectRequestedPolicy() {
+        var requested = String(
+            Plasmoid.configuration.budgetPolicySelectionRequest || "");
+        if (requested.length === 0) return;
+        policyDrafts.reload();
+        policyDrafts.select(requested);
+        Plasmoid.configuration.budgetPolicySelectionRequest = "";
     }
 
     function sourceLabel(sourceId) {

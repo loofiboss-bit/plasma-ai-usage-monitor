@@ -208,6 +208,17 @@ Item {
         return false;
     }
 
+    function openBudgetPolicy(policyId) {
+        if (!policyId) return false;
+        Plasmoid.configuration.budgetPolicySelectionRequest = policyId;
+        var configureAction = Plasmoid.internalAction("configure");
+        if (configureAction) {
+            configureAction.trigger();
+            return true;
+        }
+        return false;
+    }
+
     function settingsVerificationMessage(source) {
         var state = source.readinessStateKey || "failed";
         if (state === "reporting_actual")
@@ -712,6 +723,8 @@ Item {
         guardrails: guardrailModel
         usageDatabase: usageDatabase
         webhookNotifier: webhookNotifier
+        budgetPolicyRepository: budgetPolicyRepository
+        onPolicyRequested: policyId => root.openBudgetPolicy(policyId)
     }
 
     RefreshScheduler {

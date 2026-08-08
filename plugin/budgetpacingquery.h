@@ -35,6 +35,7 @@ public:
     QString currency;
     int warningPercent = 80;
     int criticalPercent = 90;
+    QString periodType = QStringLiteral("calendar_month");
     QString timeZoneId;
     BillingCycleResolver::Cycle cycle;
     BillingCycleResolver::Cycle previousCycle;

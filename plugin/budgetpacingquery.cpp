@@ -43,7 +43,7 @@ ForecastContract::Result unavailable(const BudgetPacingQuery::Request &request,
   result.policyId = request.policyId;
   result.sourceId = request.sourceId;
   result.sourceKind = request.sourceKind;
-  result.window = QStringLiteral("policy_period");
+  result.window = request.periodType;
   result.scope = request.scopeMode == QLatin1String("scoped")
                      ? request.scopeKind + QLatin1Char(':') + request.scopeLabel
                      : QStringLiteral("aggregate");
@@ -215,7 +215,7 @@ ForecastContract::Result BudgetPacingQuery::evaluate(const Request &request) {
   result.policyId = request.policyId;
   result.sourceId = request.sourceId;
   result.sourceKind = request.sourceKind;
-  result.window = QStringLiteral("policy_period");
+  result.window = request.periodType;
   result.scope = request.scopeMode == QLatin1String("scoped")
                      ? request.scopeKind + QLatin1Char(':') + request.scopeLabel
                      : QStringLiteral("aggregate");

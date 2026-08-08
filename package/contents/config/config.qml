@@ -1,11 +1,15 @@
 import QtQuick
 import org.kde.plasma.configuration
+import org.kde.plasma.plasmoid
 
 ConfigModel {
     ConfigCategory {
-        name: i18n("General")
-        icon: "configure"
-        source: "configGeneral.qml"
+        name: Plasmoid.configuration.budgetPolicySelectionRequest
+            ? i18n("Budget Control") : i18n("General")
+        icon: Plasmoid.configuration.budgetPolicySelectionRequest
+            ? "security-high" : "configure"
+        source: Plasmoid.configuration.budgetPolicySelectionRequest
+            ? "configBudget.qml" : "configGeneral.qml"
     }
     ConfigCategory {
         name: i18n("Providers")
@@ -21,6 +25,13 @@ ConfigModel {
         name: i18n("Budget Control")
         icon: "security-high"
         source: "configBudget.qml"
+        visible: !Plasmoid.configuration.budgetPolicySelectionRequest
+    }
+    ConfigCategory {
+        name: i18n("General")
+        icon: "configure"
+        source: "configGeneral.qml"
+        visible: !!Plasmoid.configuration.budgetPolicySelectionRequest
     }
     ConfigCategory {
         name: i18n("Subscriptions")

@@ -40,6 +40,7 @@ check:
     python3 scripts/check_config_portability.py
     python3 scripts/check_kcm_contracts.py
     python3 scripts/check_budget_ui_contract.py
+    python3 scripts/check_budget_alerts_contract.py
     python3 scripts/check_daily_ui_accessibility.py
     python3 scripts/check_qml_localization.py
     python3 scripts/check_qml_registered_types.py
@@ -91,6 +92,7 @@ release-check: build-debug
     python3 scripts/check_config_portability.py
     python3 scripts/check_kcm_contracts.py
     python3 scripts/check_budget_ui_contract.py
+    python3 scripts/check_budget_alerts_contract.py
     python3 scripts/check_daily_ui_accessibility.py
     python3 scripts/check_qml_localization.py
     python3 scripts/check_qml_registered_types.py

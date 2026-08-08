@@ -366,7 +366,8 @@ Item {
             unavailable: 0,
             safe: 1,
             warning: 2,
-            critical: 3
+            critical: 3,
+            exceeded: 4
         };
         var grouped = {};
         var forecasts = guardrailModel && guardrailModel.forecasts
@@ -400,7 +401,7 @@ Item {
             }
         }
 
-        lines.push("# HELP ai_usage_guardrail_risk_state Current deterministic guardrail state: unavailable=0, safe=1, warning=2, critical=3.");
+        lines.push("# HELP ai_usage_guardrail_risk_state Current deterministic guardrail state: unavailable=0, safe=1, warning=2, critical=3, exceeded=4.");
         lines.push("# TYPE ai_usage_guardrail_risk_state gauge");
         lines.push("# HELP ai_usage_guardrail_seconds_until_event Seconds until the earliest predicted event for the current state.");
         lines.push("# TYPE ai_usage_guardrail_seconds_until_event gauge");
