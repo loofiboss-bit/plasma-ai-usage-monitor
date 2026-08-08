@@ -25,54 +25,45 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
-        popupOpen: !!Plasmoid["expanded"]
-        Component.onCompleted: console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY")
-        property int perfStage: 0
+    Component.onCompleted: console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY")
 
-        Timer {
-            interval: 8000
-            running: true
-            repeat: false
-            onTriggered: {
-                refreshScheduler.perfStage = 1;
-                console.time("AI_USAGE_POPUP_FIRST_FRAME");
-                Plasmoid.expanded = true;
-            }
+    Timer {
+        interval: 8000
+        running: true
+        repeat: false
+        onTriggered: {
+            console.time("AI_USAGE_POPUP_FIRST_FRAME");
+            Plasmoid.expanded = true;
+            Qt.callLater(function() {
+                console.timeEnd("AI_USAGE_POPUP_FIRST_FRAME");
+                perfCloseTimer.start();
+            });
         }
+    }
 
-        Timer {
-            id: perfCloseTimer
-            interval: 1000
-            repeat: false
-            onTriggered: Plasmoid.expanded = false
+    Timer {
+        id: perfCloseTimer
+        interval: 1000
+        repeat: false
+        onTriggered: {
+            Plasmoid.expanded = false;
+            console.warn("AI_USAGE_POPUP_CLOSED");
+            perfWarmTimer.start();
         }
+    }
 
-        Timer {
-            id: perfWarmTimer
-            interval: 250
-            repeat: false
-            onTriggered: {
-                console.time("AI_USAGE_POPUP_WARM_FRAME");
-                Plasmoid.expanded = true;
-            }
+    Timer {
+        id: perfWarmTimer
+        interval: 250
+        repeat: false
+        onTriggered: {
+            console.time("AI_USAGE_POPUP_WARM_FRAME");
+            Plasmoid.expanded = true;
+            Qt.callLater(function() {
+                console.timeEnd("AI_USAGE_POPUP_WARM_FRAME");
+            });
         }
-
-        onPopupOpenChanged: {
-            if (popupOpen && perfStage === 1) {
-                Qt.callLater(function() {
-                    console.timeEnd("AI_USAGE_POPUP_FIRST_FRAME");
-                    perfCloseTimer.start();
-                });
-            } else if (!popupOpen && perfStage === 1) {
-                perfStage = 2;
-                console.warn("AI_USAGE_POPUP_CLOSED");
-                perfWarmTimer.start();
-            } else if (popupOpen && perfStage === 2) {
-                Qt.callLater(function() {
-                    console.timeEnd("AI_USAGE_POPUP_WARM_FRAME");
-                });
-            }
-        }
+    }
 '''
 
 
@@ -291,18 +282,18 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
     installed = list(
         (runtime_root / "prefix").glob(
             "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
-            "contents/ui/NativeMonitor.qml"
+            "contents/ui/main.qml"
         )
     )
     if len(installed) != 1:
-        raise RuntimeError("installed NativeMonitor.qml was not found")
-    native_monitor = installed[0]
-    source = native_monitor.read_text(encoding="utf-8")
-    target = '        popupOpen: !!Plasmoid["expanded"]\n'
-    if source.count(target) != 1 or "AI_USAGE_POPUP_FIRST_FRAME" in source:
+        raise RuntimeError("installed main.qml was not found")
+    main_qml = installed[0]
+    source = main_qml.read_text(encoding="utf-8")
+    closing = source.rfind("}")
+    if closing < 0 or "AI_USAGE_POPUP_FIRST_FRAME" in source:
         raise RuntimeError("popup instrumentation target is invalid")
-    native_monitor.write_text(
-        source.replace(target, POPUP_INSTRUMENTATION, 1),
+    main_qml.write_text(
+        source[:closing] + POPUP_INSTRUMENTATION + source[closing:],
         encoding="utf-8",
     )
     env.update(
