@@ -274,17 +274,15 @@ set -euo pipefail
 export QT_IM_MODULE=
 export GTK_IM_MODULE=
 export QT_VIRTUALKEYBOARD_DISABLE=1
+export WAYLAND_DISPLAY="$OUTER_WAYLAND_DISPLAY"
 /usr/libexec/at-spi-bus-launcher --launch-immediately >>"$4" 2>&1 &
 a11y_pid=$!
 sleep 0.25
 /usr/libexec/at-spi2-registryd --use-gnome-session >>"$4" 2>&1 &
 a11y_registry_pid=$!
-setsid kwin_wayland --wayland-display "$OUTER_WAYLAND_DISPLAY" -s "$1" \
-  --width 1600 --height 900 --scale 1 --xwayland --no-lockscreen \
-  --no-global-shortcuts --exit-with-session /usr/bin/plasmashell >>"$4" 2>&1 &
-kwin_pid=$!
+setsid /usr/bin/plasmashell >>"$4" 2>&1 &
+plasmashell_pid=$!
 binding_pid=""
-plasmashell_pid=""
 cleanup() {
   for service in org.kde.kded6 org.kde.ActivityManager; do
     service_pid="$(busctl --user status "$service" 2>/dev/null \
@@ -292,22 +290,14 @@ cleanup() {
     [[ -n "$service_pid" ]] && kill -TERM "$service_pid" >/dev/null 2>&1 || true
   done
   [[ -n "$binding_pid" ]] && kill -TERM "$binding_pid" >/dev/null 2>&1 || true
-  [[ -n "$plasmashell_pid" ]] \
-    && kill -TERM "$plasmashell_pid" >/dev/null 2>&1 || true
+  kill -TERM "$plasmashell_pid" >/dev/null 2>&1 || true
   for _ in $(seq 1 40); do
-    kill -0 "$kwin_pid" >/dev/null 2>&1 || break
+    kill -0 "$plasmashell_pid" >/dev/null 2>&1 || break
     sleep 0.05
   done
-  if kill -0 "$kwin_pid" >/dev/null 2>&1; then
-    kill -TERM -- "-$kwin_pid" >/dev/null 2>&1 || true
-    for _ in $(seq 1 20); do
-      kill -0 "$kwin_pid" >/dev/null 2>&1 || break
-      sleep 0.05
-    done
-  fi
-  kill -0 "$kwin_pid" >/dev/null 2>&1 \
-    && kill -KILL -- "-$kwin_pid" >/dev/null 2>&1 || true
-  wait "$kwin_pid" >/dev/null 2>&1 || true
+  kill -0 "$plasmashell_pid" >/dev/null 2>&1 \
+    && kill -KILL -- "-$plasmashell_pid" >/dev/null 2>&1 || true
+  wait "$plasmashell_pid" >/dev/null 2>&1 || true
   kill -TERM "$a11y_pid" >/dev/null 2>&1 || true
   kill -TERM "$a11y_registry_pid" >/dev/null 2>&1 || true
 }
@@ -323,11 +313,11 @@ for _ in $(seq 1 45); do
 done
 [[ "$ready" -eq 1 ]] || { echo "Nested Plasma panel did not become ready" >&2; exit 1; }
 sleep 2
-sed "s/__TARGET_PID__/$kwin_pid/" "$8" >"$9"
+sed "s/__TARGET_PID__/$plasmashell_pid/" "$8" >"$9"
 binding_output="${9}.bound"
 binding_ready="${9}.ready"
 DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
-  python3 "${10}" --pid "$kwin_pid" --output "$binding_output" \
+  python3 "${10}" --pid "$plasmashell_pid" --output "$binding_output" \
   --ready "$binding_ready" >>"$4" 2>&1 &
 binding_pid=$!
 for _ in $(seq 1 40); do
@@ -360,13 +350,13 @@ window_info=""
 for _ in $(seq 1 80); do
   if [[ -s "$binding_output" ]]; then
     read -r window_id bound_pid <"$binding_output"
-    [[ "$bound_pid" == "$kwin_pid" ]] || window_id=""
+    [[ "$bound_pid" == "$plasmashell_pid" ]] || window_id=""
   fi
   if [[ -n "$window_id" ]]; then
     window_info="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
       busctl --user call org.kde.KWin /KWin org.kde.KWin \
       getWindowInfo s "$window_id" 2>/dev/null || true)"
-    if rg -q "\"pid\" [a-z]+ $kwin_pid([[:space:]]|$)" <<<"$window_info"; then
+    if rg -q "\"pid\" [a-z]+ $plasmashell_pid([[:space:]]|$)" <<<"$window_info"; then
       break
     fi
     window_id=""
@@ -377,15 +367,10 @@ DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
   busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
   unloadScript s ai-monitor-phase0-window-binding >/dev/null 2>&1 || true
 [[ -n "$window_id" ]] || {
-  echo "Outer KWin could not bind nested compositor PID $kwin_pid" >&2
+  echo "Outer KWin could not bind nested plasmashell PID $plasmashell_pid" >&2
   exit 1
 }
 printf 'AI_USAGE_OUTER_WINDOW_INFO %s\n' "$window_info" >>"$4"
-plasmashell_pid="$(pgrep -P "$kwin_pid" -x plasmashell | head -n 1 || true)"
-if [[ -z "$plasmashell_pid" ]]; then
-  plasmashell_pid="$(pgrep -n -x plasmashell)"
-fi
-[[ -n "$plasmashell_pid" ]] || { echo "Nested plasmashell PID not found" >&2; exit 1; }
 timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
   --pid "$plasmashell_pid" >"$6" 2>"$7"
 """
@@ -580,7 +565,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.runs < 1 or args.warmups < 0:
         parser.error("--runs must be positive and --warmups non-negative")
-    missing = [name for name in ("bash", "busctl", "dbus-run-session", "kwin_wayland", "pgrep", "plasmashell", "rg", "rpm", "sed", "setsid", "timeout") if shutil.which(name) is None]
+    missing = [name for name in ("bash", "busctl", "dbus-run-session", "kwin_wayland", "plasmashell", "rg", "rpm", "sed", "setsid", "timeout") if shutil.which(name) is None]
     missing += [str(path) for path in (Path("/usr/libexec/at-spi-bus-launcher"), Path("/usr/libexec/at-spi2-registryd")) if not path.is_file()]
     if missing:
         parser.error("Missing commands: " + ", ".join(missing))
