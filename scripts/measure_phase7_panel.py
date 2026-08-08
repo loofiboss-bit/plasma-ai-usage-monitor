@@ -26,19 +26,19 @@ DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
 
-    Connections {
-        target: Plasmoid
+    // Plasma's qmltypes omit the injected expanded property and its notifier,
+    // but a binding to the attached runtime object observes the real state.
+    readonly property bool perfExpanded: !!Plasmoid["expanded"]
 
-        function onExpandedChanged() {
-            if (Plasmoid["expanded"]) {
-                // Use the next event-loop turn so both versions have created
-                // and polished the representation selected by PlasmoidItem.
-                Qt.callLater(function() {
-                    console.warn("AI_USAGE_POPUP_FIRST_FRAME");
-                });
-            } else {
-                console.warn("AI_USAGE_POPUP_CLOSED");
-            }
+    onPerfExpandedChanged: {
+        if (perfExpanded) {
+            // Use the next event-loop turn so both versions have created and
+            // polished the representation selected by PlasmoidItem.
+            Qt.callLater(function() {
+                console.warn("AI_USAGE_POPUP_FIRST_FRAME");
+            });
+        } else {
+            console.warn("AI_USAGE_POPUP_CLOSED");
         }
     }
 '''
