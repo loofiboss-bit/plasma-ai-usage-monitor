@@ -195,7 +195,7 @@ def request_count(path: Path) -> int:
 def open_popup(compact_prefix: str, pid: int, timeout: float) -> int:
     compact = wait_for_node(compact_prefix, pid, timeout)
     elapsed = press_and_wait_for_event(
-        compact, pid, "object:children-changed:add", timeout
+        compact, pid, "object:state-changed:defunct", timeout
     )
     wait_for_popup(pid, timeout)
     return elapsed
