@@ -316,14 +316,20 @@ void UsageDatabaseExtendedTest::testObservationSchemaV4AndCurrencyIsolation()
         bool nullableValue = false;
         bool hasScope = false;
         bool hasWindow = false;
+        bool hasServiceTierScope = false;
+        bool hasLineItemScope = false;
         while (query.next()) {
             if (query.value(1).toString() == QLatin1String("value")) nullableValue = query.value(3).toInt() == 0;
             if (query.value(1).toString() == QLatin1String("scope")) hasScope = true;
             if (query.value(1).toString() == QLatin1String("window")) hasWindow = true;
+            if (query.value(1).toString() == QLatin1String("service_tier_scope")) hasServiceTierScope = true;
+            if (query.value(1).toString() == QLatin1String("line_item_scope")) hasLineItemScope = true;
         }
         QVERIFY(nullableValue);
         QVERIFY(hasScope);
         QVERIFY(hasWindow);
+        QVERIFY(hasServiceTierScope);
+        QVERIFY(hasLineItemScope);
 
         QVERIFY(query.exec(QStringLiteral(
             "SELECT currency, value, semantic, source, data_quality, correlation_id "
@@ -534,6 +540,8 @@ void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
                             {QStringLiteral("window"), QStringLiteral("day")},
                             {QStringLiteral("modelScope"), QStringLiteral("gemini-2.5-pro")},
                             {QStringLiteral("projectScope"), QStringLiteral("workspace-a")},
+                            {QStringLiteral("serviceTierScope"), QStringLiteral("priority")},
+                            {QStringLiteral("lineItemScope"), QStringLiteral("messages")},
                             {QStringLiteral("periodStart"), start},
                             {QStringLiteral("periodEnd"), end}};
     QVariantMap actualZero = unavailable;
@@ -553,7 +561,7 @@ void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
         QSqlQuery query(check);
         QVERIFY(query.exec(QStringLiteral(
             "SELECT metric_kind,value,interval_start_utc,interval_end_utc,scope,window,source,"
-            "model_scope,project_scope "
+            "model_scope,project_scope,service_tier_scope,line_item_scope "
             "FROM observations WHERE provider='Gemini' ORDER BY id")));
         QVERIFY(query.next());
         QCOMPARE(query.value(0).toString(), QStringLiteral("token_remaining"));
@@ -565,6 +573,8 @@ void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
         QCOMPARE(query.value(6).toString(), QStringLiteral("published_documentation"));
         QCOMPARE(query.value(7).toString(), QStringLiteral("gemini-2.5-pro"));
         QCOMPARE(query.value(8).toString(), QStringLiteral("workspace-a"));
+        QCOMPARE(query.value(9).toString(), QStringLiteral("priority"));
+        QCOMPARE(query.value(10).toString(), QStringLiteral("messages"));
         QVERIFY(query.next());
         QCOMPARE(query.value(0).toString(), QStringLiteral("requests"));
         QCOMPARE(query.value(1).toDouble(), 0.0);
@@ -585,6 +595,15 @@ void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
     QVERIFY(observations.at(0).toObject().contains(QStringLiteral("value")));
     QVERIFY(observations.at(0).toObject().value(QStringLiteral("value")).isNull());
     QCOMPARE(observations.at(1).toObject().value(QStringLiteral("value")).toDouble(), 0.0);
+    for (const QString &path : exports) {
+        QFile exported(path);
+        QVERIFY(exported.open(QIODevice::ReadOnly));
+        const QByteArray contents = exported.readAll();
+        QVERIFY(!contents.contains("gemini-2.5-pro"));
+        QVERIFY(!contents.contains("workspace-a"));
+        QVERIFY(!contents.contains("priority"));
+        QVERIFY(!contents.contains("messages"));
+    }
 
     const QString observationsCsv = exports.filter(QRegularExpression(QStringLiteral("observations-.*\\.csv$"))).value(0);
     QFile csvFile(observationsCsv);
@@ -676,6 +695,7 @@ void UsageDatabaseExtendedTest::testExportJson()
     QJsonObject first = arr.first().toObject();
     QVERIFY(first.contains(QStringLiteral("timestamp")));
     QVERIFY(first.contains(QStringLiteral("cost")));
+    QVERIFY(!first.contains(QStringLiteral("model")));
     QVERIFY(qAbs(first.value(QStringLiteral("cost")).toDouble() - 3.0) < 0.01);
 }
 
@@ -692,7 +712,7 @@ void UsageDatabaseExtendedTest::testExportCsvRfc4180Quoting()
     const QDateTime now = QDateTime::currentDateTimeUtc();
     const QString csv = db.exportCsv(provider, now.addSecs(-60), now.addSecs(60));
     QVERIFY(csv.contains(QStringLiteral("\"Provider, \"\"quoted\"\"\"")));
-    QVERIFY(csv.contains(QStringLiteral("\"model,\"\"line\"\"\nnext\"")));
+    QVERIFY(!csv.contains(QStringLiteral("model,\"\"line")));
 }
 
 void UsageDatabaseExtendedTest::testSourceMetadataSchemaMigration()

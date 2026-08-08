@@ -120,6 +120,9 @@ void LocalIntegrationsTest::webhookNotifierSanitizesGuardrailPayload()
         { QStringLiteral("scope"), QStringLiteral("project:secret-project") },
         { QStringLiteral("modelScope"), QStringLiteral("secret-model") },
         { QStringLiteral("projectScope"), QStringLiteral("secret-project") },
+        { QStringLiteral("workspaceScope"), QStringLiteral("secret-workspace") },
+        { QStringLiteral("serviceTierScope"), QStringLiteral("secret-tier") },
+        { QStringLiteral("lineItemScope"), QStringLiteral("secret-line-item") },
         { QStringLiteral("apiKeyId"), QStringLiteral("secret-key") },
     };
 
@@ -131,6 +134,9 @@ void LocalIntegrationsTest::webhookNotifierSanitizesGuardrailPayload()
     QVERIFY(!sanitized.contains(QStringLiteral("scope")));
     QVERIFY(!sanitized.contains(QStringLiteral("modelScope")));
     QVERIFY(!sanitized.contains(QStringLiteral("projectScope")));
+    QVERIFY(!sanitized.contains(QStringLiteral("workspaceScope")));
+    QVERIFY(!sanitized.contains(QStringLiteral("serviceTierScope")));
+    QVERIFY(!sanitized.contains(QStringLiteral("lineItemScope")));
     QVERIFY(!sanitized.contains(QStringLiteral("apiKeyId")));
 
     QVariantMap invalid = event;

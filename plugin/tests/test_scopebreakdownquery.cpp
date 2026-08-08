@@ -34,6 +34,8 @@ private Q_SLOTS:
     void keepsCompatibilityClassesSeparate();
     void exposesOnlyReportedDimensions();
     void handlesDuplicateAndAmbiguousRows();
+    void createsMinorUnitUnattributedRow();
+    void scopedOverAggregateIsUnavailable();
 };
 
 void ScopeBreakdownQueryTest::reconcilesAggregateExactlyOnce()
@@ -89,6 +91,17 @@ void ScopeBreakdownQueryTest::exposesOnlyReportedDimensions()
         = ScopeBreakdownQuery::annotateMetric(metric(1.0, QStringLiteral("organization_scoped:line_item:Assistants")));
     QCOMPARE(lineItem.value(QStringLiteral("lineItemScope")).toString(), QStringLiteral("Assistants"));
     QVERIFY(lineItem.value(QStringLiteral("lineItemAvailable")).toBool());
+
+    QVariantMap explicitDimensions
+        = metric(1.0, QStringLiteral("organization_scoped"), QStringLiteral("claude"),
+            QStringLiteral("workspace-a"));
+    explicitDimensions.insert(QStringLiteral("serviceTierScope"), QStringLiteral("standard"));
+    explicitDimensions.insert(QStringLiteral("lineItemScope"), QStringLiteral("Messages"));
+    const QVariantMap annotated = ScopeBreakdownQuery::annotateMetric(explicitDimensions);
+    QCOMPARE(annotated.value(QStringLiteral("serviceTierScope")).toString(), QStringLiteral("standard"));
+    QCOMPARE(annotated.value(QStringLiteral("lineItemScope")).toString(), QStringLiteral("Messages"));
+    QCOMPARE(annotated.value(QStringLiteral("serviceTierDisplaySuffix")).toString(), QStringLiteral("standard"));
+    QCOMPARE(annotated.value(QStringLiteral("lineItemDisplaySuffix")).toString(), QStringLiteral("Messages"));
 }
 
 void ScopeBreakdownQueryTest::handlesDuplicateAndAmbiguousRows()
@@ -106,6 +119,46 @@ void ScopeBreakdownQueryTest::handlesDuplicateAndAmbiguousRows()
     QCOMPARE(reconciliation.value(QStringLiteral("scopedValue")).toDouble(), 10.0);
     QCOMPARE(reconciliation.value(QStringLiteral("status")).toString(), QStringLiteral("ambiguous_aggregate"));
     QVERIFY(!reconciliation.value(QStringLiteral("reconciled")).toBool());
+}
+
+void ScopeBreakdownQueryTest::createsMinorUnitUnattributedRow()
+{
+    const QVariantMap result = ScopeBreakdownQuery::run({
+        metric(10.004, QStringLiteral("organization")),
+        metric(6.0, QStringLiteral("organization_scoped"), QString(), QStringLiteral("project-a")),
+        metric(3.99, QStringLiteral("organization_scoped"), QString(), QStringLiteral("project-b")),
+    });
+    const QVariantMap reconciliation = result.value(QStringLiteral("reconciliations")).toList().first().toMap();
+    QCOMPARE(reconciliation.value(QStringLiteral("status")).toString(), QStringLiteral("unattributed"));
+    QCOMPARE(reconciliation.value(QStringLiteral("unattributedMinor")).toLongLong(), 1);
+    QVERIFY(reconciliation.value(QStringLiteral("reconciled")).toBool());
+    const QVariantList scoped = result.value(QStringLiteral("scopedRows")).toList();
+    QCOMPARE(scoped.size(), 3);
+    const QVariantMap unattributed = scoped.last().toMap();
+    QVERIFY(unattributed.value(QStringLiteral("isUnattributed")).toBool());
+    QCOMPARE(unattributed.value(QStringLiteral("displayLabel")).toString(), QStringLiteral("Unattributed"));
+    QCOMPARE(unattributed.value(QStringLiteral("valueMinor")).toLongLong(), 1);
+
+    const QVariantMap roundedExact = ScopeBreakdownQuery::run({
+        metric(10.004, QStringLiteral("organization")),
+        metric(10.0, QStringLiteral("organization_scoped"), QString(), QStringLiteral("project-a")),
+    });
+    QCOMPARE(roundedExact.value(QStringLiteral("reconciliations")).toList().first().toMap()
+                 .value(QStringLiteral("status")).toString(),
+        QStringLiteral("exact"));
+}
+
+void ScopeBreakdownQueryTest::scopedOverAggregateIsUnavailable()
+{
+    const QVariantMap result = ScopeBreakdownQuery::run({
+        metric(10.0, QStringLiteral("organization")),
+        metric(10.01, QStringLiteral("organization_scoped"), QString(), QStringLiteral("project-a")),
+    });
+    const QVariantMap reconciliation = result.value(QStringLiteral("reconciliations")).toList().first().toMap();
+    QCOMPARE(reconciliation.value(QStringLiteral("status")).toString(), QStringLiteral("mismatch"));
+    QCOMPARE(reconciliation.value(QStringLiteral("reasonKey")).toString(), QStringLiteral("scope-mismatch"));
+    QVERIFY(!reconciliation.value(QStringLiteral("available")).toBool());
+    QCOMPARE(result.value(QStringLiteral("scopedRows")).toList().size(), 1);
 }
 
 QTEST_MAIN(ScopeBreakdownQueryTest)

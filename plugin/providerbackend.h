@@ -422,7 +422,9 @@ protected:
                            const QDateTime &periodStart = QDateTime(),
                            const QDateTime &periodEnd = QDateTime(),
                            const QString &modelScope = QString(),
-                           const QString &projectScope = QString());
+                           const QString &projectScope = QString(),
+                           const QString &serviceTierScope = QString(),
+                           const QString &lineItemScope = QString());
     void clearProviderMetric(MetricKind kind, const QString &scope = QString(), const QString &window = QString());
     void removeProviderMetrics(MetricSource source,
                                const QString &window,

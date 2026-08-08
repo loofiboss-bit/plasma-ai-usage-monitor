@@ -90,6 +90,11 @@ Item {
             var policyProvider = registry.providerByConfigKey(policy.sourceId);
             policy.provider = policyProvider ? policyProvider.dbName : policy.sourceId;
             policy.observationScope = "organization";
+            policy.catalogSupportedScopes = policyProvider
+                ? policyProvider.supportedBudgetScopes : ["aggregate"];
+            policy.validatedGatewayScopes = policyProvider && policyProvider.backend
+                && policyProvider.backend["validatedBudgetScopes"] !== undefined
+                ? policyProvider.backend["validatedBudgetScopes"] : [];
             policies.push(policy);
         }
         return {

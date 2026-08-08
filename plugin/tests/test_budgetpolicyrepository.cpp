@@ -25,6 +25,12 @@ private:
           "CREATE TABLE preserved(id INTEGER PRIMARY KEY, value TEXT)")));
       QVERIFY(query.exec(
           QStringLiteral("INSERT INTO preserved(value) VALUES('v5-data')")));
+      QVERIFY(query.exec(QStringLiteral(
+          "CREATE TABLE observations(id INTEGER PRIMARY KEY, model_scope TEXT "
+          "DEFAULT '', project_scope TEXT DEFAULT '')")));
+      QVERIFY(query.exec(
+          QStringLiteral("INSERT INTO observations(model_scope,project_scope) "
+                         "VALUES('model-local','project-local')")));
       QVERIFY(query.exec(QStringLiteral("PRAGMA user_version=5")));
       db.close();
     }
@@ -66,6 +72,25 @@ void BudgetPolicyRepositoryTest::crudDuplicateValidationAndIsolation() {
   QVERIFY2(first.init(), qPrintable(first.errorString()));
   QVERIFY(QFileInfo::exists(path + QStringLiteral(".v18-backup")));
   QCOMPARE(first.policies().size(), 0);
+  {
+    const QString verifyName = QStringLiteral("verify_scoped_columns");
+    QSqlDatabase verify =
+        QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), verifyName);
+    verify.setDatabaseName(path);
+    QVERIFY(verify.open());
+    QSqlQuery query(verify);
+    QVERIFY(query.exec(QStringLiteral(
+        "SELECT model_scope,project_scope,service_tier_scope,line_item_scope "
+        "FROM observations")));
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toString(), QStringLiteral("model-local"));
+    QCOMPARE(query.value(1).toString(), QStringLiteral("project-local"));
+    QVERIFY(query.value(2).toString().isEmpty());
+    QVERIFY(query.value(3).toString().isEmpty());
+    verify.close();
+    verify = {};
+    QSqlDatabase::removeDatabase(verifyName);
+  }
 
   const QVariantMap created = first.createPolicy(validPolicy());
   QVERIFY2(created.value(QStringLiteral("ok")).toBool(),
@@ -215,6 +240,13 @@ void BudgetPolicyRepositoryTest::injectedMigrationFailureRollsBack() {
                                   "type='table' AND name='budget_policies'")) &&
         query.next());
     QCOMPARE(query.value(0).toInt(), 0);
+    QVERIFY(!query.exec(QStringLiteral(
+        "SELECT service_tier_scope,line_item_scope FROM observations")));
+    QVERIFY(query.exec(QStringLiteral(
+                "SELECT model_scope,project_scope FROM observations")) &&
+            query.next());
+    QCOMPARE(query.value(0).toString(), QStringLiteral("model-local"));
+    QCOMPARE(query.value(1).toString(), QStringLiteral("project-local"));
     db.close();
   }
   QSqlDatabase::removeDatabase(name);

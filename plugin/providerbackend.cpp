@@ -677,7 +677,9 @@ void ProviderBackend::setProviderMetric(MetricKind kind,
                                         const QDateTime &periodStart,
                                         const QDateTime &periodEnd,
                                         const QString &modelScope,
-                                        const QString &projectScope)
+                                        const QString &projectScope,
+                                        const QString &serviceTierScope,
+                                        const QString &lineItemScope)
 {
     const QString kindName = metricKindName(kind);
     const QString sourceName = metricSourceName(source);
@@ -688,6 +690,8 @@ void ProviderBackend::setProviderMetric(MetricKind kind,
             && current.value(QStringLiteral("window")).toString() == window
             && current.value(QStringLiteral("modelScope")).toString() == modelScope
             && current.value(QStringLiteral("projectScope")).toString() == projectScope
+            && current.value(QStringLiteral("serviceTierScope")).toString() == serviceTierScope
+            && current.value(QStringLiteral("lineItemScope")).toString() == lineItemScope
             && current.value(QStringLiteral("periodStart")).toDateTime() == periodStart
             && current.value(QStringLiteral("periodEnd")).toDateTime() == periodEnd
             && (currency.isEmpty()
@@ -712,7 +716,12 @@ void ProviderBackend::setProviderMetric(MetricKind kind,
     metric.insert(QStringLiteral("periodEnd"), periodEnd);
     if (!modelScope.isEmpty()) metric.insert(QStringLiteral("modelScope"), modelScope);
     if (!projectScope.isEmpty()) metric.insert(QStringLiteral("projectScope"), projectScope);
+    if (!serviceTierScope.isEmpty())
+        metric.insert(QStringLiteral("serviceTierScope"), serviceTierScope);
+    if (!lineItemScope.isEmpty())
+        metric.insert(QStringLiteral("lineItemScope"), lineItemScope);
     const bool scoped = !modelScope.isEmpty() || !projectScope.isEmpty()
+        || !serviceTierScope.isEmpty() || !lineItemScope.isEmpty()
         || scope.startsWith(QLatin1String("organization_scoped"));
     metric.insert(QStringLiteral("aggregationLevel"),
                   scoped ? QStringLiteral("scoped")

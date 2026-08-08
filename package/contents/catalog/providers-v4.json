@@ -241,6 +241,11 @@
         "cost",
         "rateLimits"
       ],
+      "supportedBudgetScopes": [
+        "aggregate",
+        "project",
+        "line_item"
+      ],
       "expectedSources": [
         "billing_api",
         "usage_api",
@@ -415,6 +420,13 @@
         "manualRateLimits",
         "usage",
         "cost"
+      ],
+      "supportedBudgetScopes": [
+        "aggregate",
+        "workspace",
+        "model",
+        "service_tier",
+        "line_item"
       ],
       "expectedSources": [
         "response_headers",
@@ -1982,6 +1994,9 @@
         "connectivity",
         "usage",
         "cost"
+      ],
+      "supportedBudgetScopes": [
+        "aggregate"
       ],
       "expectedSources": [
         "usage_api"

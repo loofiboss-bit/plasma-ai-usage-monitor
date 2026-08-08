@@ -993,8 +993,9 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider,
         "INSERT INTO "
         "observations(provider,observed_at_utc,interval_start_utc,interval_end_"
         "utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,"
-        "window,model_scope,project_scope,reset_at_utc,correlation_id) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
+        "window,model_scope,project_scope,service_tier_scope,line_item_scope,"
+        "reset_at_utc,correlation_id) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
     for (const QVariant &entry : metrics) {
         const QVariantMap metric = entry.toMap();
         const QString requestedSemantic =
@@ -1043,8 +1044,10 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider,
             12, metric.value(QStringLiteral("window"), QStringLiteral("current")));
         query.bindValue(13, metric.value(QStringLiteral("modelScope")));
         query.bindValue(14, metric.value(QStringLiteral("projectScope")));
-        query.bindValue(15, metric.value(QStringLiteral("resetAt")));
-        query.bindValue(16, correlationId);
+        query.bindValue(15, metric.value(QStringLiteral("serviceTierScope")));
+        query.bindValue(16, metric.value(QStringLiteral("lineItemScope")));
+        query.bindValue(17, metric.value(QStringLiteral("resetAt")));
+        query.bindValue(18, correlationId);
         if (!query.exec()) {
             m_db.rollback();
             return false;
@@ -2343,7 +2346,7 @@ QString UsageDatabase::exportCsv(const QString &provider, const QDateTime &from,
         const QStringList fields = {
             row[QStringLiteral("timestamp")].toString(),
             provider,
-            row[QStringLiteral("model")].toString(),
+            QString(),
             QString::number(row[QStringLiteral("inputTokens")].toLongLong()),
             QString::number(row[QStringLiteral("outputTokens")].toLongLong()),
             QString::number(row[QStringLiteral("requestCount")].toInt()),
@@ -2379,7 +2382,9 @@ QString UsageDatabase::exportJson(const QString &provider,
 
     QJsonArray arr;
     for (const QVariant &snap : snapshots) {
-        arr.append(QJsonObject::fromVariantMap(snap.toMap()));
+        QVariantMap redacted = snap.toMap();
+        redacted.remove(QStringLiteral("model"));
+        arr.append(QJsonObject::fromVariantMap(redacted));
     }
 
     QJsonObject root;
@@ -2447,7 +2452,7 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
             providerQuery.setForwardOnly(true);
             const bool providersOk
                 = providerQuery.exec(QStringLiteral("SELECT "
-                                                    "provider,timestamp,model,input_tokens,output_tokens,"
+                                                    "provider,timestamp,'' AS model,input_tokens,output_tokens,"
                                                     "request_count,cost,is_estimated_cost,"
                                                     "daily_cost,monthly_cost,rl_requests,rl_requests_"
                                                     "remaining,rl_tokens,rl_tokens_remaining,"
@@ -2463,9 +2468,14 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                 = observationQuery.exec(QStringLiteral("SELECT "
                                                        "provider,observed_at_utc,interval_start_utc,interval_end_utc,"
                                                        "metric_"
-                                                       "kind,unit,value,currency,semantic,source,data_quality,scope,"
-                                                       "window,"
-                                                       "model_scope,project_scope,reset_at_utc,correlation_id "
+                                                       "kind,unit,value,currency,semantic,source,data_quality,"
+                                                       "CASE WHEN scope LIKE 'organization_scoped%' OR "
+                                                       "COALESCE(model_scope,'')<>'' OR "
+                                                       "COALESCE(project_scope,'')<>'' OR "
+                                                       "COALESCE(service_tier_scope,'')<>'' OR "
+                                                       "COALESCE(line_item_scope,'')<>'' THEN 'scoped' ELSE scope END AS scope,"
+                                                       "window,'' AS model_scope,'' AS project_scope,"
+                                                       "reset_at_utc,correlation_id "
                                                        "FROM observations ORDER BY id"));
             if (observationsOk)
                 streamJsonRows(observationQuery);
@@ -2474,8 +2484,9 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
             QSqlQuery guardrailQuery(m_db);
             guardrailQuery.setForwardOnly(true);
             const bool guardrailsOk
-                = guardrailQuery.exec(QStringLiteral("SELECT stable_id,source_id,source_kind,risk_kind,window_key,"
-                                                     "scope,transition,observed_at_utc,predicted_at_utc,"
+                = guardrailQuery.exec(QStringLiteral("SELECT '' AS stable_id,source_id,source_kind,risk_kind,window_key,"
+                                                     "CASE WHEN scope='aggregate' THEN 'aggregate' ELSE 'scoped' END AS scope,"
+                                                     "transition,observed_at_utc,predicted_at_utc,"
                                                      "period_end_utc,method_id,evidence_grade,current_value,"
                                                      "projected_value,limit_value,unit,currency,value_class,"
                                                      "reason_key FROM guardrail_events ORDER BY id"));
@@ -2515,8 +2526,12 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
             const bool queryOk = query.exec(QStringLiteral(
                 "SELECT "
                 "provider,observed_at_utc,interval_start_utc,interval_end_utc,metric_"
-                "kind,unit,value,currency,semantic,source,data_quality,scope,window,"
-                "model_scope,project_scope,reset_at_utc,correlation_id FROM "
+                "kind,unit,value,currency,semantic,source,data_quality,"
+                "CASE WHEN scope LIKE 'organization_scoped%' OR "
+                "COALESCE(model_scope,'')<>'' OR COALESCE(project_scope,'')<>'' OR "
+                "COALESCE(service_tier_scope,'')<>'' OR COALESCE(line_item_scope,'')<>'' "
+                "THEN 'scoped' ELSE scope END AS scope,window,'' AS model_scope,"
+                "'' AS project_scope,reset_at_utc,correlation_id FROM "
                 "observations ORDER BY id"));
             while (queryOk && query.next()) {
                 QStringList fields;
@@ -2542,8 +2557,9 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
             QSqlQuery query(m_db);
             query.setForwardOnly(true);
             const bool queryOk
-                = query.exec(QStringLiteral("SELECT stable_id,source_id,source_kind,risk_kind,window_key,"
-                                            "scope,transition,observed_at_utc,predicted_at_utc,"
+                = query.exec(QStringLiteral("SELECT '' AS stable_id,source_id,source_kind,risk_kind,window_key,"
+                                            "CASE WHEN scope='aggregate' THEN 'aggregate' ELSE 'scoped' END AS scope,"
+                                            "transition,observed_at_utc,predicted_at_utc,"
                                             "period_end_utc,method_id,evidence_grade,current_value,"
                                             "projected_value,limit_value,unit,currency,value_class,"
                                             "reason_key FROM guardrail_events ORDER BY id"));
@@ -2573,7 +2589,7 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
             query.setForwardOnly(true);
             const bool queryOk = query.exec(
                 QStringLiteral("SELECT "
-                               "provider,timestamp,model,input_tokens,output_tokens,"
+                               "provider,timestamp,'' AS model,input_tokens,output_tokens,"
                                "request_count,cost,is_estimated_cost,"
                                "daily_cost,monthly_cost,rl_requests,rl_requests_"
                                "remaining,rl_tokens,rl_tokens_remaining,"

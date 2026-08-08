@@ -72,6 +72,7 @@ private Q_SLOTS:
   void unavailablePrecedenceAndCompatibility();
   void scopedAndPreviousPeriodComparison();
   void databaseBoundaryAndUnknownCurrency();
+  void providerScopeDimensionsAtDatabaseBoundary();
   void performanceAtOneHundredThousandObservations();
 };
 
@@ -306,7 +307,7 @@ void BudgetPacingQueryTest::databaseBoundaryAndUnknownCurrency() {
       "metric_kind TEXT,unit TEXT,value REAL,currency TEXT,semantic "
       "TEXT,source TEXT,"
       "data_quality TEXT,scope TEXT,window TEXT,model_scope TEXT,project_scope "
-      "TEXT)")));
+      "TEXT,service_tier_scope TEXT,line_item_scope TEXT)")));
   query.prepare(QStringLiteral(
       "INSERT INTO observations(provider,observed_at_utc,interval_start_utc,"
       "interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_"
@@ -349,6 +350,139 @@ void BudgetPacingQueryTest::databaseBoundaryAndUnknownCurrency() {
       BudgetObservationQuery::requestFromPolicy(policy, Now, database);
   QCOMPARE(BudgetPacingQuery::evaluate(pacingRequest).reasonKey,
            QStringLiteral("unknown-currency"));
+  database.close();
+  database = {};
+  QSqlDatabase::removeDatabase(connectionName);
+}
+
+void BudgetPacingQueryTest::providerScopeDimensionsAtDatabaseBoundary() {
+  QTemporaryDir directory;
+  const QString connectionName =
+      QStringLiteral("budget_scope_dimensions_%1")
+          .arg(QUuid::createUuid().toString(QUuid::WithoutBraces));
+  QSqlDatabase database =
+      QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connectionName);
+  database.setDatabaseName(
+      directory.filePath(QStringLiteral("scope-observations.db")));
+  QVERIFY(database.open());
+  QSqlQuery query(database);
+  QVERIFY(query.exec(QStringLiteral(
+      "CREATE TABLE observations(id INTEGER PRIMARY KEY,provider TEXT,"
+      "observed_at_utc TEXT,interval_start_utc TEXT,interval_end_utc TEXT,"
+      "metric_kind TEXT,unit TEXT,value REAL,currency TEXT,semantic TEXT,"
+      "source TEXT,data_quality TEXT,scope TEXT,window TEXT,model_scope TEXT,"
+      "project_scope TEXT,service_tier_scope TEXT,line_item_scope TEXT)")));
+
+  const auto insertRows = [&query](const QString &provider,
+                                   const QString &scope, const QString &model,
+                                   const QString &project,
+                                   const QString &serviceTier,
+                                   const QString &lineItem) {
+    query.prepare(QStringLiteral(
+        "INSERT INTO observations(provider,observed_at_utc,interval_start_utc,"
+        "interval_end_utc,metric_kind,unit,value,currency,semantic,source,"
+        "data_quality,scope,window,model_scope,project_scope,"
+        "service_tier_scope,line_item_scope) VALUES(?,?,?,?,'cost','USD',"
+        "0.5,'USD','gauge','billing_api','actual',?,'day',?,?,?,?)"));
+    for (int day = 1; day <= 11; ++day) {
+      const QDateTime start = QDate(2026, 7, day).startOfDay(QTimeZone::UTC);
+      query.bindValue(0, provider);
+      query.bindValue(1, start.addSecs(12 * 60 * 60)
+                             .toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+      query.bindValue(2, start.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+      query.bindValue(
+          3, start.addDays(1).toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
+      query.bindValue(4, scope);
+      query.bindValue(5, model);
+      query.bindValue(6, project);
+      query.bindValue(7, serviceTier);
+      query.bindValue(8, lineItem);
+      QVERIFY(query.exec());
+    }
+  };
+  insertRows(QStringLiteral("openai"),
+             QStringLiteral("organization_scoped:line_item:Responses"),
+             QStringLiteral("must-not-become-openai-model-cost"),
+             QStringLiteral("project-a"), {}, QStringLiteral("Responses"));
+  insertRows(QStringLiteral("anthropic"), QStringLiteral("organization_scoped"),
+             QStringLiteral("claude-sonnet"), QStringLiteral("workspace-a"),
+             QStringLiteral("standard"), QStringLiteral("Messages"));
+  insertRows(QStringLiteral("litellm"), QStringLiteral("organization"), {}, {},
+             {}, {});
+
+  const auto policy = [](const QString &source, const QString &scopeKind,
+                         const QString &scopeIdentity,
+                         const QStringList &supportedScopes) {
+    return QVariantMap{
+        {QStringLiteral("policyId"), QUuid::createUuid().toString()},
+        {QStringLiteral("sourceId"), source},
+        {QStringLiteral("sourceKind"), QStringLiteral("provider")},
+        {QStringLiteral("provider"), source},
+        {QStringLiteral("scopeMode"), QStringLiteral("scoped")},
+        {QStringLiteral("scopeKind"), scopeKind},
+        {QStringLiteral("scopeIdentity"), scopeIdentity},
+        {QStringLiteral("scopeLabel"), QStringLiteral("Local label")},
+        {QStringLiteral("catalogSupportedScopes"), supportedScopes},
+        {QStringLiteral("valueClass"), QStringLiteral("actual")},
+        {QStringLiteral("limitMinor"), 10000},
+        {QStringLiteral("currency"), QStringLiteral("USD")},
+        {QStringLiteral("periodType"), QStringLiteral("calendar_month")},
+        {QStringLiteral("timeZoneId"), QStringLiteral("UTC")},
+        {QStringLiteral("warningPercent"), 80},
+        {QStringLiteral("criticalPercent"), 90},
+    };
+  };
+  const QStringList openAiScopes{QStringLiteral("aggregate"),
+                                 QStringLiteral("project"),
+                                 QStringLiteral("line_item")};
+  for (const auto &[kind, identity] : QList<QPair<QString, QString>>{
+           {QStringLiteral("project"), QStringLiteral("project-a")},
+           {QStringLiteral("line_item"), QStringLiteral("Responses")}}) {
+    const auto result =
+        BudgetPacingQuery::evaluate(BudgetObservationQuery::requestFromPolicy(
+            policy(QStringLiteral("openai"), kind, identity, openAiScopes), Now,
+            database));
+    QVERIFY2(result.isValid(), qPrintable(result.reasonKey));
+    QCOMPARE(result.spentMinor, std::optional<qint64>(550));
+  }
+  QCOMPARE(BudgetPacingQuery::evaluate(
+               BudgetObservationQuery::requestFromPolicy(
+                   policy(QStringLiteral("openai"), QStringLiteral("model"),
+                          QStringLiteral("must-not-become-"
+                                         "openai-model-cost"),
+                          openAiScopes),
+                   Now, database))
+               .reasonKey,
+           QStringLiteral("scope-unavailable"));
+
+  const QStringList anthropicScopes{
+      QStringLiteral("aggregate"), QStringLiteral("workspace"),
+      QStringLiteral("model"), QStringLiteral("service_tier"),
+      QStringLiteral("line_item")};
+  const QList<QPair<QString, QString>> anthropicDimensions{
+      {QStringLiteral("workspace"), QStringLiteral("workspace-a")},
+      {QStringLiteral("model"), QStringLiteral("claude-sonnet")},
+      {QStringLiteral("service_tier"), QStringLiteral("standard")},
+      {QStringLiteral("line_item"), QStringLiteral("Messages")}};
+  for (const auto &[kind, identity] : anthropicDimensions) {
+    const auto result =
+        BudgetPacingQuery::evaluate(BudgetObservationQuery::requestFromPolicy(
+            policy(QStringLiteral("anthropic"), kind, identity,
+                   anthropicScopes),
+            Now, database));
+    QVERIFY2(result.isValid(), qPrintable(result.reasonKey));
+    QCOMPARE(result.spentMinor, std::optional<qint64>(550));
+  }
+
+  const auto liteLlmScoped =
+      policy(QStringLiteral("litellm"), QStringLiteral("model"),
+             QStringLiteral("gateway-model"), {QStringLiteral("aggregate")});
+  QCOMPARE(
+      BudgetPacingQuery::evaluate(BudgetObservationQuery::requestFromPolicy(
+                                      liteLlmScoped, Now, database))
+          .reasonKey,
+      QStringLiteral("scope-unavailable"));
+
   database.close();
   database = {};
   QSqlDatabase::removeDatabase(connectionName);

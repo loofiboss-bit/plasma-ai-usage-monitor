@@ -23,6 +23,7 @@ set(TEST_PROVIDER_SRC
     ${CMAKE_SOURCE_DIR}/plugin/openaicompatibleprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/openaiprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/scopebreakdownquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/currencyminorunits.cpp
     ${CMAKE_SOURCE_DIR}/plugin/azureopenaiprovider.cpp
     ${CMAKE_SOURCE_DIR}/plugin/anthropicadminparser.cpp
     ${CMAKE_SOURCE_DIR}/plugin/anthropicprovider.cpp
@@ -138,6 +139,7 @@ set_tests_properties(runwayquery PROPERTIES TIMEOUT 30)
 add_executable(test_scopebreakdownquery
     test_scopebreakdownquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/scopebreakdownquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/currencyminorunits.cpp
 )
 
 target_include_directories(test_scopebreakdownquery
@@ -521,6 +523,7 @@ add_executable(test_dailystatemodel
     ${CMAKE_SOURCE_DIR}/plugin/dailystatemodel.cpp
     ${CMAKE_SOURCE_DIR}/plugin/sourcedetailmodel.cpp
     ${CMAKE_SOURCE_DIR}/plugin/scopebreakdownquery.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/currencyminorunits.cpp
     ${CMAKE_SOURCE_DIR}/plugin/analystquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/forecastcontract.cpp
     ${CMAKE_SOURCE_DIR}/plugin/usagedatabase.cpp

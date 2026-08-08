@@ -39,6 +39,7 @@ QtObject {
                 probePolicy: entry.probePolicy || "manual_only",
                 requiresApiKey: (entry.auth?.credentialSlots || []).length > 0,
                 supportsBudget: (entry.capabilities || []).indexOf("cost") >= 0,
+                supportedBudgetScopes: entry.supportedBudgetScopes || ["aggregate"],
                 enabledConfigKey: config.enabled,
                 modelConfigKey: config.model,
                 customBaseUrlConfigKey: (config.key || entry.stableId) + "CustomBaseUrl",

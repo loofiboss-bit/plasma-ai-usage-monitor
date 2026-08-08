@@ -1,5 +1,7 @@
 #include "scopebreakdownquery.h"
 
+#include "currencyminorunits.h"
+
 #include <QDateTime>
 #include <QMap>
 #include <QSet>
@@ -108,6 +110,8 @@ bool ScopeBreakdownQuery::isScopedMetric(const QVariantMap &metric)
     }
     return !metric.value(QStringLiteral("modelScope")).toString().isEmpty()
         || !metric.value(QStringLiteral("projectScope")).toString().isEmpty()
+        || !metric.value(QStringLiteral("serviceTierScope")).toString().isEmpty()
+        || !metric.value(QStringLiteral("lineItemScope")).toString().isEmpty()
         || metric.value(QStringLiteral("scope")).toString().startsWith(QLatin1String("organization_scoped"));
 }
 
@@ -117,8 +121,14 @@ QVariantMap ScopeBreakdownQuery::annotateMetric(const QVariantMap &metric)
     const QString model = metric.value(QStringLiteral("modelScope")).toString().trimmed();
     const QString project = metric.value(QStringLiteral("projectScope")).toString().trimmed();
     const QString scope = metric.value(QStringLiteral("scope")).toString();
-    const QString serviceTier = dimensionFromScope(scope, QStringLiteral("service_tier"));
-    const QString lineItem = dimensionFromScope(scope, QStringLiteral("line_item"));
+    const QString serviceTier
+        = metric.value(QStringLiteral("serviceTierScope")).toString().trimmed().isEmpty()
+        ? dimensionFromScope(scope, QStringLiteral("service_tier"))
+        : metric.value(QStringLiteral("serviceTierScope")).toString().trimmed();
+    const QString lineItem
+        = metric.value(QStringLiteral("lineItemScope")).toString().trimmed().isEmpty()
+        ? dimensionFromScope(scope, QStringLiteral("line_item"))
+        : metric.value(QStringLiteral("lineItemScope")).toString().trimmed();
 
     result.insert(QStringLiteral("modelScope"), model);
     result.insert(QStringLiteral("modelScopeAvailable"), !model.isEmpty());
@@ -128,8 +138,12 @@ QVariantMap ScopeBreakdownQuery::annotateMetric(const QVariantMap &metric)
     result.insert(QStringLiteral("projectDisplaySuffix"), localDisplaySuffix(project));
     result.insert(QStringLiteral("serviceTierScope"), serviceTier);
     result.insert(QStringLiteral("serviceTierAvailable"), !serviceTier.isEmpty());
+    result.insert(QStringLiteral("serviceTierDisplayKind"), localDisplayKind(serviceTier));
+    result.insert(QStringLiteral("serviceTierDisplaySuffix"), localDisplaySuffix(serviceTier));
     result.insert(QStringLiteral("lineItemScope"), lineItem);
     result.insert(QStringLiteral("lineItemAvailable"), !lineItem.isEmpty());
+    result.insert(QStringLiteral("lineItemDisplayKind"), localDisplayKind(lineItem));
+    result.insert(QStringLiteral("lineItemDisplaySuffix"), localDisplaySuffix(lineItem));
     result.insert(QStringLiteral("aggregationLevel"),
         isScopedMetric(metric) ? QStringLiteral("scoped") : QStringLiteral("aggregate"));
     result.insert(QStringLiteral("valueClass"), valueClass(metric));
@@ -207,13 +221,56 @@ QVariantMap ScopeBreakdownQuery::run(const QVariantList &metrics)
         row.insert(QStringLiteral("scopedValue"), item.scopedValue);
         row.insert(QStringLiteral("aggregateRowCount"), item.aggregateCount);
         row.insert(QStringLiteral("scopedRowCount"), item.scopedCount);
-        const double scale = qMax(1.0, qMax(std::abs(item.aggregateValue), std::abs(item.scopedValue)));
-        const bool exact = item.aggregateCount == 1 && std::abs(item.aggregateValue - item.scopedValue) <= scale * 1e-9;
-        row.insert(QStringLiteral("reconciled"), exact);
-        row.insert(QStringLiteral("status"),
-            item.aggregateCount != 1 ? QStringLiteral("ambiguous_aggregate")
-                : exact              ? QStringLiteral("exact")
-                                     : QStringLiteral("mismatch"));
+        const QString currency = row.value(QStringLiteral("currency")).toString();
+        const std::optional<qint64> aggregateMinor
+            = CurrencyMinorUnits::fromMajor(item.aggregateValue, currency);
+        const std::optional<qint64> scopedMinor
+            = CurrencyMinorUnits::fromMajor(item.scopedValue, currency);
+        const bool costDimension = row.value(QStringLiteral("kind")) == QLatin1String("cost")
+            && !currency.isEmpty();
+        if (item.aggregateCount != 1) {
+            row.insert(QStringLiteral("reconciled"), false);
+            row.insert(QStringLiteral("available"), false);
+            row.insert(QStringLiteral("status"), QStringLiteral("ambiguous_aggregate"));
+            row.insert(QStringLiteral("reasonKey"), QStringLiteral("ambiguous-aggregate"));
+        } else if (costDimension && (!aggregateMinor || !scopedMinor)) {
+            row.insert(QStringLiteral("reconciled"), false);
+            row.insert(QStringLiteral("available"), false);
+            row.insert(QStringLiteral("status"), QStringLiteral("unavailable"));
+            row.insert(QStringLiteral("reasonKey"), QStringLiteral("unknown-currency"));
+        } else if (costDimension && *scopedMinor > *aggregateMinor) {
+            row.insert(QStringLiteral("reconciled"), false);
+            row.insert(QStringLiteral("available"), false);
+            row.insert(QStringLiteral("status"), QStringLiteral("mismatch"));
+            row.insert(QStringLiteral("reasonKey"), QStringLiteral("scope-mismatch"));
+        } else if (costDimension && *scopedMinor < *aggregateMinor) {
+            const qint64 unattributedMinor = *aggregateMinor - *scopedMinor;
+            QVariantMap unattributed = item.identity;
+            unattributed.insert(QStringLiteral("available"), true);
+            unattributed.insert(QStringLiteral("value"),
+                CurrencyMinorUnits::toMajor(unattributedMinor, currency).value_or(0.0));
+            unattributed.insert(QStringLiteral("valueMinor"), unattributedMinor);
+            unattributed.insert(QStringLiteral("aggregationLevel"), QStringLiteral("scoped"));
+            unattributed.insert(QStringLiteral("scope"), QStringLiteral("unattributed"));
+            unattributed.insert(QStringLiteral("scopeKind"), QStringLiteral("unattributed"));
+            unattributed.insert(QStringLiteral("displayLabel"), QStringLiteral("Unattributed"));
+            unattributed.insert(QStringLiteral("isUnattributed"), true);
+            scopedRows.append(unattributed);
+            row.insert(QStringLiteral("unattributedMinor"), unattributedMinor);
+            row.insert(QStringLiteral("reconciled"), true);
+            row.insert(QStringLiteral("available"), true);
+            row.insert(QStringLiteral("status"), QStringLiteral("unattributed"));
+            row.insert(QStringLiteral("reasonKey"), QString());
+        } else {
+            const double scale = qMax(1.0, qMax(std::abs(item.aggregateValue), std::abs(item.scopedValue)));
+            const bool exact = costDimension
+                ? *aggregateMinor == *scopedMinor
+                : std::abs(item.aggregateValue - item.scopedValue) <= scale * 1e-9;
+            row.insert(QStringLiteral("reconciled"), exact);
+            row.insert(QStringLiteral("available"), exact);
+            row.insert(QStringLiteral("status"), exact ? QStringLiteral("exact") : QStringLiteral("mismatch"));
+            row.insert(QStringLiteral("reasonKey"), exact ? QString() : QStringLiteral("scope-mismatch"));
+        }
         reconciliationRows.append(row);
     }
 

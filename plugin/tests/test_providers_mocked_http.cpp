@@ -534,6 +534,8 @@ void ProvidersMockedHttpTest::openAiProviderSupportedScopeAttribution()
                    .endsWith(QLatin1String(":Responses"))) {
             foundCostScope = true;
             QVERIFY(!metric.contains(QStringLiteral("modelScope")));
+            QCOMPARE(metric.value(QStringLiteral("lineItemScope")).toString(),
+                     QStringLiteral("Responses"));
         }
     }
     QVERIFY(foundUsageScope);
@@ -1268,6 +1270,18 @@ void ProvidersMockedHttpTest::anthropicAdminUsageCostPaginationAndDimensions()
              QStringLiteral("claude-sonnet-4-20250514"));
     QCOMPARE(cacheRead.value(QStringLiteral("projectScope")).toString(),
              QStringLiteral("workspace-a"));
+    QCOMPARE(cacheRead.value(QStringLiteral("serviceTierScope")).toString(),
+             QStringLiteral("standard"));
+    const QVariantMap scopedCost =
+        provider.metric(QStringLiteral("cost"),
+                        QStringLiteral("organization_scoped"),
+                        QStringLiteral("day"));
+    QCOMPARE(scopedCost.value(QStringLiteral("modelScope")).toString(),
+             QStringLiteral("claude-sonnet-4-20250514"));
+    QCOMPARE(scopedCost.value(QStringLiteral("projectScope")).toString(),
+             QStringLiteral("workspace-a"));
+    QCOMPARE(scopedCost.value(QStringLiteral("serviceTierScope")).toString(),
+             QStringLiteral("standard"));
     QCOMPARE(server.hitCount(QStringLiteral("/v1/organizations/usage_report/messages")), 2);
     QVERIFY(server.targets().filter(QRegularExpression(
                 QStringLiteral("[?&]page=usage-next(?:&|$)"))).size() == 1);

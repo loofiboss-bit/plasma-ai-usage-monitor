@@ -34,6 +34,12 @@ ForecastContract::ValueClass valueClassFor(const QString &semantic,
     return ForecastContract::ValueClass::Estimated;
   return ForecastContract::ValueClass::Actual;
 }
+
+QString dimensionFromScope(const QString &scope, const QString &kind) {
+  const QString prefix =
+      QStringLiteral("organization_scoped:") + kind + QLatin1Char(':');
+  return scope.startsWith(prefix) ? scope.mid(prefix.size()) : QString();
+}
 } // namespace
 
 BudgetPacingQuery::Request
@@ -63,6 +69,27 @@ BudgetObservationQuery::requestFromPolicy(const QVariantMap &policy,
       policy.value(QStringLiteral("criticalPercent"), 90).toInt();
   request.timeZoneId = policy.value(QStringLiteral("timeZoneId")).toString();
   request.generatedAt = generatedAt.toUTC();
+
+  const QString requestedDimension =
+      request.scopeMode == QLatin1String("aggregate")
+          ? QStringLiteral("aggregate")
+          : request.scopeKind;
+  QStringList supportedScopes =
+      policy.value(QStringLiteral("catalogSupportedScopes")).toStringList();
+  if (supportedScopes.isEmpty())
+    supportedScopes.append(QStringLiteral("aggregate"));
+  if (!supportedScopes.contains(requestedDimension)) {
+    request.preflightReason = QStringLiteral("scope-unavailable");
+    return request;
+  }
+  if (request.sourceId == QLatin1String("litellm") &&
+      requestedDimension != QLatin1String("aggregate") &&
+      !policy.value(QStringLiteral("validatedGatewayScopes"))
+           .toStringList()
+           .contains(requestedDimension)) {
+    request.preflightReason = QStringLiteral("scope-unavailable");
+    return request;
+  }
 
   BillingCycleResolver::Request cycleRequest;
   cycleRequest.periodType =
@@ -102,14 +129,14 @@ BudgetObservationQuery::requestFromPolicy(const QVariantMap &policy,
       "SELECT "
       "observed_at_utc,interval_start_utc,interval_end_utc,value,currency,"
       "semantic,source,data_quality,"
-      "COALESCE(model_scope,''),COALESCE(project_scope,'') FROM observations "
-      "WHERE provider=? AND metric_kind='cost' AND window='day' AND scope=? "
+      "COALESCE(model_scope,''),COALESCE(project_scope,''),scope,"
+      "COALESCE(service_tier_scope,''),COALESCE(line_item_scope,'') FROM "
+      "observations "
+      "WHERE provider=? AND metric_kind='cost' AND window='day' "
       "AND interval_start_utc>=? AND interval_end_utc<=? ORDER BY "
       "observed_at_utc,id"));
   query.addBindValue(
       policy.value(QStringLiteral("provider"), request.sourceId));
-  query.addBindValue(policy.value(QStringLiteral("observationScope"),
-                                  QStringLiteral("organization")));
   query.addBindValue(earliest.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
   query.addBindValue(
       request.cycle.endUtc.toString(QStringLiteral("yyyy-MM-dd HH:mm:ss")));
@@ -137,12 +164,45 @@ BudgetObservationQuery::requestFromPolicy(const QVariantMap &policy,
                       query.value(7).toString());
     const QString modelScope = query.value(8).toString();
     const QString projectScope = query.value(9).toString();
-    if (!projectScope.isEmpty()) {
+    const QString observationScope = query.value(10).toString();
+    const QString serviceTier =
+        query.value(11).toString().isEmpty()
+            ? dimensionFromScope(observationScope,
+                                 QStringLiteral("service_tier"))
+            : query.value(11).toString();
+    const QString lineItem =
+        query.value(12).toString().isEmpty()
+            ? dimensionFromScope(observationScope, QStringLiteral("line_item"))
+            : query.value(12).toString();
+    if (request.scopeMode == QLatin1String("scoped")) {
+      observation.scopeKind = request.scopeKind;
+      if (request.scopeKind == QLatin1String("project"))
+        observation.scopeIdentity = projectScope;
+      else if (request.scopeKind == QLatin1String("workspace"))
+        observation.scopeIdentity = projectScope;
+      else if (request.scopeKind == QLatin1String("model"))
+        observation.scopeIdentity = modelScope;
+      else if (request.scopeKind == QLatin1String("service_tier"))
+        observation.scopeIdentity = serviceTier;
+      else if (request.scopeKind == QLatin1String("line_item"))
+        observation.scopeIdentity = lineItem;
+    } else if (!serviceTier.isEmpty()) {
+      observation.scopeKind = QStringLiteral("service_tier");
+      observation.scopeIdentity = serviceTier;
+    } else if (!lineItem.isEmpty()) {
+      observation.scopeKind = QStringLiteral("line_item");
+      observation.scopeIdentity = lineItem;
+    } else if (!projectScope.isEmpty()) {
       observation.scopeKind = QStringLiteral("project");
       observation.scopeIdentity = projectScope;
     } else if (!modelScope.isEmpty()) {
       observation.scopeKind = QStringLiteral("model");
       observation.scopeIdentity = modelScope;
+    } else if (observationScope !=
+               policy.value(QStringLiteral("observationScope"),
+                            QStringLiteral("organization"))) {
+      observation.scopeKind = QStringLiteral("provider_scope");
+      observation.scopeIdentity = observationScope;
     }
     request.observations.append(observation);
   }

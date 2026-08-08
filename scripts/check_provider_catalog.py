@@ -27,6 +27,11 @@ METRIC_SOURCES = {
     "published_documentation", "local_observation", "estimated_pricing",
     "connectivity_probe", "model_discovery_api",
 }
+PROVIDER_BUDGET_SCOPES = {
+    "openai": ["aggregate", "project", "line_item"],
+    "anthropic": ["aggregate", "workspace", "model", "service_tier", "line_item"],
+    "litellm": ["aggregate"],
+}
 
 
 def fail(message: str) -> None:
@@ -111,6 +116,8 @@ def main() -> None:
             fail(f"{key} capabilities must be a non-empty list")
         if not isinstance(provider["expectedSources"], list) or not set(provider["expectedSources"]) <= METRIC_SOURCES:
             fail(f"{key} expectedSources contains an unknown Metric Contract source")
+        if key in PROVIDER_BUDGET_SCOPES and provider.get("supportedBudgetScopes") != PROVIDER_BUDGET_SCOPES[key]:
+            fail(f"{key} supportedBudgetScopes does not match the validated provider dimensions")
         auth = provider["auth"]
         if not isinstance(auth, dict) or not auth.get("scheme") or "credentialSlots" not in auth:
             fail(f"{key} auth must declare scheme and credentialSlots")

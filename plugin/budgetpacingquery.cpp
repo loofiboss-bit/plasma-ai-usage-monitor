@@ -2,6 +2,7 @@
 
 #include "currencyminorunits.h"
 
+#include <QHash>
 #include <QMap>
 #include <QSet>
 #include <QTimeZone>
@@ -22,14 +23,6 @@ double median(QList<qint64> values) {
             static_cast<double>(values.at(middle))) /
            2.0;
   return static_cast<double>(values.at(middle));
-}
-
-QString observationKey(const BudgetPacingQuery::Observation &observation) {
-  return observation.intervalStart.toUTC().toString(Qt::ISODateWithMs) +
-         QLatin1Char('|') +
-         observation.intervalEnd.toUTC().toString(Qt::ISODateWithMs) +
-         QLatin1Char('|') + observation.scopeKind + QLatin1Char('|') +
-         observation.scopeIdentity;
 }
 
 bool isCompleteUtcDay(const BudgetPacingQuery::Observation &observation,
@@ -119,16 +112,18 @@ ForecastContract::Result BudgetPacingQuery::evaluate(const Request &request) {
   if (!policyZone.isValid())
     return unavailable(request, QStringLiteral("invalid-policy"));
 
-  QMap<QString, Observation> latest;
+  QHash<QPair<qint64, qint64>, Observation> latest;
+  latest.reserve(request.observations.size());
   bool sawOtherScope = false;
   for (const Observation &candidate : request.observations) {
     if (!matchesScope(request, candidate)) {
       sawOtherScope = true;
       continue;
     }
-    const QString key = observationKey(candidate);
-    if (!latest.contains(key) ||
-        latest.value(key).observedAt < candidate.observedAt)
+    const QPair<qint64, qint64> key{candidate.intervalStart.toMSecsSinceEpoch(),
+                                    candidate.intervalEnd.toMSecsSinceEpoch()};
+    auto existing = latest.find(key);
+    if (existing == latest.end() || existing->observedAt < candidate.observedAt)
       latest.insert(key, candidate);
   }
   if (latest.isEmpty())

@@ -565,7 +565,7 @@ void OpenAIProvider::publishDailyCosts(const QJsonArray &buckets)
             QStringLiteral("actual"), {},
             range.start.isValid() ? range.start : observedAt.addDays(-1),
             range.end.isValid() ? range.end : observedAt, QString(),
-            totals.project);
+            totals.project, QString(), totals.lineItem);
     }
     setConnected(true);
 }
@@ -622,7 +622,7 @@ void OpenAIProvider::publishMonthlyCosts(const QJsonArray &buckets)
                 ? range.start
                 : monthStart.startOfDay(QTimeZone::UTC),
             range.end.isValid() ? range.end : observedAt, QString(),
-            totals.project);
+            totals.project, QString(), totals.lineItem);
     }
     setConnected(true);
 }

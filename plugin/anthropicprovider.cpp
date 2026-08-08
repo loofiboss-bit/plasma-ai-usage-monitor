@@ -378,22 +378,22 @@ void AnthropicProvider::publishUsage(bool stale) {
                       QStringLiteral("token"), QString(), scope,
                       QStringLiteral("day"), MetricSource::UsageApi,
                       QStringLiteral("actual"), {}, row.periodStart,
-                      row.periodEnd, row.model, row.project);
+                      row.periodEnd, row.model, row.project, row.serviceTier);
     setProviderMetric(MetricKind::CacheReadInputTokens, row.cacheRead,
                       QStringLiteral("token"), QString(), scope,
                       QStringLiteral("day"), MetricSource::UsageApi,
                       QStringLiteral("actual"), {}, row.periodStart,
-                      row.periodEnd, row.model, row.project);
+                      row.periodEnd, row.model, row.project, row.serviceTier);
     setProviderMetric(MetricKind::CacheCreationInputTokens, row.cacheCreation,
                       QStringLiteral("token"), QString(), scope,
                       QStringLiteral("day"), MetricSource::UsageApi,
                       QStringLiteral("actual"), {}, row.periodStart,
-                      row.periodEnd, row.model, row.project);
+                      row.periodEnd, row.model, row.project, row.serviceTier);
     setProviderMetric(MetricKind::OutputTokens, row.output,
                       QStringLiteral("token"), QString(), scope,
                       QStringLiteral("day"), MetricSource::UsageApi,
                       QStringLiteral("actual"), {}, row.periodStart,
-                      row.periodEnd, row.model, row.project);
+                      row.periodEnd, row.model, row.project, row.serviceTier);
     const QString periodKey =
         row.periodStart.toUTC().toString(Qt::ISODateWithMs) +
         QLatin1Char('|') +
@@ -487,7 +487,8 @@ void AnthropicProvider::publishCost(bool stale) {
                       QStringLiteral("USD"), QStringLiteral("USD"), scope,
                       QStringLiteral("day"), MetricSource::BillingApi,
                       QStringLiteral("actual"), {}, row.periodStart,
-                      row.periodEnd, row.model, row.project);
+                      row.periodEnd, row.model, row.project, row.serviceTier,
+                      row.lineItem);
     const QString periodKey =
         row.periodStart.toUTC().toString(Qt::ISODateWithMs) +
         QLatin1Char('|') +

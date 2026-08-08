@@ -482,7 +482,8 @@ void RunwayQueryTest::budgetPolicyDatabaseFacadeAndCancellation() {
         "metric_kind TEXT,unit TEXT,value REAL,currency TEXT,semantic "
         "TEXT,source TEXT,"
         "data_quality TEXT,scope TEXT,window TEXT,model_scope "
-        "TEXT,project_scope TEXT)")));
+        "TEXT,project_scope TEXT,service_tier_scope TEXT,line_item_scope "
+        "TEXT)")));
     query.prepare(QStringLiteral(
         "INSERT INTO observations(provider,observed_at_utc,interval_start_utc,"
         "interval_end_utc,metric_kind,unit,value,currency,semantic,source,data_"
