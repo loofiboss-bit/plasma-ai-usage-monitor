@@ -470,37 +470,58 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
     return env
 
 
-def run_sample(variant: str, build_dir: Path, sample: int, warmup: bool) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(
-        prefix=f"ai-monitor-v18-{variant}-", ignore_cleanup_errors=True
-    ) as temporary:
-        runtime_root = Path(temporary)
-        env = installed_environment(build_dir, runtime_root)
-        port = available_port()
-        request_log = runtime_root / "requests.jsonl"
-        trace_path = runtime_root / "performance.jsonl"
-        server = subprocess.Popen(
-            ["python3", str(ROOT / "scripts/demo/mock_ai_usage_server.py"), "--port", str(port), "--request-log", str(request_log)],
-            cwd=ROOT,
-            text=True,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+def run_sample(
+    variant: str,
+    env: dict[str, str],
+    sample_root: Path,
+    sample: int,
+    warmup: bool,
+) -> dict[str, Any]:
+    sample_root.mkdir(mode=0o700)
+    port = available_port()
+    request_log = sample_root / "requests.jsonl"
+    trace_path = sample_root / "performance.jsonl"
+    server = subprocess.Popen(
+        [
+            "python3",
+            str(ROOT / "scripts/demo/mock_ai_usage_server.py"),
+            "--port",
+            str(port),
+            "--request-log",
+            str(request_log),
+        ],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        sample_env = dict(env)
+        sample_env["PLASMA_AI_MONITOR_DEMO_BASE_URL"] = (
+            f"http://127.0.0.1:{port}"
         )
+        time.sleep(0.25)
+        if server.poll() is not None:
+            raise RuntimeError("Mock server failed to start")
+        result = run_panel_session(
+            sample_env, sample_root, request_log, trace_path
+        )
+        result.update(
+            {
+                "variant": variant,
+                "sample": sample,
+                "warmup": warmup,
+                "valid": True,
+            }
+        )
+        return result
+    finally:
+        server.terminate()
         try:
-            env["PLASMA_AI_MONITOR_DEMO_BASE_URL"] = f"http://127.0.0.1:{port}"
-            time.sleep(0.25)
-            if server.poll() is not None:
-                raise RuntimeError("Mock server failed to start")
-            result = run_panel_session(env, runtime_root, request_log, trace_path)
-            result.update({"variant": variant, "sample": sample, "warmup": warmup, "valid": True})
-            return result
-        finally:
-            server.terminate()
-            try:
-                server.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                server.kill()
-                server.wait(timeout=3)
+            server.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            server.kill()
+            server.wait(timeout=3)
 
 
 def summarize(name: str, samples: list[dict[str, Any]]) -> dict[str, Any]:
@@ -583,20 +604,56 @@ def main() -> None:
     warmup_samples: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     sequence: list[str] = []
-    total = args.warmups + args.runs
-    for index in range(total):
-        order = ("baseline", "candidate") if index % 2 == 0 else ("candidate", "baseline")
-        for variant in order:
-            sequence.append(variant)
-            build = args.baseline_build_dir if variant == "baseline" else args.candidate_build_dir
-            try:
-                item = run_sample(variant, build, index, index < args.warmups)
-                if index < args.warmups:
-                    warmup_samples.append(item)
-                else:
-                    measured[variant].append(item)
-            except Exception as error:  # invalid samples are evidence, never discarded
-                errors.append({"variant": variant, "sample": index, "error": str(error)})
+    with tempfile.TemporaryDirectory(
+        prefix="ai-monitor-v18-phase0-samples-", ignore_cleanup_errors=True
+    ) as temporary:
+        comparison_root = Path(temporary)
+        variant_roots = {
+            "baseline": comparison_root / "baseline",
+            "candidate": comparison_root / "candidate",
+        }
+        environments = {
+            "baseline": installed_environment(
+                args.baseline_build_dir, variant_roots["baseline"]
+            ),
+            "candidate": installed_environment(
+                args.candidate_build_dir, variant_roots["candidate"]
+            ),
+        }
+        total = args.warmups + args.runs
+        for index in range(total):
+            order = (
+                ("baseline", "candidate")
+                if index % 2 == 0
+                else ("candidate", "baseline")
+            )
+            for variant in order:
+                sequence.append(variant)
+                sample_root = (
+                    variant_roots[variant]
+                    / "samples"
+                    / f"sample-{index:02d}"
+                )
+                try:
+                    item = run_sample(
+                        variant,
+                        environments[variant],
+                        sample_root,
+                        index,
+                        index < args.warmups,
+                    )
+                    if index < args.warmups:
+                        warmup_samples.append(item)
+                    else:
+                        measured[variant].append(item)
+                except Exception as error:  # invalid samples remain evidence
+                    errors.append(
+                        {
+                            "variant": variant,
+                            "sample": index,
+                            "error": str(error),
+                        }
+                    )
 
     valid = not errors and all(len(rows) == args.runs for rows in measured.values())
     result: dict[str, Any] = {
@@ -628,6 +685,7 @@ def main() -> None:
         },
         "runs": args.runs,
         "warmups": args.warmups,
+        "runtimeReuse": "isolated-prefix-config-cache-per-variant",
         "sequence": sequence,
         "warmupSamples": warmup_samples,
         "errors": errors,
