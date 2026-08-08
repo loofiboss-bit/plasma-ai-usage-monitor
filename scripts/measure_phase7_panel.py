@@ -169,31 +169,39 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
                 "QT_VIRTUALKEYBOARD_DISABLE": "1",
                 "QT_NO_XDG_DESKTOP_PORTAL": "1",
                 "GTK_USE_PORTAL": "0",
+                "AI_USAGE_PHASE0_OUTER_LOG": str(
+                    virtual_root / "outer-kwin.log"
+                ),
             }
         )
-        completed = subprocess.run(
-            [
-                "dbus-run-session",
-                "--",
-                "kwin_wayland",
-                "--virtual",
-                "--socket",
-                "wayland-v18-phase0",
-                "--width",
-                "1920",
-                "--height",
-                "1200",
-                "--scale",
-                "1",
-                "--no-lockscreen",
-                "--no-global-shortcuts",
-                "--exit-with-session",
-                str(wrapper),
-            ],
-            cwd=ROOT,
-            env=environment,
-            check=False,
-        )
+        outer_log = Path(environment["AI_USAGE_PHASE0_OUTER_LOG"])
+        with outer_log.open("w", encoding="utf-8") as outer_stream:
+            completed = subprocess.run(
+                [
+                    "dbus-run-session",
+                    "--",
+                    "kwin_wayland",
+                    "--virtual",
+                    "--socket",
+                    "wayland-v18-phase0",
+                    "--width",
+                    "1920",
+                    "--height",
+                    "1200",
+                    "--scale",
+                    "1",
+                    "--no-lockscreen",
+                    "--no-global-shortcuts",
+                    "--exit-with-session",
+                    str(wrapper),
+                ],
+                cwd=ROOT,
+                env=environment,
+                stderr=outer_stream,
+                check=False,
+            )
+        if completed.returncode != 0:
+            print(outer_log.read_text(encoding="utf-8")[-20000:], file=sys.stderr)
         return completed.returncode
 
 
@@ -247,6 +255,20 @@ def run_panel_session(
 ) -> dict[str, Any]:
     nested_log = runtime_root / "nested-plasma.log"
     session_shell_log = runtime_root / "nested-session-shell.log"
+    binding_template = runtime_root / "bind-outer-window.template.js"
+    binding_script = runtime_root / "bind-outer-window.js"
+    binding_template.write_text(
+        "const targetPid = __TARGET_PID__;\n"
+        "function bindWindow(window) {\n"
+        "    if (Number(window.pid) !== targetPid) return;\n"
+        "    workspace.activeWindow = window;\n"
+        "    print('AI_USAGE_OUTER_WINDOW_BOUND ' + window.internalId"
+        " + ' ' + window.pid);\n"
+        "}\n"
+        "workspace.windowList().forEach(bindWindow);\n"
+        "workspace.windowAdded.connect(bindWindow);\n",
+        encoding="utf-8",
+    )
     measurement_log = runtime_root / "panel-measurement.json"
     measurement_error = runtime_root / "panel-measurement.log"
     socket_name = f"wayland-ai-monitor-v18-{os.getpid()}-{time.time_ns()}"
@@ -296,35 +318,49 @@ for _ in $(seq 1 45); do
 done
 [[ "$ready" -eq 1 ]] || { echo "Nested Plasma panel did not become ready" >&2; exit 1; }
 sleep 2
-match_id=""
-match_output=""
-for _ in $(seq 1 80); do
-  match_output="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
-    busctl --user call org.kde.KWin /WindowsRunner org.kde.krunner1 \
-    Match s "KDE Wayland Compositor" 2>/dev/null || true)"
-  while IFS= read -r candidate_id; do
-    candidate_info="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
-      busctl --user call org.kde.KWin /KWin org.kde.KWin \
-      getWindowInfo s "${candidate_id#0_}" 2>/dev/null || true)"
-    if rg -q "\"pid\" [a-z]+ $kwin_pid([[:space:]]|$)" <<<"$candidate_info"; then
-      match_id="$candidate_id"
-      break
-    fi
-  done < <(printf '%s\n' "$match_output" | rg -o '"0_\{[^\"]+\}"' | tr -d '"' || true)
-  [[ -n "$match_id" ]] && break
-  sleep 0.25
-done
-[[ -n "$match_id" ]] || {
-  echo "Outer KWin could not bind nested compositor PID $kwin_pid: $match_output" >&2
+[[ -n "${AI_USAGE_PHASE0_OUTER_LOG:-}" ]] || {
+  echo "Outer KWin log path is unavailable" >&2
+  exit 1
+}
+sed "s/__TARGET_PID__/$kwin_pid/" "$8" >"$9"
+DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
+  busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+  unloadScript s ai-monitor-phase0-window-binding >/dev/null 2>&1 || true
+load_output="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
+  busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+  loadScript ss "$9" ai-monitor-phase0-window-binding 2>/dev/null || true)"
+rg -q '^i [0-9]+$' <<<"$load_output" || {
+  echo "Outer KWin could not load the PID-bound window script: $load_output" >&2
   exit 1
 }
 DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
-  busctl --user call org.kde.KWin /WindowsRunner org.kde.krunner1 \
-  Run ss "$match_id" "" >/dev/null
-sleep 1
-window_info="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
-  busctl --user call org.kde.KWin /KWin org.kde.KWin \
-  getWindowInfo s "${match_id#0_}" 2>/dev/null || true)"
+  busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+  start >/dev/null
+window_id=""
+window_info=""
+for _ in $(seq 1 80); do
+  window_id="$(rg "AI_USAGE_OUTER_WINDOW_BOUND [^ ]+ $kwin_pid$" \
+    "$AI_USAGE_PHASE0_OUTER_LOG" | tail -n 1 \
+    | sed -n "s/.*AI_USAGE_OUTER_WINDOW_BOUND \([^ ]*\) $kwin_pid$/\1/p" \
+    || true)"
+  if [[ -n "$window_id" ]]; then
+    window_info="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
+      busctl --user call org.kde.KWin /KWin org.kde.KWin \
+      getWindowInfo s "$window_id" 2>/dev/null || true)"
+    if rg -q "\"pid\" [a-z]+ $kwin_pid([[:space:]]|$)" <<<"$window_info"; then
+      break
+    fi
+    window_id=""
+  fi
+  sleep 0.25
+done
+DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
+  busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+  unloadScript s ai-monitor-phase0-window-binding >/dev/null 2>&1 || true
+[[ -n "$window_id" ]] || {
+  echo "Outer KWin could not bind nested compositor PID $kwin_pid" >&2
+  exit 1
+}
 printf 'AI_USAGE_OUTER_WINDOW_INFO %s\n' "$window_info" >>"$4"
 plasmashell_pid="$(pgrep -P "$kwin_pid" -x plasmashell | head -n 1 || true)"
 if [[ -z "$plasmashell_pid" ]]; then
@@ -343,7 +379,8 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
                 socket_name, panel_script,
                 str(ROOT / "scripts/demo/measure_panel_accessible.py"),
                 str(nested_log), str(request_log), str(measurement_log),
-                str(measurement_error),
+                str(measurement_error), str(binding_template),
+                str(binding_script),
             ],
             cwd=ROOT,
             env=env,
@@ -481,7 +518,7 @@ def main() -> None:
     args = parser.parse_args()
     if args.runs < 1 or args.warmups < 0:
         parser.error("--runs must be positive and --warmups non-negative")
-    missing = [name for name in ("bash", "busctl", "dbus-run-session", "kwin_wayland", "pgrep", "plasmashell", "rg", "rpm", "setsid", "timeout") if shutil.which(name) is None]
+    missing = [name for name in ("bash", "busctl", "dbus-run-session", "kwin_wayland", "pgrep", "plasmashell", "rg", "rpm", "sed", "setsid", "timeout") if shutil.which(name) is None]
     missing += [str(path) for path in (Path("/usr/libexec/at-spi-bus-launcher"), Path("/usr/libexec/at-spi2-registryd")) if not path.is_file()]
     if missing:
         parser.error("Missing commands: " + ", ".join(missing))
