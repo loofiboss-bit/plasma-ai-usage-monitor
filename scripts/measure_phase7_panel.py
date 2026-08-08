@@ -64,6 +64,19 @@ POPUP_INSTRUMENTATION = r'''
 
 '''
 
+ACCESSIBLE_ACTIVATION_INSTRUMENTATION = {
+    "contents/ui/main.qml": (
+        '            onClicked: root.plasmoid["activated"]()\n',
+        '            onClicked: root.plasmoid["activated"]()\n'
+        '            Accessible.onPressAction: root.plasmoid["activated"]()\n',
+    ),
+    "contents/ui/CompactRepresentation.qml": (
+        "    onClicked: Plasmoid.activated()\n",
+        "    onClicked: Plasmoid.activated()\n"
+        "    Accessible.onPressAction: Plasmoid.activated()\n",
+    ),
+}
+
 
 def write_isolated_session_config(config_root: Path) -> None:
     """Disable unrelated first-run and update work in a temporary Plasma profile."""
@@ -426,6 +439,19 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
         source[:closing] + POPUP_INSTRUMENTATION + source[closing:],
         encoding="utf-8",
     )
+    plasmoid_root = main_qml.parents[2]
+    for relative_path, (target, replacement) in (
+        ACCESSIBLE_ACTIVATION_INSTRUMENTATION.items()
+    ):
+        qml_path = plasmoid_root / relative_path
+        qml_source = qml_path.read_text(encoding="utf-8")
+        if qml_source.count(target) != 1 or "Accessible.onPressAction" in qml_source:
+            raise RuntimeError(
+                f"accessible activation instrumentation target is invalid: {qml_path}"
+            )
+        qml_path.write_text(
+            qml_source.replace(target, replacement, 1), encoding="utf-8"
+        )
     env.update(
         {
             "OUTER_WAYLAND_DISPLAY": os.environ.get("WAYLAND_DISPLAY", "wayland-0"),
@@ -589,7 +615,12 @@ def main() -> None:
         },
         "commits": {"baseline": baseline_commit, "candidate": candidate_commit},
         "instrumentationSha256": hashlib.sha256(
-            POPUP_INSTRUMENTATION.encode()
+            (
+                POPUP_INSTRUMENTATION
+                + json.dumps(
+                    ACCESSIBLE_ACTIVATION_INSTRUMENTATION, sort_keys=True
+                )
+            ).encode()
         ).hexdigest(),
         "buildDirectories": {
             "baseline": str(args.baseline_build_dir.resolve()),

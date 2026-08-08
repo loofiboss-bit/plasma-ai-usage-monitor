@@ -8,6 +8,7 @@ import json
 import re
 import sys
 import time
+import warnings
 from pathlib import Path
 
 import gi
@@ -75,10 +76,12 @@ def named_nodes(prefix: str, pid: int):
 def action_names(node) -> list[str]:
     try:
         actions = node.get_action_iface()
-        return [
-            actions.get_action_name(index).lower()
-            for index in range(actions.get_n_actions())
-        ]
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            return [
+                actions.get_action_name(index).lower()
+                for index in range(actions.get_n_actions())
+            ]
     except Exception:
         return []
 
@@ -189,14 +192,16 @@ def wait_for_popup_closed(pid: int, timeout: float) -> None:
 def focus(node) -> None:
     probe_progress("focus-start")
     actions = node.get_action_iface()
-    focus_index = next(
-        (
-            index
-            for index in range(actions.get_n_actions())
-            if actions.get_action_name(index).lower() == "setfocus"
-        ),
-        None,
-    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        focus_index = next(
+            (
+                index
+                for index in range(actions.get_n_actions())
+                if actions.get_action_name(index).lower() == "setfocus"
+            ),
+            None,
+        )
     if focus_index is None or not actions.do_action(focus_index):
         raise RuntimeError(
             f"Accessible node {node.get_name()!r} could not receive exact focus"
@@ -207,14 +212,16 @@ def focus(node) -> None:
 
 def press(node) -> None:
     actions = node.get_action_iface()
-    press_index = next(
-        (
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        press_indexes = [
             index
             for index in range(actions.get_n_actions())
             if actions.get_action_name(index).lower() in {"press", "click"}
-        ),
-        None,
-    )
+        ]
+    # The identical measurement-only handler is appended after Qt Quick's
+    # implicit MouseArea action. Select it deterministically for both builds.
+    press_index = press_indexes[-1] if press_indexes else None
     if press_index is None or not actions.do_action(press_index):
         raise RuntimeError(
             f"Accessible node {node.get_name()!r} could not be pressed"
