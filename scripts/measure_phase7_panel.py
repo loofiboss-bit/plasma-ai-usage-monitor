@@ -87,6 +87,26 @@ POPUP_INSTRUMENTATION = r'''
 '''
 
 
+def write_isolated_session_config(config_root: Path) -> None:
+    """Disable unrelated first-run and update work in a temporary Plasma profile."""
+    autostart_dir = config_root / "autostart"
+    autostart_dir.mkdir(parents=True, exist_ok=True)
+    (autostart_dir / "org.kde.discover.notifier.desktop").write_text(
+        "[Desktop Entry]\nHidden=true\n",
+        encoding="utf-8",
+    )
+    feedback_dir = config_root / "KDE"
+    feedback_dir.mkdir(parents=True, exist_ok=True)
+    (feedback_dir / "UserFeedback.conf").write_text(
+        "[UserFeedback]\nLastEncouragement=2100-01-01T00:00:00Z\n",
+        encoding="utf-8",
+    )
+    (config_root / "plasma-welcomerc").write_text(
+        "[General]\nLastSeenVersion=999.0.0\n",
+        encoding="utf-8",
+    )
+
+
 def run_in_virtual_outer(arguments: list[str]) -> int:
     """Run the whole ABBA sequence on a headless virtual KWin output."""
     with tempfile.TemporaryDirectory(
@@ -104,6 +124,7 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
         }
         for directory in isolated_directories.values():
             directory.mkdir(mode=0o700)
+        write_isolated_session_config(isolated_directories["XDG_CONFIG_HOME"])
         wrapper = virtual_root / "phase0-run"
         command = [sys.executable, str(Path(__file__).resolve()), *arguments]
         wrapper.write_text(
@@ -317,18 +338,7 @@ timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
 
 def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]:
     env = candidate_environment(build_dir.resolve(), runtime_root)
-    autostart_dir = runtime_root / "config" / "autostart"
-    autostart_dir.mkdir(parents=True, exist_ok=True)
-    (autostart_dir / "org.kde.discover.notifier.desktop").write_text(
-        "[Desktop Entry]\nHidden=true\n",
-        encoding="utf-8",
-    )
-    feedback_dir = runtime_root / "config" / "KDE"
-    feedback_dir.mkdir(parents=True, exist_ok=True)
-    (feedback_dir / "UserFeedback.conf").write_text(
-        "[UserFeedback]\nLastEncouragement=2100-01-01T00:00:00Z\n",
-        encoding="utf-8",
-    )
+    write_isolated_session_config(runtime_root / "config")
     installed = list(
         (runtime_root / "prefix").glob(
             "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
