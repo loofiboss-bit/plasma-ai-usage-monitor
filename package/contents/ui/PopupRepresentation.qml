@@ -37,16 +37,14 @@ PlasmaExtras.Representation {
         asynchronous: true
     }
 
-    FrameAnimation {
+    Timer {
+        interval: 250
         running: true
         onTriggered: {
-            stop();
-            Qt.callLater(function() {
-                popupContent.setSource(
-                    Qt.resolvedUrl("FullRepresentation.qml"),
-                    { "monitor": popupRoot.monitor }
-                );
-            });
+            popupContent.setSource(
+                Qt.resolvedUrl("FullRepresentation.qml"),
+                { "monitor": popupRoot.monitor }
+            );
         }
     }
 

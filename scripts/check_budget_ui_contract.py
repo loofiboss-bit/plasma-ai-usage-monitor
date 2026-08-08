@@ -28,6 +28,7 @@ def main() -> None:
         popup,
         "PopupRepresentation.qml",
         "asynchronous: true",
+        "interval: 250",
         'Qt.resolvedUrl("FullRepresentation.qml")',
         '{ "monitor": popupRoot.monitor }',
         'i18n("Loading Overview…")',
