@@ -183,32 +183,32 @@ def wait_for_log_marker(
 
 
 def open_popup(
-    compact_prefix: str, pid: int, kwin_log: Path, timeout: float
+    compact_prefix: str, pid: int, session_log: Path, timeout: float
 ) -> int:
     compact = wait_for_node(compact_prefix, pid, timeout)
-    offset = kwin_log.stat().st_size if kwin_log.exists() else 0
+    offset = session_log.stat().st_size if session_log.exists() else 0
     press(compact)
     elapsed = wait_for_log_marker(
-        kwin_log, "AI_USAGE_POPUP_FIRST_FRAME", offset, timeout
+        session_log, "AI_USAGE_POPUP_FIRST_FRAME", offset, timeout
     )
     wait_for_popup(pid, timeout)
     return elapsed
 
 
 def close_popup(
-    compact_prefix: str, pid: int, kwin_log: Path, timeout: float
+    compact_prefix: str, pid: int, session_log: Path, timeout: float
 ) -> None:
     compact = wait_for_node(compact_prefix, pid, timeout)
-    offset = kwin_log.stat().st_size if kwin_log.exists() else 0
+    offset = session_log.stat().st_size if session_log.exists() else 0
     press(compact)
-    wait_for_log_marker(kwin_log, "AI_USAGE_POPUP_CLOSED", offset, timeout)
+    wait_for_log_marker(session_log, "AI_USAGE_POPUP_CLOSED", offset, timeout)
     wait_for_node(compact_prefix, pid, timeout)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--request-log", type=Path, required=True)
-    parser.add_argument("--kwin-log", type=Path, required=True)
+    parser.add_argument("--session-log", type=Path, required=True)
     parser.add_argument("--pid", type=int, required=True)
     parser.add_argument("--timeout", type=float, default=20.0)
     args = parser.parse_args()
@@ -220,15 +220,15 @@ def main() -> None:
 
     before_popup = request_count(args.request_log)
     first_open_ms = open_popup(
-        compact_prefix, args.pid, args.kwin_log, args.timeout
+        compact_prefix, args.pid, args.session_log, args.timeout
     )
     time.sleep(1)
     fresh_popup_requests = request_count(args.request_log) - before_popup
 
-    close_popup(compact_prefix, args.pid, args.kwin_log, args.timeout)
+    close_popup(compact_prefix, args.pid, args.session_log, args.timeout)
     time.sleep(0.25)
     warm_open_ms = open_popup(
-        compact_prefix, args.pid, args.kwin_log, args.timeout
+        compact_prefix, args.pid, args.session_log, args.timeout
     )
     if warm_open_ms < 20:
         raise RuntimeError(

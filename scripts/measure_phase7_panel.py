@@ -26,29 +26,21 @@ DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
 POPUP_INSTRUMENTATION = r'''
 
-    readonly property bool perfParent1Visible: !!fullRoot.parent && fullRoot.parent.visible
-    readonly property bool perfParent2Visible: !!fullRoot.parent?.parent && fullRoot.parent.parent.visible
-    readonly property bool perfParent3Visible: !!fullRoot.parent?.parent?.parent && fullRoot.parent.parent.parent.visible
-    readonly property bool perfParent4Visible: !!fullRoot.parent?.parent?.parent?.parent && fullRoot.parent.parent.parent.parent.visible
-    readonly property bool perfParent5Visible: !!fullRoot.parent?.parent?.parent?.parent?.parent && fullRoot.parent.parent.parent.parent.parent.visible
-    readonly property bool perfParent6Visible: !!fullRoot.parent?.parent?.parent?.parent?.parent?.parent && fullRoot.parent.parent.parent.parent.parent.parent.visible
+    Connections {
+        target: root
 
-    function recordPopupVisibility(visible, level) {
-        if (visible) {
-            Qt.callLater(function() {
-                console.warn("AI_USAGE_POPUP_FIRST_FRAME level=" + level);
-            });
-        } else {
-            console.warn("AI_USAGE_POPUP_CLOSED level=" + level);
+        function onExpandedChanged() {
+            if (root.expanded) {
+                // Use the next event-loop turn so both versions have created
+                // and polished the representation selected by PlasmoidItem.
+                Qt.callLater(function() {
+                    console.warn("AI_USAGE_POPUP_FIRST_FRAME");
+                });
+            } else {
+                console.warn("AI_USAGE_POPUP_CLOSED");
+            }
         }
     }
-
-    onPerfParent1VisibleChanged: recordPopupVisibility(perfParent1Visible, 1)
-    onPerfParent2VisibleChanged: recordPopupVisibility(perfParent2Visible, 2)
-    onPerfParent3VisibleChanged: recordPopupVisibility(perfParent3Visible, 3)
-    onPerfParent4VisibleChanged: recordPopupVisibility(perfParent4Visible, 4)
-    onPerfParent5VisibleChanged: recordPopupVisibility(perfParent5Visible, 5)
-    onPerfParent6VisibleChanged: recordPopupVisibility(perfParent6Visible, 6)
 '''
 
 
@@ -227,7 +219,7 @@ if [[ -z "$plasmashell_pid" ]]; then
   plasmashell_pid="$(pgrep -n -x plasmashell)"
 fi
 [[ -n "$plasmashell_pid" ]] || { echo "Nested plasmashell PID not found" >&2; exit 1; }
-timeout 55s python3 "$3" --request-log "$5" --kwin-log "$4" \
+timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
   --pid "$plasmashell_pid" >"$6" 2>"$7"
 """
     env = dict(env)
@@ -263,21 +255,17 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
     installed = list(
         (runtime_root / "prefix").glob(
             "share/plasma/plasmoids/com.github.loofi.aiusagemonitor/"
-            "contents/ui/FullRepresentation.qml"
+            "contents/ui/main.qml"
         )
     )
     if len(installed) != 1:
-        raise RuntimeError("installed FullRepresentation.qml was not found")
-    full_representation = installed[0]
-    source = full_representation.read_text(encoding="utf-8")
-    if "import QtQuick.Window" not in source:
-        source = source.replace(
-            "import QtQuick\n", "import QtQuick\nimport QtQuick.Window\n", 1
-        )
+        raise RuntimeError("installed main.qml was not found")
+    main_qml = installed[0]
+    source = main_qml.read_text(encoding="utf-8")
     closing = source.rfind("}")
     if closing < 0 or "AI_USAGE_POPUP_FIRST_FRAME" in source:
         raise RuntimeError("popup instrumentation target is invalid")
-    full_representation.write_text(
+    main_qml.write_text(
         source[:closing] + POPUP_INSTRUMENTATION + source[closing:],
         encoding="utf-8",
     )
