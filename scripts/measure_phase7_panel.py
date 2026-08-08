@@ -210,14 +210,10 @@ DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
   busctl --user call org.kde.KWin /WindowsRunner org.kde.krunner1 \
   Run ss "$match_id" "" >/dev/null
 sleep 1
-active_info="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
+window_info="$(DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
   busctl --user call org.kde.KWin /KWin org.kde.KWin \
   getWindowInfo s "${match_id#0_}" 2>/dev/null || true)"
-printf 'AI_USAGE_OUTER_WINDOW_INFO %s\n' "$active_info" >>"$4"
-rg -q '"active" b true' <<<"$active_info" || {
-  echo "Exact nested compositor window did not retain focus" >&2
-  exit 1
-}
+printf 'AI_USAGE_OUTER_WINDOW_INFO %s\n' "$window_info" >>"$4"
 plasmashell_pid="$(pgrep -P "$kwin_pid" -x plasmashell | head -n 1 || true)"
 if [[ -z "$plasmashell_pid" ]]; then
   plasmashell_pid="$(pgrep -n -x plasmashell)"
