@@ -183,7 +183,7 @@ surface is `blocked`, never silently skipped.
 | 4 | `42d978c` | Complete |
 | 5 | `f774683` | Complete |
 | 6 | `fbed8ce` | Complete |
-| 7 | — | In progress |
+| 7 | `852518c` | Complete |
 
 ## Non-goals and stop conditions
 
