@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import threading
 import time
 from pathlib import Path
@@ -193,26 +194,53 @@ def request_count(path: Path) -> int:
     return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line)
 
 
-def open_popup(compact_prefix: str, pid: int, timeout: float) -> int:
-    compact = wait_for_node(compact_prefix, pid, timeout)
-    elapsed = press_and_wait_for_event(
-        compact, pid, "object:property-change:accessible-name", timeout
+def wait_for_kwin_popup(
+    path: Path, pid: int, event_name: str, offset: int, timeout: float
+) -> int:
+    marker = re.compile(
+        rf"AI_USAGE_POPUP event={re.escape(event_name)} pid={pid}(?:\s|$)"
     )
+    started = time.monotonic()
+    deadline = started + timeout
+    while time.monotonic() < deadline:
+        if path.exists():
+            with path.open("r", encoding="utf-8", errors="replace") as stream:
+                stream.seek(offset)
+                if any(marker.search(line) for line in stream):
+                    return round((time.monotonic() - started) * 1000)
+        time.sleep(0.005)
+    detail = path.read_text(encoding="utf-8", errors="replace")[-4000:]
+    raise RuntimeError(
+        f"Timed out waiting for KWin popup {event_name} from PID {pid}; "
+        f"log tail={detail}"
+    )
+
+
+def open_popup(
+    compact_prefix: str, pid: int, kwin_log: Path, timeout: float
+) -> int:
+    compact = wait_for_node(compact_prefix, pid, timeout)
+    offset = kwin_log.stat().st_size if kwin_log.exists() else 0
+    press(compact)
+    elapsed = wait_for_kwin_popup(kwin_log, pid, "added", offset, timeout)
     wait_for_popup(pid, timeout)
     return elapsed
 
 
-def close_popup(compact_prefix: str, pid: int, timeout: float) -> None:
+def close_popup(
+    compact_prefix: str, pid: int, kwin_log: Path, timeout: float
+) -> None:
     compact = wait_for_node(compact_prefix, pid, timeout)
-    press_and_wait_for_event(
-        compact, pid, "object:state-changed:defunct", timeout
-    )
+    offset = kwin_log.stat().st_size if kwin_log.exists() else 0
+    press(compact)
+    wait_for_kwin_popup(kwin_log, pid, "removed", offset, timeout)
     wait_for_node(compact_prefix, pid, timeout)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--request-log", type=Path, required=True)
+    parser.add_argument("--kwin-log", type=Path, required=True)
     parser.add_argument("--pid", type=int, required=True)
     parser.add_argument("--timeout", type=float, default=20.0)
     args = parser.parse_args()
@@ -223,13 +251,17 @@ def main() -> None:
     startup_requests = request_count(args.request_log)
 
     before_popup = request_count(args.request_log)
-    first_open_ms = open_popup(compact_prefix, args.pid, args.timeout)
+    first_open_ms = open_popup(
+        compact_prefix, args.pid, args.kwin_log, args.timeout
+    )
     time.sleep(1)
     fresh_popup_requests = request_count(args.request_log) - before_popup
 
-    close_popup(compact_prefix, args.pid, args.timeout)
+    close_popup(compact_prefix, args.pid, args.kwin_log, args.timeout)
     time.sleep(0.25)
-    warm_open_ms = open_popup(compact_prefix, args.pid, args.timeout)
+    warm_open_ms = open_popup(
+        compact_prefix, args.pid, args.kwin_log, args.timeout
+    )
     if warm_open_ms < 20:
         raise RuntimeError(
             "Warm popup sample is below 20 ms and may have matched a stale node"

@@ -200,7 +200,11 @@ if [[ -z "$plasmashell_pid" ]]; then
   plasmashell_pid="$(pgrep -n -x plasmashell)"
 fi
 [[ -n "$plasmashell_pid" ]] || { echo "Nested plasmashell PID not found" >&2; exit 1; }
-timeout 55s python3 "$3" --request-log "$5" --pid "$plasmashell_pid" >"$6" 2>"$7"
+busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting \
+  loadScript ss "$8" "ai-usage-popup-measure" >/dev/null
+busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting start >/dev/null
+timeout 55s python3 "$3" --request-log "$5" --kwin-log "$4" \
+  --pid "$plasmashell_pid" >"$6" 2>"$7"
 """
     env = dict(env)
     env["PLASMA_AI_MONITOR_PERF_TRACE"] = str(trace_path)
@@ -211,6 +215,7 @@ timeout 55s python3 "$3" --request-log "$5" --pid "$plasmashell_pid" >"$6" 2>"$7
             str(ROOT / "scripts/demo/measure_panel_accessible.py"),
             str(nested_log), str(request_log), str(measurement_log),
             str(measurement_error),
+            str(ROOT / "scripts/demo/kwin_measure_popup.js"),
         ],
         cwd=ROOT,
         env=env,
