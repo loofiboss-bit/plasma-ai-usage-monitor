@@ -10,6 +10,7 @@ GoogleProvider::GoogleProvider(QObject *parent)
     : ProviderBackend(parent)
 {
     registerCatalogPricing(QStringLiteral("google"));
+    setPricingModel(m_model);
     loadDiscoveryCache();
 }
 
@@ -18,6 +19,7 @@ void GoogleProvider::setModel(const QString &model)
 {
     if (m_model != model) {
         m_model = model;
+        setPricingModel(m_model);
         Q_EMIT modelChanged();
         Q_EMIT discoveredModelsChanged();
     }

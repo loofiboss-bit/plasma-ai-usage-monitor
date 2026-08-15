@@ -1,10 +1,15 @@
 {
-  "schemaVersion": 6,
-  "catalogVersion": "2026.08.08",
-  "release": "18.0.0",
-  "lastReviewed": "2026-07-13",
+  "schemaVersion": 7,
+  "catalogVersion": "2026.08.15",
+  "release": "19.0.0",
+  "lastReviewed": "2026-08-14",
   "runtimeScraping": false,
-  "notes": "Static local metadata for shipped provider/model defaults. The widget must not scrape vendor pricing pages at runtime. Entries were re-reviewed on 2026-07-13; manual-review flags remain visible when exact pricing or lifecycle state cannot be represented safely.",
+  "sequence": 1,
+  "hardExpiresAt": "2026-09-13T00:00:00Z",
+  "freshnessSloDays": 30,
+  "verificationState": "packaged",
+  "estimatesAllowed": true,
+  "notes": "Catalog v7 is a signed-feed-compatible, immutable local price book. The widget must not scrape vendor pricing pages at runtime. Rows carry explicit evidence, lifecycle, and missing-dimension semantics; manual-review flags remain visible when a provider dimension cannot be represented safely.",
   "providers": [
     {
       "key": "openai",
@@ -49,11 +54,19 @@
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 2.5,
-            "cachedInput": 0.25,
-            "output": 15.0,
+            "input": 2.0,
+            "cachedInput": 0.2,
+            "cacheWrite": 2.5,
+            "output": 12.0,
             "batchDiscountPercent": 50,
             "precision": "official_exact"
+          },
+          "priceChange": {
+            "effectiveDate": "2026-08-14",
+            "kind": "corrected",
+            "summary": "OpenAI short-context pricing corrected to the current public list rate.",
+            "previous": {"input": 2.5, "cachedInput": 0.25, "output": 15.0},
+            "current": {"input": 2.0, "cachedInput": 0.2, "cacheWrite": 2.5, "output": 12.0}
           },
           "sourceRefs": [
             {
@@ -75,11 +88,19 @@
           "pricing": {
             "currency": "USD",
             "unit": "1M_tokens",
-            "input": 1.0,
-            "cachedInput": 0.1,
-            "output": 6.0,
+            "input": 0.2,
+            "cachedInput": 0.02,
+            "cacheWrite": 0.25,
+            "output": 1.2,
             "batchDiscountPercent": 50,
             "precision": "official_exact"
+          },
+          "priceChange": {
+            "effectiveDate": "2026-08-14",
+            "kind": "corrected",
+            "summary": "OpenAI short-context pricing corrected to the current public list rate.",
+            "previous": {"input": 1.0, "cachedInput": 0.1, "output": 6.0},
+            "current": {"input": 0.2, "cachedInput": 0.02, "cacheWrite": 0.25, "output": 1.2}
           },
           "sourceRefs": [
             {
@@ -345,6 +366,13 @@
             "cachedInput": 0.2,
             "precision": "derived"
           },
+          "priceChange": {
+            "effectiveDate": "2026-08-14",
+            "kind": "confirmed",
+            "summary": "Anthropic confirmed the USD 2 / USD 10 Sonnet 5 list rate is permanent.",
+            "previous": {"input": 3.0, "output": 15.0},
+            "current": {"input": 2.0, "output": 10.0}
+          },
           "sourceRefs": [
             {
               "label": "Anthropic Claude pricing",
@@ -354,7 +382,7 @@
           ],
           "lifecycle": {
             "status": "active",
-            "notes": "Introductory token pricing through 2026-08-31; standard pricing is $3 input and $15 output per million tokens afterward."
+            "notes": "Anthropic confirmed the USD 2 input and USD 10 output list rate is permanent."
           }
         },
         {
@@ -585,9 +613,7 @@
             }
           ],
           "lifecycle": {
-            "status": "retired",
-            "deprecationDate": "2026-06-01",
-            "replacementId": "gemini-2.5-flash"
+            "status": "active"
           }
         },
         {
@@ -608,6 +634,60 @@
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
               "reviewedAt": "2026-06-30"
+            }
+          ],
+          "lifecycle": {
+            "status": "retired",
+            "deprecationDate": "2026-06-01",
+            "replacementId": "gemini-2.5-flash"
+          }
+        },
+        {
+          "id": "gemini-3.5-flash",
+          "displayName": "Gemini 3.5 Flash",
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "audio"
+          ],
+          "pricing": {
+            "status": "unknown",
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "precision": "unavailable"
+          },
+          "sourceRefs": [
+            {
+              "label": "Google Gemini model documentation",
+              "url": "https://ai.google.dev/gemini-api/docs/models",
+              "reviewedAt": "2026-08-14"
+            }
+          ],
+          "lifecycle": {
+            "status": "active"
+          }
+        },
+        {
+          "id": "gemini-3.5-flash-lite",
+          "displayName": "Gemini 3.5 Flash-Lite",
+          "modalities": [
+            "text",
+            "image",
+            "video",
+            "audio"
+          ],
+          "pricing": {
+            "status": "unknown",
+            "currency": "USD",
+            "unit": "1M_tokens",
+            "precision": "unavailable"
+          },
+          "sourceRefs": [
+            {
+              "label": "Google Gemini model documentation",
+              "url": "https://ai.google.dev/gemini-api/docs/models",
+              "reviewedAt": "2026-08-14"
             }
           ],
           "lifecycle": {

@@ -30,6 +30,9 @@ QQC2.ScrollView {
         ? i18n("Open source settings") : detailModel.actionLabel
     readonly property var mediaMetrics: mediaMode
         ? (mediaSource.detailMetrics || []) : []
+    readonly property var catalogModelData: catalogModel()
+    readonly property var priceChangeData: catalogModelData.priceChange || ({})
+    readonly property var costLabData: costLabRows()
     readonly property var runwayData: runwayRows()
     readonly property var scopeData: mediaMode
         ? [] : scopeRows()
@@ -88,6 +91,92 @@ QQC2.ScrollView {
             "%1 recent point from %2 stored sample",
             "%1 recent points from %2 stored samples",
             points, samples);
+    }
+
+    function estimateProvenance() {
+        return detail.sourceData.costProvenance || {};
+    }
+
+    function provenanceValue(key, fallback) {
+        var value = estimateProvenance()[key];
+        return value === undefined || value === null || value === ""
+            ? fallback : String(value);
+    }
+
+    function catalogKey() {
+        if (detail.mediaMode || detail.sourceData.sourceKind !== "provider") return "";
+        return detail.sourceData.catalogKey || detail.sourceData.configKey
+            || detail.sourceData.stableId || detail.sourceId;
+    }
+
+    function catalogModel() {
+        var key = detail.catalogKey();
+        var modelId = detail.sourceData.pricingModel || "";
+        if (key === "" || modelId === "") return ({});
+        return ProviderPricingCatalog.model(key, modelId) || ({});
+    }
+
+    function metricValue(kind) {
+        var metrics = detail.sourceData.detailMetrics || [];
+        for (var i = metrics.length - 1; i >= 0; --i) {
+            if (metrics[i].kind === kind && metrics[i].available
+                    && metrics[i].value !== undefined && metrics[i].value !== null)
+                return Number(metrics[i].value);
+        }
+        return null;
+    }
+
+    function costLabRows() {
+        var key = detail.catalogKey();
+        var input = metricValue("input_tokens");
+        var output = metricValue("output_tokens");
+        if (key === "" || input === null || output === null) return [];
+
+        var usage = { inputTokens: input, outputTokens: output };
+        var cacheRead = metricValue("cache_read_input_tokens");
+        var cacheWrite = metricValue("cache_creation_input_tokens");
+        if (cacheRead !== null) usage.cachedInputTokens = cacheRead;
+        if (cacheWrite !== null) usage.cacheWriteTokens = cacheWrite;
+        if (detail.sourceData.pricingModality)
+            usage.modality = detail.sourceData.pricingModality;
+        if (detail.sourceData.pricingServiceTier)
+            usage.serviceTier = detail.sourceData.pricingServiceTier;
+        if (detail.sourceData.pricingRegion)
+            usage.region = detail.sourceData.pricingRegion;
+        if (detail.sourceData.pricingRoute)
+            usage.route = detail.sourceData.pricingRoute;
+
+        var models = ProviderPricingCatalog.selectableModelsForProvider(key) || [];
+        var rows = [];
+        for (var i = 0; i < models.length && rows.length < 8; ++i) {
+            var modelId = models[i].id || "";
+            if (modelId === "") continue;
+            var estimate = ProviderPricingCatalog.estimateCost(key, modelId, usage) || ({});
+            rows.push({
+                id: modelId,
+                displayName: models[i].displayName || modelId,
+                current: modelId === detail.sourceData.pricingModel,
+                available: !!estimate.available,
+                amountText: estimate.amountText || "",
+                currency: estimate.currency || "",
+                missingDimensions: estimate.missingDimensions || []
+            });
+        }
+        return rows;
+    }
+
+    function rateSummary(rates) {
+        if (!rates) return "";
+        var fields = [];
+        if (rates.input !== undefined) fields.push(i18n("input %1", rates.input));
+        if (rates.output !== undefined) fields.push(i18n("output %1", rates.output));
+        if (rates.cacheWrite !== undefined) fields.push(i18n("cache write %1", rates.cacheWrite));
+        return fields.join(i18n(" · "));
+    }
+
+    function sourceUrl() {
+        var refs = detail.estimateProvenance().sourceRefs || detail.catalogModelData.sourceRefs || [];
+        return refs.length > 0 ? (refs[0].url || "") : "";
     }
 
     function configureModel() {
@@ -209,6 +298,109 @@ QQC2.ScrollView {
                     color: Kirigami.Theme.disabledTextColor
                     elide: Text.ElideRight
                 }
+                PlasmaComponents.Button {
+                    visible: detail.sourceUrl() !== ""
+                    text: i18n("Open official pricing source")
+                    icon.name: "internet-web-browser"
+                    activeFocusOnTab: true
+                    onClicked: Qt.openUrlExternally(detail.sourceUrl())
+                }
+            }
+        }
+
+        PlasmaExtras.Heading {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            level: 4
+            text: i18n("Price change inbox")
+            visible: !detail.mediaMode && Object.keys(detail.priceChangeData).length > 0
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            visible: !detail.mediaMode && Object.keys(detail.priceChangeData).length > 0
+            implicitHeight: priceChangeLayout.implicitHeight + Kirigami.Units.largeSpacing * 2
+            radius: Kirigami.Units.smallSpacing
+            color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.7)
+            border.width: 1
+            border.color: Qt.alpha(Kirigami.Theme.highlightColor, 0.2)
+
+            ColumnLayout {
+                id: priceChangeLayout
+                anchors.fill: parent
+                anchors.margins: Kirigami.Units.largeSpacing
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: detail.priceChangeData.summary || i18n("A reviewed catalog change affects this model.")
+                    font.bold: true
+                    wrapMode: Text.WordWrap
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: i18n("Effective %1 · previous: %2 · current: %3",
+                               detail.priceChangeData.effectiveDate || i18n("review date unknown"),
+                               detail.rateSummary(detail.priceChangeData.previous),
+                               detail.rateSummary(detail.priceChangeData.current))
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
+
+        PlasmaExtras.Heading {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            level: 4
+            text: i18n("Local Cost Lab")
+            visible: !detail.mediaMode && detail.costLabData.length > 0
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            visible: !detail.mediaMode && detail.costLabData.length > 0
+            implicitHeight: costLabLayout.implicitHeight + Kirigami.Units.largeSpacing * 2
+            radius: Kirigami.Units.smallSpacing
+            color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.7)
+            border.width: 1
+            border.color: Qt.alpha(Kirigami.Theme.textColor, 0.14)
+
+            ColumnLayout {
+                id: costLabLayout
+                anchors.fill: parent
+                anchors.margins: Kirigami.Units.largeSpacing
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: i18n("Hypothetical list-price comparison for this source's retained workload. It is not a quality recommendation or a provider bill.")
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+                Repeater {
+                    model: detail.costLabData
+                    delegate: RowLayout {
+                        id: costLabRow
+                        required property var modelData
+                        Layout.fillWidth: true
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            text: costLabRow.modelData.displayName
+                                + (costLabRow.modelData.current ? i18n(" · current") : "")
+                            elide: Text.ElideRight
+                        }
+                        PlasmaComponents.Label {
+                            text: costLabRow.modelData.available
+                                ? i18n("%1 %2", costLabRow.modelData.currency, costLabRow.modelData.amountText)
+                                : i18n("Unavailable")
+                            color: costLabRow.modelData.available
+                                ? Kirigami.Theme.textColor : Kirigami.Theme.disabledTextColor
+                        }
+                    }
+                }
             }
         }
 
@@ -258,6 +450,61 @@ QQC2.ScrollView {
                             detail.sourceData.sourceKind || "")
                     }
                     Item { Layout.fillWidth: true }
+                }
+            }
+        }
+
+        PlasmaExtras.Heading {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            level: 4
+            text: i18n("Why this estimate?")
+            visible: !detail.mediaMode && Object.keys(detail.estimateProvenance()).length > 0
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            visible: !detail.mediaMode && Object.keys(detail.estimateProvenance()).length > 0
+            implicitHeight: estimateLayout.implicitHeight + Kirigami.Units.largeSpacing * 2
+            radius: Kirigami.Units.smallSpacing
+            color: Qt.alpha(Kirigami.Theme.backgroundColor, 0.7)
+            border.width: 1
+            border.color: Qt.alpha(Kirigami.Theme.textColor, 0.14)
+
+            ColumnLayout {
+                id: estimateLayout
+                anchors.fill: parent
+                anchors.margins: Kirigami.Units.largeSpacing
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: detail.estimateProvenance().available
+                        ? i18n("Available from the verified local price book.")
+                        : i18n("Unavailable: no trustworthy price was applied.")
+                    font.bold: true
+                    color: detail.estimateProvenance().available
+                        ? Kirigami.Theme.textColor : Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: [
+                        detail.provenanceValue("modelId", detail.sourceData.pricingModel || ""),
+                        detail.provenanceValue("catalogVersion", ""),
+                        detail.provenanceValue("priceId", "")
+                    ].filter(function(value) { return !!value; }).join(i18n(" · "))
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: (detail.estimateProvenance().missingDimensions || []).length > 0
+                    text: i18n("Missing: %1",
+                        (detail.estimateProvenance().missingDimensions || []).join(i18n(", ")))
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
                 }
             }
         }

@@ -33,6 +33,7 @@ check:
     python3 scripts/test_version_policy.py
     bash scripts/check_no_hardcoded_versions.sh
     python3 scripts/check_provider_catalog.py
+    python3 scripts/check_catalog_drift.py
     python3 scripts/check_config_defaults_exist_in_catalog.py
     python3 scripts/check_provider_ui_catalog_models.py
     python3 scripts/check_subscription_catalog.py
@@ -54,7 +55,7 @@ check:
     python3 scripts/test_release_media_evidence.py
     bash scripts/test_verify_exact_tag.sh
 
-# Regenerate the provider capability matrix from Catalog v6
+# Regenerate the provider capability matrix from Catalog v7
 generate-provider-docs:
     python3 scripts/generate_provider_capabilities.py
 
@@ -86,6 +87,7 @@ release-check: build-debug
     python3 scripts/test_version_policy.py
     bash scripts/check_no_hardcoded_versions.sh
     python3 scripts/check_provider_catalog.py
+    python3 scripts/check_catalog_drift.py
     python3 scripts/check_config_defaults_exist_in_catalog.py
     python3 scripts/check_provider_ui_catalog_models.py
     python3 scripts/check_subscription_catalog.py

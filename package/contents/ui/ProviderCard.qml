@@ -134,6 +134,11 @@ ColumnLayout {
                             visible: card.modelUnknownPricing()
                             text: i18n("Unknown pricing")
                         }
+
+                        SourceBadge {
+                            visible: card.modelRetirementWatch()
+                            text: i18n("Retirement watch")
+                        }
                     }
                 }
 
@@ -742,7 +747,12 @@ ColumnLayout {
         var providerKey = card.modelData.catalogKey || card.modelData.configKey || "";
         var modelId = card.backend.model || card.modelData.model || "";
         if (providerKey === "" || modelId === "") return ({});
-        return ProviderPricingCatalog.model(providerKey, modelId) || ({});
+        var model = ProviderPricingCatalog.model(providerKey, modelId) || ({});
+        var provider = ProviderPricingCatalog.provider(providerKey) || ({});
+        for (var key in provider) {
+            if (model[key] === undefined) model[key] = provider[key];
+        }
+        return model;
     }
 
     function modelNeedsReview() {
@@ -759,6 +769,11 @@ ColumnLayout {
         var row = currentCatalogModel();
         var pricing = row.pricing || {};
         return pricing.precision === "unknown" || row.dataQuality === "unknown_pricing";
+    }
+
+    function modelRetirementWatch() {
+        var lifecycle = (currentCatalogModel().lifecycle || {});
+        return lifecycle.status === "deprecated" || lifecycle.status === "retired";
     }
 
     function humanizeError(raw) {

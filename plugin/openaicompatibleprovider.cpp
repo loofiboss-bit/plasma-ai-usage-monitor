@@ -13,6 +13,7 @@ void OpenAICompatibleProvider::setModel(const QString &model)
 {
     if (m_model != model) {
         m_model = model;
+        setPricingModel(m_model);
         Q_EMIT modelChanged();
     }
 }

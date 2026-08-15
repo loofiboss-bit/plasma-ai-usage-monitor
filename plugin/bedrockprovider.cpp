@@ -1,6 +1,7 @@
 #include "bedrockprovider.h"
 
 #include "awssigv4signer.h"
+#include "providerpricingcatalog.h"
 
 #include <KLocalizedString>
 
@@ -13,6 +14,7 @@
 BedrockProvider::BedrockProvider(QObject *parent)
     : ProviderBackend(parent)
 {
+    registerCatalogPricing(QStringLiteral("bedrock"));
 }
 
 QString BedrockProvider::region() const
@@ -38,6 +40,7 @@ void BedrockProvider::setModel(const QString &model)
 {
     if (m_model != model) {
         m_model = model.trimmed();
+        setPricingModel(m_model);
         Q_EMIT modelChanged();
     }
 }

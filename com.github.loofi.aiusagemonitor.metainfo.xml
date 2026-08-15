@@ -78,6 +78,16 @@
 
   <releases>
 
+    <release version="19.0.0" date="2026-08-15">
+      <description>
+        <ul>
+          <li>Add Catalog v7 lifecycle, source provenance, review state and hard-expiry metadata.</li>
+          <li>Add fixed-point Cost Engine v2 with cache, context, modality, service-tier, route, region and fee dimensions.</li>
+          <li>Explain estimates and retain immutable pricing provenance in history and exports.</li>
+          <li>Verify signed catalog updates with Ed25519, expiry, sequence and atomic activation checks.</li>
+        </ul>
+      </description>
+    </release>
     <release version="18.0.0" date="2026-08-08">
       <description>
         <ul>

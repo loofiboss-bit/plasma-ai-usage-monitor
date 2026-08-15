@@ -6,10 +6,9 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **18.0.0 (Budget Control)** replaces fixed daily/monthly settings with
-typed local policies for real billing periods, scoped cost, safe-to-spend
-guidance, previous-period comparison and persist-before-delivery transitions.
-It preserves the read-only provider boundary and performs no inference.
+Version **19.0.0 (Verified Cost Intelligence)** makes every displayed estimate
+deterministic, provenance-bound, lifecycle-aware, and fail-closed. It keeps
+the local-first read-only provider boundary and performs no inference.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 

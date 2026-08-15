@@ -1,6 +1,7 @@
 #include "catalogloader.h"
 
 #include <QCoreApplication>
+#include <QCryptographicHash>
 #include <QDate>
 #include <QDir>
 #include <QFile>
@@ -19,6 +20,30 @@ constexpr int DEFAULT_STALE_DAYS = 30;
 QString sourceCatalogCandidate(const QDir &dir, const QString &fileName)
 {
     return dir.filePath(QStringLiteral("package/contents/catalog/%1").arg(fileName));
+}
+
+bool verifiedCacheCandidate(const QString &candidate)
+{
+    if (!QFile::exists(candidate)) {
+        return false;
+    }
+    QFile metaFile(candidate + QStringLiteral(".meta.json"));
+    if (!metaFile.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    QJsonParseError error;
+    const QJsonDocument meta = QJsonDocument::fromJson(metaFile.readAll(), &error);
+    if (error.error != QJsonParseError::NoError || !meta.isObject()) {
+        return false;
+    }
+    QFile catalogFile(candidate);
+    if (!catalogFile.open(QIODevice::ReadOnly)) {
+        return false;
+    }
+    const QString expected = meta.object().value(QStringLiteral("sha256")).toString().toLower();
+    const QString actual = QString::fromLatin1(
+        QCryptographicHash::hash(catalogFile.readAll(), QCryptographicHash::Sha256).toHex());
+    return !expected.isEmpty() && expected == actual;
 }
 
 void countFlagsInValue(const QJsonValue &value, int &manualReview, int &sourceConflict)
@@ -115,6 +140,12 @@ bool CatalogLoader::load()
     m_sourceConflictCount = 0;
     m_reviewItems.clear();
     m_catalogPath.clear();
+    m_sourceFingerprint.clear();
+    m_verificationState.clear();
+    m_sequence = 0;
+    m_hardExpiresAt.clear();
+    m_estimatesAllowed = true;
+    m_freshnessSloDays = DEFAULT_STALE_DAYS;
     m_diagnostics.clear();
     m_root = QJsonObject();
 
@@ -141,8 +172,11 @@ bool CatalogLoader::load()
         return false;
     }
 
+    const QByteArray catalogBytes = file.readAll();
+    m_sourceFingerprint = QString::fromLatin1(
+        QCryptographicHash::hash(catalogBytes, QCryptographicHash::Sha256).toHex());
     QJsonParseError error;
-    const QJsonDocument document = QJsonDocument::fromJson(file.readAll(), &error);
+    const QJsonDocument document = QJsonDocument::fromJson(catalogBytes, &error);
     if (error.error != QJsonParseError::NoError || !document.isObject()) {
         m_diagnostics << QStringLiteral("Catalog JSON is invalid: %1").arg(error.errorString());
         qWarning() << "AI Usage Monitor:" << m_diagnostics.constLast();
@@ -156,6 +190,36 @@ bool CatalogLoader::load()
     m_catalogVersion = m_root.value(QStringLiteral("catalogVersion")).toString();
     m_lastReviewed = m_root.value(QStringLiteral("lastReviewed")).toString();
     m_runtimeScraping = m_root.value(QStringLiteral("runtimeScraping")).toBool(true);
+    m_sequence = m_root.value(QStringLiteral("sequence")).toVariant().toLongLong();
+    m_hardExpiresAt = m_root.value(QStringLiteral("hardExpiresAt")).toString();
+    m_freshnessSloDays = qMax(1, m_root.value(QStringLiteral("freshnessSloDays")).toInt(DEFAULT_STALE_DAYS));
+    if (verifiedCacheCandidate(path)) {
+        m_verificationState = QStringLiteral("remote_verified");
+        QFile metadataFile(path + QStringLiteral(".meta.json"));
+        if (metadataFile.open(QIODevice::ReadOnly)) {
+            const QJsonDocument metadata = QJsonDocument::fromJson(metadataFile.readAll());
+            const QString state = metadata.object().value(QStringLiteral("state")).toString();
+            if (state == QLatin1String("remote_verified")
+                || state == QLatin1String("offline_cached")) {
+                m_verificationState = state;
+            }
+        }
+    } else {
+        m_verificationState = m_root.value(QStringLiteral("verificationState")).toString(
+            QStringLiteral("packaged"));
+    }
+    m_estimatesAllowed = m_root.value(QStringLiteral("estimatesAllowed")).toBool(true);
+    const QDateTime expiry = QDateTime::fromString(m_hardExpiresAt, Qt::ISODateWithMs).toUTC();
+    if (!expiry.isValid()) {
+        const QDateTime isoExpiry = QDateTime::fromString(m_hardExpiresAt, Qt::ISODate).toUTC();
+        if (isoExpiry.isValid() && QDateTime::currentDateTimeUtc() >= isoExpiry) {
+            m_estimatesAllowed = false;
+            m_verificationState = QStringLiteral("expired");
+        }
+    } else if (QDateTime::currentDateTimeUtc() >= expiry) {
+        m_estimatesAllowed = false;
+        m_verificationState = QStringLiteral("expired");
+    }
     countReviewFlags();
 
     if (m_schemaVersion != m_expectedSchemaVersion) {
@@ -172,6 +236,13 @@ bool CatalogLoader::load()
     if (!m_root.value(QStringLiteral("providers")).isArray()
         && m_fileName.startsWith(QLatin1String("providers"))) {
         m_diagnostics << QStringLiteral("Provider catalog must contain a providers array");
+    }
+    if (m_expectedSchemaVersion >= 7 && m_sequence <= 0) {
+        m_diagnostics << QStringLiteral("Catalog sequence must be a positive integer");
+    }
+    if (m_expectedSchemaVersion >= 7 && !QDateTime::fromString(m_hardExpiresAt, Qt::ISODate).isValid()
+        && !QDateTime::fromString(m_hardExpiresAt, Qt::ISODateWithMs).isValid()) {
+        m_diagnostics << QStringLiteral("Catalog hardExpiresAt is not an ISO timestamp");
     }
 
     m_valid = m_diagnostics.isEmpty();
@@ -201,7 +272,8 @@ bool CatalogLoader::isValid() const
 
 bool CatalogLoader::stale() const
 {
-    return isStale(DEFAULT_STALE_DAYS);
+    ensureLoaded();
+    return isStale(m_freshnessSloDays);
 }
 
 bool CatalogLoader::isStale(int maxAgeDays) const
@@ -262,6 +334,42 @@ QString CatalogLoader::catalogPath() const
     return m_catalogPath;
 }
 
+QString CatalogLoader::sourceFingerprint() const
+{
+    ensureLoaded();
+    return m_sourceFingerprint;
+}
+
+QString CatalogLoader::verificationState() const
+{
+    ensureLoaded();
+    return m_verificationState;
+}
+
+qint64 CatalogLoader::sequence() const
+{
+    ensureLoaded();
+    return m_sequence;
+}
+
+QString CatalogLoader::hardExpiresAt() const
+{
+    ensureLoaded();
+    return m_hardExpiresAt;
+}
+
+bool CatalogLoader::estimatesAllowed() const
+{
+    ensureLoaded();
+    return m_estimatesAllowed;
+}
+
+int CatalogLoader::freshnessSloDays() const
+{
+    ensureLoaded();
+    return m_freshnessSloDays;
+}
+
 QStringList CatalogLoader::diagnostics() const
 {
     ensureLoaded();
@@ -284,25 +392,45 @@ QString CatalogLoader::locateCatalogFile(const QString &fileName)
         }
     }
 
-    QDir dir = QDir::current();
-    while (true) {
-        const QString candidate = sourceCatalogCandidate(dir, fileName);
-        if (QFile::exists(candidate)) {
-            return candidate;
+    const QStringList cacheDirs = {
+        QString::fromLocal8Bit(qgetenv("AIUSAGE_MONITOR_CATALOG_CACHE_DIR")).trimmed(),
+        QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)
+            + QStringLiteral("/catalog-cache")
+    };
+    for (const QString &cacheDir : cacheDirs) {
+        if (cacheDir.isEmpty()) {
+            continue;
         }
-        if (!dir.cdUp()) {
-            break;
+        const QString candidate = QDir(cacheDir).filePath(fileName);
+        if (verifiedCacheCandidate(candidate)) {
+            return candidate;
         }
     }
 
-    dir = QDir(QCoreApplication::applicationDirPath());
-    while (true) {
-        const QString candidate = sourceCatalogCandidate(dir, fileName);
-        if (QFile::exists(candidate)) {
-            return candidate;
+    const QByteArray developmentOverride = qgetenv("AIUSAGE_MONITOR_DEVELOPMENT");
+    const bool allowSourceTree = developmentOverride == "1"
+        || QCoreApplication::applicationDirPath().contains(QStringLiteral("/build"));
+    if (allowSourceTree) {
+        QDir dir = QDir::current();
+        while (true) {
+            const QString candidate = sourceCatalogCandidate(dir, fileName);
+            if (QFile::exists(candidate)) {
+                return candidate;
+            }
+            if (!dir.cdUp()) {
+                break;
+            }
         }
-        if (!dir.cdUp()) {
-            break;
+
+        dir = QDir(QCoreApplication::applicationDirPath());
+        while (true) {
+            const QString candidate = sourceCatalogCandidate(dir, fileName);
+            if (QFile::exists(candidate)) {
+                return candidate;
+            }
+            if (!dir.cdUp()) {
+                break;
+            }
         }
     }
 

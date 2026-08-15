@@ -1,16 +1,31 @@
 # Roadmap
 
-**Current release:** 18.0.0, Budget Control
+**Current release:** 19.0.0, Verified Cost Intelligence
 
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-15
 
-AI Usage Monitor remains a desktop-native, local-first Plasma widget. v18 adds
-typed,
-applet-owned policies, real billing periods, scoped attribution, safe-to-spend
-guidance and transition persistence. It does not add provider writes, FX,
-inference or a fourth popup tab.
+AI Usage Monitor remains a desktop-native, local-first Plasma widget. v19 adds
+verified cost intelligence, signed catalog activation, deterministic pricing
+dimensions, immutable estimate provenance, drift visibility, and fail-closed
+expiry behavior. It does not add provider writes, FX, inference, or a fourth
+popup tab.
 
 ## Current release
+
+### 19.0.0 Verified Cost Intelligence
+
+- Replace runtime input/output price copies with one exact-match Cost Engine v2.
+- Ship Catalog v7 metadata for cache reads/writes, context tiers, service tiers,
+  lifecycle, evidence, sequence, and hard expiry.
+- Persist estimate provenance in snapshots, normalized observations, and exports.
+- Verify signed remote catalogs before atomic activation and reject rollback,
+  expiry, schema, and digest failures.
+- Explain estimates in Source Detail and surface review, conflict, unknown-price,
+  and retirement-watch states in the existing provider surfaces.
+- Qualify the exact release commit before GitHub, COPR, and KDE Store publication.
+
+The implementation plan is
+[`docs/plans/PLASMA_AI_USAGE_MONITOR_V19_CODEX_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V19_CODEX_PLAN.md).
 
 ### 18.0.0 Budget Control
 

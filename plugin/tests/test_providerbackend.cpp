@@ -44,6 +44,8 @@ public:
     using ProviderBackend::beginRefresh;
     using ProviderBackend::isCurrentGeneration;
     using ProviderBackend::registerModelPricing;
+    using ProviderBackend::registerCatalogPricing;
+    using ProviderBackend::setPricingModel;
     using ProviderBackend::updateEstimatedCost;
     using ProviderBackend::checkBudgetLimits;
     using ProviderBackend::isRetryableStatus;
@@ -71,7 +73,8 @@ private Q_SLOTS:
     void testMonthlyBudgetSignals();
     void testBudgetCurrencyMismatchDisablesAlerts();
     void testCostEstimation();
-    void testCostEstimationPrefixMatch();
+    void testCostEstimationRequiresExactModel();
+    void testActualBillingClearsEstimatedMetric();
     void testGenerationCounter();
     void testDisconnectReconnectSignals();
     void testNoSignalOnSameState();
@@ -394,20 +397,45 @@ void ProviderBackendTest::testCostEstimation()
     QVERIFY(p.isEstimatedCost());
 }
 
-void ProviderBackendTest::testCostEstimationPrefixMatch()
+void ProviderBackendTest::testCostEstimationRequiresExactModel()
 {
     TestProvider p;
-    p.registerModelPricing(QStringLiteral("mistral-large"), 2.0, 6.0);
+    p.registerModelPricing(QStringLiteral("mistral-large-latest"), 2.0, 6.0);
 
     p.setInputTokens(2000000);
     p.setOutputTokens(1000000);
 
-    // Use a model name that starts with the registered prefix
     p.updateEstimatedCost(QStringLiteral("mistral-large-latest"));
 
     // Expected: (2M/1M)*2 + (1M/1M)*6 = 4.0 + 6.0 = 10.0
     QVERIFY(qAbs(p.cost() - 10.0) < 0.01);
     QVERIFY(p.isEstimatedCost());
+}
+
+void ProviderBackendTest::testActualBillingClearsEstimatedMetric()
+{
+    TestProvider p;
+    p.registerCatalogPricing(QStringLiteral("openai"));
+    p.setPricingModel(QStringLiteral("gpt-5.4"));
+    p.setInputTokens(1000000);
+    p.setOutputTokens(100000);
+    p.updateEstimatedCost(QStringLiteral("gpt-5.4"));
+
+    bool hasEstimate = false;
+    for (const QVariant &entry : p.metrics()) {
+        const QVariantMap metric = entry.toMap();
+        hasEstimate = hasEstimate
+            || metric.value(QStringLiteral("source")).toString() == QLatin1String("estimated_pricing");
+    }
+    QVERIFY(hasEstimate);
+
+    p.setCurrency(QStringLiteral("USD"));
+    p.setCost(1.25);
+    for (const QVariant &entry : p.metrics()) {
+        const QVariantMap metric = entry.toMap();
+        QVERIFY(metric.value(QStringLiteral("source")).toString()
+                != QLatin1String("estimated_pricing"));
+    }
 }
 
 void ProviderBackendTest::testGenerationCounter()

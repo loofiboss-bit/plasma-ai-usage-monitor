@@ -39,13 +39,14 @@ class CatalogsTest : public QObject
 
 private Q_SLOTS:
     void providerCatalogLoads();
-    void pricingSchemaV6EstimatesWithoutFalsePrecision();
+    void pricingSchemaV7EstimatesWithoutFalsePrecision();
+    void exactCacheWriteAndLifecycleFailuresAreUnavailable();
     void subscriptionCatalogLoads();
     void staleCatalogDetection();
     void invalidCatalogExposesStatus();
 };
 
-void CatalogsTest::pricingSchemaV6EstimatesWithoutFalsePrecision()
+void CatalogsTest::pricingSchemaV7EstimatesWithoutFalsePrecision()
 {
     ProviderPricingCatalog catalog;
     QVariantMap usage{{QStringLiteral("inputTokens"), 250000},
@@ -61,7 +62,7 @@ void CatalogsTest::pricingSchemaV6EstimatesWithoutFalsePrecision()
     usage.insert(QStringLiteral("serviceTier"), QStringLiteral("batch"));
     estimate = catalog.estimateCost(QStringLiteral("google"), QStringLiteral("gemini-2.5-pro"), usage);
     QVERIFY(estimate.value(QStringLiteral("complete")).toBool());
-    QVERIFY(qAbs(estimate.value(QStringLiteral("amount")).toDouble() - 0.275) < 0.000001);
+    QVERIFY(qAbs(estimate.value(QStringLiteral("amount")).toDouble() - 0.28) < 0.000001);
 
     usage.insert(QStringLiteral("serviceTier"), QStringLiteral("standard"));
     usage.insert(QStringLiteral("additiveUsage"), QVariantMap{{QStringLiteral("google_search_grounding"), 2}});
@@ -85,13 +86,43 @@ void CatalogsTest::pricingSchemaV6EstimatesWithoutFalsePrecision()
                 .contains(QStringLiteral("cachedInputRate")));
 }
 
+void CatalogsTest::exactCacheWriteAndLifecycleFailuresAreUnavailable()
+{
+    ProviderPricingCatalog catalog;
+    const QVariantMap estimate = catalog.estimateCost(
+        QStringLiteral("openai"), QStringLiteral("gpt-5.6-terra"),
+        QVariantMap{{QStringLiteral("inputTokens"), 1000000},
+                    {QStringLiteral("cachedInputTokens"), 100000},
+                    {QStringLiteral("cacheWriteTokens"), 50000},
+                    {QStringLiteral("outputTokens"), 100000}});
+    QVERIFY(estimate.value(QStringLiteral("available")).toBool());
+    QCOMPARE(estimate.value(QStringLiteral("amountText")).toString(), QStringLiteral("3.05"));
+    QVERIFY(estimate.value(QStringLiteral("components")).toList().size() >= 4);
+
+    const QVariantMap retired = catalog.estimateCost(
+        QStringLiteral("google"), QStringLiteral("gemini-2.0-flash"),
+        QVariantMap{{QStringLiteral("inputTokens"), 1000},
+                    {QStringLiteral("outputTokens"), 1000}});
+    QVERIFY(!retired.value(QStringLiteral("available")).toBool());
+    QVERIFY(retired.value(QStringLiteral("missingDimensions")).toStringList()
+                .contains(QStringLiteral("pricing:retired")));
+
+    const QVariantMap missingModality = catalog.estimateCost(
+        QStringLiteral("google"), QStringLiteral("gemini-2.5-flash"),
+        QVariantMap{{QStringLiteral("inputTokens"), 1000},
+                    {QStringLiteral("outputTokens"), 1000}});
+    QVERIFY(!missingModality.value(QStringLiteral("available")).toBool());
+    QVERIFY(missingModality.value(QStringLiteral("missingDimensions")).toStringList()
+                .contains(QStringLiteral("modality")));
+}
+
 void CatalogsTest::providerCatalogLoads()
 {
     ProviderPricingCatalog catalog;
 
     QVERIFY(catalog.isValid());
-    QCOMPARE(catalog.schemaVersion(), 6);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.08.08"));
+    QCOMPARE(catalog.schemaVersion(), 7);
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.08.15"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(!catalog.reviewItems().isEmpty());
@@ -102,8 +133,14 @@ void CatalogsTest::providerCatalogLoads()
     const QVariantMap gpt56Pricing = catalog.pricing(QStringLiteral("openai"), QStringLiteral("gpt-5.6-terra"));
     QCOMPARE(gpt56Pricing.value(QStringLiteral("unit")).toString(), QStringLiteral("1M_tokens"));
     QCOMPARE(gpt56Pricing.value(QStringLiteral("precision")).toString(), QStringLiteral("official_exact"));
-    QCOMPARE(gpt56Pricing.value(QStringLiteral("input")).toDouble(), 2.5);
-    QCOMPARE(gpt56Pricing.value(QStringLiteral("output")).toDouble(), 15.0);
+    QCOMPARE(gpt56Pricing.value(QStringLiteral("input")).toDouble(), 2.0);
+    QCOMPARE(gpt56Pricing.value(QStringLiteral("cachedInput")).toDouble(), 0.2);
+    QCOMPARE(gpt56Pricing.value(QStringLiteral("cacheWrite")).toDouble(), 2.5);
+    QCOMPARE(gpt56Pricing.value(QStringLiteral("output")).toDouble(), 12.0);
+    QCOMPARE(catalog.pricing(QStringLiteral("openai"), QStringLiteral("gpt-5.4-mini"))
+                 .value(QStringLiteral("input")).toDouble(), 0.75);
+    QVERIFY(catalog.pricing(QStringLiteral("openai"), QStringLiteral("gpt-5.4-mini-2026"))
+                .isEmpty());
     QVERIFY(!catalog.pricing(QStringLiteral("deepseek"), QStringLiteral("deepseek-v4-flash")).isEmpty());
     QCOMPARE(catalog.effectiveModelIdAt(QStringLiteral("deepseek"), QStringLiteral("deepseek-chat"),
                                         QDate(2026, 7, 23)), QStringLiteral("deepseek-chat"));
@@ -192,10 +229,12 @@ void CatalogsTest::staleCatalogDetection()
     QFile file(dir.filePath(QStringLiteral("providers-v4.json")));
     QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
     file.write(R"JSON({
-        "schemaVersion": 6,
+        "schemaVersion": 7,
         "catalogVersion": "2026.01.01",
         "release": "8.0.0",
         "lastReviewed": "2026-01-01",
+        "sequence": 1,
+        "hardExpiresAt": "2026-02-01T00:00:00Z",
         "runtimeScraping": false,
         "providers": []
     })JSON");

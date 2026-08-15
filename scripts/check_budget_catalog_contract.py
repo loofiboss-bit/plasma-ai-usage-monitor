@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the v18 catalog-driven budget capability boundaries."""
+"""Validate the catalog-driven budget capability boundaries."""
 
 from __future__ import annotations
 
@@ -22,8 +22,8 @@ def fail(message: str) -> None:
 
 def main() -> None:
     catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
-    if catalog.get("schemaVersion") != 6:
-        fail("provider catalog must use schema v6")
+    if catalog.get("schemaVersion") != 7:
+        fail("provider catalog must use schema v7")
 
     config_keys = {
         node.attrib["name"]

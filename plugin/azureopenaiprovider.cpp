@@ -12,6 +12,7 @@ AzureOpenAIProvider::AzureOpenAIProvider(QObject *parent)
     : ProviderBackend(parent)
 {
     registerCatalogPricing(QStringLiteral("azure"));
+    setPricingModel(m_model);
 }
 
 QString AzureOpenAIProvider::model() const
@@ -23,6 +24,7 @@ void AzureOpenAIProvider::setModel(const QString &model)
 {
     if (m_model != model) {
         m_model = model;
+        setPricingModel(m_model);
         Q_EMIT modelChanged();
     }
 }

@@ -1,5 +1,7 @@
 set(aiusagemonitor_SRCS
     appinfo.cpp
+    costengine.cpp
+    catalogupdater.cpp
     catalogloader.cpp
     providerpricingcatalog.cpp
     subscriptionplancatalog.cpp
@@ -60,6 +62,8 @@ set(aiusagemonitor_SRCS
 
 set(aiusagemonitor_HDRS
     appinfo.h
+    costengine.h
+    catalogupdater.h
     catalogloader.h
     providerpricingcatalog.h
     subscriptionplancatalog.h

@@ -755,6 +755,13 @@ Item {
         }
     }
 
+    CatalogUpdateManager {
+        id: catalogUpdateManager
+        // A feed is only contacted when the administrator or a signed
+        // deployment configures an HTTPS URL through the native updater.
+        Component.onCompleted: checkForUpdate()
+    }
+
     property Component compactRepresentationComponent: CompactRepresentation {
         // Component boundaries intentionally capture their owning monitor.
         // qmllint disable unqualified

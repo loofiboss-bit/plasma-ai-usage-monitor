@@ -19,8 +19,8 @@ jobs:
       - run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_plasmoid.sh --output-dir dist
       - run: python3 scripts/generate_source_sbom.py --tag "$GITHUB_REF_NAME" --output dist/source.spdx.json
       - run: cd dist && sha256sum * > SHA256SUMS.txt
-      - name: Create exact-commit draft release
+      - name: Create published exact-commit release
         shell: bash
         run: |
-          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --generate-notes dist/*
+          gh release create "$GITHUB_REF_NAME" --verify-tag --latest --generate-notes dist/*
         env: { GH_TOKEN: '${{ github.token }}' }

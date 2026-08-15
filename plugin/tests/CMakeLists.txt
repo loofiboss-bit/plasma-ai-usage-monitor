@@ -14,6 +14,7 @@ set(TEST_BUDGET_POLICY_SRC
 )
 
 set(TEST_CATALOG_SRC
+    ${CMAKE_SOURCE_DIR}/plugin/costengine.cpp
     ${CMAKE_SOURCE_DIR}/plugin/catalogloader.cpp
     ${CMAKE_SOURCE_DIR}/plugin/providerpricingcatalog.cpp
     ${CMAKE_SOURCE_DIR}/plugin/subscriptionplancatalog.cpp
@@ -535,6 +536,18 @@ target_link_libraries(test_catalogs
 )
 
 add_test(NAME catalogs COMMAND test_catalogs)
+
+# --- Signed catalog feed and atomic activation ---
+add_executable(test_catalogupdater
+    test_catalogupdater.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/catalogupdater.cpp
+)
+target_include_directories(test_catalogupdater PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_compile_definitions(test_catalogupdater PRIVATE
+    CATALOG_UPDATER_TEST_PUBLIC_KEY_HEX="d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a"
+)
+target_link_libraries(test_catalogupdater PRIVATE Qt6::Core Qt6::Test Qt6::Network OpenSSL::Crypto)
+add_test(NAME catalogupdater COMMAND test_catalogupdater)
 
 add_executable(test_providermanager
     test_providermanager.cpp

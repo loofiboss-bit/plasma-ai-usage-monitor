@@ -110,6 +110,20 @@ QString toDbDateTimeString(const QDateTime &dt)
     return dt.toUTC().toString(QStringLiteral("yyyy-MM-dd HH:mm:ss"));
 }
 
+QString provenanceJson(const QVariantMap &provenance)
+{
+    if (provenance.isEmpty()) {
+        return {};
+    }
+    return QString::fromUtf8(
+        QJsonDocument(QJsonObject::fromVariantMap(provenance)).toJson(QJsonDocument::Compact));
+}
+
+QString provenanceValue(const QVariantMap &provenance, const QString &key)
+{
+    return provenance.value(key).toString();
+}
+
 int effectiveBucketSeconds(const QDateTime &fromUtc, const QDateTime &toUtc,
                            int bucketMinutes)
 {
@@ -442,8 +456,15 @@ void UsageDatabase::createTables()
                               "  rl_tokens_remaining INTEGER DEFAULT 0,"
                               "  cost_source TEXT NOT NULL DEFAULT 'unknown',"
                               "  usage_source TEXT NOT NULL DEFAULT 'unknown',"
-                              "  currency TEXT DEFAULT 'USD',"
-                              "  data_quality TEXT DEFAULT 'unknown'"
+                              "  currency TEXT,"
+                              "  data_quality TEXT DEFAULT 'unknown',"
+                              "  catalog_version TEXT,"
+                              "  price_id TEXT,"
+                              "  pricing_effective_from_utc DATETIME,"
+                              "  pricing_effective_to_utc DATETIME,"
+                              "  source_fingerprint TEXT,"
+                              "  provenance_json TEXT,"
+                              "  estimate_status TEXT"
                               ")"));
 
     // Indexes for efficient time-range queries
@@ -495,10 +516,17 @@ void UsageDatabase::createTables()
                        QStringLiteral("TEXT NOT NULL DEFAULT 'unknown'"));
     ensureColumnExists(QStringLiteral("usage_snapshots"),
                        QStringLiteral("currency"),
-                       QStringLiteral("TEXT DEFAULT 'USD'"));
+                       QStringLiteral("TEXT"));
     ensureColumnExists(QStringLiteral("usage_snapshots"),
                        QStringLiteral("data_quality"),
                        QStringLiteral("TEXT DEFAULT 'unknown'"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("catalog_version"), QStringLiteral("TEXT"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("price_id"), QStringLiteral("TEXT"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("pricing_effective_from_utc"), QStringLiteral("DATETIME"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("pricing_effective_to_utc"), QStringLiteral("DATETIME"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("source_fingerprint"), QStringLiteral("TEXT"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("provenance_json"), QStringLiteral("TEXT"));
+    ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("estimate_status"), QStringLiteral("TEXT"));
 
     if (!migrateToObservationSchemaV3()) {
         qWarning() << "UsageDatabase: observation schema v3 migration failed; "
@@ -555,6 +583,10 @@ void UsageDatabase::createTables()
     }
     if (!migrateToSchemaV6()) {
         qWarning() << "UsageDatabase: schema v6 migration failed; v5 history remains intact";
+        return;
+    }
+    if (!migrateToSchemaV7()) {
+        qWarning() << "UsageDatabase: schema v7 migration failed; provenance history remains partial";
     }
 }
 
@@ -622,8 +654,8 @@ bool UsageDatabase::migrateToObservationSchemaV3()
                                          "unit, value, currency, semantic, source, data_quality, "
                                          "model_scope, correlation_id) "
                                          "SELECT provider, timestamp, 'cost', "
-                                         "COALESCE(NULLIF(currency,''),'USD'), cost, "
-                                         "COALESCE(NULLIF(currency,''),'USD'), "
+                                         "COALESCE(NULLIF(currency,''),'currency'), cost, "
+                                         "NULLIF(currency,''), "
                                          "CASE WHEN is_estimated_cost != 0 THEN 'local_estimate' ELSE "
                                          "'gauge' END, cost_source, data_quality, model, %1 FROM "
                                          "usage_snapshots "
@@ -783,6 +815,50 @@ bool UsageDatabase::migrateToSchemaV6()
     return true;
 }
 
+bool UsageDatabase::migrateToSchemaV7()
+{
+    QSqlQuery query(m_db);
+    const QStringList observationColumns {
+        QStringLiteral("catalog_version TEXT"),
+        QStringLiteral("price_id TEXT"),
+        QStringLiteral("pricing_effective_from_utc DATETIME"),
+        QStringLiteral("pricing_effective_to_utc DATETIME"),
+        QStringLiteral("source_fingerprint TEXT"),
+        QStringLiteral("provenance_json TEXT"),
+        QStringLiteral("estimate_status TEXT"),
+    };
+    for (const QString &definition : observationColumns) {
+        const QStringList fields = definition.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+        ensureColumnExists(QStringLiteral("observations"), fields.value(0), definition.mid(fields.value(0).size() + 1));
+    }
+    if (!query.exec(QStringLiteral(
+            "CREATE TABLE IF NOT EXISTS estimate_provenance ("
+            "id INTEGER PRIMARY KEY AUTOINCREMENT,"
+            "snapshot_id INTEGER, observation_id INTEGER, provider TEXT NOT NULL,"
+            "observed_at_utc DATETIME NOT NULL DEFAULT (datetime('now')),"
+            "catalog_version TEXT, price_id TEXT, pricing_effective_from_utc DATETIME,"
+            "pricing_effective_to_utc DATETIME, source_fingerprint TEXT,"
+            "provenance_json TEXT NOT NULL, estimate_status TEXT NOT NULL,"
+            "immutable INTEGER NOT NULL DEFAULT 1)"))) {
+        return false;
+    }
+    if (!query.exec(QStringLiteral("CREATE INDEX IF NOT EXISTS idx_estimate_provenance_provider_time "
+                                   "ON estimate_provenance(provider, observed_at_utc)"))) {
+        return false;
+    }
+    if (!query.exec(QStringLiteral(
+            "UPDATE usage_snapshots SET estimate_status='legacy-estimate-provenance-unavailable' "
+            "WHERE is_estimated_cost != 0 AND (provenance_json IS NULL OR provenance_json='')"))) {
+        return false;
+    }
+    if (!query.exec(QStringLiteral(
+            "UPDATE observations SET estimate_status='legacy-estimate-provenance-unavailable' "
+            "WHERE semantic='local_estimate' AND (provenance_json IS NULL OR provenance_json='')"))) {
+        return false;
+    }
+    return query.exec(QStringLiteral("PRAGMA user_version = 7"));
+}
+
 void UsageDatabase::ensureColumnExists(const QString &table,
                                        const QString &column,
                                        const QString &definition)
@@ -815,7 +891,8 @@ void UsageDatabase::recordSnapshot(
     int rateLimitRequests, int rateLimitRequestsRemaining, int rateLimitTokens,
     int rateLimitTokensRemaining, const QString &model, bool isEstimatedCost,
     const QString &costSource, const QString &usageSource,
-    const QString &currency, const QString &dataQuality)
+    const QString &currency, const QString &dataQuality,
+    const QVariantMap &provenance)
 {
     if (!m_enabled)
         return;
@@ -859,8 +936,10 @@ void UsageDatabase::recordSnapshot(
         "is_estimated_cost, "
         "daily_cost, monthly_cost, rl_requests, rl_requests_remaining, "
         "rl_tokens, rl_tokens_remaining, "
-        "cost_source, usage_source, currency, data_quality) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        "cost_source, usage_source, currency, data_quality, catalog_version, price_id,"
+        "pricing_effective_from_utc, pricing_effective_to_utc, source_fingerprint,"
+        "provenance_json, estimate_status) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     query.addBindValue(provider);
     query.addBindValue(model.trimmed());
     query.addBindValue(inputTokens);
@@ -879,10 +958,19 @@ void UsageDatabase::recordSnapshot(
     query.addBindValue(usageSource.trimmed().isEmpty() ? QStringLiteral("unknown")
                                                        : usageSource.trimmed());
     query.addBindValue(currency.trimmed().isEmpty()
-                           ? QStringLiteral("USD")
-                           : currency.trimmed().toUpper());
+                           ? QVariant()
+                           : QVariant(currency.trimmed().toUpper()));
     query.addBindValue(dataQuality.trimmed().isEmpty() ? QStringLiteral("unknown")
                                                        : dataQuality.trimmed());
+    query.addBindValue(provenanceValue(provenance, QStringLiteral("catalogVersion")));
+    query.addBindValue(provenanceValue(provenance, QStringLiteral("priceId")));
+    query.addBindValue(provenanceValue(provenance, QStringLiteral("effectiveFrom")));
+    query.addBindValue(provenanceValue(provenance, QStringLiteral("effectiveTo")));
+    query.addBindValue(provenanceValue(provenance, QStringLiteral("sourceFingerprint")));
+    query.addBindValue(provenanceJson(provenance));
+    query.addBindValue(provenance.value(QStringLiteral("estimateStatus"),
+                                        isEstimatedCost ? QStringLiteral("available")
+                                                         : QStringLiteral("actual")));
 
     if (!query.exec()) {
         qWarning() << "UsageDatabase: Failed to record snapshot:"
@@ -890,12 +978,38 @@ void UsageDatabase::recordSnapshot(
         m_db.rollback();
     } else if (!recordObservations(provider, model, inputTokens, outputTokens,
                                    requestCount, cost, currency, costSource,
-                                   usageSource, dataQuality)) {
+                                   usageSource, dataQuality, provenance)) {
         qWarning() << "UsageDatabase: Failed to record normalized observations";
         m_db.rollback();
-    } else if (!m_db.commit()) {
-        qWarning() << "UsageDatabase: Failed to commit snapshot transaction";
     } else {
+        const QVariant snapshotId = query.lastInsertId();
+        if (!provenance.isEmpty()) {
+            QSqlQuery provenanceQuery(m_db);
+            provenanceQuery.prepare(QStringLiteral(
+                "INSERT INTO estimate_provenance(snapshot_id,provider,catalog_version,price_id,"
+                "pricing_effective_from_utc,pricing_effective_to_utc,source_fingerprint,"
+                "provenance_json,estimate_status) VALUES(?,?,?,?,?,?,?,?,?)"));
+            provenanceQuery.addBindValue(snapshotId);
+            provenanceQuery.addBindValue(provider);
+            provenanceQuery.addBindValue(provenanceValue(provenance, QStringLiteral("catalogVersion")));
+            provenanceQuery.addBindValue(provenanceValue(provenance, QStringLiteral("priceId")));
+            provenanceQuery.addBindValue(provenanceValue(provenance, QStringLiteral("effectiveFrom")));
+            provenanceQuery.addBindValue(provenanceValue(provenance, QStringLiteral("effectiveTo")));
+            provenanceQuery.addBindValue(provenanceValue(provenance, QStringLiteral("sourceFingerprint")));
+            provenanceQuery.addBindValue(provenanceJson(provenance));
+            provenanceQuery.addBindValue(provenance.value(QStringLiteral("estimateStatus"),
+                                                          isEstimatedCost ? QStringLiteral("available")
+                                                                           : QStringLiteral("actual")));
+            if (!provenanceQuery.exec()) {
+                qWarning() << "UsageDatabase: provenance insert failed:" << provenanceQuery.lastError().text();
+                m_db.rollback();
+                return;
+            }
+        }
+        if (!m_db.commit()) {
+            qWarning() << "UsageDatabase: Failed to commit snapshot transaction";
+            return;
+        }
         m_lastWriteTime[provider] = now;
         m_lastWrittenState[provider] = normalizedState;
         Q_EMIT observationsChanged();
@@ -908,12 +1022,11 @@ bool UsageDatabase::recordObservations(const QString &provider,
                                        double cost, const QString &currency,
                                        const QString &costSource,
                                        const QString &usageSource,
-                                       const QString &dataQuality)
+                                       const QString &dataQuality,
+                                       const QVariantMap &provenance)
 {
     const QString correlationId = QUuid::createUuid().toString(QUuid::WithoutBraces);
-    const QString currencyCode = currency.trimmed().isEmpty()
-        ? QStringLiteral("USD")
-        : currency.trimmed().toUpper();
+    const QString currencyCode = currency.trimmed().toUpper();
     const QString quality = dataQuality.trimmed().isEmpty()
         ? QStringLiteral("unknown")
         : dataQuality.trimmed();
@@ -926,38 +1039,44 @@ bool UsageDatabase::recordObservations(const QString &provider,
         QString semantic;
         QString source;
     };
-    const QList<Observation> observations = {
-        {QStringLiteral("cost"), currencyCode, cost, currencyCode,
-         costSource == QLatin1String("estimated_from_usage")
-             ? QStringLiteral("local_estimate")
-             : QStringLiteral("gauge"),
-         costSource.trimmed().isEmpty() ? QStringLiteral("unknown")
-                                        : costSource.trimmed()},
-        {QStringLiteral("input_tokens"),
+    QList<Observation> observations;
+    if (!provenance.contains(QStringLiteral("available"))
+        || provenance.value(QStringLiteral("available")).toBool()) {
+        observations.append({QStringLiteral("cost"),
+                             currencyCode.isEmpty() ? QStringLiteral("currency") : currencyCode,
+                             cost, currencyCode,
+                             costSource == QLatin1String("estimated_from_usage")
+                                 ? QStringLiteral("local_estimate")
+                                 : QStringLiteral("gauge"),
+                             costSource.trimmed().isEmpty() ? QStringLiteral("unknown")
+                                                            : costSource.trimmed()});
+    }
+    observations.append({QStringLiteral("input_tokens"),
          QStringLiteral("token"),
          static_cast<double>(inputTokens),
          {},
          QStringLiteral("cumulative_counter"),
-         usageSource},
-        {QStringLiteral("output_tokens"),
+         usageSource});
+    observations.append({QStringLiteral("output_tokens"),
          QStringLiteral("token"),
          static_cast<double>(outputTokens),
          {},
          QStringLiteral("cumulative_counter"),
-         usageSource},
-        {QStringLiteral("requests"),
+         usageSource});
+    observations.append({QStringLiteral("requests"),
          QStringLiteral("request"),
          static_cast<double>(requestCount),
          {},
          QStringLiteral("cumulative_counter"),
-         usageSource},
-    };
+         usageSource});
 
     QSqlQuery query(m_db);
     query.prepare(QStringLiteral(
         "INSERT INTO observations(provider, metric_kind, unit, value, currency, "
-        "semantic, source, data_quality, model_scope, correlation_id) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
+        "semantic, source, data_quality, model_scope, catalog_version, price_id,"
+        "pricing_effective_from_utc, pricing_effective_to_utc, source_fingerprint,"
+        "provenance_json, estimate_status, correlation_id) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     for (const Observation &observation : observations) {
         query.bindValue(0, provider);
         query.bindValue(1, observation.kind);
@@ -968,7 +1087,16 @@ bool UsageDatabase::recordObservations(const QString &provider,
         query.bindValue(6, observation.source.trimmed().isEmpty() ? QStringLiteral("unknown") : observation.source.trimmed());
         query.bindValue(7, quality);
         query.bindValue(8, model.trimmed());
-        query.bindValue(9, correlationId);
+        query.bindValue(9, provenanceValue(provenance, QStringLiteral("catalogVersion")));
+        query.bindValue(10, provenanceValue(provenance, QStringLiteral("priceId")));
+        query.bindValue(11, provenanceValue(provenance, QStringLiteral("effectiveFrom")));
+        query.bindValue(12, provenanceValue(provenance, QStringLiteral("effectiveTo")));
+        query.bindValue(13, provenanceValue(provenance, QStringLiteral("sourceFingerprint")));
+        query.bindValue(14, provenanceJson(provenance));
+        query.bindValue(15, provenance.value(QStringLiteral("estimateStatus"),
+                                             provenance.value(QStringLiteral("available")).toBool()
+                                                 ? QStringLiteral("available") : QStringLiteral("unknown")));
+        query.bindValue(16, correlationId);
         if (!query.exec()) {
             qWarning() << "UsageDatabase: observation insert failed"
                        << query.lastError().text();
@@ -994,8 +1122,10 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider,
         "observations(provider,observed_at_utc,interval_start_utc,interval_end_"
         "utc,metric_kind,unit,value,currency,semantic,source,data_quality,scope,"
         "window,model_scope,project_scope,service_tier_scope,line_item_scope,"
-        "reset_at_utc,correlation_id) "
-        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
+        "reset_at_utc,catalog_version,price_id,pricing_effective_from_utc,"
+        "pricing_effective_to_utc,source_fingerprint,provenance_json,estimate_status,"
+        "correlation_id) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"));
     for (const QVariant &entry : metrics) {
         const QVariantMap metric = entry.toMap();
         const QString requestedSemantic =
@@ -1047,7 +1177,17 @@ bool UsageDatabase::recordProviderMetrics(const QString &provider,
         query.bindValue(15, metric.value(QStringLiteral("serviceTierScope")));
         query.bindValue(16, metric.value(QStringLiteral("lineItemScope")));
         query.bindValue(17, metric.value(QStringLiteral("resetAt")));
-        query.bindValue(18, correlationId);
+        const QVariantMap provenance = metric.value(QStringLiteral("provenance")).toMap();
+        query.bindValue(18, provenanceValue(provenance, QStringLiteral("catalogVersion")));
+        query.bindValue(19, provenanceValue(provenance, QStringLiteral("priceId")));
+        query.bindValue(20, provenanceValue(provenance, QStringLiteral("effectiveFrom")));
+        query.bindValue(21, provenanceValue(provenance, QStringLiteral("effectiveTo")));
+        query.bindValue(22, provenanceValue(provenance, QStringLiteral("sourceFingerprint")));
+        query.bindValue(23, provenanceJson(provenance));
+        query.bindValue(24, provenance.value(QStringLiteral("estimateStatus"),
+                                             metric.value(QStringLiteral("available")).toBool()
+                                                 ? QStringLiteral("available") : QStringLiteral("unavailable")));
+        query.bindValue(25, correlationId);
         if (!query.exec()) {
             m_db.rollback();
             return false;
@@ -1279,7 +1419,9 @@ QVariantList UsageDatabase::getSnapshots(const QString &provider,
                        "is_estimated_cost, daily_cost, monthly_cost, "
                        "rl_requests, rl_requests_remaining, "
                        "rl_tokens, rl_tokens_remaining, cost_source, "
-                       "usage_source, currency, data_quality "
+                       "usage_source, currency, data_quality, catalog_version, price_id, "
+                       "pricing_effective_from_utc, pricing_effective_to_utc, source_fingerprint, "
+                       "provenance_json, estimate_status "
                        "FROM usage_snapshots "
                        "WHERE provider = ? AND timestamp >= ? AND timestamp <= ? "
                        "ORDER BY timestamp ASC LIMIT 10000"));
@@ -1312,6 +1454,17 @@ QVariantList UsageDatabase::getSnapshots(const QString &provider,
         row[QStringLiteral("usageSource")] = query.value(14).toString();
         row[QStringLiteral("currency")] = query.value(15).toString();
         row[QStringLiteral("dataQuality")] = query.value(16).toString();
+        row[QStringLiteral("catalogVersion")] = query.value(17).toString();
+        row[QStringLiteral("priceId")] = query.value(18).toString();
+        row[QStringLiteral("pricingEffectiveFrom")] = query.value(19).toString();
+        row[QStringLiteral("pricingEffectiveTo")] = query.value(20).toString();
+        row[QStringLiteral("sourceFingerprint")] = query.value(21).toString();
+        const QString provenance = query.value(22).toString();
+        if (!provenance.isEmpty()) {
+            const QJsonDocument document = QJsonDocument::fromJson(provenance.toUtf8());
+            if (document.isObject()) row[QStringLiteral("provenance")] = document.object().toVariantMap();
+        }
+        row[QStringLiteral("estimateStatus")] = query.value(23).toString();
         results.append(row);
     }
 
@@ -2338,7 +2491,8 @@ QString UsageDatabase::exportCsv(const QString &provider, const QDateTime &from,
         "cost,is_estimated_cost,daily_cost,monthly_cost,rl_requests,rl_requests_"
         "remaining,"
         "rl_tokens,rl_tokens_remaining,cost_source,usage_source,currency,data_"
-        "quality\n");
+        "quality,catalog_version,price_id,pricing_effective_from_utc,"
+        "pricing_effective_to_utc,source_fingerprint,provenance_json,estimate_status\n");
 
     QVariantList snapshots = getSnapshots(provider, from, to);
     for (const QVariant &snap : snapshots) {
@@ -2362,7 +2516,14 @@ QString UsageDatabase::exportCsv(const QString &provider, const QDateTime &from,
             row[QStringLiteral("costSource")].toString(),
             row[QStringLiteral("usageSource")].toString(),
             row[QStringLiteral("currency")].toString(),
-            row[QStringLiteral("dataQuality")].toString()};
+            row[QStringLiteral("dataQuality")].toString(),
+            row[QStringLiteral("catalogVersion")].toString(),
+            row[QStringLiteral("priceId")].toString(),
+            row[QStringLiteral("pricingEffectiveFrom")].toString(),
+            row[QStringLiteral("pricingEffectiveTo")].toString(),
+            row[QStringLiteral("sourceFingerprint")].toString(),
+            provenanceJson(row[QStringLiteral("provenance")].toMap()),
+            row[QStringLiteral("estimateStatus")].toString()};
         QStringList escapedFields;
         escapedFields.reserve(fields.size());
         for (const QString &field : fields) {
@@ -2388,7 +2549,7 @@ QString UsageDatabase::exportJson(const QString &provider,
     }
 
     QJsonObject root;
-    root[QStringLiteral("schemaVersion")] = 5;
+    root[QStringLiteral("schemaVersion")] = 6;
     root[QStringLiteral("provider")] = provider;
     root[QStringLiteral("from")] = from.toString(Qt::ISODate);
     root[QStringLiteral("to")] = to.toString(Qt::ISODate);
@@ -2424,7 +2585,7 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
         const QString jsonPath = dir.filePath(QStringLiteral("ai-usage-export-%1.json").arg(timestamp));
         QSaveFile jsonFile(jsonPath);
         if (jsonFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            jsonFile.write("{\n  \"schemaVersion\": 5,\n  \"exportedAt\": ");
+            jsonFile.write("{\n  \"schemaVersion\": 6,\n  \"exportedAt\": ");
             const QByteArray exportedAt
                 = QJsonDocument(QJsonArray { QDateTime::currentDateTimeUtc().toString(Qt::ISODate) })
                       .toJson(QJsonDocument::Compact);
@@ -2456,7 +2617,10 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                                     "request_count,cost,is_estimated_cost,"
                                                     "daily_cost,monthly_cost,rl_requests,rl_requests_"
                                                     "remaining,rl_tokens,rl_tokens_remaining,"
-                                                    "cost_source,usage_source,currency,data_quality FROM "
+                                                    "cost_source,usage_source,currency,data_quality,"
+                                                    "catalog_version,price_id,pricing_effective_from_utc,"
+                                                    "pricing_effective_to_utc,source_fingerprint,provenance_json,"
+                                                    "estimate_status FROM "
                                                     "usage_snapshots ORDER BY id"));
             if (providersOk)
                 streamJsonRows(providerQuery);
@@ -2475,7 +2639,9 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                                        "COALESCE(service_tier_scope,'')<>'' OR "
                                                        "COALESCE(line_item_scope,'')<>'' THEN 'scoped' ELSE scope END AS scope,"
                                                        "window,'' AS model_scope,'' AS project_scope,"
-                                                       "reset_at_utc,correlation_id "
+                                                       "reset_at_utc,correlation_id,catalog_version,price_id,"
+                                                       "pricing_effective_from_utc,pricing_effective_to_utc,"
+                                                       "source_fingerprint,provenance_json,estimate_status "
                                                        "FROM observations ORDER BY id"));
             if (observationsOk)
                 streamJsonRows(observationQuery);
@@ -2520,7 +2686,9 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
             observationsFile.write(
                 "provider,observed_at,interval_start,interval_end,metric_kind,unit,"
                 "value,currency,semantic,source,data_quality,scope,window,model_"
-                "scope,project_scope,reset_at,correlation_id\r\n");
+                "scope,project_scope,reset_at,correlation_id,catalog_version,price_id,"
+                "pricing_effective_from_utc,pricing_effective_to_utc,source_fingerprint,"
+                "provenance_json,estimate_status\r\n");
             QSqlQuery query(m_db);
             query.setForwardOnly(true);
             const bool queryOk = query.exec(QStringLiteral(
@@ -2531,11 +2699,13 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                 "COALESCE(model_scope,'')<>'' OR COALESCE(project_scope,'')<>'' OR "
                 "COALESCE(service_tier_scope,'')<>'' OR COALESCE(line_item_scope,'')<>'' "
                 "THEN 'scoped' ELSE scope END AS scope,window,'' AS model_scope,"
-                "'' AS project_scope,reset_at_utc,correlation_id FROM "
+                "'' AS project_scope,reset_at_utc,correlation_id,catalog_version,price_id,"
+                "pricing_effective_from_utc,pricing_effective_to_utc,source_fingerprint,"
+                "provenance_json,estimate_status FROM "
                 "observations ORDER BY id"));
             while (queryOk && query.next()) {
                 QStringList fields;
-                for (int i = 0; i < 17; ++i)
+                for (int i = 0; i < 24; ++i)
                     fields.append(csvField(query.value(i).toString()));
                 observationsFile.write(
                     (fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
@@ -2584,7 +2754,9 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                "request_count,cost,is_estimated_cost,"
                                "daily_cost,monthly_cost,rl_requests,rl_requests_"
                                "remaining,rl_tokens,rl_tokens_remaining,"
-                               "cost_source,usage_source,currency,data_quality\r\n");
+                               "cost_source,usage_source,currency,data_quality,catalog_version,"
+                               "price_id,pricing_effective_from_utc,pricing_effective_to_utc,"
+                               "source_fingerprint,provenance_json,estimate_status\r\n");
             QSqlQuery query(m_db);
             query.setForwardOnly(true);
             const bool queryOk = query.exec(
@@ -2593,11 +2765,14 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                "request_count,cost,is_estimated_cost,"
                                "daily_cost,monthly_cost,rl_requests,rl_requests_"
                                "remaining,rl_tokens,rl_tokens_remaining,"
-                               "cost_source,usage_source,currency,data_quality FROM "
+                               "cost_source,usage_source,currency,data_quality,"
+                               "catalog_version,price_id,pricing_effective_from_utc,"
+                               "pricing_effective_to_utc,source_fingerprint,provenance_json,"
+                               "estimate_status FROM "
                                "usage_snapshots ORDER BY id"));
             while (queryOk && query.next()) {
                 QStringList fields;
-                for (int i = 0; i < 18; ++i)
+                for (int i = 0; i < 25; ++i)
                     fields.append(csvField(query.value(i).toString()));
                 providerFile.write(
                     (fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());

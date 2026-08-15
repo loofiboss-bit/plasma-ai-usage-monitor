@@ -289,7 +289,7 @@
             <default></default>
         </entry>
 
-        <!-- Catalog v6 descriptor-driven providers -->
+        <!-- Catalog v7 descriptor-driven providers -->
         <entry name="litellmEnabled" type="Bool"><default>false</default></entry>
         <entry name="litellmModel" type="String"><default>gateway-default</default></entry>
         <entry name="litellmCustomBaseUrl" type="String"><default></default></entry>

@@ -1,0 +1,55 @@
+name: Provider catalog drift
+
+on:
+  schedule:
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 1 }
+      - id: drift
+        name: Audit catalog and official sources
+        shell: bash
+        run: |
+          set +e
+          python3 scripts/check_catalog_drift.py --network --strict-review \
+            --format markdown --output catalog-drift-report.md
+          status=$?
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: provider-catalog-drift-report
+          path: catalog-drift-report.md
+          if-no-files-found: error
+      - name: Update the single maintainer issue
+        if: steps.drift.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          title="Provider catalog drift requires review"
+          number="$(gh issue list --state open --search "${title} in:title" --json number --jq '.[0].number')"
+          if [[ -n "$number" ]]; then
+            gh issue edit "$number" --title "$title" --body-file catalog-drift-report.md
+          else
+            gh issue create --title "$title" --body-file catalog-drift-report.md
+          fi
+      - name: Close a recovered maintainer issue
+        if: steps.drift.outputs.status == '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          number="$(gh issue list --state open --search "Provider catalog drift requires review in:title" --json number --jq '.[0].number')"
+          if [[ -n "$number" ]]; then
+            gh issue close "$number" --comment "The scheduled catalog audit is green again."
+          fi

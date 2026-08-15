@@ -88,6 +88,8 @@ QString costScope(const QString &lineItem)
 OpenAIProvider::OpenAIProvider(QObject *parent)
     : ProviderBackend(parent)
 {
+    registerCatalogPricing(QStringLiteral("openai"));
+    setPricingModel(m_model);
 }
 
 QString OpenAIProvider::projectId() const { return m_projectId; }
@@ -104,6 +106,7 @@ void OpenAIProvider::setModel(const QString &model)
 {
     if (m_model != model) {
         m_model = model;
+        setPricingModel(m_model);
         Q_EMIT modelChanged();
     }
 }

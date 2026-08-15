@@ -591,6 +591,12 @@ QVariantMap DailyStateModel::buildRow(const QVariantMap &readiness,
       {QStringLiteral("costAvailable"), false},
       {QStringLiteral("costValue"), QVariant()},
       {QStringLiteral("costSource"), QStringLiteral("unknown")},
+      {QStringLiteral("costProvenance"), QVariantMap()},
+      {QStringLiteral("pricingModel"), QString()},
+      {QStringLiteral("pricingModality"), QString()},
+      {QStringLiteral("pricingServiceTier"), QString()},
+      {QStringLiteral("pricingRegion"), QString()},
+      {QStringLiteral("pricingRoute"), QString()},
       {QStringLiteral("budgetAvailable"), false},
       {QStringLiteral("budgetPercentUsed"), QVariant()},
       {QStringLiteral("quotaWindows"), QVariantList()},
@@ -624,6 +630,12 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
   row.insert(QStringLiteral("quotaWindows"),
              providerQuotas(backend->metrics()));
   row.insert(QStringLiteral("detailMetrics"), backend->metrics());
+  row.insert(QStringLiteral("costProvenance"), backend->costProvenance());
+  row.insert(QStringLiteral("pricingModel"), backend->pricingModel());
+  row.insert(QStringLiteral("pricingModality"), backend->pricingModality());
+  row.insert(QStringLiteral("pricingServiceTier"), backend->pricingServiceTier());
+  row.insert(QStringLiteral("pricingRegion"), backend->pricingRegion());
+  row.insert(QStringLiteral("pricingRoute"), backend->pricingRoute());
   row.insert(
       QStringLiteral("_actualQuota"),
       bestQuota(row.value(QStringLiteral("quotaWindows")).toList(), true));

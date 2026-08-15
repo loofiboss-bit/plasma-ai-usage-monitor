@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "2026.07.18",
-  "release": "18.0.0",
+  "release": "19.0.0",
   "lastReviewed": "2026-07-18",
   "runtimeScraping": false,
   "notes": "Static local metadata for shipped subscription defaults. Live local-auth, local-daemon, or browser sync may override presets with actual account data. Do not scrape vendor pages at runtime. Entries were re-reviewed on 2026-07-18; review/conflict flags include user-visible reasons in Diagnostics.",

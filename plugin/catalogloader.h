@@ -2,6 +2,7 @@
 #define CATALOGLOADER_H
 
 #include <QJsonObject>
+#include <QDateTime>
 #include <QObject>
 #include <QStringList>
 #include <QVariantList>
@@ -21,6 +22,12 @@ class CatalogLoader : public QObject
     Q_PROPERTY(int sourceConflictCount READ sourceConflictCount NOTIFY statusChanged)
     Q_PROPERTY(QVariantList reviewItems READ reviewItems NOTIFY statusChanged)
     Q_PROPERTY(QString catalogPath READ catalogPath NOTIFY statusChanged)
+    Q_PROPERTY(QString sourceFingerprint READ sourceFingerprint NOTIFY statusChanged)
+    Q_PROPERTY(QString verificationState READ verificationState NOTIFY statusChanged)
+    Q_PROPERTY(qint64 sequence READ sequence NOTIFY statusChanged)
+    Q_PROPERTY(QString hardExpiresAt READ hardExpiresAt NOTIFY statusChanged)
+    Q_PROPERTY(bool estimatesAllowed READ estimatesAllowed NOTIFY statusChanged)
+    Q_PROPERTY(int freshnessSloDays READ freshnessSloDays NOTIFY statusChanged)
     Q_PROPERTY(QStringList diagnostics READ diagnostics NOTIFY statusChanged)
 
 public:
@@ -39,6 +46,12 @@ public:
     int sourceConflictCount() const;
     QVariantList reviewItems() const;
     QString catalogPath() const;
+    QString sourceFingerprint() const;
+    QString verificationState() const;
+    qint64 sequence() const;
+    QString hardExpiresAt() const;
+    bool estimatesAllowed() const;
+    int freshnessSloDays() const;
     QStringList diagnostics() const;
 
 Q_SIGNALS:
@@ -64,6 +77,12 @@ private:
     int m_sourceConflictCount = 0;
     QVariantList m_reviewItems;
     QString m_catalogPath;
+    QString m_sourceFingerprint;
+    QString m_verificationState;
+    qint64 m_sequence = 0;
+    QString m_hardExpiresAt;
+    bool m_estimatesAllowed = true;
+    int m_freshnessSloDays = 30;
     QStringList m_diagnostics;
     QJsonObject m_root;
 };

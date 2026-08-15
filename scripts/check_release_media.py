@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the canonical v18 screenshot set and its capture manifest."""
+"""Validate the canonical release screenshot set and its capture manifest."""
 
 from __future__ import annotations
 

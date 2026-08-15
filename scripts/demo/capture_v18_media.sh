@@ -17,7 +17,7 @@ if [[ "${AI_USAGE_V18_CAPTURE_INNER:-0}" != "1" ]]; then
       find "$VIRTUAL_ROOT" -depth -delete
     fi
   }
-  trap cleanup_virtual EXIT
+  trap 'cleanup_virtual' EXIT
   dbus-run-session -- env \
     AI_USAGE_V18_CAPTURE_INNER=1 \
     AI_USAGE_V18_BUILD_DIR="$CAPTURE_BUILD_DIR" \
@@ -542,6 +542,13 @@ SOURCE_TREE_SHA="$(
       done \
     | sha256sum | cut -d' ' -f1
 )"
+RELEASE_VERSION="$(
+  if [[ -f "$ROOT_DIR/RELEASE_TARGET" ]]; then
+    cat "$ROOT_DIR/RELEASE_TARGET"
+  else
+    cat "$ROOT_DIR/VERSION"
+  fi
+)"
 CAPTURE_COMMIT="${CAPTURE_COMMIT:-$(git -C "$ROOT_DIR" rev-parse HEAD)}"
 SOURCE_TREE_COMMIT="${SOURCE_TREE_COMMIT:-$CAPTURE_COMMIT}"
 SOURCE_TREE_MODE="git-commit"
@@ -564,7 +571,7 @@ CAPTURE_EVIDENCE="$(
 )"
 
 jq -n \
-  --arg version "$(<"$ROOT_DIR/RELEASE_TARGET")" \
+  --arg version "$RELEASE_VERSION" \
   --arg sessionId "$SESSION_ID" \
   --arg fixtureSha256 "$FIXTURE_SHA" \
   --arg sourceTreeSha256 "$SOURCE_TREE_SHA" \

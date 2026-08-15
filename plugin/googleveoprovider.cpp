@@ -37,15 +37,13 @@ double extractDurationSeconds(const QJsonObject &payload)
         qMax(readPositive(metadata, "duration_seconds"), readPositive(metadata, "generated_seconds")));
 }
 
-double modelCostPerSecond(const QString &model)
-{
-    return ProviderPricingCatalog::instance()->amountForModelUnit(QStringLiteral("googleveo"), model, QStringLiteral("video_second"));
-}
 } // namespace
 
 GoogleVeoProvider::GoogleVeoProvider(QObject *parent)
     : ProviderBackend(parent)
 {
+    registerCatalogPricing(QStringLiteral("googleveo"));
+    setPricingModel(m_model);
 }
 
 QString GoogleVeoProvider::model() const { return m_model; }
@@ -53,6 +51,7 @@ void GoogleVeoProvider::setModel(const QString &model)
 {
     if (m_model != model) {
         m_model = model;
+        setPricingModel(m_model);
         Q_EMIT modelChanged();
     }
 }
@@ -169,8 +168,19 @@ void GoogleVeoProvider::onModelInfoReply(QNetworkReply *reply)
         } else {
             const double durationSeconds = extractDurationSeconds(doc.object());
             if (durationSeconds > 0.0) {
-                setEstimatedCost(durationSeconds * modelCostPerSecond(m_model));
-                setDataQuality(QStringLiteral("estimated"));
+                const QVariantMap estimate = ProviderPricingCatalog::instance()->estimateCost(
+                    QStringLiteral("googleveo"), m_model,
+                    QVariantMap{{QStringLiteral("unitUsage"),
+                                 QVariantMap{{QStringLiteral("video_second"), durationSeconds}}},
+                                {QStringLiteral("observedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}});
+                if (estimate.value(QStringLiteral("available")).toBool()) {
+                    setCurrency(estimate.value(QStringLiteral("currency")).toString());
+                    setEstimatedCost(estimate.value(QStringLiteral("amount")).toDouble(), estimate);
+                } else {
+                    clearProviderMetric(MetricKind::Cost, QStringLiteral("api_key"), QStringLiteral("current"));
+                    setCostSource(QStringLiteral("pricing_unavailable"));
+                    setDataQuality(QStringLiteral("pricing-unavailable"));
+                }
             } else {
                 clearProviderMetric(MetricKind::Cost, QStringLiteral("api_key"), QStringLiteral("current"));
                 setCostSource(QStringLiteral("unknown"));

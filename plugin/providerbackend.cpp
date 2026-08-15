@@ -1,4 +1,5 @@
 #include "providerbackend.h"
+#include "costengine.h"
 #include "providerpricingcatalog.h"
 #include <QDate>
 #include <QUrl>
@@ -25,6 +26,11 @@ ProviderBackend::NormalizedUsageCost normalizeOpenAiLikeUsage(const QJsonObject 
 
     normalized.parsed = true;
     normalized.inputTokens = promptTokens;
+    const QJsonObject promptDetails = usage.value(QStringLiteral("prompt_tokens_details")).toObject();
+    normalized.cacheReadInputTokens = usage.value(QStringLiteral("cache_read_input_tokens"))
+        .toInteger(promptDetails.value(QStringLiteral("cached_tokens")).toInteger(0));
+    normalized.cacheCreationInputTokens = usage.value(QStringLiteral("cache_creation_input_tokens"))
+        .toInteger(usage.value(QStringLiteral("cache_write_input_tokens")).toInteger(0));
     normalized.outputTokens = completionTokens > 0 ? completionTokens : qMax<qint64>(0, totalTokens - promptTokens);
     normalized.requestCount = 1;
 
@@ -331,6 +337,8 @@ void ProviderBackend::clearError()
 qint64 ProviderBackend::inputTokens() const { return m_inputTokens; }
 qint64 ProviderBackend::outputTokens() const { return m_outputTokens; }
 qint64 ProviderBackend::totalTokens() const { return m_inputTokens + m_outputTokens; }
+qint64 ProviderBackend::cacheReadInputTokens() const { return m_cacheReadInputTokens; }
+qint64 ProviderBackend::cacheCreationInputTokens() const { return m_cacheCreationInputTokens; }
 int ProviderBackend::requestCount() const { return m_requestCount; }
 double ProviderBackend::cost() const { return m_cost; }
 bool ProviderBackend::isEstimatedCost() const { return m_isEstimatedCost; }
@@ -346,6 +354,12 @@ QString ProviderBackend::costSource() const { return m_costSource; }
 QString ProviderBackend::usageSource() const { return m_usageSource; }
 QString ProviderBackend::currency() const { return m_currency; }
 QString ProviderBackend::dataQuality() const { return m_dataQuality; }
+QVariantMap ProviderBackend::costProvenance() const { return m_costProvenance; }
+QString ProviderBackend::pricingModel() const { return m_pricingModel; }
+QString ProviderBackend::pricingModality() const { return m_pricingModality; }
+QString ProviderBackend::pricingServiceTier() const { return m_pricingServiceTier; }
+QString ProviderBackend::pricingRegion() const { return m_pricingRegion; }
+QString ProviderBackend::pricingRoute() const { return m_pricingRoute; }
 QVariantList ProviderBackend::metrics() const { return m_metrics; }
 QVariantMap ProviderBackend::capabilityStatus() const { return m_capabilityStatus; }
 
@@ -367,12 +381,34 @@ void ProviderBackend::setInputTokens(qint64 tokens)
 {
     m_inputTokens = tokens;
     m_actualInputTokens = tokens;
+    if (!m_pricingModel.isEmpty()) updateEstimatedCost(m_pricingModel);
+}
+
+void ProviderBackend::setCacheReadInputTokens(qint64 tokens)
+{
+    m_cacheReadInputTokens = qMax<qint64>(0, tokens);
+    setProviderMetric(MetricKind::CacheReadInputTokens, m_cacheReadInputTokens,
+                      QStringLiteral("token"), QString(), QStringLiteral("api_key"),
+                      QStringLiteral("current"), MetricSource::UsageApi,
+                      QStringLiteral("actual"));
+    if (!m_pricingModel.isEmpty()) updateEstimatedCost(m_pricingModel);
+}
+
+void ProviderBackend::setCacheCreationInputTokens(qint64 tokens)
+{
+    m_cacheCreationInputTokens = qMax<qint64>(0, tokens);
+    setProviderMetric(MetricKind::CacheCreationInputTokens, m_cacheCreationInputTokens,
+                      QStringLiteral("token"), QString(), QStringLiteral("api_key"),
+                      QStringLiteral("current"), MetricSource::UsageApi,
+                      QStringLiteral("actual"));
+    if (!m_pricingModel.isEmpty()) updateEstimatedCost(m_pricingModel);
 }
 
 void ProviderBackend::setOutputTokens(qint64 tokens)
 {
     m_outputTokens = tokens;
     m_actualOutputTokens = tokens;
+    if (!m_pricingModel.isEmpty()) updateEstimatedCost(m_pricingModel);
 }
 
 void ProviderBackend::setRequestCount(int count)
@@ -395,6 +431,7 @@ void ProviderBackend::setActualUsage(qint64 inputTokens, qint64 outputTokens, in
                       QStringLiteral("api_key"), QStringLiteral("current"), MetricSource::UsageApi, QStringLiteral("actual"));
     setProviderMetric(MetricKind::Requests, m_actualRequestCount, QStringLiteral("request"), QString(),
                       QStringLiteral("api_key"), QStringLiteral("current"), MetricSource::UsageApi, QStringLiteral("actual"));
+    if (!m_pricingModel.isEmpty()) updateEstimatedCost(m_pricingModel);
 }
 
 void ProviderBackend::setProbeUsage(qint64 inputTokens, qint64 outputTokens, int requestCount)
@@ -411,6 +448,7 @@ void ProviderBackend::setCostSource(const QString &source)
         QStringLiteral("billing_api"),
         QStringLiteral("usage_api"),
         QStringLiteral("estimated_from_usage"),
+        QStringLiteral("pricing_unavailable"),
         QStringLiteral("connectivity_probe"),
         QStringLiteral("self_tracked"),
         QStringLiteral("browser_sync"),
@@ -471,7 +509,7 @@ void ProviderBackend::setUsageSource(const QString &source)
 void ProviderBackend::setCurrency(const QString &currency)
 {
     const QString normalized = currency.trimmed().toUpper();
-    const QString next = normalized.isEmpty() ? QStringLiteral("USD") : normalized;
+    const QString next = normalized;
     const bool mismatchBefore = budgetCurrencyMismatch();
     m_currency = next;
     if (mismatchBefore != budgetCurrencyMismatch()) {
@@ -487,7 +525,9 @@ void ProviderBackend::setDataQuality(const QString &quality)
 
 void ProviderBackend::setCost(double cost) {
     m_cost = cost;
+    m_hasActualCost = true;
     m_isEstimatedCost = false;
+    m_costProvenance.clear();
     setCostSource(QStringLiteral("actual_api"));
     setProviderMetric(MetricKind::Cost, cost, m_currency, m_currency, QStringLiteral("api_key"),
                       QStringLiteral("current"), MetricSource::UsageApi, QStringLiteral("actual"));
@@ -683,6 +723,17 @@ void ProviderBackend::setProviderMetric(MetricKind kind,
 {
     const QString kindName = metricKindName(kind);
     const QString sourceName = metricSourceName(source);
+    if (kind == MetricKind::Cost && source != MetricSource::EstimatedPricing
+        && quality == QLatin1String("actual")) {
+        for (qsizetype i = m_metrics.size() - 1; i >= 0; --i) {
+            const QVariantMap current = m_metrics.at(i).toMap();
+            if (current.value(QStringLiteral("kind")).toString() == kindName
+                && current.value(QStringLiteral("source")).toString()
+                       == QLatin1String("estimated_pricing")) {
+                m_metrics.removeAt(i);
+            }
+        }
+    }
     for (qsizetype i = m_metrics.size() - 1; i >= 0; --i) {
         const QVariantMap current = m_metrics.at(i).toMap();
         if (current.value(QStringLiteral("kind")).toString() == kindName
@@ -1143,53 +1194,146 @@ void ProviderBackend::registerModelPricing(const QString &modelName, double inpu
 
 void ProviderBackend::registerCatalogPricing(const QString &providerKey)
 {
-    const QVariantList rows = ProviderPricingCatalog::instance()->tokenModelsForProvider(providerKey);
-    for (const QVariant &rowValue : rows) {
-        const QVariantMap row = rowValue.toMap();
-        const QString id = row.value(QStringLiteral("id")).toString();
-        if (id.isEmpty()) {
-            continue;
-        }
-        registerModelPricing(id,
-                             row.value(QStringLiteral("input")).toDouble(),
-                             row.value(QStringLiteral("output")).toDouble());
-    }
+    m_pricingProviderKey = providerKey.trimmed().toLower();
 }
 
 void ProviderBackend::updateEstimatedCost(const QString &currentModel)
 {
-    // Only estimate if no real cost has been set by a billing API
-    if (!m_isEstimatedCost && m_cost > 0) return;
+    if (m_hasActualCost) return;
 
-    auto it = m_modelPricing.constFind(currentModel);
-    if (it == m_modelPricing.constEnd()) {
-        // Try prefix matching (e.g., "mistral-large-latest" could match "mistral-large")
-        for (auto pit = m_modelPricing.constBegin(); pit != m_modelPricing.constEnd(); ++pit) {
-            if (currentModel.startsWith(pit.key())) {
-                it = pit;
-                break;
-            }
-        }
+    const QString selectedModel = currentModel.trimmed();
+    if (selectedModel.isEmpty()) return;
+    m_pricingModel = selectedModel;
+
+    QVariantMap estimate;
+    if (!m_pricingProviderKey.isEmpty()) {
+        QVariantMap usage{{QStringLiteral("inputTokens"), qMax<qint64>(0, m_inputTokens)},
+                          {QStringLiteral("outputTokens"), qMax<qint64>(0, m_outputTokens)},
+                          {QStringLiteral("requirePricingTimestamp"), true},
+                          {QStringLiteral("observedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}};
+        if (m_cacheReadInputTokens > 0)
+            usage.insert(QStringLiteral("cachedInputTokens"), m_cacheReadInputTokens);
+        if (m_cacheCreationInputTokens > 0)
+            usage.insert(QStringLiteral("cacheWriteTokens"), m_cacheCreationInputTokens);
+        if (!m_pricingModality.isEmpty())
+            usage.insert(QStringLiteral("modality"), m_pricingModality);
+        if (!m_pricingServiceTier.isEmpty())
+            usage.insert(QStringLiteral("serviceTier"), m_pricingServiceTier);
+        if (!m_pricingRegion.isEmpty())
+            usage.insert(QStringLiteral("region"), m_pricingRegion);
+        if (!m_pricingRoute.isEmpty())
+            usage.insert(QStringLiteral("route"), m_pricingRoute);
+        if (m_pricingTimestamp.isValid())
+            usage.insert(QStringLiteral("pricingTimestamp"), m_pricingTimestamp.toString(Qt::ISODateWithMs));
+        estimate = ProviderPricingCatalog::instance()->estimateCost(m_pricingProviderKey,
+                                                                      selectedModel,
+                                                                      usage);
+        estimate.insert(QStringLiteral("providerKey"), m_pricingProviderKey);
+        estimate.insert(QStringLiteral("modelId"), selectedModel);
+        estimate.insert(QStringLiteral("observedAt"), usage.value(QStringLiteral("observedAt")));
+    } else {
+        const auto legacy = m_modelPricing.constFind(selectedModel);
+        if (legacy == m_modelPricing.constEnd()) return;
+        const QVariantMap price{{QStringLiteral("currency"), QStringLiteral("USD")},
+                                {QStringLiteral("unit"), QStringLiteral("1M_tokens")},
+                                {QStringLiteral("input"), legacy->inputPricePerMToken},
+                                {QStringLiteral("output"), legacy->outputPricePerMToken},
+                                {QStringLiteral("priceId"), QStringLiteral("legacy:") + selectedModel},
+                                {QStringLiteral("precision"), QStringLiteral("legacy")}};
+        estimate = CostEngine::estimate(price,
+                                        QVariantMap{{QStringLiteral("inputTokens"), qMax<qint64>(0, m_inputTokens)},
+                                                    {QStringLiteral("outputTokens"), qMax<qint64>(0, m_outputTokens)}},
+                                        QStringLiteral("legacy"));
+        estimate.insert(QStringLiteral("providerKey"), QStringLiteral("legacy"));
+        estimate.insert(QStringLiteral("modelId"), selectedModel);
     }
-    if (it == m_modelPricing.constEnd()) return;
 
-    double inputCost = (static_cast<double>(m_inputTokens) / 1000000.0) * it->inputPricePerMToken;
-    double outputCost = (static_cast<double>(m_outputTokens) / 1000000.0) * it->outputPricePerMToken;
-    double estimatedTotal = inputCost + outputCost;
+    m_costProvenance = estimate;
+    if (!estimate.value(QStringLiteral("available")).toBool()) {
+        m_cost = 0.0;
+        m_dailyCost = 0.0;
+        m_monthlyCost = 0.0;
+        m_isEstimatedCost = false;
+        setCurrency(QString());
+        setCostSource(QStringLiteral("pricing_unavailable"));
+        setDataQuality(QStringLiteral("pricing-unavailable"));
+        setProviderMetric(MetricKind::Cost, QVariant(), QStringLiteral("currency"), QString(),
+                          QStringLiteral("api_key"), QStringLiteral("current"),
+                          MetricSource::EstimatedPricing, QStringLiteral("unavailable"));
+        checkBudgetLimits();
+        return;
+    }
 
-    m_cost = estimatedTotal;
+    const double estimatedTotal = estimate.value(QStringLiteral("amount")).toDouble();
+    m_cost = qMax(0.0, estimatedTotal);
     m_isEstimatedCost = true;
+    m_hasActualCost = false;
+    setCurrency(estimate.value(QStringLiteral("currency")).toString());
     setCostSource(QStringLiteral("estimated_from_usage"));
-    m_dailyCost = estimatedTotal; // Best estimate for daily cost from accumulated tokens
+    setDataQuality(QStringLiteral("estimated"));
+    m_dailyCost = m_cost;
+    m_monthlyCost = m_cost;
+    setProviderMetric(MetricKind::Cost, m_cost, QStringLiteral("currency"), m_currency,
+                      QStringLiteral("api_key"), QStringLiteral("current"),
+                      MetricSource::EstimatedPricing, QStringLiteral("estimated"));
+    for (qsizetype i = m_metrics.size() - 1; i >= 0; --i) {
+        QVariantMap metric = m_metrics.at(i).toMap();
+        if (metric.value(QStringLiteral("kind")).toString() != QLatin1String("cost")) continue;
+        if (metric.value(QStringLiteral("source")).toString() != QLatin1String("estimated_pricing")) continue;
+        metric.insert(QStringLiteral("provenance"), m_costProvenance);
+        m_metrics[i] = metric;
+        Q_EMIT metricsChanged();
+        break;
+    }
     checkBudgetLimits();
 }
 
-void ProviderBackend::setEstimatedCost(double cost)
+void ProviderBackend::setEstimatedCost(double cost, const QVariantMap &provenance)
 {
     m_cost = qMax(0.0, cost);
+    m_hasActualCost = false;
     m_isEstimatedCost = true;
+    m_costProvenance = provenance;
     setCostSource(QStringLiteral("estimated_from_usage"));
+    setDataQuality(QStringLiteral("estimated"));
+    setProviderMetric(MetricKind::Cost, m_cost, QStringLiteral("currency"), m_currency,
+                      QStringLiteral("api_key"), QStringLiteral("current"),
+                      MetricSource::EstimatedPricing, QStringLiteral("estimated"));
     m_dailyCost = m_cost;
     m_monthlyCost = m_cost;
     checkBudgetLimits();
+}
+
+void ProviderBackend::setPricingModel(const QString &model)
+{
+    const QString normalized = model.trimmed();
+    if (m_pricingModel == normalized) return;
+    m_pricingModel = normalized;
+    Q_EMIT dataUpdated();
+}
+
+void ProviderBackend::setPricingDimensions(const QString &modality,
+                                           const QString &serviceTier,
+                                           const QString &region,
+                                           const QString &route,
+                                           const QDateTime &pricingTimestamp)
+{
+    const QString nextModality = modality.trimmed().toLower();
+    const QString nextServiceTier = serviceTier.trimmed().toLower();
+    const QString nextRegion = region.trimmed();
+    const QString nextRoute = route.trimmed();
+    const QDateTime nextTimestamp = pricingTimestamp.isValid()
+        ? pricingTimestamp.toUTC() : QDateTime();
+    if (m_pricingModality == nextModality && m_pricingServiceTier == nextServiceTier
+        && m_pricingRegion == nextRegion && m_pricingRoute == nextRoute
+        && m_pricingTimestamp == nextTimestamp) {
+        return;
+    }
+    m_pricingModality = nextModality;
+    m_pricingServiceTier = nextServiceTier;
+    m_pricingRegion = nextRegion;
+    m_pricingRoute = nextRoute;
+    m_pricingTimestamp = nextTimestamp;
+    if (!m_pricingModel.isEmpty()) updateEstimatedCost(m_pricingModel);
+    Q_EMIT dataUpdated();
 }

@@ -198,8 +198,11 @@ Item {
         // v13 writes the nullable typed contract for every provider.  The old
         // snapshot table remains a compatibility projection and is updated
         // only when all of its non-nullable core fields are genuinely known.
+        var costProvenance = backend.costProvenance || {};
+        var hasCostStatus = costMetric.available
+                || Object.keys(costProvenance).length > 0;
         if (inputMetric.available && outputMetric.available
-                && requestsMetric.available && costMetric.available) {
+                && requestsMetric.available && hasCostStatus) {
             usageDatabase.recordSnapshot(
                 providerName,
                 backend.inputTokens,
@@ -216,8 +219,9 @@ Item {
                 backend.isEstimatedCost,
                 backend.costSource || "unknown",
                 backend.usageSource || "unknown",
-                backend.currency || "USD",
-                backend.dataQuality || "unknown"
+                backend.currency || "",
+                backend.dataQuality || "unknown",
+                costProvenance
             );
         }
         if (backend.metrics !== undefined && backend.metrics.length > 0) {

@@ -70,13 +70,24 @@ def main() -> None:
     except json.JSONDecodeError as exc:
         fail(f"invalid JSON: {exc}")
 
-    if catalog.get("schemaVersion") != 6:
-        fail("schemaVersion must be 6")
+    if catalog.get("schemaVersion") != 7:
+        fail("schemaVersion must be 7")
     if catalog.get("runtimeScraping") is not False:
         fail("runtimeScraping must be false")
+    if not isinstance(catalog.get("sequence"), int) or catalog["sequence"] < 1:
+        fail("sequence must be a positive integer")
+    try:
+        from datetime import datetime, timezone
+        hard_expiry = datetime.fromisoformat(str(catalog.get("hardExpiresAt", "")).replace("Z", "+00:00"))
+    except ValueError:
+        fail("hardExpiresAt must be an ISO timestamp")
+    if hard_expiry <= datetime.now(timezone.utc):
+        fail("hardExpiresAt is expired")
+    if catalog.get("freshnessSloDays") != 30:
+        fail("freshnessSloDays must be 30")
 
     reviewed_date = require_iso_date(str(catalog.get("lastReviewed", "")), "lastReviewed")
-    if (date.today() - reviewed_date).days > 45:
+    if (date.today() - reviewed_date).days > 30:
         fail(f"catalog lastReviewed is stale: {reviewed_date}")
 
     providers = catalog.get("providers")
@@ -208,12 +219,15 @@ def main() -> None:
                 fail(f"{key}/{model_id} missing pricing")
             if "precision" not in pricing:
                 fail(f"{key}/{model_id} pricing.precision missing")
-            if pricing.get("precision") not in {"official_exact", "official_range", "derived", "unknown"}:
-                fail(f"{key}/{model_id} pricing.precision is not a v5 precision value")
+            if pricing.get("precision") not in {"official_exact", "official_range", "derived", "unknown", "unavailable"}:
+                fail(f"{key}/{model_id} pricing.precision is not a v7 precision value")
 
             status = pricing.get("status")
             unit = pricing.get("unit")
-            if unit in TOKEN_UNITS:
+            if status in {"unknown", "not_applicable"}:
+                if pricing.get("input") == 0.0 and pricing.get("output") == 0.0:
+                    fail(f"{key}/{model_id} unknown pricing must not fake 0.0 token pricing")
+            elif unit in TOKEN_UNITS:
                 if "input" not in pricing or "output" not in pricing:
                     fail(f"{key}/{model_id} token pricing must include input and output")
                 for field in ("input", "output", "cachedInput"):
@@ -227,7 +241,7 @@ def main() -> None:
                     fail(f"{key}/{model_id} pricing.additiveFees must be a list")
                 if "batchDiscountPercent" in pricing and not 0 <= pricing["batchDiscountPercent"] <= 100:
                     fail(f"{key}/{model_id} pricing.batchDiscountPercent must be 0..100")
-            elif unit in NON_TOKEN_UNITS or status in {"unknown", "not_applicable"}:
+            elif unit in NON_TOKEN_UNITS:
                 if pricing.get("input") == 0.0 and pricing.get("output") == 0.0:
                     fail(f"{key}/{model_id} non-token pricing must not fake 0.0 token pricing")
             else:

@@ -19,6 +19,7 @@ QString capabilityName(AnthropicProvider::AdminCapability capability) {
 AnthropicProvider::AnthropicProvider(QObject *parent)
     : ProviderBackend(parent) {
   registerCatalogPricing(QStringLiteral("anthropic"));
+  setPricingModel(m_model);
 }
 
 QString AnthropicProvider::model() const { return m_model; }
@@ -27,6 +28,7 @@ void AnthropicProvider::setModel(const QString &model) {
   if (m_model == model)
     return;
   m_model = model;
+  setPricingModel(m_model);
   Q_EMIT modelChanged();
 }
 
@@ -429,6 +431,8 @@ void AnthropicProvider::publishUsage(bool stale) {
                       period.start, period.end);
   }
   setInputTokens(input + cacheRead + cacheCreation);
+  setCacheReadInputTokens(cacheRead);
+  setCacheCreationInputTokens(cacheCreation);
   setOutputTokens(output);
   setProviderMetric(MetricKind::InputTokens, input + cacheRead + cacheCreation,
                     QStringLiteral("token"), QString(),

@@ -57,6 +57,8 @@ class ProviderBackend : public QObject
     Q_PROPERTY(qint64 inputTokens READ inputTokens NOTIFY dataUpdated)
     Q_PROPERTY(qint64 outputTokens READ outputTokens NOTIFY dataUpdated)
     Q_PROPERTY(qint64 totalTokens READ totalTokens NOTIFY dataUpdated)
+    Q_PROPERTY(qint64 cacheReadInputTokens READ cacheReadInputTokens NOTIFY dataUpdated)
+    Q_PROPERTY(qint64 cacheCreationInputTokens READ cacheCreationInputTokens NOTIFY dataUpdated)
     Q_PROPERTY(int requestCount READ requestCount NOTIFY dataUpdated)
     Q_PROPERTY(double cost READ cost NOTIFY dataUpdated)
     Q_PROPERTY(bool isEstimatedCost READ isEstimatedCost NOTIFY dataUpdated)
@@ -72,6 +74,12 @@ class ProviderBackend : public QObject
     Q_PROPERTY(QString usageSource READ usageSource NOTIFY dataUpdated)
     Q_PROPERTY(QString currency READ currency NOTIFY dataUpdated)
     Q_PROPERTY(QString dataQuality READ dataQuality NOTIFY dataUpdated)
+    Q_PROPERTY(QVariantMap costProvenance READ costProvenance NOTIFY dataUpdated)
+    Q_PROPERTY(QString pricingModel READ pricingModel NOTIFY dataUpdated)
+    Q_PROPERTY(QString pricingModality READ pricingModality NOTIFY dataUpdated)
+    Q_PROPERTY(QString pricingServiceTier READ pricingServiceTier NOTIFY dataUpdated)
+    Q_PROPERTY(QString pricingRegion READ pricingRegion NOTIFY dataUpdated)
+    Q_PROPERTY(QString pricingRoute READ pricingRoute NOTIFY dataUpdated)
     Q_PROPERTY(QVariantList metrics READ metrics NOTIFY metricsChanged)
     Q_PROPERTY(QVariantMap capabilityStatus READ capabilityStatus NOTIFY capabilityStatusChanged)
 
@@ -206,6 +214,8 @@ public:
     struct NormalizedUsageCost {
         bool parsed = false;
         qint64 inputTokens = 0;
+        qint64 cacheReadInputTokens = 0;
+        qint64 cacheCreationInputTokens = 0;
         qint64 outputTokens = 0;
         int requestCount = 0;
         double cost = 0.0;
@@ -254,6 +264,8 @@ public:
     qint64 inputTokens() const;
     qint64 outputTokens() const;
     qint64 totalTokens() const;
+    qint64 cacheReadInputTokens() const;
+    qint64 cacheCreationInputTokens() const;
     int requestCount() const;
     double cost() const;
     bool isEstimatedCost() const;
@@ -269,6 +281,12 @@ public:
     QString usageSource() const;
     QString currency() const;
     QString dataQuality() const;
+    QVariantMap costProvenance() const;
+    QString pricingModel() const;
+    QString pricingModality() const;
+    QString pricingServiceTier() const;
+    QString pricingRegion() const;
+    QString pricingRoute() const;
     QVariantList metrics() const;
     QVariantMap capabilityStatus() const;
     Q_INVOKABLE QVariantMap metric(const QString &kind,
@@ -393,6 +411,8 @@ protected:
 
     // Data setters for subclasses
     void setInputTokens(qint64 tokens);
+    void setCacheReadInputTokens(qint64 tokens);
+    void setCacheCreationInputTokens(qint64 tokens);
     void setOutputTokens(qint64 tokens);
     void setRequestCount(int count);
     void setActualUsage(qint64 inputTokens, qint64 outputTokens, int requestCount);
@@ -402,7 +422,13 @@ protected:
     void setCurrency(const QString &currency);
     void setDataQuality(const QString &quality);
     void setCost(double cost);
-    void setEstimatedCost(double cost);
+    void setEstimatedCost(double cost, const QVariantMap &provenance = {});
+    void setPricingModel(const QString &model);
+    void setPricingDimensions(const QString &modality = QString(),
+                              const QString &serviceTier = QString(),
+                              const QString &region = QString(),
+                              const QString &route = QString(),
+                              const QDateTime &pricingTimestamp = QDateTime());
     void setDailyCost(double cost);
     void setMonthlyCost(double cost);
     void setRateLimitRequests(int limit);
@@ -479,6 +505,8 @@ private:
     int m_cancellationCount = 0;
 
     qint64 m_inputTokens = 0;
+    qint64 m_cacheReadInputTokens = 0;
+    qint64 m_cacheCreationInputTokens = 0;
     qint64 m_outputTokens = 0;
     int m_requestCount = 0;
     qint64 m_actualInputTokens = 0;
@@ -492,7 +520,7 @@ private:
     double m_monthlyCost = 0.0;
     QString m_costSource = QStringLiteral("unknown");
     QString m_usageSource = QStringLiteral("unknown");
-    QString m_currency = QStringLiteral("USD");
+    QString m_currency;
     QString m_dataQuality = QStringLiteral("unknown");
     QVariantList m_metrics;
 
@@ -511,6 +539,15 @@ private:
     int m_refreshCount = 0;
     bool m_wasConnected = false; // for disconnect/reconnect tracking
     bool m_isEstimatedCost = false;
+    bool m_hasActualCost = false;
+    QVariantMap m_costProvenance;
+    QString m_pricingProviderKey;
+    QString m_pricingModel;
+    QString m_pricingModality;
+    QString m_pricingServiceTier;
+    QString m_pricingRegion;
+    QString m_pricingRoute;
+    QDateTime m_pricingTimestamp;
 
     int m_generation = 0; // incremented on each refresh() to discard stale replies
     QList<QNetworkReply *> m_activeReplies; // tracked for cancellation

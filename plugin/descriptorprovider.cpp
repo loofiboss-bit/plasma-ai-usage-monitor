@@ -1,5 +1,7 @@
 #include "descriptorprovider.h"
 
+#include "providerpricingcatalog.h"
+
 #include <KLocalizedString>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -14,6 +16,15 @@ DescriptorProvider::DescriptorProvider(const QVariantMap &descriptor, QObject *p
 {
     const QVariantList models = descriptor.value(QStringLiteral("models")).toList();
     if (!models.isEmpty()) m_model = models.first().toMap().value(QStringLiteral("id")).toString();
+    const QString adapterType = descriptor.value(QStringLiteral("adapterType")).toString();
+    const bool supportsLocalPricing = descriptor.value(QStringLiteral("capabilities")).toList()
+        .contains(QStringLiteral("cost"));
+    // Gateway usage is authoritative billing data. Do not create an
+    // unavailable estimated row before the actual mixed-currency rows arrive.
+    if (supportsLocalPricing && adapterType != QLatin1String("gateway_usage")) {
+        registerCatalogPricing(providerId());
+    }
+    setPricingModel(m_model);
     for (const QVariant &model : models) {
         QVariantMap row = model.toMap();
         row.insert(QStringLiteral("discoverySource"), QStringLiteral("shipped_catalog"));
@@ -39,6 +50,7 @@ void DescriptorProvider::setModel(const QString &model)
 {
     if (m_model == model) return;
     m_model = model;
+    setPricingModel(m_model);
     Q_EMIT modelChanged();
 }
 

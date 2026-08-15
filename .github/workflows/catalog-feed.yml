@@ -1,0 +1,74 @@
+name: Publish signed provider catalog feed
+
+on:
+  workflow_dispatch:
+    inputs:
+      sequence:
+        description: "Monotonic catalog sequence"
+        required: true
+        type: string
+      expires_at:
+        description: "Envelope expiry, for example 2026-09-30T00:00:00Z"
+        required: true
+        type: string
+      min_app_version:
+        description: "Minimum compatible app version"
+        required: true
+        default: "19.0.0"
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  sign-and-publish:
+    environment: catalog-feed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 1 }
+      - name: Sign the reviewed catalog
+        env:
+          CATALOG_FEED_SIGNING_KEY: ${{ secrets.CATALOG_FEED_SIGNING_KEY }}
+          SEQUENCE: ${{ inputs.sequence }}
+          EXPIRES_AT: ${{ inputs.expires_at }}
+          MIN_APP_VERSION: ${{ inputs.min_app_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CATALOG_FEED_SIGNING_KEY"
+          umask 077
+          key_path="$RUNNER_TEMP/catalog-feed-key.pem"
+          printf '%s' "$CATALOG_FEED_SIGNING_KEY" > "$key_path"
+          mkdir -p "$RUNNER_TEMP/catalog-feed"
+          python3 scripts/sign_catalog_feed.py \
+            --key "$key_path" \
+            --sequence "$SEQUENCE" \
+            --expires-at "$EXPIRES_AT" \
+            --min-app-version "$MIN_APP_VERSION" \
+            --output "$RUNNER_TEMP/catalog-feed/providers-v4.json"
+          rm -f "$key_path"
+      - name: Publish feed to the protected raw GitHub branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          feed_branch="catalog-feed"
+          base_sha="$(gh api "repos/${REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          if ! gh api "repos/${REPOSITORY}/git/ref/heads/${feed_branch}" >/dev/null 2>&1; then
+            gh api --method POST "repos/${REPOSITORY}/git/refs" \
+              -f "ref=refs/heads/${feed_branch}" -f "sha=${base_sha}" >/dev/null
+          fi
+          content="$(base64 -w0 "$RUNNER_TEMP/catalog-feed/providers-v4.json")"
+          existing_sha="$(gh api "repos/${REPOSITORY}/contents/catalog-feed/providers-v4.json?ref=${feed_branch}" --jq '.sha' 2>/dev/null || true)"
+          if [[ -n "$existing_sha" ]]; then
+            gh api --method PUT "repos/${REPOSITORY}/contents/catalog-feed/providers-v4.json" \
+              -f message="chore(catalog): publish signed sequence ${{ inputs.sequence }}" \
+              -f branch="$feed_branch" -f content="$content" -f sha="$existing_sha" >/dev/null
+          else
+            gh api --method PUT "repos/${REPOSITORY}/contents/catalog-feed/providers-v4.json" \
+              -f message="chore(catalog): publish signed sequence ${{ inputs.sequence }}" \
+              -f branch="$feed_branch" -f content="$content" >/dev/null
+          fi

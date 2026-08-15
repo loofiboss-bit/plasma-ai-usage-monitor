@@ -97,7 +97,7 @@ mean zero or safe.
 
 ## Provider scope and `Unattributed`
 
-Catalog v6 controls which scopes can be selected:
+Catalog v7 controls which scopes can be selected:
 
 - OpenAI: aggregate, project cost and cost line item. OpenAI model cost is
   never inferred.

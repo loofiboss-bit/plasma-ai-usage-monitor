@@ -13,11 +13,11 @@
     "Id": "com.github.loofi.aiusagemonitor",
     "License": "GPL-3.0-or-later",
     "Name": "AI Usage Monitor",
-    "Version": "18.0.0",
+    "Version": "19.0.0",
     "Website": "https://github.com/loofiboss-bit/plasma-ai-usage-monitor",
     "BugReportUrl": "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues"
   },
   "X-Plasma-API-Minimum-Version": "6.0",
   "KPackageStructure": "Plasma/Applet",
-  "X-AIUsageMonitor-RequiredPluginVersion": "18.0.0"
+  "X-AIUsageMonitor-RequiredPluginVersion": "19.0.0"
 }

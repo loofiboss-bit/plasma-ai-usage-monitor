@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [19.0.0] — 2026-08-15
+
+### Added
+
+- Add Catalog v7 lifecycle, source provenance, review state, sequence and hard-expiry metadata.
+- Add fixed-point Cost Engine v2 for exact token, generation, video-second,
+  request, cache, context, modality, service-tier, route, region and fee pricing.
+- Add signed Ed25519 catalog feeds with bounded HTTPS checks, replay protection,
+  atomic activation and a protected publication workflow.
+- Add immutable estimate provenance to history, provider observations, CSV and
+  JSON exports, plus Source Detail explanations, price-change inbox and Local Cost Lab.
+
+### Changed
+
+- Route runtime local estimates through the same catalog Cost Engine used by
+  tests and UI, while keeping provider-reported billing authoritative.
+- Resolve only exact model IDs and explicit aliases; unknown and retired models
+  fail closed instead of receiving a guessed price.
+- Keep unknown currency nullable and stop producing new estimates after catalog expiry.
+
+### Fixed
+
+- Correct current OpenAI, Google and Anthropic catalog drift and expose retired
+  model replacements without silently changing a configured model.
+- Prevent unavailable gateway estimates from being mixed with actual multi-currency billing rows.
+
 ## [18.0.0] — 2026-08-08
 
 ### Added

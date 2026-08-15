@@ -8,8 +8,13 @@ QtObject {
     readonly property string catalogVersion: ProviderPricingCatalog.catalogVersion
     readonly property string lastReviewed: ProviderPricingCatalog.lastReviewed
     readonly property bool runtimeScraping: ProviderPricingCatalog.runtimeScraping
+    readonly property string verificationState: ProviderPricingCatalog.verificationState
+    readonly property int sequence: ProviderPricingCatalog.sequence
+    readonly property string hardExpiresAt: ProviderPricingCatalog.hardExpiresAt
+    readonly property bool estimatesAllowed: ProviderPricingCatalog.estimatesAllowed
+    readonly property int freshnessSloDays: ProviderPricingCatalog.freshnessSloDays
 
-    // Provider identity, adapter profile, and capabilities come from Catalog v6.
+    // Provider identity, adapter profile, and capabilities come from Catalog v7.
     // Only runtime backend association remains in ProviderRegistry.
     readonly property var providers: {
         var catalogProviders = ProviderPricingCatalog.providers();

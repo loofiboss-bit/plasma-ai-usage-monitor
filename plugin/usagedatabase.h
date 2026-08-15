@@ -57,7 +57,8 @@ public:
                                     const QString &costSource = QStringLiteral("unknown"),
                                     const QString &usageSource = QStringLiteral("unknown"),
                                     const QString &currency = QStringLiteral("USD"),
-                                    const QString &dataQuality = QStringLiteral("unknown"));
+                                    const QString &dataQuality = QStringLiteral("unknown"),
+                                    const QVariantMap &provenance = {});
 
     /**
      * Record a usage snapshot for a subscription tool.
@@ -307,6 +308,7 @@ private:
     bool migrateToObservationSchemaV4();
     bool migrateToSchemaV5();
     bool migrateToSchemaV6();
+    bool migrateToSchemaV7();
     bool recordObservations(const QString &provider,
                             const QString &model,
                             qint64 inputTokens,
@@ -316,7 +318,8 @@ private:
                             const QString &currency,
                             const QString &costSource,
                             const QString &usageSource,
-                            const QString &dataQuality);
+                            const QString &dataQuality,
+                            const QVariantMap &provenance);
     void ensureColumnExists(const QString &table, const QString &column, const QString &definition);
 
     QSqlDatabase m_db;
