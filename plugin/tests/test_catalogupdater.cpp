@@ -23,18 +23,34 @@ QByteArray signEd25519(const QByteArray &message)
         reinterpret_cast<const unsigned char *>(seed.constData()),
         static_cast<size_t>(seed.size()));
     EVP_MD_CTX *context = EVP_MD_CTX_new();
-    Q_ASSERT(key && context);
-    Q_ASSERT(EVP_DigestSignInit(context, nullptr, nullptr, nullptr, key) == 1);
+    if (!key || !context) {
+        EVP_MD_CTX_free(context);
+        EVP_PKEY_free(key);
+        return {};
+    }
+    if (EVP_DigestSignInit(context, nullptr, nullptr, nullptr, key) != 1) {
+        EVP_MD_CTX_free(context);
+        EVP_PKEY_free(key);
+        return {};
+    }
     size_t signatureSize = 0;
-    Q_ASSERT(EVP_DigestSign(context, nullptr, &signatureSize,
-                            reinterpret_cast<const unsigned char *>(message.constData()),
-                            static_cast<size_t>(message.size())) == 1);
+    if (EVP_DigestSign(context, nullptr, &signatureSize,
+                       reinterpret_cast<const unsigned char *>(message.constData()),
+                       static_cast<size_t>(message.size())) != 1) {
+        EVP_MD_CTX_free(context);
+        EVP_PKEY_free(key);
+        return {};
+    }
     QByteArray signature(static_cast<qsizetype>(signatureSize), Qt::Uninitialized);
-    Q_ASSERT(EVP_DigestSign(context,
-                            reinterpret_cast<unsigned char *>(signature.data()),
-                            &signatureSize,
-                            reinterpret_cast<const unsigned char *>(message.constData()),
-                            static_cast<size_t>(message.size())) == 1);
+    if (EVP_DigestSign(context,
+                       reinterpret_cast<unsigned char *>(signature.data()),
+                       &signatureSize,
+                       reinterpret_cast<const unsigned char *>(message.constData()),
+                       static_cast<size_t>(message.size())) != 1) {
+        EVP_MD_CTX_free(context);
+        EVP_PKEY_free(key);
+        return {};
+    }
     signature.resize(static_cast<qsizetype>(signatureSize));
     EVP_MD_CTX_free(context);
     EVP_PKEY_free(key);
