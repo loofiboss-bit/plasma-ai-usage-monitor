@@ -12,6 +12,7 @@ if [[ "${AI_USAGE_V18_CAPTURE_INNER:-0}" != "1" ]]; then
   chmod 700 "$VIRTUAL_RUNTIME"
   CAPTURE_SCRIPT_LINK="${VIRTUAL_ROOT}/capture-v18"
   ln -s "$CAPTURE_SCRIPT" "$CAPTURE_SCRIPT_LINK"
+  # shellcheck disable=SC2329 # invoked indirectly by the EXIT trap
   cleanup_virtual() {
     if [[ -d "$VIRTUAL_ROOT" && "$VIRTUAL_ROOT" == /tmp/* ]]; then
       find "$VIRTUAL_ROOT" -depth -delete
