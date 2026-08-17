@@ -23,6 +23,7 @@ DEFAULT_CATALOG = ROOT / "package/contents/catalog/providers-v4.json"
 PRECISIONS = {"official_exact", "official_range", "derived", "unknown", "unavailable"}
 LIFECYCLE = {"active", "deprecated", "retired"}
 UNITS = {"1M_tokens", "generation", "image", "video_second", "credit", "request", "unknown", "not_applicable"}
+TRANSIENT_NETWORK_STATUSES = {408, 425, 429, 500, 502, 503, 504}
 
 
 def iso_date(value: Any, label: str, errors: list[str]) -> date | None:
@@ -45,8 +46,39 @@ def iso_timestamp(value: Any, label: str, errors: list[str]) -> datetime | None:
     return parsed.astimezone(timezone.utc)
 
 
-def add_review(items: list[dict[str, str]], label: str, reason: str) -> None:
-    items.append({"label": label, "reason": reason})
+def add_review(
+    items: list[dict[str, Any]],
+    label: str,
+    reason: str,
+    *,
+    category: str = "manual",
+    actionable: bool = False,
+) -> dict[str, Any]:
+    item = {
+        "label": label,
+        "reason": reason,
+        "category": category,
+        "actionable": actionable,
+    }
+    items.append(item)
+    return item
+
+
+def network_review_is_actionable(result: str) -> bool:
+    """Treat durable HTTP failures as actionable and transport failures as warnings.
+
+    The scheduled check is deliberately best-effort: a provider can be slow or
+    temporarily unreachable without its catalog entry being wrong. Explicit
+    HTTP failures such as 404 or 410 still indicate that a declared source
+    needs maintainer attention.
+    """
+    if not result.startswith("HTTP "):
+        return False
+    try:
+        status = int(result.split(maxsplit=1)[1])
+    except (IndexError, ValueError):
+        return False
+    return status not in TRANSIENT_NETWORK_STATUSES
 
 
 def check_source(url: str) -> str:
@@ -63,15 +95,38 @@ def check_source(url: str) -> str:
 
 def audit(catalog_path: Path, network: bool) -> dict[str, Any]:
     errors: list[str] = []
-    reviews: list[dict[str, str]] = []
+    reviews: list[dict[str, Any]] = []
+    actionable_reviews: list[dict[str, Any]] = []
     network_results: dict[str, str] = {}
+
+    def record_review(
+        label: str,
+        reason: str,
+        *,
+        category: str,
+        actionable: bool,
+    ) -> None:
+        item = add_review(reviews, label, reason, category=category, actionable=actionable)
+        if item["actionable"]:
+            actionable_reviews.append(item)
+
     try:
         catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        return {"status": "error", "errors": [f"cannot read catalog: {error}"], "reviewItems": []}
+        return {
+            "status": "error",
+            "errors": [f"cannot read catalog: {error}"],
+            "reviewItems": [],
+            "actionableReviewItems": [],
+        }
 
     if not isinstance(catalog, dict):
-        return {"status": "error", "errors": ["catalog root must be an object"], "reviewItems": []}
+        return {
+            "status": "error",
+            "errors": ["catalog root must be an object"],
+            "reviewItems": [],
+            "actionableReviewItems": [],
+        }
 
     if catalog.get("schemaVersion") != 7:
         errors.append("schemaVersion must be 7")
@@ -96,7 +151,12 @@ def audit(catalog_path: Path, network: bool) -> dict[str, Any]:
     if catalog.get("verificationState") not in {"packaged", "remote_verified"}:
         errors.append("verificationState must be packaged or remote_verified")
     if catalog.get("estimatesAllowed") is not True:
-        add_review(reviews, "catalog", "estimatesAllowed is false; cost estimates remain unavailable")
+        record_review(
+            "catalog",
+            "estimatesAllowed is false; cost estimates remain unavailable",
+            category="catalog_policy",
+            actionable=True,
+        )
 
     providers = catalog.get("providers")
     if not isinstance(providers, list) or not providers:
@@ -162,7 +222,12 @@ def audit(catalog_path: Path, network: bool) -> dict[str, Any]:
                 if not isinstance(replacement, str) or not replacement:
                     errors.append(f"{context} needs lifecycle.replacementId")
                 else:
-                    add_review(reviews, context, f"lifecycle is {lifecycle['status']}; replacement is {replacement}")
+                    record_review(
+                        context,
+                        f"lifecycle is {lifecycle['status']}; replacement is {replacement}",
+                        category="lifecycle",
+                        actionable=False,
+                    )
 
             source_refs = model.get("sourceRefs")
             if not isinstance(source_refs, list) or not source_refs:
@@ -180,12 +245,22 @@ def audit(catalog_path: Path, network: bool) -> dict[str, Any]:
                     source_age = (today - source_reviewed).days
                     if source_age > slo:
                         stale_source_count += 1
-                        add_review(reviews, context, f"official source review is {source_age} days old")
+                        record_review(
+                            context,
+                            f"official source review is {source_age} days old",
+                            category="stale_source",
+                            actionable=True,
+                        )
                 if network and url and url not in seen_source_urls:
                     seen_source_urls.add(url)
                     network_results[url] = check_source(url)
                     if not network_results[url].startswith("HTTP 2") and not network_results[url].startswith("HTTP 3"):
-                        add_review(reviews, url, f"official source reachability check returned {network_results[url]}")
+                        record_review(
+                            url,
+                            f"official source reachability check returned {network_results[url]}",
+                            category="source_reachability",
+                            actionable=network_review_is_actionable(network_results[url]),
+                        )
 
             pricing = model.get("pricing")
             if not isinstance(pricing, dict):
@@ -198,7 +273,12 @@ def audit(catalog_path: Path, network: bool) -> dict[str, Any]:
             unit = pricing.get("unit")
             if status in {"unknown", "not_applicable"} or precision in {"unknown", "unavailable"}:
                 unknown_price_count += 1
-                add_review(reviews, context, f"pricing is {status or precision}; estimate is unavailable")
+                record_review(
+                    context,
+                    f"pricing is {status or precision}; estimate is unavailable",
+                    category="pricing_unavailable",
+                    actionable=False,
+                )
             elif unit not in UNITS:
                 errors.append(f"{context}.pricing.unit is invalid")
             elif unit == "1M_tokens":
@@ -221,7 +301,9 @@ def audit(catalog_path: Path, network: bool) -> dict[str, Any]:
             errors.append(f"{key} aliases collide with model IDs: {', '.join(sorted(overlap))}")
 
     result: dict[str, Any] = {
-        "status": "error" if errors else ("review_required" if reviews else "ok"),
+        "status": "error" if errors else (
+            "review_required" if actionable_reviews else "expected_review" if reviews else "ok"
+        ),
         "catalog": str(catalog_path.relative_to(ROOT) if catalog_path.is_relative_to(ROOT) else catalog_path),
         "schemaVersion": catalog.get("schemaVersion"),
         "catalogVersion": catalog.get("catalogVersion"),
@@ -234,9 +316,12 @@ def audit(catalog_path: Path, network: bool) -> dict[str, Any]:
             "staleSourceReviews": stale_source_count,
             "unknownOrUnavailablePricing": unknown_price_count,
             "networkSourcesChecked": len(network_results),
+            "actionableReviewItems": len(actionable_reviews),
+            "expectedReviewItems": len(reviews) - len(actionable_reviews),
         },
         "errors": errors,
         "reviewItems": reviews,
+        "actionableReviewItems": actionable_reviews,
         "network": network_results,
     }
     return result
@@ -265,7 +350,11 @@ def markdown(report: dict[str, Any]) -> str:
         elif key == "errors":
             lines.extend(f"- {value}" for value in values)
         else:
-            lines.extend(f"- `{value['label']}`: {value['reason']}" for value in values)
+            lines.extend(
+                f"- [{'actionable' if value.get('actionable') else 'expected'}] "
+                f"`{value['label']}`: {value['reason']}"
+                for value in values
+            )
     if report.get("network"):
         lines.extend(["", "## Network checks", ""])
         lines.extend(f"- `{url}`: {result}" for url, result in report["network"].items())
@@ -277,6 +366,11 @@ def main() -> int:
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--network", action="store_true")
     parser.add_argument("--strict-review", action="store_true", help="return 2 when maintainer review is needed")
+    parser.add_argument(
+        "--strict-actionable-review",
+        action="store_true",
+        help="return 2 only when an actionable maintainer review is needed",
+    )
     parser.add_argument("--format", choices=("text", "json", "markdown"), default="text")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
@@ -284,17 +378,20 @@ def main() -> int:
     report = audit(args.catalog.resolve(), args.network)
     rendered = json.dumps(report, indent=2, sort_keys=True) + "\n" if args.format == "json" else markdown(report) if args.format == "markdown" else (
         f"Catalog drift {report['status']}: {report.get('stats', {})}; "
-        f"errors={len(report.get('errors', []))}, reviews={len(report.get('reviewItems', []))}"
+        f"errors={len(report.get('errors', []))}, reviews={len(report.get('reviewItems', []))}, "
+        f"actionable={len(report.get('actionableReviewItems', []))}"
     )
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(rendered, encoding="utf-8")
     else:
-        print(rendered, end="")
+        print(rendered, end="" if rendered.endswith("\n") else "\n")
 
     if report.get("errors"):
         return 1
     if args.strict_review and report.get("reviewItems"):
+        return 2
+    if args.strict_actionable_review and report.get("actionableReviewItems"):
         return 2
     return 0
 

@@ -20,7 +20,7 @@ jobs:
         shell: bash
         run: |
           set +e
-          python3 scripts/check_catalog_drift.py --network --strict-review \
+          python3 scripts/check_catalog_drift.py --network --strict-actionable-review \
             --format markdown --output catalog-drift-report.md
           status=$?
           echo "status=${status}" >> "$GITHUB_OUTPUT"
@@ -51,5 +51,5 @@ jobs:
         run: |
           number="$(gh issue list --state open --search "Provider catalog drift requires review in:title" --json number --jq '.[0].number')"
           if [[ -n "$number" ]]; then
-            gh issue close "$number" --comment "The scheduled catalog audit is green again."
+            gh issue close "$number" --comment "The scheduled catalog audit found no actionable catalog drift."
           fi

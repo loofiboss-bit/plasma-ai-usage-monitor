@@ -34,6 +34,7 @@ check:
     bash scripts/check_no_hardcoded_versions.sh
     python3 scripts/check_provider_catalog.py
     python3 scripts/check_catalog_drift.py
+    python3 scripts/test_catalog_drift.py
     python3 scripts/check_config_defaults_exist_in_catalog.py
     python3 scripts/check_provider_ui_catalog_models.py
     python3 scripts/check_subscription_catalog.py
@@ -88,6 +89,7 @@ release-check: build-debug
     bash scripts/check_no_hardcoded_versions.sh
     python3 scripts/check_provider_catalog.py
     python3 scripts/check_catalog_drift.py
+    python3 scripts/test_catalog_drift.py
     python3 scripts/check_config_defaults_exist_in_catalog.py
     python3 scripts/check_provider_ui_catalog_models.py
     python3 scripts/check_subscription_catalog.py

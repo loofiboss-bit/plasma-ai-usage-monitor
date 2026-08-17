@@ -51,5 +51,18 @@ python3 scripts/sign_catalog_feed.py \
 ```
 
 The daily drift workflow checks structure, lifecycle, freshness, declared
-official sources, and optional bounded HTTPS reachability. It reports review
-items but never changes or activates pricing automatically.
+official sources, and optional bounded HTTPS reachability. Its report keeps
+all review items visible, but separates expected manual-review states from
+actionable drift:
+
+- lifecycle replacements and deliberately unavailable pricing remain expected
+  review items; the application stays fail-closed and does not invent a price;
+- stale source evidence, invalid catalog policy, and durable HTTP failures
+  (for example 404/410) are actionable review items;
+- transient network failures are recorded as expected warnings because a
+  reachability timeout alone does not prove catalog drift.
+
+The scheduled workflow uses
+`python3 scripts/check_catalog_drift.py --network --strict-actionable-review`.
+It opens or updates the maintainer issue only when actionable items or errors
+are present. The audit never changes or activates pricing automatically.

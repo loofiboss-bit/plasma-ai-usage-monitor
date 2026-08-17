@@ -66,7 +66,7 @@ private:
     void loadDiscoveryCache();
     void saveDiscoveryCache() const;
 
-    QString m_model = QStringLiteral("gemini-2.0-flash");
+    QString m_model = QStringLiteral("gemini-3.1-flash-lite");
     QString m_tier = QStringLiteral("free");
     QVariantList m_discoveredModels;
     QVariantList m_pendingLiveModels;

@@ -1,6 +1,6 @@
 # Plasma AI Usage Monitor v19.0.0 — Verified Cost Intelligence
 
-| Target | `19.0.0` |
+| Target | `19.0.1` |
 | --- | --- |
 
 ## Objective

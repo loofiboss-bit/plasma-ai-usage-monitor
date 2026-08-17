@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [19.0.1] — 2026-08-17
+
+### Fixed
+
+- Separate expected catalog review states from actionable drift so lifecycle,
+  unavailable-pricing, and transient reachability warnings do not reopen the
+  maintainer issue while stale evidence and durable HTTP failures still block.
+- Refresh Catalog v7 source-review metadata, add current Gemini pricing and
+  replacement metadata, and keep the native Google default on an active model.
+- Add regression coverage for the catalog drift exit contracts and report
+  classifications.
+
 ## [19.0.0] — 2026-08-15
 
 ### Added

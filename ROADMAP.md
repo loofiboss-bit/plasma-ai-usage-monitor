@@ -1,8 +1,8 @@
 # Roadmap
 
-**Current release:** 19.0.0, Verified Cost Intelligence
+**Current release:** 19.0.1, Catalog Drift Reliability
 
-**Last updated:** 2026-08-15
+**Last updated:** 2026-08-17
 
 AI Usage Monitor remains a desktop-native, local-first Plasma widget. v19 adds
 verified cost intelligence, signed catalog activation, deterministic pricing
@@ -11,6 +11,14 @@ expiry behavior. It does not add provider writes, FX, inference, or a fourth
 popup tab.
 
 ## Current release
+
+### 19.0.1 Catalog Drift Reliability
+
+- Separate expected lifecycle, unavailable-pricing, and transient network
+  review states from actionable catalog drift.
+- Refresh Catalog v7 evidence and current Gemini pricing without enabling
+  runtime scraping or automatic price activation.
+- Keep the native Google backend default aligned with an active catalog model.
 
 ### 19.0.0 Verified Cost Intelligence
 
