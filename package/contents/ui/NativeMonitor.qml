@@ -21,6 +21,22 @@ Item {
         var required = Plasmoid["metaData"]?.["version"] || "";
         return required !== "" && required !== AppInfo.version;
     }
+
+    function lowestLiveQuota(monitor) {
+        var actualSources = ["billing_api", "usage_api", "actual_api",
+                             "metrics_api", "response_headers", "browser_sync",
+                             "antigravity_local", "local_daemon_actual"];
+        var windows = monitor?.quotaWindows || [];
+        var lowest = null;
+        for (var i = 0; i < windows.length; ++i) {
+            var window = windows[i];
+            var remaining = Number(window.percentRemaining);
+            if (actualSources.indexOf(String(window.source || "")) < 0
+                    || !Number.isFinite(remaining)) continue;
+            if (lowest === null || remaining < lowest) lowest = remaining;
+        }
+        return lowest;
+    }
     property bool popupExpanded: false
     // qmllint enable unresolved-type
 
@@ -51,7 +67,10 @@ Item {
             var tool = tools[j];
             if (tool.enabled && tool.monitor && tool.monitor.installed) {
                 var toolInfo = tool.name + ": ";
-                if (tool.monitor.limitReached) {
+                var liveRemaining = root.lowestLiveQuota(tool.monitor);
+                if (liveRemaining !== null) {
+                    toolInfo += i18n("%1% remaining", Math.round(liveRemaining));
+                } else if (tool.monitor.limitReached) {
                     toolInfo += i18n("Limit Reached");
                 } else if ((tool.monitor.usageLimit || 0) > 0) {
                     toolInfo += tool.monitor.usageCount + "/" + tool.monitor.usageLimit + " " + i18n("used");

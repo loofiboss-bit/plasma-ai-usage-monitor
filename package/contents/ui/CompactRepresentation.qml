@@ -8,6 +8,16 @@ import "components" as Components
 MouseArea {
     id: compactRoot
 
+    readonly property real textModeWidth: compactModeIcon.Layout.preferredWidth
+        + compactContent.spacing + compactDailyValue.implicitWidth
+    implicitWidth: displayMode === "icon"
+        ? Kirigami.Units.iconSizes.small : textModeWidth
+    implicitHeight: Kirigami.Units.iconSizes.small
+    Layout.fillWidth: false
+    Layout.minimumWidth: implicitWidth
+    Layout.preferredWidth: implicitWidth
+    Layout.maximumWidth: implicitWidth
+
     required property var monitor
     readonly property url brandedIconSource: Qt.resolvedUrl("../icons/logo.png")
     readonly property var providers: compactRoot.monitor.allProviders ?? []
@@ -75,17 +85,20 @@ MouseArea {
     }
 
     RowLayout {
+        id: compactContent
         anchors.fill: parent
         visible: compactRoot.displayMode !== "icon"
         spacing: Kirigami.Units.smallSpacing / 2
 
         Kirigami.Icon {
+            id: compactModeIcon
             source: compactRoot.brandedIconSource
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: width
         }
 
         PlasmaComponents.Label {
+            id: compactDailyValue
             objectName: "compactDailyValue"
             Layout.fillWidth: true
             text: compactRoot.displayText()
