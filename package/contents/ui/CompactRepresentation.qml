@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import "components" as Components
@@ -10,13 +11,14 @@ MouseArea {
 
     readonly property real textModeWidth: compactModeIcon.Layout.preferredWidth
         + compactContent.spacing + compactDailyValue.implicitWidth
+    readonly property bool verticalPanel: Plasmoid.formFactor === PlasmaCore.Types.Vertical
     implicitWidth: displayMode === "icon"
-        ? Kirigami.Units.iconSizes.small : textModeWidth
+        ? Math.max(Kirigami.Units.iconSizes.small, height) : textModeWidth
     implicitHeight: Kirigami.Units.iconSizes.small
-    Layout.fillWidth: false
-    Layout.minimumWidth: implicitWidth
+    Layout.fillWidth: verticalPanel
+    Layout.minimumWidth: verticalPanel ? Kirigami.Units.iconSizes.small : implicitWidth
     Layout.preferredWidth: implicitWidth
-    Layout.maximumWidth: implicitWidth
+    Layout.maximumWidth: verticalPanel ? Number.POSITIVE_INFINITY : implicitWidth
 
     required property var monitor
     readonly property url brandedIconSource: Qt.resolvedUrl("../icons/logo.png")
@@ -101,6 +103,9 @@ MouseArea {
             id: compactDailyValue
             objectName: "compactDailyValue"
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            elide: Text.ElideRight
+            clip: true
             text: compactRoot.displayText()
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter
