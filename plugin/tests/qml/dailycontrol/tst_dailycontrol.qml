@@ -115,6 +115,46 @@ TestCase {
 
     function init() { load({}, summary({})); }
 
+    function test_tooltipUsesNormalizedLiveWindows() {
+        load({ "codex-cli": {
+            stableId: "codex-cli", freshnessState: "fresh",
+            quotaWindows: [
+                { sourceClass: "configured_limit", percentRemaining: 0 },
+                { sourceClass: "local_estimate", percentRemaining: 2 },
+                { sourceClass: "actual", percentRemaining: 96 },
+                { sourceClass: "actual", percentRemaining: 48 }
+            ]
+        } }, summary({}));
+        compare(dailyPresentation.lowestLiveQuota("codex-cli"), 48);
+        compare(dailyPresentation.lowestLiveQuota("missing"), null);
+        fakeDailyState.rows["codex-cli"].quotaWindows.push(
+            { sourceClass: "actual", percentRemaining: 0 });
+        fakeDailyState.sourceChanged("codex-cli");
+        compare(dailyPresentation.lowestLiveQuota("codex-cli"), 0);
+    }
+
+    function test_tooltipRejectsUnavailableAndStaleQuota_data() {
+        return [
+            { tag: "null", value: null, freshness: "fresh" },
+            { tag: "undefined", value: undefined, freshness: "fresh" },
+            { tag: "empty", value: "", freshness: "fresh" },
+            { tag: "nan", value: NaN, freshness: "fresh" },
+            { tag: "infinite", value: Infinity, freshness: "fresh" },
+            { tag: "negative", value: -1, freshness: "fresh" },
+            { tag: "over-100", value: 101, freshness: "fresh" },
+            { tag: "stale", value: 25, freshness: "stale" },
+            { tag: "never", value: 25, freshness: "never" }
+        ];
+    }
+
+    function test_tooltipRejectsUnavailableAndStaleQuota(data) {
+        load({ tool: {
+            stableId: "tool", freshnessState: data.freshness,
+            quotaWindows: [{ sourceClass: "actual", percentRemaining: data.value }]
+        } }, summary({}));
+        compare(dailyPresentation.lowestLiveQuota("tool"), null);
+    }
+
     function test_legacyPanelModesMapToCanonicalModes() {
         compare(dailyPresentation.normalizeCompactMode("count"), "active-sources");
         compare(dailyPresentation.normalizeCompactMode("critical"), "attention");

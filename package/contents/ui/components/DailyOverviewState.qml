@@ -83,6 +83,28 @@ QtObject {
         return filterRows(function(row) { return row.qualityClass === quality; });
     }
 
+    function lowestLiveQuota(stableId) {
+        for (var i = 0; i < sourceRows.length; ++i) {
+            var row = sourceRows[i];
+            if (row.stableId !== stableId) continue;
+            if (row.freshnessState === "stale" || row.freshnessState === "never")
+                return null;
+            var windows = row.quotaWindows || [];
+            var lowest = null;
+            for (var j = 0; j < windows.length; ++j) {
+                var window = windows[j];
+                var remaining = window.percentRemaining;
+                if (window.sourceClass !== "actual"
+                        || typeof remaining !== "number"
+                        || !Number.isFinite(remaining)
+                        || remaining < 0 || remaining > 100) continue;
+                if (lowest === null || remaining < lowest) lowest = remaining;
+            }
+            return lowest;
+        }
+        return null;
+    }
+
     function summaryText() {
         var enabled = Number(summary.enabledSourceCount || 0);
         var useful = Number(summary.reportingUsefulSourceCount || 0);

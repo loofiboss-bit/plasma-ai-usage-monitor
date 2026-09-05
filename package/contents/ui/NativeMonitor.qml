@@ -22,20 +22,9 @@ Item {
         return required !== "" && required !== AppInfo.version;
     }
 
-    function lowestLiveQuota(monitor) {
-        var actualSources = ["billing_api", "usage_api", "actual_api",
-                             "metrics_api", "response_headers", "browser_sync",
-                             "antigravity_local", "local_daemon_actual"];
-        var windows = monitor?.quotaWindows || [];
-        var lowest = null;
-        for (var i = 0; i < windows.length; ++i) {
-            var window = windows[i];
-            var remaining = Number(window.percentRemaining);
-            if (actualSources.indexOf(String(window.source || "")) < 0
-                    || !Number.isFinite(remaining)) continue;
-            if (lowest === null || remaining < lowest) lowest = remaining;
-        }
-        return lowest;
+    Components.DailyOverviewState {
+        id: tooltipState
+        dailyState: root.presentationDailyState
     }
     property bool popupExpanded: false
     // qmllint enable unresolved-type
@@ -67,7 +56,7 @@ Item {
             var tool = tools[j];
             if (tool.enabled && tool.monitor && tool.monitor.installed) {
                 var toolInfo = tool.name + ": ";
-                var liveRemaining = root.lowestLiveQuota(tool.monitor);
+                var liveRemaining = tooltipState.lowestLiveQuota(tool.stableId);
                 if (liveRemaining !== null) {
                     toolInfo += i18n("%1% remaining", Math.round(liveRemaining));
                 } else if (tool.monitor.limitReached) {
