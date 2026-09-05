@@ -17,3 +17,18 @@ jobs:
       - run: python3 scripts/qml_lint.py --build-dir build/ci
       - run: PYTHONNOUSERSITE=1 xvfb-run -a python3 scripts/smoke_test_qml_import.py --strict --build-dir build/ci
       - run: dbus-run-session -- xvfb-run -a bash scripts/smoke_test_plasmoid.sh build/ci
+      - name: Install isolated capture dependencies
+        run: dnf install -y kwin-wayland spectacle ImageMagick jq ripgrep python3-gobject at-spi2-core breeze-gtk mesa-dri-drivers
+      - name: Capture current Plasma release evidence
+        timeout-minutes: 10
+        env:
+          QT_QUICK_BACKEND: software
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: bash scripts/demo/capture_v18_media.sh "$PWD/build/ci"
+      - name: Upload captured Plasma evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: plasma-media-${{ github.event.pull_request.number || github.sha }}
+          path: assets/screenshots/
+          if-no-files-found: error
