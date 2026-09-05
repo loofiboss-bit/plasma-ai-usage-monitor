@@ -76,11 +76,11 @@ void SubscriptionToolsTest::planDefaults()
     QVERIFY(!codex.quotaWindows().isEmpty());
 
     CopilotMonitor copilot;
-    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Free")), 50);
-    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Pro")), 300);
-    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Pro+")), 1500);
-    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Business")), 300);
-    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Enterprise")), 1000);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Free")), 0);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Pro")), 0);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Pro+")), 0);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Business")), 0);
+    QCOMPARE(copilot.defaultLimitForPlan(QStringLiteral("Enterprise")), 0);
     QCOMPARE(copilot.defaultCostForPlan(QStringLiteral("Pro+")), 39.0);
     QCOMPARE(copilot.defaultCostForPlan(QStringLiteral("Business")), 19.0);
 }
