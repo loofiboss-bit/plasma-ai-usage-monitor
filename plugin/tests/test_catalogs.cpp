@@ -193,7 +193,7 @@ void CatalogsTest::subscriptionCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 1);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.07.18"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.09.05"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(catalog.sourceConflictCount() > 0);
@@ -212,7 +212,8 @@ void CatalogsTest::subscriptionCatalogLoads()
 
     const QVariantList copilotProPlusRows = catalog.quotaWindows(QStringLiteral("github-copilot"), QStringLiteral("pro_plus"));
     QVERIFY(!copilotProPlusRows.isEmpty());
-    QCOMPARE(copilotProPlusRows.first().toMap().value(QStringLiteral("limit")).toInt(), 1500);
+    QCOMPARE(copilotProPlusRows.first().toMap().value(QStringLiteral("kind")).toString(), QStringLiteral("ai_credits"));
+    QVERIFY(!copilotProPlusRows.first().toMap().contains(QStringLiteral("limit")));
 
     const QVariantList creditsRows = catalog.billingModeQuotaWindows(QStringLiteral("github-copilot"), QStringLiteral("ai_credits_usage_based"));
     QVERIFY(!creditsRows.isEmpty());
