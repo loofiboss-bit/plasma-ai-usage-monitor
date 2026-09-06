@@ -33,6 +33,12 @@ if [[ "${AI_USAGE_V18_CAPTURE_INNER:-0}" != "1" ]]; then
   exit $?
 fi
 
+export XDG_CURRENT_DESKTOP=KDE
+export XDG_SESSION_TYPE=wayland
+export QT_LOGGING_TO_CONSOLE=1
+dbus-update-activation-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR \
+  XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_LOGGING_TO_CONSOLE
+
 /usr/libexec/at-spi-bus-launcher --launch-immediately --a11y=1 >/dev/null 2>&1 &
 sleep 1
 /usr/libexec/at-spi2-registryd --dbus-name org.a11y.atspi.Registry >/dev/null 2>&1 &
@@ -54,6 +60,14 @@ FOCUSED_WINDOW_ID=""
 FOCUSED_WINDOW_INFO=""
 
 cleanup() {
+  local status=$?
+  if (( status != 0 )); then
+    for log in "$SESSION_ROOT"/*.log; do
+      [[ -f "$log" ]] || continue
+      echo "Capture diagnostics: $(basename "$log")" >&2
+      tail -n 80 "$log" >&2
+    done
+  fi
   if [[ -n "$WINDOW_PID" ]]; then
     kill "$WINDOW_PID" 2>/dev/null || true
     wait "$WINDOW_PID" 2>/dev/null || true
@@ -157,7 +171,7 @@ capture_view() {
   local filename="$2"
   local settle_seconds="$3"
   local layout="${4:-wide}"
-  local temporary="${OUTPUT_DIR}/.${filename}.capture"
+  local temporary="${OUTPUT_DIR}/.${filename}.capture.png"
   local dimensions
   local width
   local height
@@ -341,7 +355,7 @@ focus_nested_panel() {
 
 capture_panel() {
   local filename="panel-lowest-quota.png"
-  local temporary="${OUTPUT_DIR}/.${filename}.capture"
+  local temporary="${OUTPUT_DIR}/.${filename}.capture.png"
   local raw="${temporary}.raw.png"
   local panel_config_home="${CONFIG_HOME}/panel"
   local panel_cache_home="${CACHE_HOME}/panel"
