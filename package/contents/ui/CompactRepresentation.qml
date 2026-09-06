@@ -1,12 +1,24 @@
 import QtQuick
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
+import org.kde.plasma.core as PlasmaCore
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import "components" as Components
 
 MouseArea {
     id: compactRoot
+
+    readonly property real textModeWidth: compactModeIcon.Layout.preferredWidth
+        + compactContent.spacing + compactDailyValue.implicitWidth
+    readonly property bool verticalPanel: Plasmoid.formFactor === PlasmaCore.Types.Vertical
+    implicitWidth: displayMode === "icon"
+        ? Math.max(Kirigami.Units.iconSizes.small, height) : textModeWidth
+    implicitHeight: Kirigami.Units.iconSizes.small
+    Layout.fillWidth: verticalPanel
+    Layout.minimumWidth: verticalPanel ? Kirigami.Units.iconSizes.small : implicitWidth
+    Layout.preferredWidth: implicitWidth
+    Layout.maximumWidth: verticalPanel ? Number.POSITIVE_INFINITY : implicitWidth
 
     required property var monitor
     readonly property url brandedIconSource: Qt.resolvedUrl("../icons/logo.png")
@@ -75,19 +87,25 @@ MouseArea {
     }
 
     RowLayout {
+        id: compactContent
         anchors.fill: parent
         visible: compactRoot.displayMode !== "icon"
         spacing: Kirigami.Units.smallSpacing / 2
 
         Kirigami.Icon {
+            id: compactModeIcon
             source: compactRoot.brandedIconSource
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: width
         }
 
         PlasmaComponents.Label {
+            id: compactDailyValue
             objectName: "compactDailyValue"
             Layout.fillWidth: true
+            Layout.minimumWidth: 0
+            elide: Text.ElideRight
+            clip: true
             text: compactRoot.displayText()
             horizontalAlignment: Text.AlignHCenter
             verticalAlignment: Text.AlignVCenter

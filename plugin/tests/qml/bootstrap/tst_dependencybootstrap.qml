@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Layouts
 import QtTest
 import "../../../../package/contents/ui" as AppUi
 
@@ -20,7 +21,17 @@ TestCase {
 
     Component {
         id: runtimeFixture
-        Item { property string marker: "runtime" }
+        Item {
+            property string marker: "runtime"
+            Layout.minimumWidth: 120
+            Layout.preferredWidth: 180
+            Layout.maximumWidth: 240
+            Layout.minimumHeight: 24
+            Layout.preferredHeight: 36
+            Layout.maximumHeight: 48
+            Layout.fillWidth: false
+            Layout.fillHeight: true
+        }
     }
 
     Component {
@@ -104,5 +115,20 @@ TestCase {
         tryCompare(loader.item, "marker", "bootstrap");
         loader.runtimeReady = true;
         tryCompare(loader.item, "marker", "runtime");
+        compare(loader.Layout.minimumWidth, 120);
+        compare(loader.Layout.preferredWidth, 180);
+        compare(loader.Layout.maximumWidth, 240);
+        compare(loader.Layout.minimumHeight, 24);
+        compare(loader.Layout.preferredHeight, 36);
+        compare(loader.Layout.maximumHeight, 48);
+        compare(loader.Layout.fillWidth, false);
+        compare(loader.Layout.fillHeight, true);
+
+        loader.item.Layout.preferredWidth = 220;
+        compare(loader.Layout.preferredWidth, 220);
+        loader.runtimeReady = false;
+        tryCompare(loader.item, "marker", "bootstrap");
+        compare(loader.Layout.preferredWidth, -1);
+        compare(loader.Layout.maximumWidth, Infinity);
     }
 }

@@ -21,6 +21,11 @@ Item {
         var required = Plasmoid["metaData"]?.["version"] || "";
         return required !== "" && required !== AppInfo.version;
     }
+
+    Components.DailyOverviewState {
+        id: tooltipState
+        dailyState: root.presentationDailyState
+    }
     property bool popupExpanded: false
     // qmllint enable unresolved-type
 
@@ -51,7 +56,10 @@ Item {
             var tool = tools[j];
             if (tool.enabled && tool.monitor && tool.monitor.installed) {
                 var toolInfo = tool.name + ": ";
-                if (tool.monitor.limitReached) {
+                var liveRemaining = tooltipState.lowestLiveQuota(tool.stableId);
+                if (liveRemaining !== null) {
+                    toolInfo += i18n("%1% remaining", Math.round(liveRemaining));
+                } else if (tool.monitor.limitReached) {
                     toolInfo += i18n("Limit Reached");
                 } else if ((tool.monitor.usageLimit || 0) > 0) {
                     toolInfo += tool.monitor.usageCount + "/" + tool.monitor.usageLimit + " " + i18n("used");

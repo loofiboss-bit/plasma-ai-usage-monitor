@@ -98,6 +98,12 @@ def main() -> int:
             kept.append(warning)
             if warning.get("type") != "info":
                 warnings.append(warning)
+                print(
+                    f"{file_result.get('filename', '<unknown>')}:"
+                    f"{warning.get('line', '?')}:{warning.get('column', '?')}: "
+                    f"{warning.get('message', warning)}",
+                    file=sys.stderr,
+                )
         file_result["warnings"] = kept
     report.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
     if result.returncode != 0 or warnings:
