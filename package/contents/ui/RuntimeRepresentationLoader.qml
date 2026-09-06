@@ -5,17 +5,18 @@ Loader {
     required property bool runtimeReady
     required property Component bootstrapRepresentation
     property Component runtimeRepresentation: null
+    readonly property Item representationItem: item as Item
 
     sourceComponent: runtimeReady && runtimeRepresentation
         ? runtimeRepresentation
         : bootstrapRepresentation
 
-    Layout.fillWidth: item ? item.Layout.fillWidth : false
-    Layout.fillHeight: item ? item.Layout.fillHeight : false
-    Layout.minimumWidth: item ? item.Layout.minimumWidth : -1
-    Layout.minimumHeight: item ? item.Layout.minimumHeight : -1
-    Layout.preferredWidth: item ? item.Layout.preferredWidth : -1
-    Layout.preferredHeight: item ? item.Layout.preferredHeight : -1
-    Layout.maximumWidth: item ? item.Layout.maximumWidth : Number.POSITIVE_INFINITY
-    Layout.maximumHeight: item ? item.Layout.maximumHeight : Number.POSITIVE_INFINITY
+    Layout.fillWidth: representationItem ? representationItem.Layout.fillWidth : false
+    Layout.fillHeight: representationItem ? representationItem.Layout.fillHeight : false
+    Layout.minimumWidth: representationItem ? representationItem.Layout.minimumWidth : -1
+    Layout.minimumHeight: representationItem ? representationItem.Layout.minimumHeight : -1
+    Layout.preferredWidth: representationItem ? representationItem.Layout.preferredWidth : -1
+    Layout.preferredHeight: representationItem ? representationItem.Layout.preferredHeight : -1
+    Layout.maximumWidth: representationItem ? representationItem.Layout.maximumWidth : Number.POSITIVE_INFINITY
+    Layout.maximumHeight: representationItem ? representationItem.Layout.maximumHeight : Number.POSITIVE_INFINITY
 }
