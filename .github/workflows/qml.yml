@@ -16,10 +16,9 @@ jobs:
       - run: cmake --preset ci && cmake --build --preset ci --target aiusagemonitorplugin
       - run: python3 scripts/qml_lint.py --build-dir build/ci
       - run: PYTHONNOUSERSITE=1 xvfb-run -a python3 scripts/smoke_test_qml_import.py --strict --build-dir build/ci
-      - run: dbus-run-session -- xvfb-run -a bash scripts/smoke_test_plasmoid.sh build/ci
       - name: Install isolated capture dependencies
         run: |
-          dnf install -y kwin-wayland spectacle ImageMagick jq ripgrep python3-gobject at-spi2-core breeze-gtk mesa-dri-drivers libcap
+          dnf install -y kwin-wayland plasma-desktop spectacle ImageMagick jq ripgrep python3-gobject at-spi2-core breeze-gtk mesa-dri-drivers libcap procps-ng xorg-x11-server-Xwayland
           # Virtual capture does not need the package's real-time scheduling capability.
           # Removing it avoids execve(EPERM) under Docker's capability bounding set.
           getcap /usr/bin/kwin_wayland
@@ -46,3 +45,4 @@ jobs:
             build/ci/qml-lint-report.json
             build/ci/plasma-capture.log
           if-no-files-found: ignore
+      - run: dbus-run-session -- xvfb-run -a bash scripts/smoke_test_plasmoid.sh build/ci
