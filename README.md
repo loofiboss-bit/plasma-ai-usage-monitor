@@ -85,7 +85,7 @@ The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilo
 - Scoped OpenAI and Anthropic budget policies plus compatible aggregate LiteLLM/OpenRouter policies
 - Persist-before-delivery warning, critical, exceeded, recovery and reset notifications with snooze
 - Scheduled JSON or CSV exports
-- A loopback-only Prometheus endpoint
+- An opt-in Prometheus endpoint that defaults to loopback; unauthenticated all-IPv4 listening requires explicit configuration
 - Configuration schema-v3 backup for settings and policies; keys, tokens, cookies and webhook URLs remain excluded
 - Native Diagnostics for the loaded plugin, install layers, database, source readiness, KWallet, catalogs, and browser profiles
 - No telemetry or hosted backend

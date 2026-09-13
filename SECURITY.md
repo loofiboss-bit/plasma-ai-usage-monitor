@@ -31,7 +31,7 @@ The project aims to acknowledge reports within 48 hours. Fix timing depends on s
 - Browser Sync cookie handling
 - local SQLite history and exports
 - configuration import and export
-- loopback Prometheus server
+- Prometheus server network exposure
 - Slack and Discord webhook handling
 - native plugin packaging and load paths
 
@@ -55,7 +55,11 @@ Browser Sync is disabled by default. Cookie databases are read through a native 
 
 ### Local data
 
-Usage history stays in a local SQLite database. The widget has no telemetry, hosted backend, or cloud sync. The optional Prometheus endpoint binds to 127.0.0.1.
+Usage history stays in a local SQLite database. The widget has no telemetry,
+hosted backend, or cloud sync. The optional Prometheus endpoint binds to
+`127.0.0.1` by default. Listening on all IPv4 interfaces is an explicit opt-in;
+that endpoint has no authentication or TLS and must be restricted with a host
+or network firewall.
 
 Webhook alerts leave the computer by design and may contain provider status or budget context. The user chooses and controls the destination.
 

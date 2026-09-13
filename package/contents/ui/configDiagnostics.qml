@@ -84,7 +84,7 @@ KCM.SimpleKCM {
         "googleveoMonthlyBudget", "azureDailyBudget", "azureMonthlyBudget", "bedrockDailyBudget", "bedrockMonthlyBudget", "litellmDailyBudget", "litellmMonthlyBudget", "cerebrasDailyBudget", "cerebrasMonthlyBudget", "fireworksDailyBudget", "fireworksMonthlyBudget", "perplexityDailyBudget", "perplexityMonthlyBudget",
         "budgetWarningPercent", "forecastUiEnabled", "forecastNotificationsEnabled", "forecastLeadTimeHours",
         "historyEnabled", "historyRetentionDays", "analystIntensityMode", "analystNormalization",
-        "prometheusEnabled", "prometheusPort", "autoExportEnabled", "autoExportDirectory", "autoExportIntervalMinutes",
+        "prometheusEnabled", "prometheusPort", "prometheusListenAllInterfaces", "autoExportEnabled", "autoExportDirectory", "autoExportIntervalMinutes",
         "autoExportFormat", "antigravityEnabled", "antigravityNotifications", "antigravityRefreshInterval",
         "browserSyncEnabled", "browserSyncBrowser", "browserSyncProfile", "browserSyncInterval",
         "claudeCodeEnabled", "claudeCodePlan", "claudeCodePlanId", "claudeCodeCustomLimit", "claudeCodeNotifications",

@@ -551,6 +551,10 @@
         <entry name="prometheusPort" type="Int">
             <default>9464</default>
         </entry>
+        <entry name="prometheusListenAllInterfaces" type="Bool">
+            <default>false</default>
+            <label>Expose the unauthenticated Prometheus endpoint on all IPv4 interfaces</label>
+        </entry>
         <entry name="autoExportEnabled" type="Bool">
             <default>false</default>
         </entry>

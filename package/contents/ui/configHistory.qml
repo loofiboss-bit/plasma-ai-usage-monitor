@@ -13,6 +13,7 @@ KCM.SimpleKCM {
     property alias cfg_historyRetentionDays: retentionSlider.value
     property alias cfg_prometheusEnabled: prometheusSwitch.checked
     property alias cfg_prometheusPort: prometheusPortSpin.value
+    property alias cfg_prometheusListenAllInterfaces: prometheusNetworkSwitch.checked
     property alias cfg_autoExportEnabled: autoExportSwitch.checked
     property alias cfg_autoExportDirectory: autoExportDirectoryField.text
     property alias cfg_autoExportIntervalMinutes: autoExportIntervalSpin.value
@@ -159,10 +160,28 @@ KCM.SimpleKCM {
             }
 
             QQC2.Label {
-                text: i18n("Served locally on 127.0.0.1 only")
+                text: prometheusNetworkSwitch.checked
+                    ? i18n("Served on all IPv4 interfaces")
+                    : i18n("Served locally on 127.0.0.1 only")
                 color: Kirigami.Theme.disabledTextColor
                 Layout.fillWidth: true
             }
+        }
+
+        QQC2.Switch {
+            id: prometheusNetworkSwitch
+            Kirigami.FormData.label: i18n("Network access:")
+            text: i18n("Listen on all IPv4 interfaces")
+            enabled: prometheusSwitch.checked
+            checked: Plasmoid.configuration.prometheusListenAllInterfaces
+        }
+
+        Kirigami.InlineMessage {
+            visible: prometheusSwitch.checked && prometheusNetworkSwitch.checked
+            type: Kirigami.MessageType.Warning
+            text: i18n("The metrics endpoint has no authentication or encryption. Anyone who can reach this port can read the exported metrics. Restrict access with a firewall.")
+            Accessible.name: text
+            Layout.fillWidth: true
         }
 
         Kirigami.Separator {

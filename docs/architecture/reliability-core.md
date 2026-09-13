@@ -340,9 +340,11 @@ BrowserSyncService owns profile discovery, cookie extraction, authenticated requ
 
 ## Local integrations
 
-The Prometheus server binds to loopback. Guardrail series are collapsed to the
-worst state and earliest event per provider, risk kind, and value class. They
-never use scope, model, project, workspace, stable-ID, or API-key labels.
+The Prometheus server binds to loopback by default. Users can explicitly bind
+its unauthenticated endpoint to all IPv4 interfaces for remote collection.
+Guardrail series are collapsed to the worst state and earliest event per
+provider, risk kind, and value class. They never use scope, model, project,
+workspace, stable-ID, or API-key labels.
 Scheduled JSON and CSV export writes to a user-selected local directory. Slack
 and Discord webhooks are explicit outbound integrations and use KWallet-stored
 URLs plus alert cooldowns.

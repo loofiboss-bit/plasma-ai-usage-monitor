@@ -6,7 +6,9 @@ TestCase {
     name: "ConfigPortability"
 
     readonly property var activeKeys: [
-        "refreshInterval", "compactDisplayMode", "openaiEnabled"
+        "refreshInterval", "compactDisplayMode", "openaiEnabled",
+        "prometheusEnabled", "prometheusPort",
+        "prometheusListenAllInterfaces"
     ]
 
     function test_schemaV2RetiredKeysAreIgnored() {
@@ -61,6 +63,35 @@ TestCase {
         verify(payload.ok);
         compare(payload.settings.refreshInterval, 600);
         compare(payload.budgetPolicies.length, 1);
+    }
+
+    function test_prometheusSettingsRoundTripAndRejectTypeDrift() {
+        var current = {
+            prometheusEnabled: false,
+            prometheusPort: 9464,
+            prometheusListenAllInterfaces: false
+        };
+        var restored = ConfigPortability.schemaV3Payload({
+            schemaVersion: 3,
+            settings: {
+                prometheusEnabled: true,
+                prometheusPort: 19464,
+                prometheusListenAllInterfaces: true
+            },
+            budgetPolicies: []
+        }, activeKeys, current);
+
+        verify(restored.ok);
+        compare(restored.settings.prometheusEnabled, true);
+        compare(restored.settings.prometheusPort, 19464);
+        compare(restored.settings.prometheusListenAllInterfaces, true);
+
+        var invalid = ConfigPortability.schemaV3Payload({
+            schemaVersion: 3,
+            settings: { prometheusListenAllInterfaces: "true" },
+            budgetPolicies: []
+        }, activeKeys, current);
+        verify(!invalid.ok);
     }
 
     function test_schemaV3RejectsBrokenAndPartialShape() {

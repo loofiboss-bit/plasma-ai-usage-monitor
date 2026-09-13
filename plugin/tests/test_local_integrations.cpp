@@ -17,6 +17,9 @@ class LocalIntegrationsTest : public QObject {
 
 private Q_SLOTS:
   void metricsServerResponds();
+  void metricsServerStaysDisabledUntilEnabled();
+  void metricsServerBindingIsExplicit();
+  void metricsServerRecoversAfterBindFailure();
   void usageDatabaseExportsFiles();
   void webhookNotifierRejectsInsecureEndpoints();
   void webhookNotifierSanitizesGuardrailPayload();
@@ -26,7 +29,11 @@ private Q_SLOTS:
 
 void LocalIntegrationsTest::metricsServerResponds() {
   LocalMetricsServer server;
-  server.setPayload(QStringLiteral("test_metric 1\n"));
+  server.setPayload(QStringLiteral("stale_metric 1\n"));
+  QSignalSpy payloadSpy(&server, &LocalMetricsServer::payloadRequested);
+  connect(&server, &LocalMetricsServer::payloadRequested, &server, [&server]() {
+    server.setPayload(QStringLiteral("fresh_metric 1\n"));
+  });
   server.setPort(19464);
   server.setEnabled(true);
   QVERIFY(server.isListening());
@@ -41,7 +48,9 @@ void LocalIntegrationsTest::metricsServerResponds() {
   const QByteArray response = socket.readAll();
   QVERIFY(response.contains("HTTP/1.1 200 OK"));
   QVERIFY(response.contains("Content-Type: text/plain; version=0.0.4"));
-  QVERIFY(response.contains("test_metric 1"));
+  QVERIFY(response.contains("fresh_metric 1"));
+  QVERIFY(!response.contains("stale_metric 1"));
+  QCOMPARE(payloadSpy.count(), 1);
 
   auto request = [](const QByteArray &payload) {
     QTcpSocket client;
@@ -58,12 +67,102 @@ void LocalIntegrationsTest::metricsServerResponds() {
   const QByteArray head =
       request("HEAD /metrics HTTP/1.1\r\nHost: localhost\r\n\r\n");
   QVERIFY(head.contains("HTTP/1.1 200 OK"));
-  QVERIFY(!head.contains("test_metric 1"));
+  QVERIFY(!head.contains("fresh_metric 1"));
   QVERIFY(request("GET /missing HTTP/1.1\r\nHost: localhost\r\n\r\n")
               .contains("404 Not Found"));
   QVERIFY(request("POST /metrics HTTP/1.1\r\nHost: "
                   "localhost\r\nContent-Length: 0\r\n\r\n")
               .contains("405 Method Not Allowed"));
+}
+
+void LocalIntegrationsTest::metricsServerStaysDisabledUntilEnabled() {
+  QTcpServer portProbe;
+  QVERIFY(portProbe.listen(QHostAddress::LocalHost, 0));
+  const quint16 port = portProbe.serverPort();
+  portProbe.close();
+
+  LocalMetricsServer server;
+  QSignalSpy listeningSpy(&server, &LocalMetricsServer::listeningChanged);
+  QVERIFY(!server.isEnabled());
+  QVERIFY(!server.isListening());
+  QVERIFY(!server.listenOnAllInterfaces());
+
+  server.setPort(port);
+  server.setListenOnAllInterfaces(true);
+  QVERIFY(!server.isListening());
+  QCOMPARE(listeningSpy.count(), 0);
+
+  server.setEnabled(true);
+  QVERIFY(server.isListening());
+  QCOMPARE(server.listeningAddress(),
+           QHostAddress(QHostAddress::AnyIPv4).toString());
+  QCOMPARE(listeningSpy.count(), 1);
+
+  server.setEnabled(false);
+  QVERIFY(!server.isListening());
+  QVERIFY(server.listeningAddress().isEmpty());
+  QCOMPARE(listeningSpy.count(), 2);
+}
+
+void LocalIntegrationsTest::metricsServerBindingIsExplicit() {
+  QTcpServer portProbe;
+  QVERIFY(portProbe.listen(QHostAddress::LocalHost, 0));
+  const quint16 port = portProbe.serverPort();
+  portProbe.close();
+
+  LocalMetricsServer server;
+  server.setPort(port);
+  server.setEnabled(true);
+  QVERIFY(server.isListening());
+  QVERIFY(!server.listenOnAllInterfaces());
+  QCOMPARE(server.listeningAddress(),
+           QHostAddress(QHostAddress::LocalHost).toString());
+
+  QSignalSpy bindingSpy(&server,
+                        &LocalMetricsServer::listenOnAllInterfacesChanged);
+  server.setListenOnAllInterfaces(true);
+  QCOMPARE(bindingSpy.count(), 1);
+  QVERIFY(server.isListening());
+  QVERIFY(server.listenOnAllInterfaces());
+  QCOMPARE(server.listeningAddress(),
+           QHostAddress(QHostAddress::AnyIPv4).toString());
+
+  server.setListenOnAllInterfaces(false);
+  QCOMPARE(bindingSpy.count(), 2);
+  QVERIFY(server.isListening());
+  QCOMPARE(server.listeningAddress(),
+           QHostAddress(QHostAddress::LocalHost).toString());
+}
+
+void LocalIntegrationsTest::metricsServerRecoversAfterBindFailure() {
+  QTcpServer firstPortProbe;
+  QVERIFY(firstPortProbe.listen(QHostAddress::LocalHost, 0));
+  const quint16 firstPort = firstPortProbe.serverPort();
+  firstPortProbe.close();
+
+  QTcpServer blocker;
+  QVERIFY(blocker.listen(QHostAddress::LocalHost, 0));
+
+  LocalMetricsServer server;
+  server.setPort(firstPort);
+  QSignalSpy listeningSpy(&server, &LocalMetricsServer::listeningChanged);
+  QSignalSpy errorSpy(&server, &LocalMetricsServer::error);
+  server.setEnabled(true);
+  QVERIFY(server.isListening());
+  QCOMPARE(listeningSpy.count(), 1);
+
+  server.setPort(blocker.serverPort());
+  QVERIFY(!server.isListening());
+  QCOMPARE(errorSpy.count(), 1);
+  QCOMPARE(listeningSpy.count(), 2);
+
+  blocker.close();
+  server.setEnabled(false);
+  server.setEnabled(true);
+  QVERIFY(server.isListening());
+  QCOMPARE(server.listeningAddress(),
+           QHostAddress(QHostAddress::LocalHost).toString());
+  QCOMPARE(listeningSpy.count(), 3);
 }
 
 void LocalIntegrationsTest::usageDatabaseExportsFiles() {

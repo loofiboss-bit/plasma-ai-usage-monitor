@@ -42,6 +42,7 @@ LocalMetricsServer::LocalMetricsServer(QObject *parent)
                     socket->disconnectFromHost();
                     return;
                 }
+                Q_EMIT payloadRequested();
                 const QByteArray body = m_payload.toUtf8();
                 QByteArray response =
                     "HTTP/1.1 200 OK\r\n"
@@ -96,6 +97,25 @@ void LocalMetricsServer::setPort(int port)
     }
 }
 
+bool LocalMetricsServer::listenOnAllInterfaces() const
+{
+    return m_listenOnAllInterfaces;
+}
+
+void LocalMetricsServer::setListenOnAllInterfaces(bool enabled)
+{
+    if (m_listenOnAllInterfaces != enabled) {
+        m_listenOnAllInterfaces = enabled;
+        restartServer();
+        Q_EMIT listenOnAllInterfacesChanged();
+    }
+}
+
+QString LocalMetricsServer::listeningAddress() const
+{
+    return m_server->isListening() ? m_server->serverAddress().toString() : QString();
+}
+
 QString LocalMetricsServer::payload() const
 {
     return m_payload;
@@ -122,7 +142,10 @@ void LocalMetricsServer::restartServer()
     }
 
     if (m_enabled) {
-        if (!m_server->listen(QHostAddress::LocalHost, static_cast<quint16>(m_port))) {
+        const QHostAddress address = m_listenOnAllInterfaces
+            ? QHostAddress::AnyIPv4
+            : QHostAddress::LocalHost;
+        if (!m_server->listen(address, static_cast<quint16>(m_port))) {
             Q_EMIT error(m_server->errorString());
         }
     }

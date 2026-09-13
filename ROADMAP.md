@@ -122,7 +122,9 @@ publication requires exact-tag artifacts and readback from every named surface.
 
 ### Useful local integrations
 
-- Improve scheduled exports and loopback Prometheus labels without widening the network boundary.
+- Improve scheduled exports and low-cardinality Prometheus labels while keeping
+  loopback as the secure default and all-IPv4 listening as an explicit,
+  unauthenticated opt-in.
 - Keep webhook payloads small and explicit.
 - Improve Browser Sync diagnostics while treating the feature as Labs.
 

@@ -13,6 +13,8 @@ class LocalMetricsServer : public QObject
 
     Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(int port READ port WRITE setPort NOTIFY portChanged)
+    Q_PROPERTY(bool listenOnAllInterfaces READ listenOnAllInterfaces WRITE setListenOnAllInterfaces NOTIFY
+            listenOnAllInterfacesChanged)
     Q_PROPERTY(QString payload READ payload WRITE setPayload NOTIFY payloadChanged)
     Q_PROPERTY(bool listening READ isListening NOTIFY listeningChanged)
 
@@ -26,6 +28,10 @@ public:
     int port() const;
     void setPort(int port);
 
+    bool listenOnAllInterfaces() const;
+    void setListenOnAllInterfaces(bool enabled);
+    QString listeningAddress() const;
+
     QString payload() const;
     void setPayload(const QString &payload);
 
@@ -34,6 +40,8 @@ public:
 Q_SIGNALS:
     void enabledChanged();
     void portChanged();
+    void listenOnAllInterfacesChanged();
+    void payloadRequested();
     void payloadChanged();
     void listeningChanged();
     void error(const QString &message);
@@ -44,6 +52,7 @@ private:
     QTcpServer *m_server = nullptr;
     bool m_enabled = false;
     int m_port = 9464;
+    bool m_listenOnAllInterfaces = false;
     QString m_payload;
 };
 

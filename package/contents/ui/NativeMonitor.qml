@@ -623,6 +623,7 @@ Item {
         id: metricsServer
         enabled: Plasmoid.configuration.prometheusEnabled
         port: Plasmoid.configuration.prometheusPort
+        listenOnAllInterfaces: Plasmoid.configuration.prometheusListenAllInterfaces
     }
 
     WebhookNotifier {

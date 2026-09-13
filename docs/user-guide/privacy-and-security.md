@@ -42,9 +42,11 @@ calculations read local SQLite history only and make no network request.
 
 Remote custom base URLs must use HTTPS. Plain HTTP is accepted only for loopback development endpoints.
 
-The optional Prometheus server binds to 127.0.0.1. Guardrail metrics aggregate
-by provider, risk kind, and actual/estimated value class; they do not add model,
-project, workspace, scope, stable-ID, or API-key labels.
+The optional Prometheus server binds to `127.0.0.1` by default. An explicit
+setting can expose its unauthenticated, unencrypted endpoint on all IPv4
+interfaces; use a firewall whenever that setting is enabled. Guardrail metrics
+aggregate by source, risk kind, and actual/estimated value class; they do not
+add model, project, workspace, scope, stable-ID, or API-key labels.
 
 Slack and Discord webhooks send alert content to the configured webhook service.
 Policy notifications use an allow-listed payload containing provider display

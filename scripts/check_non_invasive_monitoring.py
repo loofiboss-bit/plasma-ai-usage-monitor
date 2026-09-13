@@ -40,6 +40,9 @@ for relative, (scheduled, manual) in checks.items():
 runtime_coordinator = (
     ROOT / "package/contents/ui/RuntimeCoordinator.qml"
 ).read_text()
+prometheus_helper = (
+    ROOT / "package/contents/ui/PrometheusMetrics.js"
+).read_text()
 metrics_start = runtime_coordinator.find("var typedMetrics")
 metrics_end = runtime_coordinator.find(
     "ai_usage_provider_probe_input_tokens", metrics_start
@@ -92,5 +95,59 @@ for forbidden_dimension in (
         )
 if '"budget_pacing"' in guardrail_body:
     fail("Prometheus guardrail export uses a non-contract risk kind")
+
+for required in (
+    "ai_usage_tool_quota_percent_remaining",
+    "ai_usage_tool_quota_reset_timestamp_seconds",
+    'tool=\\""',
+    'kind=\\""',
+    'source=\\""',
+    'quality=\\""',
+):
+    if required not in prometheus_helper:
+        fail(f"Prometheus tool-quota export is missing {required}")
+if "monitor.quotaWindowsChanged.connect(syncMetricsPayload)" not in runtime_coordinator:
+    fail("Prometheus payload does not refresh when synchronized quota windows change")
+if "function onPayloadRequested()" not in runtime_coordinator:
+    fail("Prometheus payload is not regenerated for each scrape")
+
+dashboard = json.loads((ROOT / "docs/grafana-dashboard.json").read_text())
+dashboard_expressions = {
+    target["expr"]
+    for panel in dashboard.get("panels", [])
+    for target in panel.get("targets", [])
+    if isinstance(target.get("expr"), str)
+}
+emitted_metric_names = set(re.findall(
+    r"\bai_usage_[a-z0-9_]+\b", runtime_coordinator + prometheus_helper
+))
+queried_metric_names = set(re.findall(
+    r"\bai_usage_[a-z0-9_]+\b", "\n".join(dashboard_expressions)
+))
+unknown_dashboard_metrics = queried_metric_names - emitted_metric_names
+if unknown_dashboard_metrics:
+    fail(
+        "Grafana dashboard queries metrics not emitted by the runtime: "
+        + ", ".join(sorted(unknown_dashboard_metrics))
+    )
+required_dashboard_queries = {
+    'min(ai_usage_tool_quota_percent_remaining{tool=~"$tool"})',
+    'clamp_min(min(ai_usage_tool_quota_reset_timestamp_seconds{tool=~"$tool"}) - time(), 0)',
+    'ai_usage_tool_quota_percent_remaining{tool=~"$tool"}',
+    '(min by (tool, kind) (ai_usage_tool_quota_percent_remaining{tool=~"$tool"}) / (clamp_min(-deriv((min by (tool, kind) (ai_usage_tool_quota_percent_remaining{tool=~"$tool"}))[1h:]) * 3600, 0) > 0)) * 3600',
+    'clamp_min(-deriv((min by (tool, kind) (ai_usage_tool_quota_percent_remaining{tool=~"$tool"}))[15m:]) * 3600, 0)',
+}
+missing_dashboard_queries = required_dashboard_queries - dashboard_expressions
+if missing_dashboard_queries:
+    fail(
+        "Grafana dashboard is missing contracted queries: "
+        + ", ".join(sorted(missing_dashboard_queries))
+    )
+usage_rate_panels = [
+    panel for panel in dashboard.get("panels", [])
+    if panel.get("title") == "Quota Usage Rate"
+]
+if len(usage_rate_panels) != 1 or usage_rate_panels[0].get("type") != "timeseries":
+    fail("Grafana quota usage rate must be presented as one time-series panel")
 
 print(f"Non-invasive monitoring OK: {len(catalog['providers'])} provider profiles")
