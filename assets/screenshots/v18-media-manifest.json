@@ -1,9 +1,9 @@
 {
-  "version": "20.0.0",
+  "version": "20.1.0",
   "sessionId": "f2cfda94-3647-430a-b0dc-22afe3a44ed0",
   "fixtureSha256": "ded180d50ae8abfe49122dcc03c4ebca0adf210b0d0da6bdd64c873bfdb74d15",
-  "sourceTreeSha256": "c63d5f92222f0799a5f1f7fb09f6fb00592597eac98fb35d8f02b92c5d71aa49",
-  "archiveSourceTreeSha256": "c63d5f92222f0799a5f1f7fb09f6fb00592597eac98fb35d8f02b92c5d71aa49",
+  "sourceTreeSha256": "d25e3bb5126ce9f982d0198c79cf7885b3f44e3ca8c225770f755ffbcabf0a7b",
+  "archiveSourceTreeSha256": "d25e3bb5126ce9f982d0198c79cf7885b3f44e3ca8c225770f755ffbcabf0a7b",
   "sourceTreeCommit": "501852e550cd4396b0ce0077b5326db030a60442",
   "sourceTreeMode": "filesystem-release-candidate",
   "plasmaSession": "Fedora KDE Plasma",

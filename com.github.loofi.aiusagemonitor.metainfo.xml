@@ -78,6 +78,7 @@
 
   <releases>
 
+    <release version="20.1.0" date="2026-09-13"/>
     <release version="20.0.0" date="2026-09-07"/>
     <release version="19.0.1" date="2026-08-17"/>
     <release version="19.0.0" date="2026-08-15">

@@ -2,7 +2,7 @@
 
 | Field | Decision |
 | --- | --- |
-| Proposed release | 20.0.0 |
+| Proposed release | 20.1.0 |
 | Review date | 2026-09-05 |
 | Plan finalized | 2026-09-07 |
 | Reviewed main | `9942664` — current release 19.0.1 |

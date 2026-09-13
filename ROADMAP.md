@@ -1,36 +1,17 @@
 # Roadmap
 
-**Current release:** 20.0.0, Reliable Daily Quotas
+**Current release:** 20.1.0, Quota Observability & Platform Flexibility
 
-**Last updated:** 2026-09-07
-
-## Release in preparation: 20.0.0 Reliable Daily Quotas
-
-Make quota, reset, freshness, and recovery consistent across the panel, tooltip,
-Overview, and Source Detail. Reuse the prepared fixes in PRs #49 and #50, then:
-
-1. Separate authenticated quota freshness from local activity and select the
-   earliest reset independently of the lowest remaining quota.
-2. Consolidate daily presentation and qualify panel orientation, scaling,
-   localization, unavailable values, and real zeroes.
-3. Add per-entry subscription evidence lifecycle and distinguish account
-   entitlement, published pricing, and local activity targets.
-4. Produce repeatable isolated Plasma evidence for exact candidate qualification.
-5. Update user documentation and verify the release on Fedora before publication.
-
-The plan is finalized. Remaining CI, media, and physical desktop qualification
-are deferred to the v20 release stage by the owner; they are not marked passed.
-Implementation is in progress; publication remains pending. The detailed review, acceptance cases, and
-delivery phases are in the
-[v20 plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V20_CODEX_PLAN.md).
-
-AI Usage Monitor remains a desktop-native, local-first Plasma widget. v19 adds
-verified cost intelligence, signed catalog activation, deterministic pricing
-dimensions, immutable estimate provenance, drift visibility, and fail-closed
-expiry behavior. It does not add provider writes, FX, inference, or a fourth
-popup tab.
+**Last updated:** 2026-09-13
 
 ## Current release
+
+### 20.1.0 Quota Observability & Platform Flexibility
+
+- Refresh Codex quotas from the user's local CLI login independently of browser sync.
+- Add an automatic update check privacy control to gate external release checks and stop periodic polling.
+- Export live tool quota remaining and reset timestamps to Prometheus and allow opt-in all-IPv4 network listening.
+- Provide platform-aware recovery and version check guidance for Fedora, FreeBSD, and generic Linux.
 
 ### 20.0.0 Reliable Daily Quotas
 
