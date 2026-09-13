@@ -37,6 +37,32 @@ class EvidenceTests(unittest.TestCase):
         self.assertIn('https://example.com/pricing', text)
         self.assertFalse(report(fixture, date(2026, 10, 5))[1])
 
+    def test_manual_review_with_current_evidence_is_not_actionable(self):
+        fixture = {
+            'tools': [{
+                'key': 'example',
+                'reviewReason': 'Vendor requires authenticated account verification.',
+                'plans': [{
+                    'id': 'free',
+                    'price': {
+                        'amount': 0,
+                        'currency': 'USD',
+                        'period': 'month',
+                        'precision': 'official_exact',
+                        'evidence': dict(self.evidence(), needsManualReview=True),
+                    },
+                }],
+            }],
+        }
+        text, actionable = report(fixture, date(2026, 9, 10))
+        self.assertFalse(actionable)
+        self.assertIn('example / free / Price', text)
+        self.assertIn('Vendor requires authenticated account verification', text)
+
+        text_expired, actionable_expired = report(fixture, date(2026, 10, 6))
+        self.assertTrue(actionable_expired)
+        self.assertIn('evidence not current', text_expired)
+
     def test_source_review_cannot_be_renewed_by_entry(self):
         evidence = self.evidence()
         evidence['sourceRefs'][0]['reviewedAt'] = '2026-07-01'

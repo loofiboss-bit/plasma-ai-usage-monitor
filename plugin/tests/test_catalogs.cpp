@@ -123,7 +123,7 @@ void CatalogsTest::providerCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 7);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.08.17"));
+    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.09.13"));
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(!catalog.reviewItems().isEmpty());

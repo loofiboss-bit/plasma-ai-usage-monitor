@@ -23,7 +23,8 @@ jobs:
           python3 scripts/check_catalog_drift.py --network --strict-actionable-review \
             --format markdown --output catalog-drift-report.md
           status=$?
-          python3 scripts/check_subscription_drift.py --output subscription-drift-report.md
+          python3 scripts/check_subscription_drift.py --strict-actionable-review \
+            --output subscription-drift-report.md
           subscription_status=$?
           cat subscription-drift-report.md >> catalog-drift-report.md
           if [[ "$subscription_status" != "0" ]]; then status=1; fi
