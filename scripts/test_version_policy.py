@@ -84,4 +84,24 @@ with tempfile.TemporaryDirectory(prefix="ai-monitor-version-policy-") as temp:
         if result.returncode == 0:
             raise SystemExit(f"Version policy accepted mutated {label}")
 
+    appstream_path = fixture / "com.github.loofi.aiusagemonitor.metainfo.xml"
+    original_appstream = appstream_path.read_text(encoding="utf-8")
+
+    commented = original_appstream.replace(
+        f'<release version="{version}"',
+        f'<!-- Release notes review -->\n    <release version="{version}"',
+        1,
+    )
+    appstream_path.write_text(commented, encoding="utf-8")
+    result = run(fixture)
+    appstream_path.write_text(original_appstream, encoding="utf-8")
+    if result.returncode != 0:
+        raise SystemExit(f"Version policy rejected AppStream release preceded by comments: {result.stderr}")
+
+    appstream_path.write_text("<component><releases>", encoding="utf-8")
+    result = run(fixture)
+    appstream_path.write_text(original_appstream, encoding="utf-8")
+    if result.returncode == 0:
+        raise SystemExit("Version policy accepted malformed AppStream XML")
+
 print(f"Version policy tests OK: {len(mutations)} release surfaces rejected")

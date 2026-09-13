@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 
@@ -86,14 +87,17 @@ def main() -> None:
     if spec_version != version:
         fail(f"RPM Version is {spec_version}, expected {version}")
 
-    metainfo = (
-        root / "com.github.loofi.aiusagemonitor.metainfo.xml"
-    ).read_text(encoding="utf-8")
-    appstream_version = require_match(
-        metainfo,
-        r"<releases>\s*(?:<!--.*?-->\s*)*<release version=\"(\d+\.\d+\.\d+)\"",
-        "latest AppStream release",
-    ).group(1)
+    metainfo_path = root / "com.github.loofi.aiusagemonitor.metainfo.xml"
+    try:
+        metainfo_tree = ET.fromstring(metainfo_path.read_text(encoding="utf-8"))
+    except (OSError, ET.ParseError) as error:
+        fail(f"cannot read or parse {metainfo_path.name}: {error}")
+    release_elements = metainfo_tree.findall("./releases/release")
+    if not release_elements:
+        fail("latest AppStream release is missing")
+    appstream_version = release_elements[0].get("version")
+    if not appstream_version or not re.fullmatch(r"\d+\.\d+\.\d+", appstream_version):
+        fail("latest AppStream release is missing")
     if appstream_version != version:
         fail(f"latest AppStream release is {appstream_version}, expected {version}")
 
