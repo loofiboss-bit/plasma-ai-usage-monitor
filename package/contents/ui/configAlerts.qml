@@ -20,6 +20,7 @@ KCM.SimpleKCM {
     property alias cfg_notifyOnDisconnect: disconnectNotifySwitch.checked
     property alias cfg_notifyOnReconnect: reconnectNotifySwitch.checked
     property alias cfg_notificationCooldownMinutes: cooldownSlider.value
+    property alias cfg_automaticUpdateChecks: automaticUpdateChecksSwitch.checked
     property alias cfg_notifyOnUpdate: updateNotifySwitch.checked
     property alias cfg_updateCheckInterval: updateCheckSpinBox.value
 
@@ -300,6 +301,12 @@ KCM.SimpleKCM {
         }
 
         QQC2.Switch {
+            id: automaticUpdateChecksSwitch
+            Kirigami.FormData.label: i18n("Check for new AI Usage Monitor releases:")
+            checked: Plasmoid.configuration.automaticUpdateChecks
+        }
+
+        QQC2.Switch {
             id: updateNotifySwitch
             Kirigami.FormData.label: i18n("Notify on new version:")
             enabled: alertsSwitch.checked
@@ -308,7 +315,7 @@ KCM.SimpleKCM {
 
         RowLayout {
             Kirigami.FormData.label: i18n("Check every:")
-            enabled: alertsSwitch.checked && updateNotifySwitch.checked
+            enabled: automaticUpdateChecksSwitch.checked
             spacing: Kirigami.Units.smallSpacing
 
             QQC2.SpinBox {
@@ -326,12 +333,11 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            text: i18n("Checks GitHub for new releases and shows a KDE notification when an update is available.")
+            text: i18n("Automatic checks contact GitHub for new AI Usage Monitor releases. Update notifications remain controlled separately.")
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
-            enabled: alertsSwitch.checked
         }
 
         Kirigami.Separator {

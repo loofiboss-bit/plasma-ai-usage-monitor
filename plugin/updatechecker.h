@@ -26,6 +26,7 @@ class UpdateChecker : public QObject
     Q_PROPERTY(QString currentVersion READ currentVersion WRITE setCurrentVersion NOTIFY currentVersionChanged)
     Q_PROPERTY(int checkIntervalHours READ checkIntervalHours WRITE setCheckIntervalHours NOTIFY checkIntervalHoursChanged)
     Q_PROPERTY(QString releaseApiUrl READ releaseApiUrl WRITE setReleaseApiUrl NOTIFY releaseApiUrlChanged)
+    Q_PROPERTY(bool automaticChecksEnabled READ automaticChecksEnabled WRITE setAutomaticChecksEnabled NOTIFY automaticChecksEnabledChanged)
     Q_PROPERTY(bool checking READ checking NOTIFY checkingChanged)
     Q_PROPERTY(QString latestVersion READ latestVersion NOTIFY latestVersionChanged)
 
@@ -43,16 +44,21 @@ public:
     QString releaseApiUrl() const;
     void setReleaseApiUrl(const QString &url);
 
+    bool automaticChecksEnabled() const;
+    void setAutomaticChecksEnabled(bool enabled);
+
     bool checking() const;
     QString latestVersion() const;
 
-    /// Trigger a manual check (callable from QML)
+    /// Trigger a manual check from QML.
+    /// No-op while automatic checks are disabled or currentVersion is empty.
     Q_INVOKABLE void checkForUpdate();
 
 Q_SIGNALS:
     void currentVersionChanged();
     void checkIntervalHoursChanged();
     void releaseApiUrlChanged();
+    void automaticChecksEnabledChanged();
     void checkingChanged();
     void latestVersionChanged();
     void updateAvailable(const QString &latestVersion, const QString &releaseUrl);
@@ -66,6 +72,7 @@ private:
     QString m_latestVersion;
     QString m_releaseApiUrl = QStringLiteral("https://api.github.com/repos/loofiboss-bit/plasma-ai-usage-monitor/releases/latest");
     int m_intervalHours = 12;
+    bool m_automaticChecksEnabled = true;
     bool m_checking = false;
 };
 

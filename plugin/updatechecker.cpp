@@ -25,6 +25,7 @@ UpdateChecker::UpdateChecker(QObject *parent)
 {
     m_timer->setSingleShot(false);
     connect(m_timer, &QTimer::timeout, this, &UpdateChecker::checkForUpdate);
+    QTimer::singleShot(5000, this, &UpdateChecker::checkForUpdate);
 }
 
 // ── Properties ──
@@ -62,6 +63,24 @@ void UpdateChecker::setReleaseApiUrl(const QString &url)
     Q_EMIT releaseApiUrlChanged();
 }
 
+bool UpdateChecker::automaticChecksEnabled() const { return m_automaticChecksEnabled; }
+void UpdateChecker::setAutomaticChecksEnabled(bool enabled)
+{
+    if (m_automaticChecksEnabled == enabled) {
+        return;
+    }
+
+    m_automaticChecksEnabled = enabled;
+
+    if (enabled) {
+        startTimerIfReady();
+    } else {
+        m_timer->stop();
+    }
+
+    Q_EMIT automaticChecksEnabledChanged();
+}
+
 bool UpdateChecker::checking() const { return m_checking; }
 QString UpdateChecker::latestVersion() const { return m_latestVersion; }
 
@@ -69,7 +88,7 @@ QString UpdateChecker::latestVersion() const { return m_latestVersion; }
 
 void UpdateChecker::checkForUpdate()
 {
-    if (m_checking) return;
+    if (!m_automaticChecksEnabled || m_currentVersion.isEmpty() || m_checking) return;
 
     m_checking = true;
     Q_EMIT checkingChanged();
@@ -117,11 +136,10 @@ void UpdateChecker::checkForUpdate()
 
 void UpdateChecker::startTimerIfReady()
 {
-    if (m_currentVersion.isEmpty()) return;
+    if (!m_automaticChecksEnabled || m_currentVersion.isEmpty()) return;
+
     m_timer->setInterval(m_intervalHours * 3600 * 1000);
     if (!m_timer->isActive()) {
         m_timer->start();
-        // Also do an immediate first check (with short delay to let QML finish loading)
-        QTimer::singleShot(5000, this, &UpdateChecker::checkForUpdate);
     }
 }

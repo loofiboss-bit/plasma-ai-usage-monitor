@@ -75,7 +75,7 @@ KCM.SimpleKCM {
         "notificationCooldownMinutes", "dndStartHour", "dndEndHour", "openaiNotificationsEnabled", "anthropicNotificationsEnabled",
         "googleNotificationsEnabled", "mistralNotificationsEnabled", "deepseekNotificationsEnabled", "groqNotificationsEnabled", "xaiNotificationsEnabled",
         "ollamaNotificationsEnabled", "openrouterNotificationsEnabled", "togetherNotificationsEnabled", "cohereNotificationsEnabled", "googleveoNotificationsEnabled",
-        "azureNotificationsEnabled", "bedrockNotificationsEnabled", "litellmNotificationsEnabled", "cerebrasNotificationsEnabled", "fireworksNotificationsEnabled", "perplexityNotificationsEnabled", "notifyOnUpdate", "updateCheckInterval", "slackWebhookEnabled",
+        "azureNotificationsEnabled", "bedrockNotificationsEnabled", "litellmNotificationsEnabled", "cerebrasNotificationsEnabled", "fireworksNotificationsEnabled", "perplexityNotificationsEnabled", "automaticUpdateChecks", "notifyOnUpdate", "updateCheckInterval", "slackWebhookEnabled",
         "discordWebhookEnabled", "webhookCooldownMinutes", "openaiDailyBudget", "openaiMonthlyBudget", "anthropicDailyBudget",
         "anthropicMonthlyBudget", "googleDailyBudget", "googleMonthlyBudget", "mistralDailyBudget", "mistralMonthlyBudget",
         "deepseekDailyBudget", "deepseekMonthlyBudget", "groqDailyBudget", "groqMonthlyBudget", "xaiDailyBudget",

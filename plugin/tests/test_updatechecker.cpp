@@ -108,6 +108,9 @@ private Q_SLOTS:
     void testSetReleaseApiUrl();
     void testEmitsUpdateForNewerRelease();
     void testDoesNotEmitUpdateForSameVersion();
+    void testMissingCurrentVersionDoesNotRequest();
+    void testDisabledCheckerDoesNotRequest();
+    void testReEnablingAllowsSingleRequest();
 };
 
 void UpdateCheckerTest::testSetCurrentVersion()
@@ -162,6 +165,7 @@ void UpdateCheckerTest::testInitialState()
     QVERIFY(checker.currentVersion().isEmpty());
     QVERIFY(checker.latestVersion().isEmpty());
     QVERIFY(!checker.checking());
+    QVERIFY(checker.automaticChecksEnabled());
     QCOMPARE(checker.checkIntervalHours(), 12);
 }
 
@@ -241,6 +245,79 @@ void UpdateCheckerTest::testDoesNotEmitUpdateForSameVersion()
     QTRY_VERIFY_WITH_TIMEOUT(latestSpy.count() >= 1, 3000);
     QCOMPARE(checker.latestVersion(), QStringLiteral("3.8.1"));
     QCOMPARE(updateSpy.count(), 0);
+}
+
+void UpdateCheckerTest::testMissingCurrentVersionDoesNotRequest()
+{
+    UpdateStubServer server;
+    QVERIFY(server.listen());
+
+    UpdateChecker checker;
+    checker.setReleaseApiUrl(server.urlFor(QStringLiteral("/releases/latest")));
+
+    checker.checkForUpdate();
+
+    QTest::qWait(100);
+    QCOMPARE(server.hitCount(QStringLiteral("/releases/latest")), 0);
+    QVERIFY(!checker.checking());
+}
+
+void UpdateCheckerTest::testDisabledCheckerDoesNotRequest()
+{
+    UpdateStubServer server;
+    QVERIFY(server.listen());
+    server.setResponse(QStringLiteral("GET"),
+                       QStringLiteral("/releases/latest"),
+                       200,
+                       QByteArrayLiteral(R"JSON({
+                           "tag_name": "v3.9.0",
+                           "html_url": "https://example.test/releases/v3.9.0"
+                       })JSON"));
+
+    UpdateChecker checker;
+    checker.setReleaseApiUrl(server.urlFor(QStringLiteral("/releases/latest")));
+    checker.setCurrentVersion(QStringLiteral("3.8.1"));
+
+    QSignalSpy enabledSpy(&checker, &UpdateChecker::automaticChecksEnabledChanged);
+    QSignalSpy updateSpy(&checker, &UpdateChecker::updateAvailable);
+
+    checker.setAutomaticChecksEnabled(false);
+    checker.checkForUpdate();
+
+    QTest::qWait(100);
+    QCOMPARE(server.hitCount(QStringLiteral("/releases/latest")), 0);
+    QCOMPARE(updateSpy.count(), 0);
+    QCOMPARE(enabledSpy.count(), 1);
+    QVERIFY(!checker.automaticChecksEnabled());
+    QVERIFY(!checker.checking());
+}
+
+void UpdateCheckerTest::testReEnablingAllowsSingleRequest()
+{
+    UpdateStubServer server;
+    QVERIFY(server.listen());
+    server.setResponse(QStringLiteral("GET"),
+                       QStringLiteral("/releases/latest"),
+                       200,
+                       QByteArrayLiteral(R"JSON({
+                           "tag_name": "v3.8.1",
+                           "html_url": "https://example.test/releases/v3.8.1"
+                       })JSON"));
+
+    UpdateChecker checker;
+    checker.setReleaseApiUrl(server.urlFor(QStringLiteral("/releases/latest")));
+    checker.setAutomaticChecksEnabled(false);
+    checker.setCurrentVersion(QStringLiteral("3.8.1"));
+
+    checker.setAutomaticChecksEnabled(true);
+    QTest::qWait(100);
+    QCOMPARE(server.hitCount(QStringLiteral("/releases/latest")), 0);
+
+    checker.checkForUpdate();
+
+    QTRY_COMPARE_WITH_TIMEOUT(server.hitCount(QStringLiteral("/releases/latest")), 1, 1000);
+    QTest::qWait(200);
+    QCOMPARE(server.hitCount(QStringLiteral("/releases/latest")), 1);
 }
 
 QTEST_MAIN(UpdateCheckerTest)

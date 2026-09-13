@@ -31,6 +31,11 @@ from schema v5 is transactional and creates a `.v18-backup` first.
 
 Enabled providers connect directly to their configured API endpoints. Scheduled calls are read-only and listed in the generated capability matrix. Manual inference tests are explicit and may consume quota or money.
 
+By default, AI Usage Monitor checks for new versions through GitHub's Releases
+API at `https://api.github.com/repos/loofiboss-bit/plasma-ai-usage-monitor/releases/latest`.
+Disable this under **Settings -> Alerts -> Update Notifications** without
+affecting provider monitoring.
+
 OpenAI and Anthropic organization reports use read-only endpoints, bounded
 pagination, and never send a message or inference request. Forecast
 calculations read local SQLite history only and make no network request.

@@ -708,6 +708,7 @@ Item {
 
     UpdateChecker {
         id: updateChecker
+        automaticChecksEnabled: Plasmoid.configuration.automaticUpdateChecks
         // Plasma's KPluginMetaData value type is absent from its installed qmltypes.
         // qmllint disable unresolved-type
         currentVersion: (Plasmoid["metaData"]

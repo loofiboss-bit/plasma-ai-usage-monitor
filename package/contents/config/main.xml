@@ -389,6 +389,10 @@
         <entry name="fireworksNotificationsEnabled" type="Bool"><default>true</default></entry>
         <entry name="perplexityNotificationsEnabled" type="Bool"><default>true</default></entry>
         <!-- Update notifications -->
+        <entry name="automaticUpdateChecks" type="Bool">
+            <default>true</default>
+            <label>Automatically check GitHub for new AI Usage Monitor releases</label>
+        </entry>
         <entry name="notifyOnUpdate" type="Bool">
             <default>true</default>
             <label>Show notification when a new version is available</label>
