@@ -33,7 +33,7 @@ Item {
         onRecoveryRequested: {
             scheduler.refreshStaleProviders(scheduler.refreshScheduled);
             scheduler.refreshAntigravity(false);
-            scheduler.performBrowserSync();
+            scheduler.performAutomaticSubscriptionSync();
         }
     }
 
@@ -138,6 +138,18 @@ Item {
         }
     }
 
+    function performAutomaticSubscriptionSync() {
+        if (configuration.browserSyncEnabled && configuration.claudeCodeEnabled
+                && claudeCodeMonitor.installed && claudeCodeMonitor.canAutoSync()) {
+            browserSyncService.sync("claude", claudeCodeMonitor);
+        }
+
+        if (configuration.codexEnabled && codexCliMonitor.installed
+                && codexCliMonitor.canAutoSync()) {
+            codexCliMonitor.syncFromLocalAuth();
+        }
+    }
+
     function antigravityIsFresh() {
         var last = antigravityMonitor?.lastSuccessfulRefresh;
         if (!last) return false;
@@ -175,8 +187,9 @@ Item {
     Timer {
         interval: Math.max(60, scheduler.configuration.browserSyncInterval) * 1000
         running: scheduler.configuration.browserSyncEnabled
+                 || scheduler.configuration.codexEnabled
         repeat: true
-        onTriggered: scheduler.performBrowserSync()
+        onTriggered: scheduler.performAutomaticSubscriptionSync()
     }
 
     Timer {

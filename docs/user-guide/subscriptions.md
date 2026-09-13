@@ -36,7 +36,15 @@ Choose the correct plan for locally tracked tools. Antigravity is the exception:
 
 ## Codex CLI
 
-The widget prefers the existing local Codex login and can read its live five-hour and weekly quota windows when the local response format is supported. If that source is unavailable, the card falls back to local plan tracking.
+The widget automatically uses the existing local Codex login to refresh live
+five-hour and weekly quota windows at startup, on its refresh schedule, and
+after Codex monitoring is enabled. This local-auth refresh does not inspect
+browser profiles, even when Browser Sync is unavailable or its circuit breaker
+has stopped browser requests. If local auth is unavailable, the card falls back
+to local plan tracking.
+
+When you explicitly enable and run Browser Sync Labs, Codex still tries local
+auth first and may use the selected browser session as a compatibility fallback.
 
 ## Claude Code
 
@@ -48,7 +56,10 @@ The card tracks local activity and the selected billing mode. An optional GitHub
 
 ## Browser Sync Labs
 
-Browser Sync Labs is off by default. It reads a selected local browser profile and calls the relevant service directly with the existing session.
+Browser Sync Labs is off by default. Only enabling it permits the widget to read
+a selected local browser profile and call the relevant service directly with
+the existing session. Automatic Codex local-auth refresh does not require this
+setting and does not read browser storage.
 
 Before enabling it:
 

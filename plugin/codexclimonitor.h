@@ -47,6 +47,7 @@ public:
     Q_INVOKABLE int defaultSecondaryLimitForPlan(const QString &plan) const override;
 
     // Live sync
+    Q_INVOKABLE void syncFromLocalAuth();
     Q_INVOKABLE void syncFromBrowser(const QString &cookieHeader, int browserType) override;
 
     // Pure parser kept public for deterministic regression tests.
@@ -71,6 +72,7 @@ protected:
 
 private:
     QString codexConfigDir() const;
+    void startSync(const QString &browserCookieHeader, bool browserFallbackRequested);
     bool fetchCodexUsage(const QString &cookieHeader);
     void fetchAccountCheck(const QString &cookieHeader);
 

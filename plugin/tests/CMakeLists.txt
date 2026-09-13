@@ -249,6 +249,19 @@ target_link_libraries(test_subscription_tools
 
 add_test(NAME subscription_tools COMMAND test_subscription_tools)
 
+add_executable(test_codexlocalauth
+    test_codexlocalauth.cpp
+    ${TEST_CATALOG_SRC}
+    ${CMAKE_SOURCE_DIR}/plugin/subscriptiontoolbackend.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/localactivitymonitorbase.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/codexclimonitor.cpp
+)
+target_include_directories(test_codexlocalauth PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_codexlocalauth
+    PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n
+)
+add_test(NAME codexlocalauth COMMAND test_codexlocalauth)
+
 add_executable(test_antigravitymonitor
     test_antigravitymonitor.cpp
     ${TEST_CATALOG_SRC}
@@ -449,6 +462,17 @@ add_test(
 add_executable(test_phase7_qml
     test_phase7_qml.cpp
 )
+
+add_executable(test_codexscheduling_qml
+    test_codexscheduling_qml.cpp
+)
+target_link_libraries(test_codexscheduling_qml PRIVATE Qt6::QuickTest)
+add_test(
+    NAME codexscheduling_qml
+    COMMAND test_codexscheduling_qml
+            -input "${CMAKE_CURRENT_SOURCE_DIR}/qml/codexscheduling"
+            -platform offscreen
+)
 target_link_libraries(test_phase7_qml PRIVATE Qt6::QuickTest)
 add_test(
     NAME phase7_qml
@@ -470,6 +494,7 @@ set(QML_TEST_NAMES
     history_qml
     phase6_qml
     phase7_qml
+    codexscheduling_qml
 )
 set_tests_properties(${QML_TEST_NAMES} PROPERTIES
     ENVIRONMENT
@@ -490,6 +515,7 @@ set(QML_TEST_TARGETS
     test_history_qml
     test_phase6_qml
     test_phase7_qml
+    test_codexscheduling_qml
 )
 foreach(qml_test_target IN LISTS QML_TEST_TARGETS)
     add_dependencies(${qml_test_target} aiusagemonitorplugin)

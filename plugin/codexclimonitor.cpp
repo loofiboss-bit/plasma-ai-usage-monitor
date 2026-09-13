@@ -96,29 +96,41 @@ double CodexCliMonitor::defaultCostForPlan(const QString &plan) const
     return catalogDefaultCostForPlan(plan);
 }
 
-// --- Browser Sync ---
+// --- Live sync ---
+
+void CodexCliMonitor::syncFromLocalAuth()
+{
+    startSync(QString(), false);
+}
 
 void CodexCliMonitor::syncFromBrowser(const QString &cookieHeader, int browserType)
 {
     Q_UNUSED(browserType);
+    startSync(cookieHeader, true);
+}
+
+void CodexCliMonitor::startSync(const QString &browserCookieHeader, bool browserFallbackRequested)
+{
     if (isSyncing()) return;
     setSyncing(true);
     setSyncStatus(QStringLiteral("Syncing..."));
 
-    if (!qEnvironmentVariableIsSet("PLASMA_AI_MONITOR_DEMO") && fetchCodexUsage(cookieHeader)) {
+    if (!qEnvironmentVariableIsSet("PLASMA_AI_MONITOR_DEMO") && fetchCodexUsage(browserCookieHeader)) {
         return;
     }
 
-    if (cookieHeader.isEmpty()) {
+    if (browserCookieHeader.isEmpty()) {
         setSyncing(false);
         setSyncStatus(i18n("Not logged in"));
-        const QString message = i18n("Not logged in — open chatgpt.com in the selected browser first");
+        const QString message = browserFallbackRequested
+            ? i18n("Not logged in — open chatgpt.com in the selected browser first")
+            : i18n("Not logged in - run codex login to enable local Codex quota sync");
         Q_EMIT syncDiagnostic(toolName(), QStringLiteral("not_logged_in"), message);
         Q_EMIT syncCompleted(false, message);
         return;
     }
 
-    fetchAccountCheck(cookieHeader);
+    fetchAccountCheck(browserCookieHeader);
 }
 
 bool CodexCliMonitor::fetchCodexUsage(const QString &cookieHeader)

@@ -475,7 +475,7 @@ Item {
         syncMetricsPayload();
         startupTimer.start();
         initialPruneTimer.start();
-        if (configuration.browserSyncEnabled) {
+        if (configuration.browserSyncEnabled || configuration.codexEnabled) {
             initialSyncTimer.start();
         }
     }
@@ -621,8 +621,9 @@ Item {
         }
 
         function onCodexEnabledChanged() {
-            if (runtime.codexCliMonitor.enabled) {
+            if (runtime.configuration.codexEnabled) {
                 runtime.codexCliMonitor.checkToolInstalled();
+                runtime.scheduler.performAutomaticSubscriptionSync();
             }
         }
 
@@ -692,7 +693,7 @@ Item {
         id: initialSyncTimer
         interval: 5000
         repeat: false
-        onTriggered: runtime.scheduler.performBrowserSync()
+        onTriggered: runtime.scheduler.performAutomaticSubscriptionSync()
     }
 
 }

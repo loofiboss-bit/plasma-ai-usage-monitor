@@ -58,9 +58,20 @@ The widget does not write provider keys to Plasma config files. If KWallet is un
 
 ## Browser Sync Labs
 
-Browser Sync reads the selected local profile and uses the existing authenticated session for a direct request to the service. Cookie data does not enter QML, diagnostics, logs, history, or exports.
+Browser Sync reads the selected local profile and uses the existing authenticated
+session for a direct request to the service. It reads browser storage only when
+Browser Sync Labs is enabled. Cookie data does not enter QML, diagnostics, logs,
+history, or exports.
 
 Temporary browser database copies use owner-only permissions. Browser Sync is disabled by default because it depends on undocumented service behavior.
+
+Codex quota refresh is separate from Browser Sync. When Codex monitoring is
+enabled, automatic startup, scheduled, and enable-time refreshes read the local
+Codex login directly and never inspect browser cookies. An explicit Browser Sync
+request may provide the selected browser session as a fallback if Codex local
+auth cannot complete. Claude session sync remains available only through enabled
+Browser Sync, and its browser-sync circuit breaker does not block automatic
+Codex local-auth refresh.
 
 ## Antigravity local monitoring
 
