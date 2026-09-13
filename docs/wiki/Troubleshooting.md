@@ -31,7 +31,7 @@ Run the smoke check from a repository checkout:
 ./scripts/smoke_test_plasmoid.sh
 ~~~
 
-Remove only the stale user-local package if Diagnostics confirms that it shadows the current RPM:
+Remove only the stale user-local package if Diagnostics confirms that it shadows the current system package:
 
 ~~~bash
 kpackagetool6 --type Plasma/Applet --remove com.github.loofi.aiusagemonitor
@@ -41,9 +41,9 @@ Log out and back in after changing install layers.
 
 ## QML plugin cannot be loaded
 
-The compiled plugin and Plasma package must have the same version. A missing or mismatched plugin opens an in-widget recovery screen with the detected frontend and plugin versions.
+The compiled plugin and Plasma package must have the same version. A missing or mismatched plugin opens an in-widget recovery screen with the detected frontend and plugin versions, a source-install link, and a redacted bootstrap report. The recovery screen stays platform-neutral because the native plugin may be unavailable.
 
-On Fedora, copy the command from that screen or reinstall the COPR package:
+Follow the [source installation guide](Installation#guided-source-install) for the current platform. On Fedora, you can instead reinstall the COPR package:
 
 ~~~bash
 sudo dnf reinstall plasma-ai-usage-monitor
@@ -55,7 +55,7 @@ Open Diagnostics and inspect **Version**, **Loaded plugin**, and **Install layer
 
 ## Frontend and native plugin versions differ
 
-Update the KDE Store frontend and the Fedora or source-installed plugin together. Diagnostics warns when a user-local frontend shadows the system package and offers a copyable repair command when it can identify one.
+Update the KDE Store frontend and the matching native plugin together. When Native Diagnostics is available, it warns when a user-local frontend shadows the system package. It offers a `dnf` repair command on Fedora and source-install guidance on other systems.
 
 ## KWallet does not open
 
@@ -149,10 +149,15 @@ Follow Plasma logs while reproducing the problem:
 journalctl --user -f | grep -i -E 'plasma|aiusage|qml'
 ~~~
 
-Also collect or copy **Diagnostics → Copy version check**:
+Also use **Diagnostics → Copy version check**. It always copies the Plasma version command:
 
 ~~~bash
 plasmashell --version
+~~~
+
+On Fedora, Native Diagnostics also includes the package version query:
+
+~~~bash
 rpm -q plasma-ai-usage-monitor
 ~~~
 

@@ -39,7 +39,8 @@ public:
                                            const QString &userDataRoot,
                                            const QStringList &systemDataRoots,
                                            const QString &nativePluginPath,
-                                           const QString &nativePluginVersion);
+                                           const QString &nativePluginVersion,
+                                           const QString &productType);
     static QVariantMap inspectDatabase(const QString &databasePath);
     static QString formatSupportReport(const QVariantMap &systemContext,
                                        const QVariantMap &runtimeContext);

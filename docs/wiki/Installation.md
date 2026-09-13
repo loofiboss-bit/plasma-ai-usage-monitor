@@ -3,7 +3,7 @@
 
 AI Usage Monitor needs a Plasma frontend and a matching compiled Qt plugin. The Fedora COPR and source install include both. The KDE Store package contains the frontend only.
 
-## Fedora COPR
+## Fedora COPR (Fedora only)
 
 Install the supported package:
 
@@ -37,13 +37,13 @@ Removing the package does not delete your local KWallet entries or history datab
 
 ## KDE Store package
 
-Install the native plugin from Fedora COPR or a source build before installing the KDE Store plasmoid. Keep the Store frontend and native plugin on the same version.
+Install the matching native plugin before installing the KDE Store plasmoid. On Fedora, use the COPR package above. On other supported Plasma 6 systems, use the source installation below. Keep the Store frontend and native plugin on the same version.
 
-If the plugin is missing or mismatched, the widget opens a recovery screen instead of a blank popup. It shows both detected versions, a copyable COPR command, a source-install link, and a redacted bootstrap report. Install or update the matching package, then restart Plasma or log out and back in.
+If the plugin is missing or mismatched, the widget opens a recovery screen instead of a blank popup. It shows both detected versions, a source-install link, and a redacted bootstrap report. Because the native plugin may be unavailable, this screen does not assume a distribution or package manager. Follow the source installation guide for the current platform, then restart Plasma or log out and back in.
 
 ## Guided source install
 
-Use this route on Plasma 6 systems where COPR is unavailable:
+Use this route on supported Plasma 6 systems when you are not installing the Fedora COPR package:
 
 ~~~bash
 git clone https://github.com/loofiboss-bit/plasma-ai-usage-monitor.git
@@ -82,4 +82,4 @@ A user-local widget can override the system package. If the panel shows an old v
 ./scripts/smoke_test_plasmoid.sh
 ~~~
 
-The two versions must match. Native Diagnostics also shows the frontend layer, plugin layer, loaded plugin path, and a repair command when it can identify one. Continue with [Troubleshooting](Troubleshooting) if the layers or versions do not agree.
+The two versions must match. Native Diagnostics also shows the frontend layer, plugin layer, loaded plugin path, and recovery guidance. On Fedora it can offer a `dnf` repair command; other systems receive source-install guidance. Continue with [Troubleshooting](Troubleshooting) if the layers or versions do not agree.

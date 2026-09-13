@@ -12,7 +12,6 @@ PlasmaExtras.Representation {
     required property string bootstrapState
     required property string supportReport
 
-    readonly property string installCommand: "sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor && sudo dnf install --refresh plasma-ai-usage-monitor"
     readonly property url sourceInstallUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/installation.md#guided-source-install"
     readonly property bool checking: bootstrapState === "idle"
                                      || bootstrapState === "loading-probe"
@@ -37,12 +36,12 @@ PlasmaExtras.Representation {
 
     function descriptionForState() {
         if (mismatch)
-            return i18n("Update the KDE Store widget and the Fedora package so both use the same version.");
+            return i18n("Update the widget frontend and matching native plugin together so both use the same version. Follow the source installation guide for your platform.");
         if (bootstrapState === "runtime-unavailable")
-            return i18n("The plugin was found, but the monitor could not load. Reinstall the matching package.");
+            return i18n("The plugin was found, but the monitor could not load. Reinstall the matching native plugin by following the source installation guide for your platform.");
         if (checking)
             return i18n("AI Usage Monitor is checking whether its compiled dependency is ready.");
-        return i18n("The KDE Store package contains the widget frontend only. Install the matching compiled plugin from Fedora COPR or build it from source.");
+        return i18n("The KDE Store package contains the widget frontend only. Install the matching native plugin by following the source installation guide for your platform.");
     }
 
     ColumnLayout {
@@ -104,33 +103,8 @@ PlasmaExtras.Representation {
 
             PlasmaComponents.Label {
                 Layout.fillWidth: true
-                text: i18n("Fedora COPR command")
-                font.bold: true
-            }
-
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: Kirigami.Units.smallSpacing
-
-                PlasmaComponents.TextField {
-                    id: commandField
-                    Layout.fillWidth: true
-                    readOnly: true
-                    selectByMouse: true
-                    text: bootstrap.installCommand
-                    Accessible.name: i18n("Fedora COPR install command")
-                }
-
-                PlasmaComponents.Button {
-                    text: copiedTimer.running ? i18n("Copied") : i18n("Copy")
-                    icon.name: "edit-copy"
-                    onClicked: {
-                        commandField.selectAll();
-                        commandField.copy();
-                        commandField.deselect();
-                        copiedTimer.restart();
-                    }
-                }
+                text: i18n("The guide covers matching widget and native plugin versions, build requirements, and source installation steps for supported platforms.")
+                wrapMode: Text.WordWrap
             }
 
             PlasmaComponents.Button {
@@ -182,11 +156,6 @@ PlasmaExtras.Representation {
         }
 
         Item { Layout.fillHeight: true }
-    }
-
-    Timer {
-        id: copiedTimer
-        interval: 2000
     }
 
     Timer {

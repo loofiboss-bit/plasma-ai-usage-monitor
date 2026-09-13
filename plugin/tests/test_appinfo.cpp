@@ -35,6 +35,7 @@ private Q_SLOTS:
     void supportReportRejectsSensitiveValues();
     void installationInspectionDetectsShadowingAndMismatch();
     void installationInspectionClassifiesMissingPlugin();
+    void installationInspectionUsesNeutralGuidanceForFreeBsd();
     void databaseInspectionIsReadOnlyAndTyped();
 };
 
@@ -186,7 +187,7 @@ void AppInfoTest::installationInspectionDetectsShadowingAndMismatch()
         QStringLiteral("14.0.0"), userRoot, {systemRoot},
         QStringLiteral("/usr/lib64/qt6/qml/com/github/loofi/aiusagemonitor/"
                        "libaiusagemonitorplugin.so"),
-        QStringLiteral("13.0.0"));
+        QStringLiteral("13.0.0"), QStringLiteral("fedora"));
     QCOMPARE(result.value(QStringLiteral("frontendLayer")).toString(),
              QStringLiteral("user-local"));
     QCOMPARE(result.value(QStringLiteral("pluginLayer")).toString(), QStringLiteral("system"));
@@ -206,11 +207,35 @@ void AppInfoTest::installationInspectionClassifiesMissingPlugin()
 
     const QVariantMap result = AppInfo::inspectInstallation(
         QStringLiteral("14.0.0"), QDir(root.path()).filePath(QStringLiteral("home/.local/share")),
-        {systemRoot}, QString(), QString());
+        {systemRoot}, QString(), QString(), QStringLiteral("fedora"));
     QCOMPARE(result.value(QStringLiteral("nativeStatus")).toString(), QStringLiteral("missing"));
     QVERIFY(!result.value(QStringLiteral("nativeAvailable")).toBool());
     QCOMPARE(result.value(QStringLiteral("repairCommand")).toString(),
              QStringLiteral("sudo dnf install plasma-ai-usage-monitor"));
+}
+
+void AppInfoTest::installationInspectionUsesNeutralGuidanceForFreeBsd()
+{
+    QTemporaryDir root;
+    QVERIFY(root.isValid());
+    for (const QString &pluginVersion : {QString(), QStringLiteral("13.0.0")})
+    {
+        const QString pluginPath = pluginVersion.isEmpty()
+            ? QString() : QStringLiteral("/usr/local/lib/qt6/qml/libaiusagemonitorplugin.so");
+        const QVariantMap result = AppInfo::inspectInstallation(
+            QStringLiteral("14.0.0"), QDir(root.path()).filePath(QStringLiteral("home/.local/share")),
+            {}, pluginPath, pluginVersion, QStringLiteral("freebsd"));
+        QCOMPARE(result.value(QStringLiteral("productType")).toString(), QStringLiteral("freebsd"));
+        QCOMPARE(result.value(QStringLiteral("nativeStatus")).toString(),
+                 pluginVersion.isEmpty() ? QStringLiteral("missing")
+                                         : QStringLiteral("version_mismatch"));
+        QCOMPARE(result.value(QStringLiteral("repairCommand")).toString(), QString());
+        const QString nextStep = result.value(QStringLiteral("nextStep")).toString();
+        QVERIFY(!nextStep.isEmpty());
+        for (const QString &term : {QStringLiteral("Fedora"), QStringLiteral("COPR"),
+                                    QStringLiteral("dnf"), QStringLiteral("rpm")})
+            QVERIFY2(!nextStep.contains(term), qPrintable(term));
+    }
 }
 
 void AppInfoTest::databaseInspectionIsReadOnlyAndTyped()

@@ -252,7 +252,8 @@ QVariantMap AppInfo::inspectInstallation(const QString &frontendVersion,
                                          const QString &userDataRoot,
                                          const QStringList &systemDataRoots,
                                          const QString &nativePluginPath,
-                                         const QString &nativePluginVersion)
+                                         const QString &nativePluginVersion,
+                                         const QString &productType)
 {
     const QString userVersion = metadataVersion(userDataRoot);
     const QString systemVersion = firstSystemVersion(systemDataRoots);
@@ -294,14 +295,30 @@ QVariantMap AppInfo::inspectInstallation(const QString &frontendVersion,
     if (!nativeAvailable)
     {
         nativeStatus = QStringLiteral("missing");
-        nextStep = i18n("Install the complete Fedora package, then restart Plasma.");
-        repairCommand = QStringLiteral("sudo dnf install plasma-ai-usage-monitor");
+        if (productType == QStringLiteral("fedora"))
+        {
+            nextStep = i18n("Install the complete Fedora package, then restart Plasma.");
+            repairCommand = QStringLiteral("sudo dnf install plasma-ai-usage-monitor");
+        }
+        else
+        {
+            nextStep = i18n("Install the matching native plugin from the source installation "
+                            "guide, then restart Plasma.");
+        }
     }
     else if (!versionMatch)
     {
         nativeStatus = QStringLiteral("version_mismatch");
-        nextStep = i18n("Update the frontend and native plugin together, then restart Plasma.");
-        repairCommand = QStringLiteral("sudo dnf upgrade --refresh plasma-ai-usage-monitor");
+        if (productType == QStringLiteral("fedora"))
+        {
+            nextStep = i18n("Update the frontend and native plugin together, then restart Plasma.");
+            repairCommand = QStringLiteral("sudo dnf upgrade --refresh plasma-ai-usage-monitor");
+        }
+        else
+        {
+            nextStep = i18n("Update the matching native plugin from the source installation "
+                            "guide, then restart Plasma.");
+        }
     }
     else if (shadowing)
     {
@@ -318,6 +335,7 @@ QVariantMap AppInfo::inspectInstallation(const QString &frontendVersion,
     }
 
     return {{QStringLiteral("frontendVersion"), frontendVersion.trimmed()},
+            {QStringLiteral("productType"), productType},
             {QStringLiteral("nativePluginVersion"), nativePluginVersion.trimmed()},
             {QStringLiteral("nativePluginPath"), redactHome(nativePluginPath)},
             {QStringLiteral("frontendLayer"), frontendLayer},
@@ -339,7 +357,8 @@ QVariantMap AppInfo::systemDiagnostics(const QString &frontendVersion) const
         QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation);
     systemRoots.removeAll(userRoot);
     QVariantMap result =
-        inspectInstallation(frontendVersion, userRoot, systemRoots, pluginPath(), version());
+        inspectInstallation(frontendVersion, userRoot, systemRoots, pluginPath(), version(),
+                            QSysInfo::productType());
     result.insert(QStringLiteral("plasmaVersion"), commandVersion(QStringLiteral("plasmashell")));
     result.insert(QStringLiteral("distribution"), QSysInfo::prettyProductName());
     return result;

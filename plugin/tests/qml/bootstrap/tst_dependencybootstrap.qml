@@ -15,6 +15,11 @@ TestCase {
     }
 
     Component {
+        id: dependencyBootstrapComponent
+        AppUi.DependencyBootstrap {}
+    }
+
+    Component {
         id: bootstrapFixture
         Item { property string marker: "bootstrap" }
     }
@@ -56,6 +61,25 @@ TestCase {
         return controller;
     }
 
+    function createBootstrap(bootstrapState) {
+        var bootstrap = dependencyBootstrapComponent.createObject(testCase, {
+            frontendVersion: "13.0.0",
+            installedPluginVersion: "",
+            bootstrapState: bootstrapState,
+            supportReport: "redacted support report"
+        });
+        verify(bootstrap !== null);
+        activeControllers.push(bootstrap);
+        return bootstrap;
+    }
+
+    function verifyPlatformNeutral(text) {
+        verify(text.length > 0);
+        ["Fedora", "COPR", "dnf", "rpm"].forEach(function(term) {
+            verify(text.indexOf(term) < 0);
+        });
+    }
+
     function test_missingPluginShowsRecoveryState() {
         var controller = createController("ProbeMissing.qml");
 
@@ -65,6 +89,24 @@ TestCase {
         verify(controller.supportReport().indexOf("Native plugin: not_detected") >= 0);
         verify(controller.supportReport().indexOf("Native status: plugin-unavailable") >= 0);
         verify(controller.supportReport().indexOf(controller.errorDetail) < 0);
+    }
+
+    function test_recoveryGuidanceIsPlatformNeutral_data() {
+        return [
+            { tag: "missing", bootstrapState: "plugin-unavailable" },
+            { tag: "older", bootstrapState: "plugin-older" },
+            { tag: "newer", bootstrapState: "plugin-newer" },
+            { tag: "runtime", bootstrapState: "runtime-unavailable" }
+        ];
+    }
+
+    function test_recoveryGuidanceIsPlatformNeutral(data) {
+        var bootstrap = createBootstrap(data.bootstrapState);
+
+        verifyPlatformNeutral(bootstrap.descriptionForState());
+        verify(bootstrap["installCommand"] === undefined);
+        verify(bootstrap.sourceInstallUrl.toString().indexOf(
+            "installation.md#guided-source-install") >= 0);
     }
 
     function test_matchingPluginLoadsRuntime() {

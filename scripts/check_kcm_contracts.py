@@ -83,13 +83,31 @@ def validate_catalog_notifications(providers: list[dict]) -> None:
 
 
 def validate_diagnostics() -> None:
-    text = (UI / "configDiagnostics.qml").read_text(encoding="utf-8")
+    diagnostics_path = UI / "configDiagnostics.qml"
+    command_policy_path = UI / "DiagnosticsCommands.js"
+    text = diagnostics_path.read_text(encoding="utf-8")
+    command_policy = command_policy_path.read_text(encoding="utf-8")
     forbidden = ("konsole --hold", "sh -c", "install_doctor.sh", "show_installed_versions.sh")
-    found = [token for token in forbidden if token in text]
-    if found:
-        fail(f"Diagnostics still contains shell-launch tokens: {', '.join(found)}")
-    if "plasmashell --version; rpm -q plasma-ai-usage-monitor" not in text:
-        fail("Diagnostics does not expose the copyable version-check command")
+    for path, source in ((diagnostics_path, text), (command_policy_path, command_policy)):
+        found = [token for token in forbidden if token in source]
+        if found:
+            fail(f"{path.name} contains shell-launch tokens: {', '.join(found)}")
+    for token in (
+        'import "DiagnosticsCommands.js" as DiagnosticsCommands',
+        "DiagnosticsCommands.versionCheckCommand(systemInfo.productType)",
+        "clipboard.setText(diagnosticsPage.versionCheckCommand)",
+    ):
+        if token not in text:
+            fail(f"Diagnostics version-check copy contract is missing: {token}")
+    for token in (
+        'productType === "fedora"',
+        'return "plasmashell --version; rpm -q plasma-ai-usage-monitor"',
+        'return "plasmashell --version"',
+    ):
+        if token not in command_policy:
+            fail(f"Diagnostics command policy is missing: {token}")
+    if "diagnosticsPage.systemInfo.nativePluginVersion" not in text:
+        fail("Diagnostics must display the detected native plugin version")
     if not re.search(r'troubleshootingUrl:\s*"https://', text):
         fail("Diagnostics troubleshooting action must use HTTPS")
     if "Qt.resolvedUrl" in text:
@@ -108,6 +126,9 @@ def validate_diagnostics() -> None:
 
     bootstrap = (UI / "DependencyBootstrap.qml").read_text(encoding="utf-8")
     controller = (UI / "DependencyBootstrapController.qml").read_text(encoding="utf-8")
+    platform_terms = [term for term in ("Fedora", "COPR", "dnf", "rpm") if term in bootstrap]
+    if platform_terms:
+        fail(f"Missing-plugin recovery contains platform-specific guidance: {', '.join(platform_terms)}")
     if "required property string supportReport" not in bootstrap or "Copy report" not in bootstrap:
         fail("Missing-plugin recovery does not expose a copyable support report")
     if "function supportReport()" not in controller or "Native status:" not in controller:

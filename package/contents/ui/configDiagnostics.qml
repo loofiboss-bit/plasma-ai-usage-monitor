@@ -9,11 +9,13 @@ import org.kde.kcmutils as KCM
 import com.github.loofi.aiusagemonitor 1.0
 import QtQuick.Dialogs as Dialogs
 import "ConfigPortability.js" as ConfigPortability
+import "DiagnosticsCommands.js" as DiagnosticsCommands
 
 KCM.SimpleKCM {
     id: diagnosticsPage
 
-    readonly property string versionCheckCommand: "plasmashell --version; rpm -q plasma-ai-usage-monitor"
+    readonly property string versionCheckCommand:
+        DiagnosticsCommands.versionCheckCommand(systemInfo.productType)
     readonly property string troubleshootingUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/troubleshooting.md"
     readonly property string providerGuideUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/user-guide/providers.md"
     readonly property string providerCatalogUrl: "https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/package/contents/catalog/providers-v4.json"
@@ -459,7 +461,8 @@ KCM.SimpleKCM {
         
         QQC2.Label {
             Kirigami.FormData.label: i18n("Version:")
-            text: i18n("Frontend %1 · native plugin %2", diagnosticsPage.frontendVersion, AppInfo.version)
+            text: i18n("Frontend %1 · native plugin %2", diagnosticsPage.frontendVersion,
+                       diagnosticsPage.systemInfo.nativePluginVersion)
             color: diagnosticsPage.systemInfo.nativeStatus === "ready"
                    ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
             wrapMode: Text.WordWrap
