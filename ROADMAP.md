@@ -4,6 +4,18 @@
 
 **Last updated:** 2026-09-13
 
+## Next milestone
+
+### 21.0.0 Distribution, Onboarding & Community Growth
+
+- Expand Linux packaging with an official Arch Linux AUR package (`PKGBUILD`).
+- Ship a universal one-line installer (`scripts/quick_install.sh`) supporting Fedora, Arch, Debian/Ubuntu, and generic Linux.
+- Improve missing-plugin recovery UX in QML with interactive one-click clipboard commands.
+- Auto-detect local coding tools (`codex`, `claude`, `antigravity`) during Guided Setup.
+- Modernize README hero presentation and execute KDE-focused community outreach (KDE Store, discuss.kde.org, r/kde).
+
+The implementation plan is [`docs/plans/PLASMA_AI_USAGE_MONITOR_V21_DISTRIBUTION_AND_GROWTH_PLAN.md`](docs/plans/PLASMA_AI_USAGE_MONITOR_V21_DISTRIBUTION_AND_GROWTH_PLAN.md).
+
 ## Current release
 
 ### 20.1.0 Quota Observability & Platform Flexibility
