@@ -1,5 +1,6 @@
 #include "codexclimonitor.h"
 #include <KLocalizedString>
+#include <QCryptographicHash>
 #include <QDebug>
 #include <QDir>
 #include <QFile>
@@ -63,6 +64,7 @@ CodexCliMonitor::CodexCliMonitor(QObject *parent)
     setInstallExecutableNames({QStringLiteral("codex")});
     setInstallPaths({configDir});
     setWatchedPaths({configDir});
+    m_localAuthRevision = localAuthRevision();
 }
 
 QString CodexCliMonitor::codexConfigDir() const
@@ -97,6 +99,35 @@ double CodexCliMonitor::defaultCostForPlan(const QString &plan) const
 }
 
 // --- Live sync ---
+
+bool CodexCliMonitor::canAutoSyncFromLocalAuth()
+{
+    const QByteArray revision = localAuthRevision();
+    if (revision.isEmpty() || revision == m_localAuthRevision) return canAutoSync();
+    if (isSyncing()) return false;
+
+    qInfo() << "CodexCliMonitor: Local authentication credentials changed; resetting automatic sync retry state";
+    resetSyncRetry();
+    m_localAuthRevision = revision;
+    return canAutoSync();
+}
+
+QByteArray CodexCliMonitor::localAuthRevision() const
+{
+    QFile authFile(codexConfigDir() + QStringLiteral("/auth.json"));
+    if (!authFile.open(QIODevice::ReadOnly)) return {};
+
+    const QByteArray contents = authFile.readAll();
+    const QJsonDocument document = QJsonDocument::fromJson(contents);
+    if (!document.isObject()) return {};
+
+    const QJsonValue accessToken = document.object()
+                                       .value(QStringLiteral("tokens"))
+                                       .toObject()
+                                       .value(QStringLiteral("access_token"));
+    if (!accessToken.isString() || accessToken.toString().isEmpty()) return {};
+    return QCryptographicHash::hash(contents, QCryptographicHash::Sha256);
+}
 
 void CodexCliMonitor::syncFromLocalAuth()
 {

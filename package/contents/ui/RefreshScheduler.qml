@@ -145,7 +145,7 @@ Item {
         }
 
         if (configuration.codexEnabled && codexCliMonitor.installed
-                && codexCliMonitor.canAutoSync()) {
+                && codexCliMonitor.canAutoSyncFromLocalAuth()) {
             codexCliMonitor.syncFromLocalAuth();
         }
     }
