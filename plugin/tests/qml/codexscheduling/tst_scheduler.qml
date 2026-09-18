@@ -9,6 +9,8 @@ TestCase {
     property int browserCalls: 0
     property var browserServices: []
     property int codexLocalCalls: 0
+    property int genericGateCalls: 0
+    property int localAuthGateCalls: 0
 
     QtObject {
         id: configuration
@@ -29,7 +31,8 @@ TestCase {
     QtObject {
         id: codexMonitor
         property bool installed: true
-        function canAutoSync() { return true; }
+        function canAutoSync() { testCase.genericGateCalls++; return true; }
+        function canAutoSyncFromLocalAuth() { testCase.localAuthGateCalls++; return true; }
         function syncFromLocalAuth() { testCase.codexLocalCalls++; }
     }
 
@@ -75,6 +78,8 @@ TestCase {
         browserCalls = 0;
         browserServices = [];
         codexLocalCalls = 0;
+        genericGateCalls = 0;
+        localAuthGateCalls = 0;
         configuration.browserSyncEnabled = false;
         configuration.claudeCodeEnabled = false;
         configuration.codexEnabled = false;
@@ -114,6 +119,8 @@ TestCase {
 
         compare(codexLocalCalls, 1);
         compare(browserCalls, 0);
+        compare(localAuthGateCalls, 1);
+        compare(genericGateCalls, 0);
     }
 
     function test_explicitBrowserSyncAllowsCodexFallbackAndGatesClaude() {
@@ -124,6 +131,8 @@ TestCase {
 
         scheduler.performBrowserSync();
         compare(browserCalls, 0);
+        compare(genericGateCalls, 0);
+        compare(localAuthGateCalls, 0);
 
         configuration.browserSyncEnabled = true;
         scheduler.performBrowserSync();
@@ -131,6 +140,8 @@ TestCase {
         verify(browserServices.indexOf("claude") >= 0);
         verify(browserServices.indexOf("codex") >= 0);
         compare(codexLocalCalls, 0);
+        compare(genericGateCalls, 1);
+        compare(localAuthGateCalls, 0);
     }
 
     function test_automaticCodexIgnoresBrowserServiceCircuit() {
@@ -145,6 +156,8 @@ TestCase {
         compare(browserCalls, 1);
         compare(browserServices[0], "claude");
         compare(codexLocalCalls, 1);
+        compare(localAuthGateCalls, 1);
+        compare(genericGateCalls, 0);
     }
 
     function test_periodicTimerRunsLocalAuthWithoutBrowserSync() {
@@ -158,5 +171,7 @@ TestCase {
         timer.triggered();
         compare(codexLocalCalls, 1);
         compare(browserCalls, 0);
+        compare(localAuthGateCalls, 1);
+        compare(genericGateCalls, 0);
     }
 }

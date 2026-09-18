@@ -47,6 +47,7 @@ public:
     Q_INVOKABLE int defaultSecondaryLimitForPlan(const QString &plan) const override;
 
     // Live sync
+    Q_INVOKABLE bool canAutoSyncFromLocalAuth();
     Q_INVOKABLE void syncFromLocalAuth();
     Q_INVOKABLE void syncFromBrowser(const QString &cookieHeader, int browserType) override;
 
@@ -72,10 +73,12 @@ protected:
 
 private:
     QString codexConfigDir() const;
+    QByteArray localAuthRevision() const;
     void startSync(const QString &browserCookieHeader, bool browserFallbackRequested);
     bool fetchCodexUsage(const QString &cookieHeader);
     void fetchAccountCheck(const QString &cookieHeader);
 
+    QByteArray m_localAuthRevision;
     bool m_hasTertiary = false;
     bool m_hasCreditsData = false;
 };

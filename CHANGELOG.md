@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [20.1.1] — 2026-09-18
+
+### Fixed
+
+- Recover automatic Codex local-auth quota sync after `codex login` rotates
+  credentials without requiring a Plasma restart.
+- Keep malformed, incomplete, or in-flight `auth.json` snapshots from
+  resetting the retry latch, and add scheduler and local-auth regression tests.
+
 ## [20.0.0] — 2026-09-07
 
 ### Changed
