@@ -1,10 +1,18 @@
 # Roadmap
 
-**Current release:** 20.1.0, Quota Observability & Platform Flexibility
+**Current release:** 20.1.1, Quota Observability & Platform Flexibility
 
-**Last updated:** 2026-09-13
+**Last updated:** 2026-09-18
 
 ## Current release
+
+### 20.1.1 Codex Local-Auth Recovery
+
+- Recover automatic Codex quota sync after `codex login` rotates credentials
+  without requiring a Plasma restart.
+- Ignore missing, malformed, incomplete, or in-flight auth snapshots when
+  deciding whether to reset the automatic retry latch.
+- Keep browser-based Codex fallback on its explicit sync path.
 
 ### 20.1.0 Quota Observability & Platform Flexibility
 
