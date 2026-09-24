@@ -1,12 +1,18 @@
 # Roadmap
 
-**Current release:** 21.0.0, Source Health & Data Quality (candidate)
+**Current release:** 21.0.0, Source Health & Data Quality
 
 **Last updated:** 2026-09-24
 
 ## Current release
 
-### 21.0.0 Source Health & Data Quality (candidate)
+### 21.0.0 Source Health & Data Quality
+
+Released on 2026-09-24 from tag `v21.0.0` at commit
+`050a50ab0825fe076b619a2ceb2cdbc19aec9a35`. The release is available from
+[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v21.0.0),
+[Fedora COPR](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/build/11029770/),
+and the [KDE Store](https://store.kde.org/p/2353976/).
 
 - Distinguish a detected local tool waiting for first activity from a source
   reporting an estimate.
@@ -16,8 +22,8 @@
   Retry-After, and scheduled-refresh context.
 - Remove the mixed monthly exposure metric and export actual spend, estimated
   burn, and fixed subscription fees separately by known currency.
-- Qualify the local candidate through tests, package checks, and Fedora
-  lifecycle controls before planning publication.
+- Release qualification passed: tests, package checks, and Fedora lifecycle
+  controls.
 
 ### 20.1.1 Codex Local-Auth Recovery
 
@@ -36,10 +42,10 @@
 
 ### 20.0.0 Reliable Daily Quotas
 
-Prepared locally; publication is pending final qualification. Quota observation
+Released on 2026-09-07 and superseded by 20.1.1. Quota observation
 freshness, independently selected reset times, normalized tooltip presentation,
-and subscription evidence lifecycle are the focus. The versioned checklist
-records current evidence and remaining gates.
+and subscription evidence lifecycle were the focus. See the versioned release
+checklist for its evidence.
 
 ### 19.0.1 Catalog Drift Reliability
 

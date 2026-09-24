@@ -1,7 +1,7 @@
 # Plasma AI Usage Monitor v21 Plan
 
 - **Target release:** `21.0.0`
-- **Status:** local candidate; not published
+- **Status:** released as `v21.0.0`; see the [release checklist](../release/v21.0.0-checklist.md)
 - **Theme:** Source Health and Data Quality
 
 ## Goal
@@ -47,8 +47,9 @@ it combined billing, estimates, and fixed fees. Consumers should use
   keyboard navigation and screen-reader labels.
 - Update the English user guide, architecture, changelog, and roadmap. Generate
   the wiki mirror from the user guide.
-- Qualify the package candidate with Fedora lifecycle checks before planning
-  any publication. No publication, tag, or remote write is part of this plan.
+- Qualify the package with Fedora lifecycle checks before publication. The
+  exact release lineage and public readback are recorded in the release
+  checklist. Manual screen-reader navigation remains unverified.
 
 ## Constraints
 
