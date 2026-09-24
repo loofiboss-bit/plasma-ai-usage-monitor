@@ -20,8 +20,11 @@ const QStringList kRoleNames{QStringLiteral("stableId"),
                              QStringLiteral("freshnessState"),
                              QStringLiteral("lastSuccess"),
                              QStringLiteral("lastAttempt"),
+                             QStringLiteral("retryAfter"),
+                             QStringLiteral("nextScheduledRefresh"),
                              QStringLiteral("lastErrorKind"),
                              QStringLiteral("nextActionKey"),
+                             QStringLiteral("nextActionText"),
                              QStringLiteral("hasUsefulData"),
                              QStringLiteral("hasActualData"),
                              QStringLiteral("hasEstimatedData"),
@@ -75,6 +78,10 @@ bool finiteNumber(const QVariant &value) {
   return !value.isNull() && value.metaType().id() != QMetaType::Bool &&
          value.metaType().id() != QMetaType::QString && ok &&
          std::isfinite(number);
+}
+
+bool freshObservation(const QDateTime &observed, const QDateTime &now) {
+  return observed.isValid() && observed <= now && observed.secsTo(now) < 900;
 }
 
 QVariant catalogPriceAmount(const QVariantMap &price) {
@@ -186,25 +193,29 @@ QVariantList metricsAt(const QVariantList &metrics, const QDateTime &now) {
   QVariantList result;
   for (const QVariant &entry : metrics) {
     QVariantMap metric = entry.toMap();
-    const QString kind = metric.value(QStringLiteral("kind")).toString();
-    if (kind == QLatin1String("request_remaining") ||
-        kind == QLatin1String("request_limit") ||
-        kind == QLatin1String("token_remaining") ||
-        kind == QLatin1String("token_limit")) {
-      const QDateTime observed =
-          asDateTime(metric.value(QStringLiteral("observedAt")));
-      const QDateTime reset =
-          asDateTime(metric.value(QStringLiteral("resetAt")));
-      const QString state =
-          !observed.isValid()               ? QStringLiteral("never_observed")
-          : reset.isValid() && reset <= now ? QStringLiteral("awaiting_refresh")
-          : observed > now || observed.secsTo(now) >= 900
-              ? QStringLiteral("stale")
-              : QStringLiteral("fresh");
-      metric.insert(QStringLiteral("freshnessState"), state);
-      metric.insert(QStringLiteral("available"),
-                    metric.value(QStringLiteral("available")).toBool() &&
-                        state == QLatin1String("fresh"));
+    const QDateTime observed =
+        asDateTime(metric.value(QStringLiteral("observedAt")));
+    const QDateTime reset =
+        asDateTime(metric.value(QStringLiteral("resetAt")));
+    const QString state =
+        !observed.isValid()               ? QStringLiteral("never_observed")
+        : reset.isValid() && reset <= now ? QStringLiteral("awaiting_refresh")
+        : observed > now || observed.secsTo(now) >= 900
+            ? QStringLiteral("stale")
+            : QStringLiteral("fresh");
+    const bool wasAvailable = metric.value(QStringLiteral("available")).toBool();
+    metric.insert(QStringLiteral("freshnessState"), state);
+    if (state != QLatin1String("fresh")) {
+      const QVariant previousValue = metric.value(QStringLiteral("value"));
+      if (wasAvailable && observed.isValid() && observed <= now &&
+          previousValue.isValid() && !previousValue.isNull()) {
+        metric.insert(QStringLiteral("lastKnownValue"), previousValue);
+        metric.insert(QStringLiteral("lastKnownAvailable"), true);
+      }
+      metric.insert(QStringLiteral("value"), QVariant());
+      metric.insert(QStringLiteral("available"), false);
+    } else {
+      metric.insert(QStringLiteral("available"), wasAvailable);
     }
     result.append(metric);
   }
@@ -258,11 +269,17 @@ QVariantList providerQuotas(const QVariantList &metrics) {
         : (estimatedSource(remainingSource) || estimatedSource(limitSource))
             ? QStringLiteral("local_estimate")
             : quotaSourceClass(limitSource);
-    const QVariantMap candidate =
+    QVariantMap candidate =
         quota(kind, remainingMetric.value(QStringLiteral("window")).toString(),
               100.0 - remaining, remaining,
               asDateTime(remainingMetric.value(QStringLiteral("resetAt"))),
               sourceClass, remainingSource);
+    const QDateTime observed =
+        asDateTime(remainingMetric.value(QStringLiteral("observedAt")));
+    if (observed.isValid())
+      candidate.insert(QStringLiteral("observedAt"), observed);
+    candidate.insert(QStringLiteral("freshnessState"),
+                      remainingMetric.value(QStringLiteral("freshnessState")));
     const QString key = candidate.value(QStringLiteral("kind")).toString() +
                         QLatin1Char('|') +
                         candidate.value(QStringLiteral("window")).toString() +
@@ -361,7 +378,7 @@ QVariantList toolQuotas(SubscriptionToolBackend *tool, const QDateTime &now) {
     const QString source = window.value(QStringLiteral("source")).toString();
     const QString sourceClass = quotaSourceClass(
         source, window.value(QStringLiteral("precision")).toString());
-    const QVariantMap candidate = quota(
+    QVariantMap candidate = quota(
         window.value(QStringLiteral("kind"), QStringLiteral("quota"))
             .toString(),
         window
@@ -370,6 +387,12 @@ QVariantList toolQuotas(SubscriptionToolBackend *tool, const QDateTime &now) {
             .toString(),
         used, remaining, asDateTime(window.value(QStringLiteral("resetAt"))),
         sourceClass, source);
+    const QDateTime observed = asDateTime(window.value(QStringLiteral("observedAt")));
+    if (observed.isValid())
+      candidate.insert(QStringLiteral("observedAt"), observed);
+    if (window.contains(QStringLiteral("freshnessState")))
+      candidate.insert(QStringLiteral("freshnessState"),
+                       window.value(QStringLiteral("freshnessState")));
     const QString key = candidate.value(QStringLiteral("kind")).toString() +
                         QLatin1Char('|') +
                         candidate.value(QStringLiteral("window")).toString() +
@@ -612,13 +635,18 @@ QVariantMap DailyStateModel::buildRow(const QVariantMap &readiness,
       {QStringLiteral("qualityClass"), QStringLiteral("unavailable")},
       {QStringLiteral("freshnessState"), QStringLiteral("never")},
       {QStringLiteral("lastSuccess"),
-       readiness.value(QStringLiteral("lastVerified"))},
+       readiness.value(QStringLiteral("lastSuccess"))},
       {QStringLiteral("lastAttempt"),
-       readiness.value(QStringLiteral("lastVerified"))},
+       readiness.value(QStringLiteral("lastAttempt"))},
+      {QStringLiteral("retryAfter"), readiness.value(QStringLiteral("retryAfter"))},
+      {QStringLiteral("nextScheduledRefresh"),
+       readiness.value(QStringLiteral("nextScheduledRefresh"))},
       {QStringLiteral("lastErrorKind"),
        readiness.value(QStringLiteral("errorCode"))},
       {QStringLiteral("nextActionKey"),
        readiness.value(QStringLiteral("nextActionKey"))},
+      {QStringLiteral("nextActionText"),
+       readiness.value(QStringLiteral("nextActionText"))},
       {QStringLiteral("hasUsefulData"), false},
       {QStringLiteral("hasActualData"), false},
       {QStringLiteral("hasEstimatedData"), false},
@@ -674,14 +702,37 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
              metricsAt(backend->metrics(), m_presentationTime));
   row.insert(QStringLiteral("lastSuccess"), backend->lastSuccess());
   row.insert(QStringLiteral("lastAttempt"), backend->lastAttempt());
-  row.insert(QStringLiteral("freshnessState"),
-             backend->lastSuccess().isValid()
-                 ? (backend->lastSuccess().secsTo(m_presentationTime) >= 900
-                        ? QStringLiteral("stale")
-                    : backend->lastSuccess().secsTo(m_presentationTime) >= 300
-                        ? QStringLiteral("aging")
-                        : QStringLiteral("fresh"))
-                 : QStringLiteral("never"));
+  row.insert(QStringLiteral("retryAfter"), backend->retryAfter());
+  row.insert(QStringLiteral("nextScheduledRefresh"),
+             backend->nextScheduledRefresh());
+  bool hasFreshMetric = false;
+  bool hasStaleMetric = false;
+  for (const QVariant &entry : liveMetrics) {
+    const QVariantMap metric = entry.toMap();
+    hasFreshMetric = hasFreshMetric ||
+                     (metricAvailable(metric) &&
+                      metric.value(QStringLiteral("freshnessState")) ==
+                          QLatin1String("fresh"));
+    hasStaleMetric = hasStaleMetric ||
+                     metric.value(QStringLiteral("freshnessState")) ==
+                         QLatin1String("stale") ||
+                     metric.value(QStringLiteral("freshnessState")) ==
+                         QLatin1String("awaiting_refresh");
+  }
+  const QDateTime successfulCheck = backend->lastSuccess();
+  const bool successInFuture = successfulCheck.isValid() &&
+                               successfulCheck > m_presentationTime;
+  const qint64 successAge = successfulCheck.isValid() && !successInFuture
+      ? successfulCheck.secsTo(m_presentationTime) : -1;
+  const QString freshness =
+      successInFuture || successAge >= 900 || (!hasFreshMetric && hasStaleMetric)
+          ? QStringLiteral("stale")
+      : successAge >= 300 ? QStringLiteral("aging")
+      : successAge >= 0 || hasFreshMetric
+          ? QStringLiteral("fresh")
+          : hasStaleMetric ? QStringLiteral("stale")
+                           : QStringLiteral("never");
+  row.insert(QStringLiteral("freshnessState"), freshness);
   row.insert(QStringLiteral("_remainingRequests"),
              providerRemainingRequests(liveMetrics));
   row.insert(QStringLiteral("quotaWindows"), providerQuotas(liveMetrics));
@@ -714,10 +765,6 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
     if (fallback.isEmpty())
       fallback = metric;
   }
-  actual = actual || row.value(QStringLiteral("readinessState")) ==
-                         QLatin1String("reporting_actual");
-  estimated = estimated || row.value(QStringLiteral("readinessState")) ==
-                               QLatin1String("reporting_estimate");
   row.insert(QStringLiteral("hasActualData"), actual);
   row.insert(QStringLiteral("hasEstimatedData"), estimated);
   row.insert(QStringLiteral("hasBalance"), !balance.isEmpty());
@@ -762,7 +809,7 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
   QVariantMap actualCosts;
   QVariantMap estimatedCosts;
   QStringList costSources;
-  for (const QVariant &entry : preferredCosts(backend->metrics())) {
+  for (const QVariant &entry : preferredCosts(liveMetrics)) {
     const QVariantMap metric = entry.toMap();
     const QString source = metric.value(QStringLiteral("source")).toString();
     const QString currency =
@@ -780,7 +827,7 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
   row.insert(QStringLiteral("_actualCosts"), actualCosts);
   row.insert(QStringLiteral("_estimatedCosts"), estimatedCosts);
   row.insert(QStringLiteral("_dailyActualCosts"),
-             costTotals(backend->metrics(), QStringLiteral("day")));
+             costTotals(liveMetrics, QStringLiteral("day")));
   QVariantMap combined = actualCosts;
   mergeCurrencies(combined, estimatedCosts);
   if (combined.size() == 1) {
@@ -848,6 +895,10 @@ QVariantMap DailyStateModel::buildToolRow(QVariantMap row,
          quotaWindow.value(QStringLiteral("sourceKey"))},
         {QStringLiteral("quality"),
          quotaWindow.value(QStringLiteral("sourceClass"))},
+        {QStringLiteral("freshnessState"),
+         quotaWindow.value(QStringLiteral("freshnessState"))},
+        {QStringLiteral("observedAt"),
+         quotaWindow.value(QStringLiteral("observedAt"))},
         {QStringLiteral("semantic"), QStringLiteral("rolling_gauge")},
         {QStringLiteral("scope"), QStringLiteral("subscription")}});
   }
@@ -856,19 +907,21 @@ QVariantMap DailyStateModel::buildToolRow(QVariantMap row,
       QStringLiteral("_actualQuota"),
       bestQuota(row.value(QStringLiteral("quotaWindows")).toList(), true));
   const QDateTime lastSuccess = tool->lastQuotaObservation();
-  row.insert(QStringLiteral("lastSuccess"), lastSuccess);
-  row.insert(QStringLiteral("lastAttempt"), tool->lastSyncTime());
+  if (lastSuccess.isValid())
+    row.insert(QStringLiteral("lastSuccess"), lastSuccess);
+  if (tool->lastSyncTime().isValid())
+    row.insert(QStringLiteral("lastAttempt"), tool->lastSyncTime());
   const bool actual = tool->hasFreshQuota(m_presentationTime);
-  row.insert(QStringLiteral("freshnessState"), actual ? QStringLiteral("fresh")
-                                               : lastSuccess.isValid()
-                                                   ? QStringLiteral("stale")
-                                                   : QStringLiteral("never"));
+  const QDateTime activityAt = tool->lastActivity();
+  const bool activityFresh = freshObservation(activityAt, m_presentationTime);
+  row.insert(QStringLiteral("freshnessState"),
+             actual || activityFresh ? QStringLiteral("fresh")
+             : lastSuccess.isValid() || activityAt.isValid()
+                 ? QStringLiteral("stale")
+                 : QStringLiteral("never"));
   row.insert(QStringLiteral("lastKnownQuotaWindows"),
              tool->quotaWindowsAt(m_presentationTime));
-  const bool estimated = tool->lastActivity().isValid() ||
-                         tool->usageCount() > 0 ||
-                         row.value(QStringLiteral("readinessState")) ==
-                             QLatin1String("reporting_estimate");
+  const bool estimated = activityFresh;
   row.insert(QStringLiteral("hasActualData"), actual);
   row.insert(QStringLiteral("hasEstimatedData"), estimated);
 

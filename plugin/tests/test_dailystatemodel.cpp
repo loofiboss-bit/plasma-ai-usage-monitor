@@ -73,6 +73,10 @@ public:
     setErrorDetails(QStringLiteral("redacted"),
                     ProviderErrorKind::Authentication);
   }
+  void failRateLimited(const QDateTime &retryAt) {
+    setErrorDetails(QStringLiteral("redacted"), ProviderErrorKind::RateLimit,
+                    429, retryAt);
+  }
 };
 
 class DailyTool final : public SubscriptionToolBackend {
@@ -100,6 +104,8 @@ public:
 
   void install() { setInstalled(true); }
   void recordActivity() { setLastActivity(QDateTime::currentDateTimeUtc()); }
+  void recordActivityAt(const QDateTime &time) { setLastActivity(time); }
+  void setCount(int count) { setUsageCount(count); }
   void sync(const QVariantList &windows) {
     setSyncedQuotaWindows(windows);
     setLastSyncTime(QDateTime::currentDateTimeUtc());
@@ -115,11 +121,15 @@ class DailyStateModelTest : public QObject {
 private Q_SLOTS:
   void liveClockAcceptsObservationAfterLastTick();
   void actualQuotaWinsOverLocalTarget();
+  void localConfiguredLimitWithoutActivityIsNotReported();
+  void staleLocalActivityIsLastKnownOnly();
   void providerQuotaAgesWithPresentationClock();
   void quotaClockAndIndependentReset();
   void enabledSourcesAppearExactlyOnce();
   void toolOnlySummaryIsComplete();
   void unavailableAndAvailableZeroStayDistinct();
+  void expiredCostRemainsLastKnownButDoesNotAggregate();
+  void retryAfterIsPresentInSourceDetail();
   void providerToolMixedCurrencyAndFeesAggregateSeparately();
   void rangePricedToolPreservesRange();
   void staleBalanceAndConnectivityRemainDistinct();
@@ -177,6 +187,61 @@ void DailyStateModelTest::actualQuotaWinsOverLocalTarget() {
                .value("percentRemaining")
                .toDouble(),
            80.0);
+}
+
+void DailyStateModelTest::localConfiguredLimitWithoutActivityIsNotReported() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyTool tool;
+  tool.setEnabled(true);
+  tool.install();
+  tool.setUsageLimit(100);
+  readiness.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+  daily.registerReadinessModel(&readiness);
+  daily.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+
+  const QVariantMap row = daily.source(QStringLiteral("codex-cli"));
+  QCOMPARE(row.value(QStringLiteral("readinessState")).toString(),
+           QStringLiteral("waiting_for_activity"));
+  QCOMPARE(row.value(QStringLiteral("qualityClass")).toString(),
+           QStringLiteral("unavailable"));
+  QVERIFY(!row.value(QStringLiteral("hasUsefulData")).toBool());
+  QVERIFY(row.value(QStringLiteral("quotaWindows")).toList().isEmpty());
+  QCOMPARE(daily.summary().value(QStringLiteral("reportingUsefulSourceCount")).toInt(),
+           0);
+}
+
+void DailyStateModelTest::staleLocalActivityIsLastKnownOnly() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyTool tool;
+  tool.setEnabled(true);
+  tool.install();
+  tool.setUsageLimit(100);
+  tool.setCount(25);
+  const QDateTime observed = QDateTime::currentDateTimeUtc();
+  tool.recordActivityAt(observed);
+  readiness.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+  daily.registerReadinessModel(&readiness);
+  daily.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+  daily.setPresentationTime(observed.addSecs(901));
+
+  const QVariantMap row = daily.source(QStringLiteral("codex-cli"));
+  QCOMPARE(row.value(QStringLiteral("readinessState")).toString(),
+           QStringLiteral("degraded"));
+  QCOMPARE(row.value(QStringLiteral("qualityClass")).toString(),
+           QStringLiteral("unavailable"));
+  QVERIFY(!row.value(QStringLiteral("hasEstimatedData")).toBool());
+  QVERIFY(row.value(QStringLiteral("quotaWindows")).toList().isEmpty());
+  const QVariantList lastKnown =
+      row.value(QStringLiteral("lastKnownQuotaWindows")).toList();
+  QVERIFY(!lastKnown.isEmpty());
+  QCOMPARE(lastKnown.first().toMap()
+               .value(QStringLiteral("freshnessState")).toString(),
+           QStringLiteral("stale"));
+  QCOMPARE(lastKnown.first().toMap()
+               .value(QStringLiteral("percentUsed")).toDouble(),
+           25.0);
 }
 
 void DailyStateModelTest::providerQuotaAgesWithPresentationClock() {
@@ -353,6 +418,61 @@ void DailyStateModelTest::unavailableAndAvailableZeroStayDistinct() {
   QCOMPARE(row.value(QStringLiteral("primaryMetricValue")).toDouble(), 0.0);
   QVERIFY(row.value(QStringLiteral("costAvailable")).toBool());
   QCOMPARE(row.value(QStringLiteral("costValue")).toDouble(), 0.0);
+}
+
+void DailyStateModelTest::expiredCostRemainsLastKnownButDoesNotAggregate() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  provider.makeReady();
+  const QDateTime observed = QDateTime::currentDateTimeUtc();
+  provider.addMetric(ProviderBackend::MetricKind::Cost, 7.25,
+                     QStringLiteral("USD"), QStringLiteral("USD"),
+                     QStringLiteral("month"),
+                     ProviderBackend::MetricSource::BillingApi);
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+  daily.setPresentationTime(observed.addSecs(901));
+
+  const QVariantMap row = daily.source(QStringLiteral("openai"));
+  QVERIFY(!row.value(QStringLiteral("costAvailable")).toBool());
+  QVERIFY(!row.value(QStringLiteral("hasActualData")).toBool());
+  QVERIFY(daily.summary().value(QStringLiteral("actualSpendTotals")).toMap().isEmpty());
+  bool foundLastKnown = false;
+  for (const QVariant &entry : row.value(QStringLiteral("detailMetrics")).toList()) {
+    const QVariantMap metric = entry.toMap();
+    if (metric.value(QStringLiteral("kind")) != QLatin1String("cost"))
+      continue;
+    QVERIFY(!metric.value(QStringLiteral("available")).toBool());
+    QVERIFY(metric.value(QStringLiteral("lastKnownAvailable")).toBool());
+    QCOMPARE(metric.value(QStringLiteral("lastKnownValue")).toDouble(), 7.25);
+    QCOMPARE(metric.value(QStringLiteral("freshnessState")).toString(),
+             QStringLiteral("stale"));
+    foundLastKnown = true;
+  }
+  QVERIFY(foundLastKnown);
+}
+
+void DailyStateModelTest::retryAfterIsPresentInSourceDetail() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  provider.makeReady();
+  const QDateTime retryAt = QDateTime::currentDateTimeUtc().addSecs(1800);
+  provider.failRateLimited(retryAt);
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+
+  SourceDetailModel detail;
+  detail.registerDailyState(&daily);
+  detail.setSourceId(QStringLiteral("openai"));
+  QCOMPARE(detail.source().value(QStringLiteral("retryAfter")).toDateTime(),
+           retryAt);
+  QCOMPARE(detail.actionLabel(), QStringLiteral("Refresh"));
 }
 
 void DailyStateModelTest::

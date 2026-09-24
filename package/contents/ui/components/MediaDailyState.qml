@@ -84,6 +84,12 @@ QtObject {
 
         var openRouter = baseRow("openrouter", "OpenRouter", "provider",
                                  "actual");
+        openRouter.monitoringLevel = "actual_usage_spend";
+        openRouter.lastAttempt = new Date(Date.now() - 60000).toISOString();
+        openRouter.lastSuccess = openRouter.lastAttempt;
+        openRouter.nextScheduledRefresh =
+            new Date(Date.now() + 5 * 60000).toISOString();
+        openRouter.nextActionText = "No action is required.";
         openRouter.primaryMetricAvailable = true;
         openRouter.primaryMetricValue = 0.42;
         openRouter.primaryMetricUnit = "currency";
@@ -97,6 +103,7 @@ QtObject {
                 percentRemaining: 37,
                 sourceClass: "actual",
                 sourceKey: "usage_api",
+                observedAt: new Date(Date.now() - 60000).toISOString(),
                 resetAt: resetAt(12)
             }];
             openRouter.detailMetrics = [
@@ -104,13 +111,17 @@ QtObject {
                     kind: "cost", available: true, value: 0.42,
                     unit: "USD", currency: "USD", source: "usage_api",
                     quality: "actual", semantic: "spend",
-                    scope: "key", window: "day", resetAt: ""
+                    scope: "key", window: "day",
+                    observedAt: new Date(Date.now() - 60000).toISOString(),
+                    resetAt: ""
                 },
                 {
                     kind: "requests", available: true, value: 184,
                     unit: "request", currency: "", source: "usage_api",
                     quality: "actual", semantic: "usage",
-                    scope: "key", window: "day", resetAt: ""
+                    scope: "key", window: "day",
+                    observedAt: new Date(Date.now() - 60000).toISOString(),
+                    resetAt: ""
                 },
                 {
                     kind: "tokens", available: false, value: undefined,

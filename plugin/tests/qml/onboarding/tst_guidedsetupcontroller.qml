@@ -61,7 +61,7 @@ TestCase {
         }
         function verifySource(stableId) {
             verifyCalls++;
-            var state = outcomes[stableId] || (stableId === "codex-cli" ? "reporting_estimate" : "reporting_actual");
+            var state = outcomes[stableId] || (stableId === "codex-cli" ? "waiting_for_activity" : "reporting_actual");
             update(stableId, {
                 readinessStateKey: state,
                 nextActionText: state === "failed" ? "Replace the credential and try again." : ""
@@ -180,7 +180,8 @@ TestCase {
         tryCompare(controller, "step", controller.resultStep);
         verify(fakeConfiguration.codexEnabled);
         verify(fakeConfiguration.setupWizardCompleted);
-        compare(controller.resultQuality, "Local activity estimate");
+        compare(controller.resultQuality, "Waiting for local activity");
+        verify(controller.resultSummary.indexOf("no usage estimate is reported") >= 0);
         compare(fakeReadiness.verifyCalls, 1);
     }
 

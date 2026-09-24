@@ -78,6 +78,15 @@
 
   <releases>
 
+    <release version="21.0.0" date="2026-09-24">
+      <description>
+        <ul>
+          <li>Distinguish detected local tools waiting for activity from reporting estimates.</li>
+          <li>Show source capability, data freshness, recent checks, and retry timing in Source Detail.</li>
+          <li>Keep actual spend, estimated burn, and fixed subscription fees separate in Prometheus.</li>
+        </ul>
+      </description>
+    </release>
     <release version="20.1.1" date="2026-09-18"/>
     <release version="20.1.0" date="2026-09-13"/>
     <release version="20.0.0" date="2026-09-07"/>

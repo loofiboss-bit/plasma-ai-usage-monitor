@@ -1,10 +1,23 @@
 # Roadmap
 
-**Current release:** 20.1.1, Quota Observability & Platform Flexibility
+**Current release:** 21.0.0, Source Health & Data Quality (candidate)
 
-**Last updated:** 2026-09-18
+**Last updated:** 2026-09-24
 
 ## Current release
+
+### 21.0.0 Source Health & Data Quality (candidate)
+
+- Distinguish a detected local tool waiting for first activity from a source
+  reporting an estimate.
+- Exclude stale, expired, future-dated, and undated metrics from daily
+  availability and aggregates while retaining timestamped last-known values.
+- Add capability-aware source health with attempt, successful-check,
+  Retry-After, and scheduled-refresh context.
+- Remove the mixed monthly exposure metric and export actual spend, estimated
+  burn, and fixed subscription fees separately by known currency.
+- Qualify the local candidate through tests, package checks, and Fedora
+  lifecycle controls before planning publication.
 
 ### 20.1.1 Codex Local-Auth Recovery
 

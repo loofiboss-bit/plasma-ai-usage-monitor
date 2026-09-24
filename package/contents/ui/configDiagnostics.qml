@@ -688,7 +688,7 @@ KCM.SimpleKCM {
         for (var i = 0; i < sourceSnapshot.length; i++) {
             var source = sourceSnapshot[i];
             if (!source.enabled) continue;
-            if (["reporting_actual", "reporting_estimate", "connected_connectivity_only"].indexOf(source.readinessStateKey) >= 0)
+            if (["reporting_actual", "reporting_estimate", "waiting_for_activity", "connected_connectivity_only"].indexOf(source.readinessStateKey) >= 0)
                 continue;
             result.push(source);
         }
@@ -716,6 +716,7 @@ KCM.SimpleKCM {
             "needs_configuration": i18n("Needs configuration"),
             "ready_to_verify": i18n("Ready to verify"),
             "verifying": i18n("Verifying"),
+            "waiting_for_activity": i18n("Checked, waiting for local activity"),
             "connected_connectivity_only": i18n("Connectivity confirmed"),
             "reporting_estimate": i18n("Reporting an estimate"),
             "reporting_actual": i18n("Reporting provider data"),

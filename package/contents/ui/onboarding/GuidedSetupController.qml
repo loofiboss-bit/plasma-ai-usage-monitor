@@ -321,6 +321,7 @@ QtObject {
         if (step !== verificationStep || !selectedSource.readinessStateKey) return;
         var state = selectedSource.readinessStateKey;
         if (state === "reporting_actual" || state === "reporting_estimate"
+                || state === "waiting_for_activity"
                 || state === "connected_connectivity_only") {
             verificationTimeout.stop();
             resultQuality = qualityLabel(selectedSource);
@@ -368,7 +369,10 @@ QtObject {
     }
 
     function qualityLabel(source) {
-        if (source.sourceKindKey === "local_tool") return qsTr("Local activity estimate");
+        if (source.sourceKindKey === "local_tool")
+            return source.readinessStateKey === "waiting_for_activity"
+                ? qsTr("Waiting for local activity")
+                : qsTr("Local activity estimate");
         var labels = {
             "actual_usage_spend": qsTr("Actual usage and spend"),
             "actual_key_usage": qsTr("Actual key usage"),
@@ -380,6 +384,9 @@ QtObject {
     }
 
     function qualitySummary(source) {
+        if (source.sourceKindKey === "local_tool"
+                && source.readinessStateKey === "waiting_for_activity")
+            return qsTr("The app was detected and its local activity path was checked. No activity has been observed yet, so no usage estimate is reported. Use the app and its activity will appear when available.");
         if (source.sourceKindKey === "local_tool")
             return qsTr("The tool was detected and its local activity path was checked. Values remain local estimates unless an authenticated source reports a quota window.");
         if (source.monitoringLevel === "connectivity_only")

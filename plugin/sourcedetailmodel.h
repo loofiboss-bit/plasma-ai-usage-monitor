@@ -50,7 +50,11 @@ public:
     LineItemScopeRole,
     LineItemAvailableRole,
     AggregationLevelRole,
-    ValueClassRole
+    ValueClassRole,
+    LastKnownValueRole,
+    LastKnownAvailableRole,
+    FreshnessStateRole,
+    ObservedAtRole
   };
   Q_ENUM(Role)
 

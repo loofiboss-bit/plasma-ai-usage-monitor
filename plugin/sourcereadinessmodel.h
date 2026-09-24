@@ -26,6 +26,7 @@ public:
         NeedsConfiguration,
         ReadyToVerify,
         Verifying,
+        WaitingForActivity,
         ConnectedConnectivityOnly,
         ReportingEstimate,
         ReportingActual,
@@ -64,6 +65,10 @@ public:
         InstalledRole,
         EnabledRole,
         LastVerifiedRole,
+        LastAttemptRole,
+        LastSuccessRole,
+        RetryAfterRole,
+        NextScheduledRefreshRole,
         SafeVerificationRole,
         CustomEndpointRequiredRole,
         ReadinessStateRole,
@@ -118,6 +123,10 @@ private:
         bool installed = true;
         bool enabled = false;
         QDateTime lastVerified;
+        QDateTime lastAttempt;
+        QDateTime lastSuccess;
+        QDateTime retryAfter;
+        QDateTime nextScheduledRefresh;
         SourceState state = SourceState::Disabled;
         NextAction nextAction = NextAction::None;
         QString errorCode;

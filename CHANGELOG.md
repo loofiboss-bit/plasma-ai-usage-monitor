@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add a `waiting_for_activity` source state for detected local tools that have
+  not reported activity, and treat its verification as a successful check
+  without counting it as an estimate.
+- Add capability-aware Source Detail health, last attempt/check times,
+  Retry-After and scheduled-refresh context, and an accessible technical-metric
+  expander.
+
+### Changed
+
+- Build daily data quality and aggregates from available, time-valid metrics;
+  keep expired values as timestamped last-known details and preserve observed
+  numeric zeroes.
+- Stop exporting unavailable local usage, missing subscription fees, unknown
+  currency amounts, and stale provider metrics as observed zero or USD values.
+
+### Removed
+
+- Remove `ai_usage_total_monthly_exposure`, which combined actual billing,
+  estimates, and fixed subscription fees. Prometheus consumers should use the
+  separate `ai_usage_api_spend`, `ai_usage_estimated_burn`, and
+  `ai_usage_subscription_fees` series.
+
 ## [20.1.1] — 2026-09-18
 
 ### Fixed
