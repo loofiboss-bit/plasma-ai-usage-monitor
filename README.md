@@ -6,10 +6,11 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-Version **20.1.1 (Reliable Daily Quotas)** separates verified quota from local
-activity, keeps the next reset independent of the lowest quota, and displays
-subscription price ranges without turning them into guessed fees. All daily
-surfaces use the same normalized source state and presentation clock.
+The **21.0.0 candidate (Source Health & Data Quality)** distinguishes a detected
+local tool waiting for activity from a reporting estimate, excludes stale
+metrics from daily aggregates, and shows source capability and retry timing in
+Source Detail. Prometheus keeps provider spend, estimated burn, and fixed fees
+separate by known currency. This candidate has not been published.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 

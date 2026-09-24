@@ -73,6 +73,10 @@ def main() -> None:
         'objectName: "sourceDetailPrimaryAction"',
         'objectName: "sourceDetailSettings"',
         'objectName: "sourceDetailHistory"',
+        'objectName: "sourceDetailTechnicalToggle"',
+        'Accessible.description: i18n("Shows or hides per-metric values, freshness, and provenance.")',
+        'Accessible.description: detail.healthActionText()',
+        'Accessible.name: detail.healthActionText()',
         "activeFocusOnTab: true",
         'Accessible.name: i18n("Metric provenance: %1", text)',
     )

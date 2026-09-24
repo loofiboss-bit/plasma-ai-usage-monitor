@@ -17,7 +17,10 @@ bool isActualMetricSource(const QString &source)
         QStringLiteral("usage_api"),
         QStringLiteral("actual_api"),
         QStringLiteral("metrics_api"),
-        QStringLiteral("browser_sync")
+        QStringLiteral("response_headers"),
+        QStringLiteral("browser_sync"),
+        QStringLiteral("antigravity_local"),
+        QStringLiteral("local_daemon_actual")
     };
     return actualSources.contains(source);
 }
@@ -38,6 +41,32 @@ QDateTime latest(const QDateTime &first, const QDateTime &second)
     if (!first.isValid()) return second;
     if (!second.isValid()) return first;
     return first > second ? first : second;
+}
+
+bool freshMetric(const QVariantMap &metric, const QDateTime &now)
+{
+    if (!metric.value(QStringLiteral("available")).toBool())
+        return false;
+    if (metric.value(QStringLiteral("quality")).toString() == QLatin1String("stale"))
+        return false;
+    const auto asDateTime = [](const QVariant &value) {
+        QDateTime dateTime = value.toDateTime();
+        if (!dateTime.isValid())
+            dateTime = QDateTime::fromString(value.toString(), Qt::ISODateWithMs);
+        if (!dateTime.isValid())
+            dateTime = QDateTime::fromString(value.toString(), Qt::ISODate);
+        return dateTime;
+    };
+    const QDateTime observed = asDateTime(metric.value(QStringLiteral("observedAt")));
+    if (!observed.isValid() || observed > now || observed.secsTo(now) >= 900)
+        return false;
+    const QDateTime reset = asDateTime(metric.value(QStringLiteral("resetAt")));
+    return !reset.isValid() || reset > now;
+}
+
+bool freshObservation(const QDateTime &observed, const QDateTime &now)
+{
+    return observed.isValid() && observed <= now && observed.secsTo(now) < 900;
 }
 }
 
@@ -109,6 +138,10 @@ QVariant SourceReadinessModel::data(const QModelIndex &index, int role) const
     case InstalledRole: return snapshot.installed;
     case EnabledRole: return snapshot.enabled;
     case LastVerifiedRole: return snapshot.lastVerified;
+    case LastAttemptRole: return snapshot.lastAttempt;
+    case LastSuccessRole: return snapshot.lastSuccess;
+    case RetryAfterRole: return snapshot.retryAfter;
+    case NextScheduledRefreshRole: return snapshot.nextScheduledRefresh;
     case SafeVerificationRole: return entry.safeVerification;
     case CustomEndpointRequiredRole: return entry.customEndpointRequired;
     case ReadinessStateRole: return QVariant::fromValue(snapshot.state);
@@ -137,6 +170,10 @@ QHash<int, QByteArray> SourceReadinessModel::roleNames() const
         {InstalledRole, "installed"},
         {EnabledRole, "enabled"},
         {LastVerifiedRole, "lastVerified"},
+        {LastAttemptRole, "lastAttempt"},
+        {LastSuccessRole, "lastSuccess"},
+        {RetryAfterRole, "retryAfter"},
+        {NextScheduledRefreshRole, "nextScheduledRefresh"},
         {SafeVerificationRole, "safeVerification"},
         {CustomEndpointRequiredRole, "customEndpointRequired"},
         {ReadinessStateRole, "readinessState"},
@@ -258,8 +295,15 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
         result.installed = tool && tool->isInstalled();
         result.enabled = tool ? tool->isEnabled() : entry.enabled;
         result.setupRank = result.installed ? 0 : 300;
-        if (tool) result.lastVerified = latest(latest(tool->lastSyncTime(), tool->lastActivity()),
-                                               entry.localVerification);
+        if (tool) {
+            result.lastVerified = latest(latest(tool->lastSyncTime(), tool->lastActivity()),
+                                         entry.localVerification);
+            result.lastAttempt = latest(tool->lastAttemptTime(),
+                                        entry.localVerification);
+            result.lastSuccess = latest(
+                latest(tool->lastSyncTime(), tool->lastActivity()),
+                latest(tool->lastQuotaObservation(), entry.localVerification));
+        }
 
         if (!result.enabled) {
             result.state = SourceState::Disabled;
@@ -302,14 +346,24 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
         } else if (tool && tool->lastQuotaObservation().isValid()) {
           result.state = SourceState::Degraded;
           result.nextAction = NextAction::RefreshStaleData;
-        } else if (tool &&
-                   (tool->lastActivity().isValid() || tool->usageCount() > 0 ||
-                    entry.localVerification.isValid())) {
-          result.state = SourceState::ReportingEstimate;
-          result.nextAction = NextAction::None;
+        } else if (tool && tool->lastActivity().isValid()) {
+          const QDateTime now = m_presentationTime.isValid()
+              ? m_presentationTime : QDateTime::currentDateTimeUtc();
+          if (freshObservation(tool->lastActivity(), now)) {
+              result.state = SourceState::ReportingEstimate;
+              result.nextAction = NextAction::None;
+          } else {
+              result.state = SourceState::Degraded;
+              result.errorCode = QStringLiteral("stale");
+              result.nextAction = NextAction::RefreshStaleData;
+          }
+        } else if (tool && tool->usageCount() > 0) {
+          result.state = SourceState::Degraded;
+          result.errorCode = QStringLiteral("stale");
+          result.nextAction = NextAction::RefreshStaleData;
         } else {
-          result.state = SourceState::ReadyToVerify;
-          result.nextAction = NextAction::VerifySource;
+          result.state = SourceState::WaitingForActivity;
+          result.nextAction = NextAction::None;
         }
         return result;
     }
@@ -338,6 +392,10 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
     }
 
     result.lastVerified = backend->lastSuccess();
+    result.lastAttempt = backend->lastAttempt();
+    result.lastSuccess = backend->lastSuccess();
+    result.retryAfter = backend->retryAfter();
+    result.nextScheduledRefresh = backend->nextScheduledRefresh();
     if (backend->isLoading() || backend->providerState() == ProviderBackend::ProviderState::Refreshing) {
         result.state = SourceState::Verifying;
         result.nextAction = NextAction::WaitForVerification;
@@ -435,18 +493,27 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
 
     bool hasActual = false;
     bool hasEstimate = false;
+    bool hasStaleMetric = false;
+    const QDateTime now = m_presentationTime.isValid()
+        ? m_presentationTime : QDateTime::currentDateTimeUtc();
     for (const QVariant &value : backend->metrics()) {
         const QVariantMap metric = value.toMap();
         if (!metric.value(QStringLiteral("available")).toBool()) continue;
+        if (!freshMetric(metric, now)) {
+            hasStaleMetric = true;
+            continue;
+        }
         const QString source = metric.value(QStringLiteral("source")).toString();
         hasActual = hasActual || isActualMetricSource(source);
         hasEstimate = hasEstimate || isEstimatedMetricSource(source);
     }
-    hasActual = hasActual || isActualMetricSource(backend->usageSource())
-        || isActualMetricSource(backend->costSource());
-    hasEstimate = hasEstimate || backend->isEstimatedCost()
-        || isEstimatedMetricSource(backend->usageSource())
-        || isEstimatedMetricSource(backend->costSource());
+
+    if (!hasActual && !hasEstimate && hasStaleMetric) {
+        result.state = SourceState::Degraded;
+        result.errorCode = QStringLiteral("stale");
+        result.nextAction = NextAction::RefreshStaleData;
+        return result;
+    }
 
     result.state = hasActual ? SourceState::ReportingActual
         : hasEstimate ? SourceState::ReportingEstimate
@@ -496,6 +563,7 @@ void SourceReadinessModel::connectProvider(int row, ProviderBackend *backend)
     connect(backend, &ProviderBackend::stateChanged, this, update);
     connect(backend, &ProviderBackend::dataUpdated, this, update);
     connect(backend, &ProviderBackend::metricsChanged, this, update);
+    connect(backend, &ProviderBackend::diagnosticsChanged, this, update);
     connect(backend, &ProviderBackend::customBaseUrlChanged, this, update);
     if (backend->metaObject()->indexOfSignal("credentialsChanged()") >= 0)
         connect(backend, SIGNAL(credentialsChanged()), this, SLOT(backendChanged()));
@@ -554,6 +622,7 @@ QString SourceReadinessModel::stateKey(SourceState state)
     case SourceState::NeedsConfiguration: return QStringLiteral("needs_configuration");
     case SourceState::ReadyToVerify: return QStringLiteral("ready_to_verify");
     case SourceState::Verifying: return QStringLiteral("verifying");
+    case SourceState::WaitingForActivity: return QStringLiteral("waiting_for_activity");
     case SourceState::ConnectedConnectivityOnly: return QStringLiteral("connected_connectivity_only");
     case SourceState::ReportingEstimate: return QStringLiteral("reporting_estimate");
     case SourceState::ReportingActual: return QStringLiteral("reporting_actual");

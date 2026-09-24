@@ -29,7 +29,11 @@ const QStringList kRoleNames{
     QStringLiteral("lineItemScope"),
     QStringLiteral("lineItemAvailable"),
     QStringLiteral("aggregationLevel"),
-    QStringLiteral("valueClass")};
+    QStringLiteral("valueClass"),
+    QStringLiteral("lastKnownValue"),
+    QStringLiteral("lastKnownAvailable"),
+    QStringLiteral("freshnessState"),
+    QStringLiteral("observedAt")};
 
 bool availableMetric(const QVariantMap &metric) {
   const QVariant value = metric.value(QStringLiteral("value"));

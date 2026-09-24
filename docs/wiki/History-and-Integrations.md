@@ -106,10 +106,35 @@ firewall. Anyone who can connect can read the exported metrics.
 Guardrail metrics use fixed source/risk/value-class labels.
 Authenticated local-tool quota windows are exported as
 `ai_usage_tool_quota_percent_remaining`, labeled by tool, window kind, source,
-and quality. `ai_usage_tool_quota_reset_timestamp_seconds` exports the reset as
-a Unix timestamp when the source provides one. The older
-`ai_usage_tool_percent_used` series remains the self-tracked plan estimate and
-must not be treated as live quota.
+a Unix timestamp when the source provides one. Self-tracked
+`ai_usage_tool_usage_count` and `ai_usage_tool_percent_used` require a local
+activity observation from the last 15 minutes. Older activity is available
+through `ai_usage_tool_last_activity_seconds`, while its count and percentage
+are omitted until a fresh observation arrives. These metrics are local
+estimates, not live provider quota.
+
+### Cost metrics and v21 interface change
+
+Cost classes remain separate and are emitted only when a fresh numeric value
+and a recognized ISO currency are available:
+
+- `ai_usage_api_spend{period="current|today|month",currency="…"}` for actual
+  provider-reported spend
+- `ai_usage_estimated_burn{period="month",cost_source="estimated_from_usage",currency="…"}`
+  for local pricing estimates
+- `ai_usage_subscription_fees{period="month",cost_source="self_tracked",currency="…"}`
+  for known fixed subscription fees
+- `ai_usage_tool_subscription_fee{tool="…",cost_source="self_tracked",currency="…"}`
+  for each known tool plan fee
+
+Unknown currencies are not relabeled as USD. Missing usage, activity, or price
+values are omitted instead of exported as zero. An explicitly observed numeric
+zero remains a valid sample.
+
+Version 21 removes `ai_usage_total_monthly_exposure`. It mixed actual provider
+billing, local estimates, and subscription fees into one value. Update any
+consumer of that series to query the separate class-specific metrics above;
+the project does not convert or add unlike currencies.
 
 `ai_usage_guardrail_risk_state` uses `0` unavailable, `1` safe, `2` warning,
 `3` critical and `4` exceeded.

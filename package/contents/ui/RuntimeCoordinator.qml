@@ -107,6 +107,12 @@ Item {
         guardrailRefreshTimer.restart();
     }
 
+    function providerMetricMaxAgeMs(provider) {
+        var interval = scheduler && scheduler.scheduledInterval
+            ? scheduler.scheduledInterval(provider) : 0;
+        return PrometheusMetrics.freshnessMaxAgeMs(interval);
+    }
+
     function loadIntegrationSecrets() {
         if (registry.demoMode) {
             if (copilotMonitor) copilotMonitor.githubToken = "";
@@ -260,7 +266,7 @@ Item {
         var apiSpendToday = {};
         var apiSpendMonth = {};
         var estimatedBurn = {};
-        var subscriptionFees = 0;
+        var subscriptionFees = {};
         var providers = registry.allProviders || [];
         for (var i = 0; i < providers.length; i++) {
             var provider = providers[i];
@@ -271,7 +277,8 @@ Item {
             var backend = provider.backend;
             var costSource = labelValue(backend.costSource || "unknown");
             var usageSource = labelValue(backend.usageSource || "unknown");
-            var currency = labelValue(backend.currency || "USD");
+            var currency = PrometheusMetrics.normalizedCurrency(backend.currency)
+                || "unknown";
             var dataQuality = labelValue(backend.dataQuality || "unknown");
             lines.push("ai_usage_provider_connected{provider=\"" + providerKey + "\"} " + (backend.connected ? "1" : "0"));
             lines.push("ai_usage_provider_source_info{provider=\"" + providerKey + "\",cost_source=\"" + costSource + "\",usage_source=\"" + usageSource + "\",currency=\"" + currency + "\",data_quality=\"" + dataQuality + "\"} 1");
@@ -291,30 +298,41 @@ Item {
                     + "\",quality=\"" + labelValue(metric.quality)
                     + "\",scope=\"" + labelValue(metric.scope)
                     + "\",window=\"" + labelValue(metric.window) + "\"";
+                var metricFresh = PrometheusMetrics.metricIsFresh(
+                    metric, Date.now(), providerMetricMaxAgeMs(provider));
+                var metricAmountValid = metric.kind !== "cost"
+                    || !!PrometheusMetrics.normalizedCurrency(metric.currency);
+                var numericValue = PrometheusMetrics.isFiniteAmount(metric.value);
                 lines.push("ai_usage_provider_metric_available{" + metricLabels + "} "
-                           + (metric.available ? "1" : "0"));
-                if (metric.available) {
+                           + (metricFresh && metricAmountValid && numericValue ? "1" : "0"));
+                if (metricFresh && metricAmountValid && numericValue) {
                     lines.push("ai_usage_provider_metric{" + metricLabels + "} " + Number(metric.value));
                 }
             }
-            lines.push("ai_usage_provider_probe_input_tokens{provider=\"" + providerKey + "\"} " + (backend.probeInputTokens || 0));
-            lines.push("ai_usage_provider_probe_output_tokens{provider=\"" + providerKey + "\"} " + (backend.probeOutputTokens || 0));
-            lines.push("ai_usage_provider_probe_requests{provider=\"" + providerKey + "\"} " + (backend.probeRequestCount || 0));
+            if (Number(backend.probeInputTokens) > 0
+                    || Number(backend.probeOutputTokens) > 0
+                    || Number(backend.probeRequestCount) > 0) {
+                lines.push("ai_usage_provider_probe_input_tokens{provider=\"" + providerKey + "\"} " + Number(backend.probeInputTokens));
+                lines.push("ai_usage_provider_probe_output_tokens{provider=\"" + providerKey + "\"} " + Number(backend.probeOutputTokens));
+                lines.push("ai_usage_provider_probe_requests{provider=\"" + providerKey + "\"} " + Number(backend.probeRequestCount));
+            }
             if (backend.lastRefreshed) {
                 lines.push("ai_usage_provider_last_refresh_seconds{provider=\"" + providerKey + "\"} "
                            + Date.parse(backend.lastRefreshed) / 1000);
             }
-            var currentCost = backend.metric ? backend.metric("cost", "", "current") : {};
-            var dailyCost = backend.metric ? backend.metric("cost", "", "day") : {};
-            var monthlyCost = backend.metric ? backend.metric("cost", "", "month") : {};
-            if ((currentCost.source === "billing_api" || currentCost.source === "usage_api")
-                    && currentCost.available) {
-                addCurrencyValue(apiSpend, currentCost.currency, currentCost.value);
-                if (dailyCost.available) addCurrencyValue(apiSpendToday, dailyCost.currency, dailyCost.value);
-                if (monthlyCost.available) addCurrencyValue(apiSpendMonth, monthlyCost.currency, monthlyCost.value);
-            } else if (backend.costSource === "estimated_from_usage" || backend.isEstimatedCost) {
-                addCurrencyValue(estimatedBurn, currency,
-                                 backend.estimatedMonthlyCost || backend.monthlyCost || backend.cost || 0);
+            var providerMetrics = backend.metrics || [];
+            var providerCosts = {
+                actualCurrent: apiSpend,
+                actualToday: apiSpendToday,
+                actualMonth: apiSpendMonth,
+                estimatedBurn: estimatedBurn
+            };
+            var maxMetricAgeMs = providerMetricMaxAgeMs(provider);
+            for (var costIndex = 0; costIndex < providerMetrics.length; costIndex++) {
+                var costMetric = providerMetrics[costIndex] || {};
+                PrometheusMetrics.addProviderCostMetric(
+                    providerCosts, costMetric, backend.isEstimatedCost,
+                    backend.estimatedMonthlyCost, Date.now(), maxMetricAgeMs);
             }
         }
 
@@ -330,32 +348,38 @@ Item {
             }
             var toolKey = tool.name.toLowerCase().replace(/[^a-z0-9]+/g, "_");
             lines.push("ai_usage_tool_installed{tool=\"" + toolKey + "\"} " + (tool.monitor.installed ? "1" : "0"));
-            lines.push("ai_usage_tool_usage_count{tool=\"" + toolKey + "\"} " + (tool.monitor.usageCount || 0));
-            lines.push("ai_usage_tool_usage_limit{tool=\"" + toolKey + "\"} " + (tool.monitor.usageLimit || 0));
-            lines.push("ai_usage_tool_percent_used{tool=\"" + toolKey + "\"} " + (tool.monitor.percentUsed || 0));
-            lines.push("ai_usage_tool_last_activity_seconds{tool=\"" + toolKey + "\"} " + (tool.monitor.lastActivity ? Date.parse(tool.monitor.lastActivity) / 1000 : 0));
-            lines.push("ai_usage_tool_subscription_fee{tool=\"" + toolKey + "\",cost_source=\"self_tracked\",currency=\"USD\"} " + (tool.monitor.hasSubscriptionCost ? (tool.monitor.subscriptionCost || 0) : 0));
+            PrometheusMetrics.appendLocalActivityMetrics(
+                lines, toolKey, tool.monitor.usageCount, tool.monitor.usageLimit,
+                tool.monitor.lastActivity);
             PrometheusMetrics.appendToolQuotaMetrics(lines, toolKey,
                                                      tool.monitor.quotaWindows || []);
             if (tool.monitor.hasSubscriptionCost) {
-                subscriptionFees += tool.monitor.subscriptionCost || 0;
+                var subscriptionPrice = MonitorPlugin.SubscriptionPlanCatalog.price(
+                    tool.stableId, tool.monitor.planTier) || {};
+                if (subscriptionPrice.available === true
+                        && PrometheusMetrics.isFiniteAmount(subscriptionPrice.amount)) {
+                    var feeCurrency = PrometheusMetrics.normalizedCurrency(
+                        subscriptionPrice.currency);
+                    if (feeCurrency) {
+                        lines.push("ai_usage_tool_subscription_fee{tool=\""
+                            + toolKey + "\",cost_source=\"self_tracked\",currency=\""
+                            + feeCurrency + "\"} " + subscriptionPrice.amount);
+                        PrometheusMetrics.addCurrencyValue(subscriptionFees,
+                            feeCurrency, subscriptionPrice.amount);
+                    }
+                }
             }
         }
 
-        appendCurrencyMetrics(lines, "ai_usage_api_spend", "period=\"current\"", apiSpend);
-        appendCurrencyMetrics(lines, "ai_usage_api_spend", "period=\"today\"", apiSpendToday);
-        appendCurrencyMetrics(lines, "ai_usage_api_spend", "period=\"month\"", apiSpendMonth);
-        lines.push("ai_usage_subscription_fees{period=\"month\",currency=\"USD\",cost_source=\"self_tracked\"} " + subscriptionFees);
-        appendCurrencyMetrics(lines, "ai_usage_estimated_burn",
-                              "period=\"month\",cost_source=\"estimated_from_usage\"", estimatedBurn);
+        PrometheusMetrics.appendCostClassMetrics(lines, {
+            actualCurrent: apiSpend,
+            actualToday: apiSpendToday,
+            actualMonth: apiSpendMonth,
+            subscriptionFees: subscriptionFees,
+            estimatedBurn: estimatedBurn
+        });
 
         appendGuardrailMetrics(lines);
-
-        var exposure = {};
-        mergeCurrencyValues(exposure, apiSpendMonth);
-        mergeCurrencyValues(exposure, estimatedBurn);
-        addCurrencyValue(exposure, "USD", subscriptionFees);
-        appendCurrencyMetrics(lines, "ai_usage_total_monthly_exposure", "", exposure);
 
         metricsServer.payload = lines.join("\n") + "\n";
     }
@@ -424,24 +448,11 @@ Item {
     }
 
     function addCurrencyValue(totals, currency, value) {
-        var code = labelValue(currency || "USD").toUpperCase();
-        totals[code] = (totals[code] || 0) + Number(value || 0);
-    }
-
-    function mergeCurrencyValues(target, source) {
-        var currencies = Object.keys(source || {});
-        for (var i = 0; i < currencies.length; i++) {
-            addCurrencyValue(target, currencies[i], source[currencies[i]]);
-        }
+        return PrometheusMetrics.addCurrencyValue(totals, currency, value);
     }
 
     function appendCurrencyMetrics(lines, metric, extraLabels, totals) {
-        var currencies = Object.keys(totals || {}).sort();
-        for (var i = 0; i < currencies.length; i++) {
-            var prefix = extraLabels ? extraLabels + "," : "";
-            lines.push(metric + "{" + prefix + "currency=\"" + currencies[i] + "\"} "
-                       + totals[currencies[i]]);
-        }
+        PrometheusMetrics.appendCurrencyMetrics(lines, metric, extraLabels, totals);
     }
 
     function connectProviderSignals() {

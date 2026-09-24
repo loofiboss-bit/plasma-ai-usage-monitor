@@ -21,7 +21,11 @@ If setup was skipped earlier, reopen the widget and choose **Resume setup**. Ful
 5. Run the verification. Provider verification uses the scheduled read-only request and never sends inference. Local-tool verification checks the detected activity path.
 6. Read the result quality before opening the dashboard.
 
-Connectivity-only verification is a successful connection test, not proof of token usage or spend. A local-tool result remains an estimate unless an authenticated source reports a live quota window.
+Connectivity-only verification is a successful connection test, not proof of
+token usage or spend. A detected local tool with no observed activity completes
+setup as **Waiting for local activity** and is not counted as reporting an
+estimate. Local activity becomes an estimate only after it is observed, unless
+an authenticated source reports a live quota window.
 
 ## Add another source in Settings
 
@@ -71,6 +75,7 @@ Open **Settings → Diagnostics** after the first setup. Confirm:
 - the frontend and plugin come from the expected install layers
 - the history database is healthy or not created yet
 - no enabled source unexpectedly needs recovery
+- detected local tools waiting for first activity are reported as waiting, not as estimates
 - KWallet and both catalogs are available
 
 Diagnostics can copy the relevant repair command, version check, capability report, or redacted support report. Use the source-readiness action to select a provider that needs repair.

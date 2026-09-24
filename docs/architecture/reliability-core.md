@@ -35,9 +35,13 @@ next action.
 
 The stable states are `disabled`, `unavailable_locally`,
 `needs_configuration`, `ready_to_verify`, `verifying`,
+`waiting_for_activity`,
 `connected_connectivity_only`, `reporting_estimate`, `reporting_actual`,
 `degraded`, and `failed`. Connectivity never implies useful usage or spend.
 Actual and estimated metrics are classified from Metric Contract v2 sources.
+Detected local tools without observed activity use `waiting_for_activity` and
+do not count as reporting estimates. Successful verification can complete
+onboarding in this state.
 Provider failures are classified from `ProviderErrorKind`; localized error text
 is not parsed. Local sync diagnostics use stable diagnostic codes and never
 expose cookies or credential values.
@@ -70,6 +74,13 @@ Optional quota, reset, cost, and budget scalars always have a matching
 availability role. An available numeric zero remains zero. An unavailable value
 is an invalid `QVariant`; callers must check its availability role and must not
 coerce it to zero.
+
+Provider metrics are eligible for current daily state only when their
+`observedAt` is present, not in the future, less than 15 minutes old, and any
+reset is still ahead. Stale values are copied to `lastKnownValue`, marked
+unavailable, and excluded from quality classes and aggregates. Daily rows also
+expose `retryAfter` and `nextScheduledRefresh` so Source Detail can explain the
+next permitted check without querying a backend directly.
 
 `quotaWindows` contains every compatible normalized quota window for the source.
 Each row carries `kind`, `window`, `percentUsed`, `percentRemaining`,
@@ -345,6 +356,18 @@ its unauthenticated endpoint to all IPv4 interfaces for remote collection.
 Guardrail series are collapsed to the worst state and earliest event per
 provider, risk kind, and value class. They never use scope, model, project,
 workspace, stable-ID, or API-key labels.
+
+Prometheus exports current normalized provider metrics only when they are
+available, timestamped, fresh, and not past reset. Monetary values require a
+recognized ISO currency. `ai_usage_api_spend`,
+`ai_usage_estimated_burn`, and `ai_usage_subscription_fees` keep actual spend,
+estimates, and fixed fees separate. Version 21 removes
+`ai_usage_total_monthly_exposure`; consumers must select a class-specific
+series. Unknown values are omitted, while an available numeric zero remains a
+sample. Self-tracked tool counts and percentages also require a local activity
+observation from the last 15 minutes; the last-activity timestamp may remain
+available after the count becomes stale.
+
 Scheduled JSON and CSV export writes to a user-selected local directory. Slack
 and Discord webhooks are explicit outbound integrations and use KWallet-stored
 URLs plus alert cooldowns.

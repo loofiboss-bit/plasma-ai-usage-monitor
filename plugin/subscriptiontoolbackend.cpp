@@ -788,27 +788,39 @@ QVariantList SubscriptionToolBackend::quotaWindows() const
     }
 
     if (m_usageLimit > 0 || m_usageCount > 0) {
-        appendRow(usageRow(periodKind(primaryPeriodType()),
-                           periodLabel().isEmpty() ? QStringLiteral("Primary quota") : periodLabel(),
-                           primaryPeriodType() == Monthly ? QStringLiteral("requests") : QStringLiteral("messages"),
-                           m_usageCount,
-                           m_usageLimit,
-                           periodEnd(),
-                           timeUntilReset(),
-                           m_usageLimit > 0 ? QStringLiteral("user_config") : QStringLiteral("local_activity"),
-                           m_usageLimit > 0 ? QStringLiteral("self_tracked_local") : QStringLiteral("estimated")));
+        QVariantMap row = usageRow(
+            periodKind(primaryPeriodType()),
+            periodLabel().isEmpty() ? QStringLiteral("Primary quota") : periodLabel(),
+            primaryPeriodType() == Monthly ? QStringLiteral("requests") : QStringLiteral("messages"),
+            m_usageCount, m_usageLimit, periodEnd(), timeUntilReset(),
+            m_usageLimit > 0 ? QStringLiteral("user_config") : QStringLiteral("local_activity"),
+            m_usageLimit > 0 ? QStringLiteral("self_tracked_local") : QStringLiteral("estimated"));
+        row.insert(QStringLiteral("observedAt"), m_lastActivity);
+        if (!m_lastActivity.isValid()) {
+            row.remove(QStringLiteral("remaining"));
+            row.remove(QStringLiteral("percentUsed"));
+            row.insert(QStringLiteral("available"), false);
+            row.insert(QStringLiteral("freshnessState"), QStringLiteral("never_observed"));
+        }
+        appendRow(row);
     }
 
     if (hasSecondaryLimit() && (m_secondaryUsageLimit > 0 || m_secondaryUsageCount > 0)) {
-        appendRow(usageRow(periodKind(secondaryPeriodType()),
-                           secondaryPeriodLabel().isEmpty() ? QStringLiteral("Secondary quota") : secondaryPeriodLabel(),
-                           QStringLiteral("messages"),
-                           m_secondaryUsageCount,
-                           m_secondaryUsageLimit,
-                           secondaryPeriodEnd(),
-                           secondaryTimeUntilReset(),
-                           m_secondaryUsageLimit > 0 ? QStringLiteral("user_config") : QStringLiteral("local_activity"),
-                           m_secondaryUsageLimit > 0 ? QStringLiteral("self_tracked_local") : QStringLiteral("estimated")));
+        QVariantMap row = usageRow(
+            periodKind(secondaryPeriodType()),
+            secondaryPeriodLabel().isEmpty() ? QStringLiteral("Secondary quota") : secondaryPeriodLabel(),
+            QStringLiteral("messages"), m_secondaryUsageCount,
+            m_secondaryUsageLimit, secondaryPeriodEnd(), secondaryTimeUntilReset(),
+            m_secondaryUsageLimit > 0 ? QStringLiteral("user_config") : QStringLiteral("local_activity"),
+            m_secondaryUsageLimit > 0 ? QStringLiteral("self_tracked_local") : QStringLiteral("estimated"));
+        row.insert(QStringLiteral("observedAt"), m_lastActivity);
+        if (!m_lastActivity.isValid()) {
+            row.remove(QStringLiteral("remaining"));
+            row.remove(QStringLiteral("percentUsed"));
+            row.insert(QStringLiteral("available"), false);
+            row.insert(QStringLiteral("freshnessState"), QStringLiteral("never_observed"));
+        }
+        appendRow(row);
     }
 
     return rows;
@@ -882,11 +894,14 @@ void SubscriptionToolBackend::setSyncEnabled(bool enabled)
 
 QString SubscriptionToolBackend::syncStatus() const { return m_syncStatus; }
 QDateTime SubscriptionToolBackend::lastSyncTime() const { return m_lastSyncTime; }
+QDateTime SubscriptionToolBackend::lastAttemptTime() const { return m_lastAttemptTime; }
 bool SubscriptionToolBackend::isSyncing() const { return m_syncing; }
 
 void SubscriptionToolBackend::setSyncing(bool syncing)
 {
     if (m_syncing != syncing) {
+        if (syncing)
+            m_lastAttemptTime = QDateTime::currentDateTimeUtc();
         m_syncing = syncing;
         Q_EMIT syncStatusChanged();
     }
@@ -930,20 +945,34 @@ SubscriptionToolBackend::quotaWindowsAt(const QDateTime &now) const {
   QVariantList result;
   for (const QVariant &value : quotaWindows()) {
     QVariantMap row = value.toMap();
-    if (authenticatedQuotaSource(row)) {
-      const QDateTime observed =
-          row.value(QStringLiteral("observedAt")).toDateTime();
+    const QString source = row.value(QStringLiteral("source")).toString();
+    const QString precision = row.value(QStringLiteral("precision")).toString();
+    const bool localEstimate =
+        source == QLatin1String("local_activity") ||
+        precision == QLatin1String("self_tracked_local") ||
+        precision == QLatin1String("estimated");
+    if (authenticatedQuotaSource(row) || localEstimate) {
+      QDateTime observed = row.value(QStringLiteral("observedAt")).toDateTime();
+      if (!observed.isValid())
+        observed = QDateTime::fromString(
+            row.value(QStringLiteral("observedAt")).toString(), Qt::ISODate);
+      const bool hasMeasuredValue =
+          row.contains(QStringLiteral("percentUsed")) ||
+          row.contains(QStringLiteral("percentRemaining"));
       QDateTime reset = row.value(QStringLiteral("resetAt")).toDateTime();
       if (!reset.isValid())
         reset = QDateTime::fromString(
             row.value(QStringLiteral("resetAt")).toString(), Qt::ISODate);
       const QString reason =
-          !observed.isValid()               ? QStringLiteral("never_observed")
+          !hasMeasuredValue || !observed.isValid()
+              ? QStringLiteral("never_observed")
           : reset.isValid() && reset <= now ? QStringLiteral("awaiting_refresh")
           : observed > now || observed.secsTo(now) >= 900
               ? QStringLiteral("stale")
               : QStringLiteral("fresh");
-      row.insert(QStringLiteral("available"), reason == QLatin1String("fresh"));
+      row.insert(QStringLiteral("available"),
+                 row.value(QStringLiteral("available"), true).toBool() &&
+                     reason == QLatin1String("fresh"));
       row.insert(QStringLiteral("freshnessState"), reason);
     }
     result.append(row);
@@ -962,8 +991,10 @@ bool SubscriptionToolBackend::hasFreshQuota(const QDateTime &now) const {
 QDateTime SubscriptionToolBackend::lastQuotaObservation() const {
   QDateTime latest;
   for (const QVariant &value : quotaWindows()) {
-    const QDateTime observed =
-        value.toMap().value(QStringLiteral("observedAt")).toDateTime();
+    const QVariantMap row = value.toMap();
+    if (!authenticatedQuotaSource(row))
+      continue;
+    const QDateTime observed = row.value(QStringLiteral("observedAt")).toDateTime();
     if (observed.isValid() && (!latest.isValid() || observed > latest))
       latest = observed;
   }

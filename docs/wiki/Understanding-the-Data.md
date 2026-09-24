@@ -6,7 +6,8 @@ Provider cards answer different questions because provider APIs expose different
 Overview prioritizes the source that needs action in one **Daily focus**, then
 shows non-overlapping live-quota, reset, and spend facts. Source rows are ordered
 by attention, provider-reported data, estimates or balances, connectivity-only
-checks, and unavailable data. Open a row for Source Detail; it keeps metric
+checks, and unavailable data. A detected local tool with no observation is
+shown as waiting for activity, not as an estimate. Open a row for Source Detail; it keeps metric
 availability, freshness, provenance, coverage, and compatible recent history
 visible without treating a connection check as usage. The same daily state
 drives the panel and notifications.
@@ -59,7 +60,12 @@ as stale but does not generate a fresh threshold-change notification.
 
 ## Unknown and zero
 
-**Unknown** means the source did not provide a compatible value. Zero means the source explicitly reported zero. The widget preserves that distinction in the UI, database, exports, alerts, and Prometheus output.
+**Unknown** means the source did not provide a compatible value. Zero means the source explicitly reported zero. The widget preserves that distinction in the UI, database, exports, alerts, and Prometheus output. A local app can be detected and checked successfully while still waiting for its first activity; this state is not counted as an estimate or active data.
+
+Metrics older than 15 minutes, from a future observation time, past their reset,
+or missing an observation time are unavailable to daily counts and quality
+classes. Source Detail may retain an expired numeric value as **Last known** with
+its observation time; it does not feed live quota, spend, or usage aggregates.
 
 Compact cost modes include only available provider-reported spend and keep each
 currency separate. Remaining requests show an em dash when no compatible metric
@@ -153,5 +159,6 @@ updating the displayed time does not itself call a provider.
 Automatic recovery requests coalesce after a missed wake interval or network
 recovery. Authentication and permission failures require corrective action.
 Rate-limited browser and API requests honor Retry-After; transient failures wait
-before retrying. Use source settings to repair credentials and explicitly verify
-the source after repair.
+before retrying. Source Detail shows the next permitted retry and disables its
+refresh action while that window is active. Use source settings to repair
+credentials and explicitly verify the source after repair.

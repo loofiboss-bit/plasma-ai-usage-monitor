@@ -9,6 +9,7 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import com.github.loofi.aiusagemonitor 1.0
 import ".." as Monitor
+import "../SourceHealth.js" as SourceHealth
 
 QQC2.ScrollView {
     id: detail
@@ -16,8 +17,12 @@ QQC2.ScrollView {
     property var monitor: null
     property string sourceId: ""
     property bool showAllScopes: false
+    property bool technicalDetailsExpanded: mediaMode
+    property double healthClockMs: Date.now()
     readonly property bool mediaMode: AppInfo.demoMode
         && AppInfo.smokeView === "media-source-detail"
+    readonly property bool retryBlocked: SourceHealth.retryBlocked(
+        sourceData.retryAfter, healthClockMs)
     readonly property var mediaSource: mediaMode && monitor
         ? monitor.presentationDailyState.source(sourceId) : ({})
     readonly property var sourceData: mediaMode ? mediaSource : detailModel.source
@@ -27,7 +32,9 @@ QQC2.ScrollView {
         ? ({ availableMetricCount: 2, totalMetricCount: 3 })
         : detailModel.coverage
     readonly property string actionLabelData: mediaMode
-        ? i18n("Open source settings") : detailModel.actionLabel
+        ? mediaSource.nextActionKey === "none"
+            ? "" : i18n("Open source settings")
+        : detailModel.actionLabel
     readonly property var mediaMetrics: mediaMode
         ? (mediaSource.detailMetrics || []) : []
     readonly property var catalogModelData: catalogModel()
@@ -60,8 +67,68 @@ QQC2.ScrollView {
             connectivity_only: i18n("Connectivity only"),
             unavailable: i18n("Data unavailable")
         };
-        return labels[sourceData.qualityClass]
-            || i18n("Data unavailable");
+        var freshnessLabels = {
+            fresh: i18n("checked recently"),
+            aging: i18n("getting old"),
+            stale: i18n("stale"),
+            never: i18n("not observed yet")
+        };
+        return (labels[sourceData.qualityClass]
+            || i18n("Data unavailable"))
+            + i18n(" · %1", freshnessLabels[sourceData.freshnessState]
+                               || i18n("freshness unknown"));
+    }
+
+    function dateMilliseconds(value) {
+        return SourceHealth.dateMilliseconds(value);
+    }
+
+    function localizedDate(value) {
+        var milliseconds = dateMilliseconds(value);
+        return milliseconds > 0
+            ? new Date(milliseconds).toLocaleString(Qt.locale())
+            : i18n("Not available");
+    }
+
+    function expectedCapabilityText() {
+        if (sourceData.sourceKind === "local_tool") {
+            if (sourceData.readinessState === "waiting_for_activity")
+                return i18n("Expected data: local activity appears after the detected app is used. Usage remains unavailable until the first activity observation.");
+            return i18n("Expected data: local activity estimates and any authenticated quota windows supported by this tool.");
+        }
+        var descriptions = {
+            actual_usage_spend: i18n("Expected data: provider-reported usage and spend when the endpoint exposes them."),
+            actual_key_usage: i18n("Expected data: actual API key usage; billing may be unavailable."),
+            gateway_aggregate: i18n("Expected data: aggregate usage or spend reported by the gateway."),
+            balance_connectivity: i18n("Expected data: account balance and connection status."),
+            connectivity_only: i18n("Expected data: connection status only; usage metrics are not exposed by this source.")
+        };
+        return descriptions[sourceData.monitoringLevel]
+            || i18n("Expected data: the capabilities documented for this source.");
+    }
+
+    function healthActionText() {
+        if (retryBlocked)
+            return i18n("The provider has asked us to wait until %1 before trying again.",
+                        localizedDate(sourceData.retryAfter));
+        if (sourceData.readinessState === "waiting_for_activity")
+            return i18n("No action is needed yet. Use the app to create its first local activity observation.");
+        return sourceData.nextActionText || i18n("No action is required.");
+    }
+
+    function metricFreshnessText(state, observedAt) {
+        var labels = {
+            fresh: i18n("fresh"),
+            aging: i18n("getting old"),
+            stale: i18n("stale"),
+            awaiting_refresh: i18n("awaiting refresh"),
+            never_observed: i18n("not observed yet")
+        };
+        var label = labels[state] || i18n("freshness unknown");
+        var observedMs = dateMilliseconds(observedAt);
+        if (state === "fresh" || state === "never_observed" || observedMs <= 0)
+            return label;
+        return i18n("%1 · observed %2", label, localizedDate(observedAt));
     }
 
     function formatMetric(value, unit, currency) {
@@ -263,6 +330,13 @@ QQC2.ScrollView {
 
     onMonitorChanged: configureModel()
 
+    Timer {
+        interval: 30000
+        repeat: true
+        running: true
+        onTriggered: detail.healthClockMs = Date.now()
+    }
+
     ColumnLayout {
         width: detail.availableWidth
         spacing: Kirigami.Units.mediumSpacing
@@ -293,8 +367,6 @@ QQC2.ScrollView {
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
                     text: detail.statusText()
-                        + i18n(" · %1", detail.sourceData.freshnessState
-                                    || i18n("unknown freshness"))
                     color: Kirigami.Theme.disabledTextColor
                     elide: Text.ElideRight
                 }
@@ -435,19 +507,61 @@ QQC2.ScrollView {
                     color: Kirigami.Theme.disabledTextColor
                     wrapMode: Text.WordWrap
                 }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: detail.expectedCapabilityText()
+                    wrapMode: Text.WordWrap
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: i18n("Last attempt: %1", detail.localizedDate(detail.sourceData.lastAttempt))
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: i18n("Last successful check: %1", detail.localizedDate(detail.sourceData.lastSuccess))
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: detail.dateMilliseconds(detail.sourceData.nextScheduledRefresh) > 0
+                    text: i18n("Next scheduled check: %1", detail.localizedDate(detail.sourceData.nextScheduledRefresh))
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: detail.healthActionText()
+                    wrapMode: Text.WordWrap
+                    Accessible.name: detail.healthActionText()
+                }
                 RowLayout {
                     Layout.fillWidth: true
                     visible: detail.actionLabelData !== ""
                     PlasmaComponents.Button {
                         objectName: "sourceDetailPrimaryAction"
-                        text: detail.actionLabelData
-                        icon.name: text === i18n("Refresh")
-                            ? "view-refresh" : "configure"
+                        text: detail.retryBlocked
+                            ? i18n("Retry at %1", detail.localizedDate(detail.sourceData.retryAfter))
+                            : detail.actionLabelData
+                        icon.name: detail.retryBlocked
+                            ? "chronometer"
+                            : text === i18n("Refresh")
+                                ? "view-refresh" : "configure"
                         activeFocusOnTab: true
-                        onClicked: detail.actionRequested(
-                            detail.sourceId,
-                            detail.sourceData.nextActionKey || "open_source_settings",
-                            detail.sourceData.sourceKind || "")
+                        enabled: !detail.retryBlocked
+                        Accessible.name: text
+                        Accessible.description: detail.healthActionText()
+                        onClicked: {
+                            if (!SourceHealth.canRequestAction(
+                                        detail.sourceData.retryAfter,
+                                        detail.healthClockMs)) return;
+                            detail.actionRequested(
+                                detail.sourceId,
+                                detail.sourceData.nextActionKey || "open_source_settings",
+                                detail.sourceData.sourceKind || "");
+                        }
                     }
                     Item { Layout.fillWidth: true }
                 }
@@ -531,10 +645,12 @@ QQC2.ScrollView {
                     var row = retained[i];
                     if (row.available !== false || !row.observedAt) continue;
                     var value = row.percentRemaining;
-                    var unit = i18n("% remaining");
+                    var unit = row.unit || i18n("% remaining");
                     if (value === undefined && typeof row.percentUsed === "number")
                         value = 100 - row.percentUsed;
-                    if (value === undefined) { value = row.value; unit = row.unit || ""; }
+                    if (value === undefined && row.lastKnownAvailable)
+                        value = row.lastKnownValue;
+                    if (value === undefined) value = row.value;
                     if (typeof value !== "number" || !Number.isFinite(value)) continue;
                     lines.push(i18n("Last known · %1: %2 %3 · observed %4 · awaiting fresh data",
                         row.window || row.label || row.kind, value, unit,
@@ -635,11 +751,28 @@ QQC2.ScrollView {
             Layout.rightMargin: Kirigami.Units.smallSpacing
             level: 4
             text: i18n("Typed metrics")
+            visible: detail.technicalDetailsExpanded
+        }
+
+        PlasmaComponents.Button {
+            objectName: "sourceDetailTechnicalToggle"
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            text: detail.technicalDetailsExpanded
+                ? i18n("Hide technical metric details")
+                : i18n("Show technical metric details")
+            checkable: true
+            checked: detail.technicalDetailsExpanded
+            activeFocusOnTab: true
+            Accessible.name: text
+            Accessible.description: i18n("Shows or hides per-metric values, freshness, and provenance.")
+            onClicked: detail.technicalDetailsExpanded = checked
         }
 
         Repeater {
             model: detailModel
-            visible: !detail.mediaMode
+            visible: !detail.mediaMode && detail.technicalDetailsExpanded
             Rectangle {
                 id: metricRow
                 required property string kind
@@ -652,6 +785,10 @@ QQC2.ScrollView {
                 required property string semantic
                 required property string scope
                 required property string window
+                required property var lastKnownValue
+                required property bool lastKnownAvailable
+                required property string freshnessState
+                required property var observedAt
                 Layout.fillWidth: true
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
@@ -679,8 +816,13 @@ QQC2.ScrollView {
                                 ? detail.formatMetric(metricRow.value,
                                                       metricRow.unit,
                                                       metricRow.currency)
-                                : i18n("Unavailable")
-                            color: metricRow.available
+                                : metricRow.lastKnownAvailable
+                                    ? i18n("Last known: %1", detail.formatMetric(
+                                        metricRow.lastKnownValue,
+                                        metricRow.unit,
+                                        metricRow.currency))
+                                    : i18n("Unavailable")
+                            color: metricRow.available || metricRow.lastKnownAvailable
                                 ? Kirigami.Theme.textColor
                                 : Kirigami.Theme.disabledTextColor
                         }
@@ -689,7 +831,11 @@ QQC2.ScrollView {
                         Layout.fillWidth: true
                         text: [metricRow.source, metricRow.quality,
                                metricRow.semantic, metricRow.scope,
-                               metricRow.window].filter(function(value) {
+                               metricRow.window,
+                               detail.metricFreshnessText(
+                                   metricRow.freshnessState,
+                                   metricRow.observedAt)
+                              ].filter(function(value) {
                                    return !!value;
                                }).join(i18n(" · "))
                         color: Kirigami.Theme.disabledTextColor
@@ -703,6 +849,7 @@ QQC2.ScrollView {
 
         Repeater {
             model: detail.mediaMetrics
+            visible: detail.technicalDetailsExpanded
             Rectangle {
                 id: mediaMetricRow
                 required property var modelData

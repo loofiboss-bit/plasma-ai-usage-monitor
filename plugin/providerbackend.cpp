@@ -225,8 +225,21 @@ ProviderBackend::Freshness ProviderBackend::freshness() const
     if (!m_lastSuccess.isValid()) return Freshness::Never;
     const qint64 age = m_lastSuccess.secsTo(QDateTime::currentDateTimeUtc());
     if (age < 5 * 60) return Freshness::Fresh;
-    if (age < 15 * 60) return Freshness::Aging;
+    if (age < freshnessMaxAgeSeconds()) return Freshness::Aging;
     return Freshness::Stale;
+}
+qint64 ProviderBackend::freshnessMaxAgeSeconds() const
+{
+    constexpr qint64 kDefaultMaxAgeSeconds = 15 * 60;
+    constexpr qint64 kRefreshCompletionGraceSeconds = 5 * 60;
+    if (!m_lastSuccess.isValid() || !m_nextScheduledRefresh.isValid())
+        return kDefaultMaxAgeSeconds;
+    const qint64 scheduledInterval =
+        m_lastSuccess.secsTo(m_nextScheduledRefresh);
+    if (scheduledInterval <= 0)
+        return kDefaultMaxAgeSeconds;
+    return qMax(kDefaultMaxAgeSeconds,
+                scheduledInterval + kRefreshCompletionGraceSeconds);
 }
 QDateTime ProviderBackend::nextScheduledRefresh() const { return m_nextScheduledRefresh; }
 int ProviderBackend::coalescedRefreshCount() const { return m_coalescedRefreshCount; }

@@ -59,6 +59,7 @@ public:
 
     void setDetected(bool installed) { setInstalled(installed); }
     void setActivity(const QDateTime &time) { setLastActivity(time); }
+    void setUsageCountForTest(int count) { setUsageCount(count); }
     void setSyncInProgress(bool syncing) { setSyncing(syncing); }
     void setVerified(const QDateTime &time) { setLastSyncTime(time); }
     void observeQuota() {
@@ -87,7 +88,11 @@ private Q_SLOTS:
     void credentialPropertyChangesInvalidateSource();
     void anthropicAdminCredentialIsAValidAlternative();
     void localToolStateTransitions();
+    void localToolWithoutActivityWaitsInsteadOfReportingEstimate();
+    void localEstimateIsNotReportedAsAuthenticatedQuota();
+    void failedSyncPreservesLocalHealthTimestamps();
     void explicitVerificationUsesSafeReadOnlyContract();
+    void retryAfterIsExposedAndBlocksVerification();
     void demoModeUsesIsolatedEndpoint();
     void candidateRankingIsDeterministic();
 };
@@ -178,8 +183,12 @@ void SourceReadinessModelTest::actualApiAliasReportsActualData()
     model.registerProviderBackend(QStringLiteral("openrouter"), &provider);
     model.setSourceEnabled(QStringLiteral("openrouter"), true);
     provider.setApiKey(QStringLiteral("test-key"));
-    provider.setUsageSource(QStringLiteral("actual_api"));
     provider.setConnected(true);
+    provider.setProviderMetric(ProviderBackend::MetricKind::Requests, 0,
+                               QStringLiteral("request"), QString(),
+                               QStringLiteral("account"), QStringLiteral("current"),
+                               ProviderBackend::MetricSource::UsageApi,
+                               QStringLiteral("actual"));
 
     QCOMPARE(model.source(QStringLiteral("openrouter"))
                  .value(QStringLiteral("readinessStateKey")).toString(),
@@ -292,7 +301,7 @@ void SourceReadinessModelTest::localToolStateTransitions()
     tool.setEnabled(true);
     QCOMPARE(state(), QStringLiteral("unavailable_locally"));
     tool.setDetected(true);
-    QCOMPARE(state(), QStringLiteral("ready_to_verify"));
+    QCOMPARE(state(), QStringLiteral("waiting_for_activity"));
     tool.setSyncInProgress(true);
     QCOMPARE(state(), QStringLiteral("verifying"));
     tool.setSyncInProgress(false);
@@ -310,6 +319,69 @@ void SourceReadinessModelTest::localToolStateTransitions()
     QCOMPARE(state(), QStringLiteral("reporting_actual"));
 }
 
+void SourceReadinessModelTest::localToolWithoutActivityWaitsInsteadOfReportingEstimate()
+{
+    SourceReadinessModel model;
+    ReadinessTool tool;
+    model.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+    tool.setEnabled(true);
+    tool.setDetected(true);
+
+    QCOMPARE(model.source(QStringLiteral("codex-cli"))
+                 .value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("waiting_for_activity"));
+    QCOMPARE(model.source(QStringLiteral("codex-cli"))
+                 .value(QStringLiteral("nextActionKey")).toString(),
+             QStringLiteral("none"));
+    QVERIFY(model.verifySource(QStringLiteral("codex-cli")));
+    const QVariantMap checked = model.source(QStringLiteral("codex-cli"));
+    QCOMPARE(checked.value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("waiting_for_activity"));
+    QVERIFY(checked.value(QStringLiteral("lastAttempt")).toDateTime().isValid());
+    QVERIFY(checked.value(QStringLiteral("lastSuccess")).toDateTime().isValid());
+}
+
+void SourceReadinessModelTest::localEstimateIsNotReportedAsAuthenticatedQuota()
+{
+    SourceReadinessModel model;
+    ReadinessTool tool;
+    model.registerLocalTool(QStringLiteral("claude-code"), &tool);
+    tool.setEnabled(true);
+    tool.setDetected(true);
+    tool.setUsageLimit(100);
+    tool.setUsageCountForTest(5);
+    tool.setActivity(QDateTime::currentDateTimeUtc());
+
+    QVERIFY(!tool.lastQuotaObservation().isValid());
+    QCOMPARE(model.source(QStringLiteral("claude-code"))
+                 .value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("reporting_estimate"));
+}
+
+void SourceReadinessModelTest::failedSyncPreservesLocalHealthTimestamps()
+{
+    SourceReadinessModel model;
+    ReadinessTool tool;
+    model.registerLocalTool(QStringLiteral("claude-code"), &tool);
+    tool.setEnabled(true);
+    tool.setDetected(true);
+    const QDateTime lastSuccess = QDateTime::currentDateTimeUtc().addSecs(-120);
+    tool.setActivity(lastSuccess);
+    tool.setVerified(lastSuccess);
+
+    tool.setSyncInProgress(true);
+    const QDateTime failedAttempt = tool.lastAttemptTime();
+    QVERIFY(failedAttempt.isValid());
+    tool.diagnostic(QStringLiteral("network_error"));
+    tool.setSyncInProgress(false);
+
+    const QVariantMap source = model.source(QStringLiteral("claude-code"));
+    QCOMPARE(source.value(QStringLiteral("lastAttempt")).toDateTime(), failedAttempt);
+    QCOMPARE(source.value(QStringLiteral("lastSuccess")).toDateTime(), lastSuccess);
+    QCOMPARE(source.value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("degraded"));
+}
+
 void SourceReadinessModelTest::explicitVerificationUsesSafeReadOnlyContract()
 {
     SourceReadinessModel model;
@@ -321,7 +393,7 @@ void SourceReadinessModelTest::explicitVerificationUsesSafeReadOnlyContract()
     QVERIFY(model.verifySource(QStringLiteral("codex-cli")));
     const QVariantMap source = model.source(QStringLiteral("codex-cli"));
     QCOMPARE(source.value(QStringLiteral("readinessStateKey")).toString(),
-             QStringLiteral("reporting_estimate"));
+             QStringLiteral("waiting_for_activity"));
     QVERIFY(source.value(QStringLiteral("lastVerified")).toDateTime().isValid());
 
     SourceReadinessModel disabledModel;
@@ -331,6 +403,24 @@ void SourceReadinessModelTest::explicitVerificationUsesSafeReadOnlyContract()
 
     const QVariantMap liteLlm = disabledModel.source(QStringLiteral("litellm"));
     QVERIFY(liteLlm.value(QStringLiteral("customEndpointRequired")).toBool());
+}
+
+void SourceReadinessModelTest::retryAfterIsExposedAndBlocksVerification()
+{
+    SourceReadinessModel model;
+    ReadinessProvider provider;
+    model.registerProviderBackend(QStringLiteral("openai"), &provider);
+    model.setSourceEnabled(QStringLiteral("openai"), true);
+    provider.setApiKey(QStringLiteral("test-key"));
+    provider.setConnected(true);
+    const QDateTime retryAt = QDateTime::currentDateTimeUtc().addSecs(1800);
+    provider.setErrorDetails(QStringLiteral("redacted"),
+                             ProviderBackend::ProviderErrorKind::RateLimit,
+                             429, retryAt);
+
+    const QVariantMap source = model.source(QStringLiteral("openai"));
+    QCOMPARE(source.value(QStringLiteral("retryAfter")).toDateTime(), retryAt);
+    QVERIFY(!model.verifySource(QStringLiteral("openai")));
 }
 
 void SourceReadinessModelTest::demoModeUsesIsolatedEndpoint()

@@ -256,6 +256,7 @@ public:
     QDateTime lastAttempt() const;
     QDateTime lastSuccess() const;
     Freshness freshness() const;
+    qint64 freshnessMaxAgeSeconds() const;
     QDateTime nextScheduledRefresh() const;
     int coalescedRefreshCount() const;
     int cancellationCount() const;
