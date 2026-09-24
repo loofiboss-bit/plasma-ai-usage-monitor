@@ -6,11 +6,13 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-The **21.0.0 candidate (Source Health & Data Quality)** distinguishes a detected
+The **21.0.0 release (Source Health & Data Quality)** distinguishes a detected
 local tool waiting for activity from a reporting estimate, excludes stale
 metrics from daily aggregates, and shows source capability and retry timing in
 Source Detail. Prometheus keeps provider spend, estimated burn, and fixed fees
-separate by known currency. This candidate has not been published.
+separate by known currency. It is available from [GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v21.0.0),
+[Fedora COPR](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/build/11029770/),
+and the [KDE Store](https://store.kde.org/p/2353976/).
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 
