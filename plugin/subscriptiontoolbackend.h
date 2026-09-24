@@ -92,6 +92,7 @@ class SubscriptionToolBackend : public QObject
     Q_PROPERTY(bool syncEnabled READ isSyncEnabled WRITE setSyncEnabled NOTIFY syncEnabledChanged)
     Q_PROPERTY(QString syncStatus READ syncStatus NOTIFY syncStatusChanged)
     Q_PROPERTY(QDateTime lastSyncTime READ lastSyncTime NOTIFY syncStatusChanged)
+    Q_PROPERTY(QDateTime lastAttemptTime READ lastAttemptTime NOTIFY syncStatusChanged)
     Q_PROPERTY(bool syncing READ isSyncing NOTIFY syncStatusChanged)
 
     // Tertiary usage (e.g., Codex code‐review cap)
@@ -184,6 +185,7 @@ public:
     void setSyncEnabled(bool enabled);
     QString syncStatus() const;
     QDateTime lastSyncTime() const;
+    QDateTime lastAttemptTime() const;
     bool isSyncing() const;
 
     // Tertiary (code review, etc.)
@@ -324,6 +326,7 @@ private:
     bool m_syncing = false;
     QString m_syncStatus;
     QDateTime m_lastSyncTime;
+    QDateTime m_lastAttemptTime;
 
     QTimer *m_resetCheckTimer;
     QNetworkAccessManager *m_networkManager = nullptr;

@@ -139,6 +139,51 @@ TestCase {
         }, now));
     }
 
+    function test_metricFreshnessFollowsScheduledRefreshInterval() {
+        var now = Date.parse("2026-08-23T10:00:00Z");
+        var metric = {
+            available: true, value: 10,
+            observedAt: "2026-08-23T09:40:00Z"
+        };
+        var closedPopupAge = PrometheusMetrics.freshnessMaxAgeMs(20 * 60 * 1000);
+        verify(closedPopupAge >= 25 * 60 * 1000);
+        verify(PrometheusMetrics.metricIsFresh(metric, now, closedPopupAge));
+        verify(!PrometheusMetrics.metricIsFresh(
+            metric, now,
+            PrometheusMetrics.freshnessMaxAgeMs(5 * 60 * 1000)));
+    }
+
+    function test_periodBoundedAnthropicCostRowsDoNotDoubleCountDailySpend() {
+        var costs = {
+            actualCurrent: {}, actualToday: {}, actualMonth: {},
+            estimatedBurn: {}
+        };
+        var observed = "2026-08-23T09:59:00Z";
+        var periodRows = [
+            {kind: "cost", value: 8, currency: "USD", window: "day",
+             scope: "organization", aggregationLevel: "aggregate",
+             source: "billing_api", available: true, observedAt: observed,
+             periodStart: "2026-08-01T00:00:00Z",
+             periodEnd: "2026-08-08T00:00:00Z"},
+            {kind: "cost", value: 5, currency: "USD", window: "day",
+             scope: "organization", aggregationLevel: "aggregate",
+             source: "billing_api", available: true, observedAt: observed,
+             periodStart: "2026-08-08T00:00:00Z",
+             periodEnd: "2026-08-15T00:00:00Z"}
+        ];
+        var summary = {kind: "cost", value: 3, currency: "USD", window: "day",
+             scope: "organization", aggregationLevel: "aggregate",
+             source: "billing_api", available: true, observedAt: observed};
+        var now = Date.parse("2026-08-23T10:00:00Z");
+        for (var i = 0; i < periodRows.length; i++)
+            PrometheusMetrics.addProviderCostMetric(costs, periodRows[i], false, 0,
+                now, 15 * 60 * 1000);
+        PrometheusMetrics.addProviderCostMetric(costs, summary, false, 0,
+            now, 15 * 60 * 1000);
+
+        compare(costs.actualToday.USD, 3);
+    }
+
     function test_localActivityExportRequiresFreshObservationAndPreservesZero() {
         var now = Date.parse("2026-08-23T10:00:00Z");
         var noObservation = [];

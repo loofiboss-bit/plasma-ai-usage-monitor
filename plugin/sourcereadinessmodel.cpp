@@ -298,11 +298,11 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
         if (tool) {
             result.lastVerified = latest(latest(tool->lastSyncTime(), tool->lastActivity()),
                                          entry.localVerification);
-            result.lastAttempt = latest(tool->lastSyncTime(), entry.localVerification);
-            result.lastSuccess = entry.localDiagnosticCode.isEmpty()
-                ? latest(latest(entry.localVerification, tool->lastActivity()),
-                         tool->lastQuotaObservation())
-                : QDateTime();
+            result.lastAttempt = latest(tool->lastAttemptTime(),
+                                        entry.localVerification);
+            result.lastSuccess = latest(
+                latest(tool->lastSyncTime(), tool->lastActivity()),
+                latest(tool->lastQuotaObservation(), entry.localVerification));
         }
 
         if (!result.enabled) {

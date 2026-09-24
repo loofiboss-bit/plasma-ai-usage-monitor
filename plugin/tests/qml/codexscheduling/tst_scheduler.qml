@@ -64,6 +64,25 @@ TestCase {
     }
 
     QtObject {
+        id: scheduledBackend
+        property date lastSuccess: new Date(Date.now() - 60 * 1000)
+        property date nextScheduledRefresh: new Date(0)
+        signal stateChanged()
+        function setNextScheduledRefresh(value) { nextScheduledRefresh = value; }
+        function requestRefresh() {}
+    }
+
+    QtObject {
+        id: scheduledProvider
+        property string configKey: "openai"
+        property bool enabled: true
+        property int refreshInterval: 300
+        property int minimumRefreshSeconds: 300
+        property bool requiresApiKey: false
+        property var backend: scheduledBackend
+    }
+
+    QtObject {
         id: database
         function pruneOldData() {}
         function requestExportAll(requestId, directory, formats) {}
@@ -173,5 +192,18 @@ TestCase {
         compare(browserCalls, 0);
         compare(localAuthGateCalls, 1);
         compare(genericGateCalls, 0);
+    }
+
+    function test_nextScheduledRefreshAdvancesAfterSuccessfulRefresh() {
+        configuration.refreshInterval = 300;
+        registry.allProviders = [scheduledProvider];
+        var scheduler = createScheduler();
+        verify(scheduler);
+        var previousNext = scheduledBackend.nextScheduledRefresh;
+
+        scheduledBackend.lastSuccess = new Date(Date.now());
+        scheduledBackend.stateChanged();
+        verify(scheduledBackend.nextScheduledRefresh > scheduledBackend.lastSuccess);
+        verify(scheduledBackend.nextScheduledRefresh > previousNext);
     }
 }

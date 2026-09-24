@@ -5,6 +5,7 @@
 #include "subscriptionplancatalog.h"
 #include "subscriptiontoolbackend.h"
 
+#include <KLocalizedString>
 #include <QDateTime>
 #include <QSet>
 #include <algorithm>
@@ -189,7 +190,8 @@ bool betterQuota(const QVariantMap &candidate, const QVariantMap &current) {
   return leftReset.isValid() && leftReset < rightReset;
 }
 
-QVariantList metricsAt(const QVariantList &metrics, const QDateTime &now) {
+QVariantList metricsAt(const QVariantList &metrics, const QDateTime &now,
+                       qint64 maxAgeSeconds) {
   QVariantList result;
   for (const QVariant &entry : metrics) {
     QVariantMap metric = entry.toMap();
@@ -200,7 +202,7 @@ QVariantList metricsAt(const QVariantList &metrics, const QDateTime &now) {
     const QString state =
         !observed.isValid()               ? QStringLiteral("never_observed")
         : reset.isValid() && reset <= now ? QStringLiteral("awaiting_refresh")
-        : observed > now || observed.secsTo(now) >= 900
+        : observed > now || observed.secsTo(now) >= maxAgeSeconds
             ? QStringLiteral("stale")
             : QStringLiteral("fresh");
     const bool wasAvailable = metric.value(QStringLiteral("available")).toBool();
@@ -696,10 +698,11 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
                                               ProviderBackend *backend) const {
   if (backend == nullptr)
     return row;
+  const qint64 maxAgeSeconds = backend->freshnessMaxAgeSeconds();
   const QVariantList liveMetrics =
-      metricsAt(backend->metrics(), m_presentationTime);
+      metricsAt(backend->metrics(), m_presentationTime, maxAgeSeconds);
   row.insert(QStringLiteral("lastKnownQuotaWindows"),
-             metricsAt(backend->metrics(), m_presentationTime));
+             metricsAt(backend->metrics(), m_presentationTime, maxAgeSeconds));
   row.insert(QStringLiteral("lastSuccess"), backend->lastSuccess());
   row.insert(QStringLiteral("lastAttempt"), backend->lastAttempt());
   row.insert(QStringLiteral("retryAfter"), backend->retryAfter());
@@ -725,7 +728,8 @@ QVariantMap DailyStateModel::buildProviderRow(QVariantMap row,
   const qint64 successAge = successfulCheck.isValid() && !successInFuture
       ? successfulCheck.secsTo(m_presentationTime) : -1;
   const QString freshness =
-      successInFuture || successAge >= 900 || (!hasFreshMetric && hasStaleMetric)
+      successInFuture || successAge >= maxAgeSeconds ||
+              (!hasFreshMetric && hasStaleMetric)
           ? QStringLiteral("stale")
       : successAge >= 300 ? QStringLiteral("aging")
       : successAge >= 0 || hasFreshMetric
@@ -1065,14 +1069,21 @@ QVariantMap DailyStateModel::finalizeRow(QVariantMap row,
     severity = QStringLiteral("info");
     reason = QStringLiteral("ready_to_verify");
   }
-  if (reason.startsWith(QLatin1String("quota_")))
+  if (reason.startsWith(QLatin1String("quota_"))) {
     row.insert(QStringLiteral("nextActionKey"), QStringLiteral("review_quota"));
-  else if (reason.startsWith(QLatin1String("budget_")))
+    row.insert(QStringLiteral("nextActionText"),
+               i18n("Review the quota and its reset time."));
+  } else if (reason.startsWith(QLatin1String("budget_"))) {
     row.insert(QStringLiteral("nextActionKey"),
                QStringLiteral("open_source_settings"));
-  else if (reason == QLatin1String("stale_data"))
+    row.insert(QStringLiteral("nextActionText"),
+               i18n("Review the source settings and budget."));
+  } else if (reason == QLatin1String("stale_data")) {
     row.insert(QStringLiteral("nextActionKey"),
                QStringLiteral("refresh_stale_data"));
+    row.insert(QStringLiteral("nextActionText"),
+               i18n("Refresh this source's stale data."));
+  }
   row.insert(QStringLiteral("attentionSeverity"), severity);
   row.insert(QStringLiteral("attentionReasonKey"), reason);
   row.insert(QStringLiteral("_priority"), priority);

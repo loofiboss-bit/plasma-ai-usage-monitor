@@ -59,6 +59,7 @@ public:
 
     void setDetected(bool installed) { setInstalled(installed); }
     void setActivity(const QDateTime &time) { setLastActivity(time); }
+    void setUsageCountForTest(int count) { setUsageCount(count); }
     void setSyncInProgress(bool syncing) { setSyncing(syncing); }
     void setVerified(const QDateTime &time) { setLastSyncTime(time); }
     void observeQuota() {
@@ -88,6 +89,8 @@ private Q_SLOTS:
     void anthropicAdminCredentialIsAValidAlternative();
     void localToolStateTransitions();
     void localToolWithoutActivityWaitsInsteadOfReportingEstimate();
+    void localEstimateIsNotReportedAsAuthenticatedQuota();
+    void failedSyncPreservesLocalHealthTimestamps();
     void explicitVerificationUsesSafeReadOnlyContract();
     void retryAfterIsExposedAndBlocksVerification();
     void demoModeUsesIsolatedEndpoint();
@@ -336,6 +339,47 @@ void SourceReadinessModelTest::localToolWithoutActivityWaitsInsteadOfReportingEs
              QStringLiteral("waiting_for_activity"));
     QVERIFY(checked.value(QStringLiteral("lastAttempt")).toDateTime().isValid());
     QVERIFY(checked.value(QStringLiteral("lastSuccess")).toDateTime().isValid());
+}
+
+void SourceReadinessModelTest::localEstimateIsNotReportedAsAuthenticatedQuota()
+{
+    SourceReadinessModel model;
+    ReadinessTool tool;
+    model.registerLocalTool(QStringLiteral("claude-code"), &tool);
+    tool.setEnabled(true);
+    tool.setDetected(true);
+    tool.setUsageLimit(100);
+    tool.setUsageCountForTest(5);
+    tool.setActivity(QDateTime::currentDateTimeUtc());
+
+    QVERIFY(!tool.lastQuotaObservation().isValid());
+    QCOMPARE(model.source(QStringLiteral("claude-code"))
+                 .value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("reporting_estimate"));
+}
+
+void SourceReadinessModelTest::failedSyncPreservesLocalHealthTimestamps()
+{
+    SourceReadinessModel model;
+    ReadinessTool tool;
+    model.registerLocalTool(QStringLiteral("claude-code"), &tool);
+    tool.setEnabled(true);
+    tool.setDetected(true);
+    const QDateTime lastSuccess = QDateTime::currentDateTimeUtc().addSecs(-120);
+    tool.setActivity(lastSuccess);
+    tool.setVerified(lastSuccess);
+
+    tool.setSyncInProgress(true);
+    const QDateTime failedAttempt = tool.lastAttemptTime();
+    QVERIFY(failedAttempt.isValid());
+    tool.diagnostic(QStringLiteral("network_error"));
+    tool.setSyncInProgress(false);
+
+    const QVariantMap source = model.source(QStringLiteral("claude-code"));
+    QCOMPARE(source.value(QStringLiteral("lastAttempt")).toDateTime(), failedAttempt);
+    QCOMPARE(source.value(QStringLiteral("lastSuccess")).toDateTime(), lastSuccess);
+    QCOMPARE(source.value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("degraded"));
 }
 
 void SourceReadinessModelTest::explicitVerificationUsesSafeReadOnlyContract()

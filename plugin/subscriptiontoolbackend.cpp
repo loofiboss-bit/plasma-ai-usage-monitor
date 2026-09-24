@@ -894,11 +894,14 @@ void SubscriptionToolBackend::setSyncEnabled(bool enabled)
 
 QString SubscriptionToolBackend::syncStatus() const { return m_syncStatus; }
 QDateTime SubscriptionToolBackend::lastSyncTime() const { return m_lastSyncTime; }
+QDateTime SubscriptionToolBackend::lastAttemptTime() const { return m_lastAttemptTime; }
 bool SubscriptionToolBackend::isSyncing() const { return m_syncing; }
 
 void SubscriptionToolBackend::setSyncing(bool syncing)
 {
     if (m_syncing != syncing) {
+        if (syncing)
+            m_lastAttemptTime = QDateTime::currentDateTimeUtc();
         m_syncing = syncing;
         Q_EMIT syncStatusChanged();
     }
@@ -988,8 +991,10 @@ bool SubscriptionToolBackend::hasFreshQuota(const QDateTime &now) const {
 QDateTime SubscriptionToolBackend::lastQuotaObservation() const {
   QDateTime latest;
   for (const QVariant &value : quotaWindows()) {
-    const QDateTime observed =
-        value.toMap().value(QStringLiteral("observedAt")).toDateTime();
+    const QVariantMap row = value.toMap();
+    if (!authenticatedQuotaSource(row))
+      continue;
+    const QDateTime observed = row.value(QStringLiteral("observedAt")).toDateTime();
     if (observed.isValid() && (!latest.isValid() || observed > latest))
       latest = observed;
   }

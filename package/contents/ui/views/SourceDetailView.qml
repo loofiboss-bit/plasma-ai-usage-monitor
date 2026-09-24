@@ -93,7 +93,7 @@ QQC2.ScrollView {
     function expectedCapabilityText() {
         if (sourceData.sourceKind === "local_tool") {
             if (sourceData.readinessState === "waiting_for_activity")
-                return i18n("Expected data: local activity appears after the detected app is used. No activity is treated as zero usage.");
+                return i18n("Expected data: local activity appears after the detected app is used. Usage remains unavailable until the first activity observation.");
             return i18n("Expected data: local activity estimates and any authenticated quota windows supported by this tool.");
         }
         var descriptions = {

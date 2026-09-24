@@ -68,14 +68,63 @@ function appendCostClassMetrics(lines, costs) {
                           costs.estimatedBurn || {});
 }
 
-function metricIsFresh(metric, nowMs) {
+function freshnessMaxAgeMs(scheduledIntervalMs) {
+    var interval = typeof scheduledIntervalMs === "number"
+        && Number.isFinite(scheduledIntervalMs) && scheduledIntervalMs > 0
+        ? scheduledIntervalMs : 0;
+    return Math.max(15 * 60 * 1000, interval + 5 * 60 * 1000);
+}
+
+function metricIsFresh(metric, nowMs, maxAgeMs) {
     var observedAt = dateMilliseconds(metric && metric.observedAt);
     var currentTime = nowMs === undefined ? Date.now() : nowMs;
     var resetAt = dateMilliseconds(metric && metric.resetAt);
+    var freshnessLimit = typeof maxAgeMs === "number"
+        && Number.isFinite(maxAgeMs) && maxAgeMs > 0
+        ? maxAgeMs : 15 * 60 * 1000;
     return !!(metric && metric.available === true
         && observedAt > 0 && observedAt <= currentTime
-        && currentTime - observedAt < 15 * 60 * 1000
+        && currentTime - observedAt < freshnessLimit
         && (!resetAt || resetAt > currentTime));
+}
+
+function addProviderCostMetric(costs, metric, providerEstimated, estimatedMonthlyCost,
+                               nowMs, maxAgeMs) {
+    if (!metric || metric.kind !== "cost"
+            || metric.aggregationLevel === "scoped"
+            || metric.modelScope || metric.projectScope
+            || String(metric.scope || "").startsWith("organization_scoped")
+            || !metricIsFresh(metric, nowMs, maxAgeMs)
+            || !isFiniteAmount(metric.value)
+            || !normalizedCurrency(metric.currency)) {
+        return false;
+    }
+
+    var actualCost = ["billing_api", "usage_api", "actual_api", "metrics_api"]
+        .indexOf(metric.source) >= 0;
+    if (actualCost) {
+        if (metric.window === "current")
+            return addCurrencyValue(costs.actualCurrent, metric.currency, metric.value);
+        if (metric.window === "day") {
+            // Period-bounded rows are individual billing periods, not the
+            // provider's canonical daily total.
+            if (dateMilliseconds(metric.periodStart) > 0
+                    || dateMilliseconds(metric.periodEnd) > 0)
+                return false;
+            return addCurrencyValue(costs.actualToday, metric.currency, metric.value);
+        }
+        if (metric.window === "month")
+            return addCurrencyValue(costs.actualMonth, metric.currency, metric.value);
+        return false;
+    }
+
+    if (["estimated_pricing", "estimated_from_usage"].indexOf(metric.source) >= 0
+            && metric.window === "current" && providerEstimated
+            && isFiniteAmount(estimatedMonthlyCost)) {
+        return addCurrencyValue(costs.estimatedBurn, metric.currency,
+                                estimatedMonthlyCost);
+    }
+    return false;
 }
 
 function dateMilliseconds(value) {

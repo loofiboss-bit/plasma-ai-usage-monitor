@@ -165,22 +165,37 @@ Item {
     Instantiator {
         model: scheduler.registry.allProviders
 
-        delegate: Timer {
+        delegate: Item {
+            id: providerDelegate
+            visible: false
+            width: 0
+            height: 0
             required property var modelData
 
-            interval: scheduler.scheduledInterval(modelData)
-            running: modelData.enabled
-            repeat: true
-            onTriggered: scheduler.refreshProvider(modelData, scheduler.refreshScheduled, true)
-            onIntervalChanged: updateNextSchedule()
+            Timer {
+                id: providerTimer
+                interval: scheduler.scheduledInterval(providerDelegate.modelData)
+                running: providerDelegate.modelData.enabled
+                repeat: true
+                onTriggered: scheduler.refreshProvider(providerDelegate.modelData, scheduler.refreshScheduled, true)
+                onIntervalChanged: providerTimer.updateNextSchedule()
 
-            function updateNextSchedule() {
-                if (!modelData.backend) return;
-                var base = modelData.backend.lastSuccess || new Date();
-                modelData.backend.setNextScheduledRefresh(scheduler.nextSchedule(modelData, base));
+                function updateNextSchedule() {
+                    var provider = providerDelegate.modelData;
+                    if (!provider.backend) return;
+                    var base = provider.backend.lastSuccess || new Date();
+                    provider.backend.setNextScheduledRefresh(scheduler.nextSchedule(provider, base));
+                }
             }
 
-            Component.onCompleted: updateNextSchedule()
+            Connections {
+                target: providerDelegate.modelData.backend
+                function onStateChanged() {
+                    providerTimer.updateNextSchedule();
+                }
+            }
+
+            Component.onCompleted: providerTimer.updateNextSchedule()
         }
     }
 

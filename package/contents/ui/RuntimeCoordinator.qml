@@ -107,6 +107,12 @@ Item {
         guardrailRefreshTimer.restart();
     }
 
+    function providerMetricMaxAgeMs(provider) {
+        var interval = scheduler && scheduler.scheduledInterval
+            ? scheduler.scheduledInterval(provider) : 0;
+        return PrometheusMetrics.freshnessMaxAgeMs(interval);
+    }
+
     function loadIntegrationSecrets() {
         if (registry.demoMode) {
             if (copilotMonitor) copilotMonitor.githubToken = "";
@@ -292,7 +298,8 @@ Item {
                     + "\",quality=\"" + labelValue(metric.quality)
                     + "\",scope=\"" + labelValue(metric.scope)
                     + "\",window=\"" + labelValue(metric.window) + "\"";
-                var metricFresh = PrometheusMetrics.metricIsFresh(metric);
+                var metricFresh = PrometheusMetrics.metricIsFresh(
+                    metric, Date.now(), providerMetricMaxAgeMs(provider));
                 var metricAmountValid = metric.kind !== "cost"
                     || !!PrometheusMetrics.normalizedCurrency(metric.currency);
                 var numericValue = PrometheusMetrics.isFiniteAmount(metric.value);
@@ -314,33 +321,18 @@ Item {
                            + Date.parse(backend.lastRefreshed) / 1000);
             }
             var providerMetrics = backend.metrics || [];
+            var providerCosts = {
+                actualCurrent: apiSpend,
+                actualToday: apiSpendToday,
+                actualMonth: apiSpendMonth,
+                estimatedBurn: estimatedBurn
+            };
+            var maxMetricAgeMs = providerMetricMaxAgeMs(provider);
             for (var costIndex = 0; costIndex < providerMetrics.length; costIndex++) {
                 var costMetric = providerMetrics[costIndex] || {};
-                if (costMetric.kind !== "cost"
-                        || costMetric.aggregationLevel === "scoped"
-                        || costMetric.modelScope || costMetric.projectScope
-                        || String(costMetric.scope || "").startsWith("organization_scoped")
-                        || !PrometheusMetrics.metricIsFresh(costMetric)
-                        || !PrometheusMetrics.isFiniteAmount(costMetric.value)
-                        || !PrometheusMetrics.normalizedCurrency(costMetric.currency)) {
-                    continue;
-                }
-                var actualCost = ["billing_api", "usage_api", "actual_api",
-                                  "metrics_api"].indexOf(costMetric.source) >= 0;
-                if (actualCost) {
-                    if (costMetric.window === "current")
-                        PrometheusMetrics.addCurrencyValue(apiSpend, costMetric.currency, costMetric.value);
-                    if (costMetric.window === "day")
-                        PrometheusMetrics.addCurrencyValue(apiSpendToday, costMetric.currency, costMetric.value);
-                    if (costMetric.window === "month")
-                        PrometheusMetrics.addCurrencyValue(apiSpendMonth, costMetric.currency, costMetric.value);
-                } else if (["estimated_pricing", "estimated_from_usage"].indexOf(costMetric.source) >= 0
-                           && costMetric.window === "current"
-                           && backend.isEstimatedCost) {
-                    var monthlyEstimate = backend.estimatedMonthlyCost;
-                    if (PrometheusMetrics.isFiniteAmount(monthlyEstimate))
-                        PrometheusMetrics.addCurrencyValue(estimatedBurn, costMetric.currency, monthlyEstimate);
-                }
+                PrometheusMetrics.addProviderCostMetric(
+                    providerCosts, costMetric, backend.isEstimatedCost,
+                    backend.estimatedMonthlyCost, Date.now(), maxMetricAgeMs);
             }
         }
 

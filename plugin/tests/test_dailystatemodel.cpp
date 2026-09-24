@@ -68,6 +68,7 @@ public:
   void makeStale() {
     updateLastRefreshed(QDateTime::currentDateTimeUtc().addDays(-2));
   }
+  void markSuccess(const QDateTime &time) { updateLastRefreshed(time); }
 
   void failAuthentication() {
     setErrorDetails(QStringLiteral("redacted"),
@@ -120,6 +121,7 @@ class DailyStateModelTest : public QObject {
 
 private Q_SLOTS:
   void liveClockAcceptsObservationAfterLastTick();
+  void providerMetricFreshnessFollowsScheduledRefresh();
   void actualQuotaWinsOverLocalTarget();
   void localConfiguredLimitWithoutActivityIsNotReported();
   void staleLocalActivityIsLastKnownOnly();
@@ -162,6 +164,48 @@ void DailyStateModelTest::liveClockAcceptsObservationAfterLastTick() {
                         {"percentRemaining", 80.0}}});
   QCOMPARE(daily.summary().value("lowestActualRemainingQuota").toMap().value("percentRemaining").toDouble(), 80.0);
   QCOMPARE(readiness.source("codex-cli").value("readinessStateKey").toString(), QStringLiteral("reporting_actual"));
+}
+
+void DailyStateModelTest::providerMetricFreshnessFollowsScheduledRefresh() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider provider;
+  provider.makeReady();
+  const QDateTime observed = QDateTime::currentDateTimeUtc();
+  provider.addMetric(ProviderBackend::MetricKind::Cost, 1.0,
+                     QStringLiteral("USD"), QStringLiteral("USD"),
+                     QStringLiteral("day"),
+                     ProviderBackend::MetricSource::BillingApi);
+  provider.markSuccess(observed);
+  provider.setNextScheduledRefresh(observed.addSecs(20 * 60));
+  readiness.registerProviderBackend(QStringLiteral("openai"), &provider);
+  readiness.setSourceEnabled(QStringLiteral("openai"), true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend(QStringLiteral("openai"), &provider);
+
+  daily.setPresentationTime(observed.addSecs(20 * 60));
+  QVariantMap row = daily.source(QStringLiteral("openai"));
+  QCOMPARE(row.value(QStringLiteral("freshnessState")).toString(),
+           QStringLiteral("aging"));
+  bool availableAtScheduledCheck = false;
+  for (const QVariant &entry : row.value(QStringLiteral("detailMetrics")).toList()) {
+    const QVariantMap metric = entry.toMap();
+    if (metric.value(QStringLiteral("kind")) == QLatin1String("cost"))
+      availableAtScheduledCheck = metric.value(QStringLiteral("available")).toBool();
+  }
+  QVERIFY(availableAtScheduledCheck);
+
+  daily.setPresentationTime(observed.addSecs(26 * 60));
+  row = daily.source(QStringLiteral("openai"));
+  QCOMPARE(row.value(QStringLiteral("freshnessState")).toString(),
+           QStringLiteral("stale"));
+  bool staleMetricUnavailable = false;
+  for (const QVariant &entry : row.value(QStringLiteral("detailMetrics")).toList()) {
+    const QVariantMap metric = entry.toMap();
+    if (metric.value(QStringLiteral("kind")) == QLatin1String("cost"))
+      staleMetricUnavailable = !metric.value(QStringLiteral("available")).toBool();
+  }
+  QVERIFY(staleMetricUnavailable);
 }
 
 void DailyStateModelTest::actualQuotaWinsOverLocalTarget() {
@@ -963,6 +1007,8 @@ void DailyStateModelTest::sourceDetailPreservesTypedMetricsAndConcreteAction() {
     }
   }
   QVERIFY(foundAvailableZero);
+  QVERIFY(detail.source().value(QStringLiteral("nextActionText")).toString()
+              .contains(QStringLiteral("quota"), Qt::CaseInsensitive));
 }
 
 void DailyStateModelTest::normalSourcesSortByReportingQuality() {
