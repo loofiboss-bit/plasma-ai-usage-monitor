@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QNetworkRequest>
 #include <QNetworkReply>
 #include <QSignalSpy>
 #include <QTemporaryDir>
@@ -31,30 +32,60 @@ private:
     QByteArray m_home;
 };
 
-class TestCodexCliMonitor : public CodexCliMonitor
-{
-public:
-    using CodexCliMonitor::handleCodexUsageReplyFailure;
-    using CodexCliMonitor::recordSyncHttpFailure;
-    using CodexCliMonitor::setSyncing;
-};
-
 class RejectedReply final : public QNetworkReply
 {
 public:
-    explicit RejectedReply(int status)
+    explicit RejectedReply(int status, QObject *parent = nullptr)
+        : QNetworkReply(parent)
     {
         setOpenMode(QIODevice::ReadOnly);
         setAttribute(QNetworkRequest::HttpStatusCodeAttribute, status);
         setError(QNetworkReply::AuthenticationRequiredError, QStringLiteral("Authentication rejected"));
-        setFinished(true);
     }
 
     void abort() override {}
     qint64 bytesAvailable() const override { return 0; }
+    void finish()
+    {
+        QMetaObject::invokeMethod(this, [this]() {
+            setFinished(true);
+            Q_EMIT finished();
+        }, Qt::QueuedConnection);
+    }
 
 protected:
     qint64 readData(char *, qint64) override { return -1; }
+};
+
+class TestCodexCliMonitor : public CodexCliMonitor
+{
+public:
+    using CodexCliMonitor::recordSyncHttpFailure;
+    using CodexCliMonitor::setSyncing;
+
+    void setRejectedStatus(int status) { m_rejectedStatus = status; }
+    RejectedReply *pendingReply() const { return m_pendingReply; }
+    int browserFallbackCount() const { return m_browserFallbackCount; }
+    QString browserFallbackCookie() const { return m_browserFallbackCookie; }
+
+protected:
+    QNetworkReply *requestCodexUsage(const QNetworkRequest &) override
+    {
+        m_pendingReply = new RejectedReply(m_rejectedStatus, this);
+        return m_pendingReply;
+    }
+
+    void fetchAccountCheck(const QString &cookieHeader) override
+    {
+        ++m_browserFallbackCount;
+        m_browserFallbackCookie = cookieHeader;
+    }
+
+private:
+    int m_rejectedStatus = 401;
+    RejectedReply *m_pendingReply = nullptr;
+    int m_browserFallbackCount = 0;
+    QString m_browserFallbackCookie;
 };
 }
 
@@ -67,6 +98,8 @@ private Q_SLOTS:
     void localAuthRecoversAfterCredentialsChange();
     void localAuthHttpRejectionReportsCodexLoginInsteadOfGenericSyncFailure_data();
     void localAuthHttpRejectionReportsCodexLoginInsteadOfGenericSyncFailure();
+    void explicitBrowserHttpRejectionFallsBackWithOriginalCookie_data();
+    void explicitBrowserHttpRejectionFallsBackWithOriginalCookie();
 };
 
 void CodexLocalAuthTest::localAuthIsInvokableAndReportsMissingLogin()
@@ -161,16 +194,23 @@ void CodexLocalAuthTest::localAuthHttpRejectionReportsCodexLoginInsteadOfGeneric
     authFile.close();
 
     TestCodexCliMonitor monitor;
+    monitor.setRejectedStatus(status);
     QVERIFY(monitor.canAutoSyncFromLocalAuth());
     QSignalSpy completionSpy(&monitor, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy diagnosticSpy(&monitor, &SubscriptionToolBackend::syncDiagnostic);
 
-    monitor.setSyncing(true);
-    RejectedReply reply(status);
-    monitor.handleCodexUsageReplyFailure(&reply, QString());
+    monitor.syncFromLocalAuth();
+    RejectedReply *reply = monitor.pendingReply();
+    QVERIFY(reply);
+    QVERIFY(!reply->isFinished());
+    QCOMPARE(completionSpy.count(), 0);
+    QCOMPARE(diagnosticSpy.count(), 0);
+    reply->finish();
+    QTRY_COMPARE(completionSpy.count(), 1);
 
-    const QString completionMessage = completionSpy.count() == 1 ? completionSpy.first().at(1).toString() : QString();
-    const QString observed = QStringLiteral("Expected a not_logged_in Codex CLI diagnostic containing 'codex login'; "
+    const QString expectedMessage = QStringLiteral("Not logged in - run codex login to enable local Codex quota sync");
+    const QString completionMessage = completionSpy.first().at(1).toString();
+    const QString observed = QStringLiteral("Expected a not_logged_in Codex CLI diagnostic with the local login action; "
                                             "observed status='%1', diagnostics=%2, completions=%3, completion message='%4'")
                                  .arg(monitor.syncStatus())
                                  .arg(diagnosticSpy.count())
@@ -179,17 +219,61 @@ void CodexLocalAuthTest::localAuthHttpRejectionReportsCodexLoginInsteadOfGeneric
     const bool hasActionableDiagnostic = diagnosticSpy.count() == 1
         && diagnosticSpy.first().at(0).toString() == QStringLiteral("Codex CLI")
         && diagnosticSpy.first().at(1).toString() == QStringLiteral("not_logged_in")
-        && diagnosticSpy.first().at(2).toString().contains(QStringLiteral("codex login"));
+        && diagnosticSpy.first().at(2).toString() == expectedMessage;
     QVERIFY2(monitor.syncStatus() == QStringLiteral("Run codex login") && hasActionableDiagnostic, qPrintable(observed));
 
+    QCOMPARE(monitor.syncStatus(), QStringLiteral("Run codex login"));
     QCOMPARE(diagnosticSpy.first().at(0).toString(), QStringLiteral("Codex CLI"));
     QCOMPARE(diagnosticSpy.first().at(1).toString(), QStringLiteral("not_logged_in"));
     const QString actionableMessage = diagnosticSpy.first().at(2).toString();
-    QVERIFY(actionableMessage.contains(QStringLiteral("codex login")));
+    QCOMPARE(actionableMessage, expectedMessage);
     QCOMPARE(completionSpy.count(), 1);
     QCOMPARE(completionSpy.first().at(0).toBool(), false);
     QCOMPARE(completionSpy.first().at(1).toString(), actionableMessage);
     QVERIFY(!monitor.canAutoSyncFromLocalAuth());
+}
+
+void CodexLocalAuthTest::explicitBrowserHttpRejectionFallsBackWithOriginalCookie_data()
+{
+    QTest::addColumn<int>("status");
+
+    QTest::newRow("http-401") << 401;
+    QTest::newRow("http-403") << 403;
+}
+
+void CodexLocalAuthTest::explicitBrowserHttpRejectionFallsBackWithOriginalCookie()
+{
+    QFETCH(int, status);
+
+    QTemporaryDir home;
+    QVERIFY(home.isValid());
+    HomeGuard homeGuard;
+    qputenv("HOME", home.path().toUtf8());
+
+    QVERIFY(QDir().mkpath(home.filePath(QStringLiteral(".codex"))));
+    QFile authFile(home.filePath(QStringLiteral(".codex/auth.json")));
+    QVERIFY(authFile.open(QIODevice::WriteOnly));
+    const QByteArray auth = QByteArrayLiteral("{\"tokens\":{\"access_token\":\"dummy-token\"}}");
+    QCOMPARE(authFile.write(auth), auth.size());
+    authFile.close();
+
+    TestCodexCliMonitor monitor;
+    monitor.setRejectedStatus(status);
+    QSignalSpy completionSpy(&monitor, &SubscriptionToolBackend::syncCompleted);
+    QSignalSpy diagnosticSpy(&monitor, &SubscriptionToolBackend::syncDiagnostic);
+    const QString cookie = QStringLiteral("session=original-browser-cookie");
+
+    monitor.syncFromBrowser(cookie, 0);
+    RejectedReply *reply = monitor.pendingReply();
+    QVERIFY(reply);
+    QVERIFY(!reply->isFinished());
+    QCOMPARE(monitor.browserFallbackCount(), 0);
+    reply->finish();
+    QTRY_COMPARE(monitor.browserFallbackCount(), 1);
+
+    QCOMPARE(monitor.browserFallbackCookie(), cookie);
+    QCOMPARE(diagnosticSpy.count(), 0);
+    QCOMPARE(completionSpy.count(), 0);
 }
 
 QTEST_MAIN(CodexLocalAuthTest)

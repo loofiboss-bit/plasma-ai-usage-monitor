@@ -164,6 +164,11 @@ void CodexCliMonitor::startSync(const QString &browserCookieHeader, bool browser
     fetchAccountCheck(browserCookieHeader);
 }
 
+QNetworkReply *CodexCliMonitor::requestCodexUsage(const QNetworkRequest &request)
+{
+    return networkManager()->get(request);
+}
+
 bool CodexCliMonitor::fetchCodexUsage(const QString &cookieHeader)
 {
     QFile authFile(codexConfigDir() + QStringLiteral("/auth.json"));
@@ -185,7 +190,7 @@ bool CodexCliMonitor::fetchCodexUsage(const QString &cookieHeader)
     request.setAttribute(QNetworkRequest::Http2AllowedAttribute, false);
     request.setTransferTimeout(30000);
 
-    QNetworkReply *reply = networkManager()->get(request);
+    QNetworkReply *reply = requestCodexUsage(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, cookieHeader]() {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
