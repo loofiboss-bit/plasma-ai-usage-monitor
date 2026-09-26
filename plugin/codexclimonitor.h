@@ -3,6 +3,8 @@
 
 #include "localactivitymonitorbase.h"
 
+class QNetworkReply;
+
 /**
  * Monitor for OpenAI Codex CLI usage.
  *
@@ -70,6 +72,7 @@ protected:
     UsagePeriod primaryPeriodType() const override { return FiveHour; }
     UsagePeriod secondaryPeriodType() const override { return Weekly; }
     QString catalogToolKey() const override { return QStringLiteral("codex-cli"); }
+    void handleCodexUsageReplyFailure(QNetworkReply *reply, const QString &cookieHeader);
 
 private:
     QString codexConfigDir() const;

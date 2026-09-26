@@ -189,23 +189,7 @@ bool CodexCliMonitor::fetchCodexUsage(const QString &cookieHeader)
     connect(reply, &QNetworkReply::finished, this, [this, reply, cookieHeader]() {
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
-          recordSyncHttpFailure(
-              reply->attribute(QNetworkRequest::HttpStatusCodeAttribute)
-                  .toInt(),
-              reply->rawHeader("Retry-After"));
-          const int status =
-              reply->attribute(QNetworkRequest::HttpStatusCodeAttribute)
-                  .toInt();
-          if ((status == 401 || status == 403) && !cookieHeader.isEmpty()) {
-            qWarning() << "CodexCliMonitor: Codex usage request rejected; "
-                          "falling back to browser account check, HTTP"
-                       << status;
-            fetchAccountCheck(cookieHeader);
-            return;
-          }
-            setSyncing(false);
-            setSyncStatus(i18n("Sync failed"));
-            Q_EMIT syncCompleted(false, reply->errorString());
+            handleCodexUsageReplyFailure(reply, cookieHeader);
             return;
         }
 
@@ -239,6 +223,30 @@ bool CodexCliMonitor::fetchCodexUsage(const QString &cookieHeader)
         Q_EMIT usageUpdated();
     });
     return true;
+}
+
+void CodexCliMonitor::handleCodexUsageReplyFailure(QNetworkReply *reply, const QString &cookieHeader)
+{
+    recordSyncHttpFailure(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt(), reply->rawHeader("Retry-After"));
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (status == 401 || status == 403) {
+        if (!cookieHeader.isEmpty()) {
+            qWarning() << "CodexCliMonitor: Codex usage request rejected; "
+                          "falling back to browser account check, HTTP"
+                       << status;
+            fetchAccountCheck(cookieHeader);
+            return;
+        }
+        setSyncing(false);
+        setSyncStatus(i18n("Run codex login"));
+        const QString message = i18n("Not logged in - run codex login to enable local Codex quota sync");
+        Q_EMIT syncDiagnostic(toolName(), QStringLiteral("not_logged_in"), message);
+        Q_EMIT syncCompleted(false, message);
+        return;
+    }
+    setSyncing(false);
+    setSyncStatus(i18n("Sync failed"));
+    Q_EMIT syncCompleted(false, reply->errorString());
 }
 
 QVariantList CodexCliMonitor::quotaWindowsFromUsagePayload(const QByteArray &payload)
