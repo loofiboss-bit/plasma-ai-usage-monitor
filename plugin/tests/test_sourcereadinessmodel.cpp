@@ -345,6 +345,7 @@ void SourceReadinessModelTest::localToolAuthenticationDiagnostics()
              QStringLiteral("reporting_estimate"));
 
     tool.diagnostic(diagnosticCode);
+    tool.complete(false);
     const QVariantMap failed = model.source(QStringLiteral("claude-code"));
     QCOMPARE(failed.value(QStringLiteral("readinessStateKey")).toString(), QStringLiteral("failed"));
     QCOMPARE(failed.value(QStringLiteral("nextActionKey")).toString(), QStringLiteral("sign_in"));
