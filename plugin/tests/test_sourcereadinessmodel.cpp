@@ -88,6 +88,8 @@ private Q_SLOTS:
     void credentialPropertyChangesInvalidateSource();
     void anthropicAdminCredentialIsAValidAlternative();
     void localToolStateTransitions();
+    void localToolAuthenticationDiagnostics_data();
+    void localToolAuthenticationDiagnostics();
     void localToolWithoutActivityWaitsInsteadOfReportingEstimate();
     void localEstimateIsNotReportedAsAuthenticatedQuota();
     void failedSyncPreservesLocalHealthTimestamps();
@@ -317,6 +319,42 @@ void SourceReadinessModelTest::localToolStateTransitions()
              QStringLiteral("check_network"));
     tool.complete(true);
     QCOMPARE(state(), QStringLiteral("reporting_actual"));
+}
+
+void SourceReadinessModelTest::localToolAuthenticationDiagnostics_data()
+{
+    QTest::addColumn<QString>("diagnosticCode");
+
+    QTest::newRow("not-logged-in") << QStringLiteral("not_logged_in");
+    QTest::newRow("not-signed-in") << QStringLiteral("not_signed_in");
+}
+
+void SourceReadinessModelTest::localToolAuthenticationDiagnostics()
+{
+    QFETCH(QString, diagnosticCode);
+
+    SourceReadinessModel model;
+    ReadinessTool tool;
+    model.registerLocalTool(QStringLiteral("claude-code"), &tool);
+    tool.setEnabled(true);
+    tool.setDetected(true);
+    tool.setActivity(QDateTime::currentDateTimeUtc());
+
+    const QVariantMap reportingEstimate = model.source(QStringLiteral("claude-code"));
+    QCOMPARE(reportingEstimate.value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("reporting_estimate"));
+
+    tool.diagnostic(diagnosticCode);
+    const QVariantMap failed = model.source(QStringLiteral("claude-code"));
+    QCOMPARE(failed.value(QStringLiteral("readinessStateKey")).toString(), QStringLiteral("failed"));
+    QCOMPARE(failed.value(QStringLiteral("nextActionKey")).toString(), QStringLiteral("sign_in"));
+    QCOMPARE(failed.value(QStringLiteral("errorCode")).toString(), diagnosticCode);
+
+    tool.complete(true);
+    const QVariantMap cleared = model.source(QStringLiteral("claude-code"));
+    QCOMPARE(cleared.value(QStringLiteral("readinessStateKey")).toString(),
+             QStringLiteral("reporting_estimate"));
+    QCOMPARE(cleared.value(QStringLiteral("errorCode")).toString(), QString());
 }
 
 void SourceReadinessModelTest::localToolWithoutActivityWaitsInsteadOfReportingEstimate()
