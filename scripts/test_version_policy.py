@@ -8,11 +8,14 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from update_release_version import render
+
 
 ROOT = Path(__file__).resolve().parents[1]
 CHECKER = ROOT / "scripts" / "check_version_policy.py"
 BASE_FILES = (
     "VERSION",
+    "README.md",
     "ROADMAP.md",
     "SECURITY.md",
     "package/metadata.json",
@@ -56,8 +59,23 @@ with tempfile.TemporaryDirectory(prefix="ai-monitor-version-policy-") as temp:
     if baseline.returncode != 0:
         raise SystemExit(baseline.stdout + baseline.stderr)
 
+    major_part, minor_part, patch_part = map(int, version.split("."))
+    next_version = f"{major_part}.{minor_part}.{patch_part + 1}"
+    next_readme = render(next_version)[ROOT / "README.md"]
+    if (
+        f"The **{next_version} release (" not in next_readme
+        or f"/releases/tag/v{next_version})" not in next_readme
+    ):
+        raise SystemExit("Version bump left the README heading or release link stale")
+
     previous = f"{major - 1}.0.0"
     mutations = {
+        "readme heading": ("README.md", f"The **{version} release (", f"The **{previous} release ("),
+        "readme link": (
+            "README.md",
+            f"/releases/tag/v{version})",
+            f"/releases/tag/v{previous})",
+        ),
         "roadmap": ("ROADMAP.md", f"**Current release:** {version}", f"**Current release:** {previous}"),
         "security": ("SECURITY.md", f"| {major}.x | Supported |", f"| {major}.x | Unsupported |"),
         "metadata": ("package/metadata.json", f'"Version": "{version}"', f'"Version": "{previous}"'),
