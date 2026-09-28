@@ -52,6 +52,20 @@ def main() -> None:
     if re.search(rf"^###\s+{re.escape(version)}\b", roadmap, re.MULTILINE) is None:
         fail(f"ROADMAP release section {version} is missing")
 
+    readme = (root / "README.md").read_text(encoding="utf-8")
+    readme_version = require_match(
+        readme, r"The \*\*(\d+\.\d+\.\d+) release \(", "README current release"
+    ).group(1)
+    if readme_version != version:
+        fail(f"README current release is {readme_version}, expected {version}")
+    release_url_version = require_match(
+        readme,
+        r"\[GitHub Releases\]\(https://github\.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v(\d+\.\d+\.\d+)\)",
+        "README GitHub release link",
+    ).group(1)
+    if release_url_version != version:
+        fail(f"README GitHub release link is {release_url_version}, expected {version}")
+
     security = (root / "SECURITY.md").read_text(encoding="utf-8")
     if (
         re.search(

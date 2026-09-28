@@ -68,9 +68,15 @@ def render(version: str) -> dict[Path, str]:
     readme = readme_path.read_text(encoding="utf-8")
     readme = replace_once(
         readme,
-        r"(Version \*\*)[0-9]+\.[0-9]+\.[0-9]+( \([^\n]+\)\*\*)",
+        r"(The \*\*)[0-9]+\.[0-9]+\.[0-9]+( release \()",
         rf"\g<1>{version}\g<2>",
         "README current release",
+    )
+    readme = replace_once(
+        readme,
+        r"(\[GitHub Releases\]\(https://github\.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v)[0-9]+\.[0-9]+\.[0-9]+(\))",
+        rf"\g<1>{version}\g<2>",
+        "README GitHub release link",
     )
     outputs[readme_path] = readme
 

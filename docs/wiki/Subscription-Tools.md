@@ -44,6 +44,11 @@ browser profiles, even when Browser Sync is unavailable or its circuit breaker
 has stopped browser requests. If local auth is unavailable, the card falls back
 to local plan tracking.
 
+If the local quota request is rejected with HTTP 401 or 403, the card says
+`Run codex login` and Source Health offers a sign-in action. Run `codex login`
+in a terminal, then refresh. Automatic retries stay paused until the local
+credentials change.
+
 When you explicitly enable and run Browser Sync Labs, Codex still tries local
 auth first and may use the selected browser session as a compatibility fallback.
 
