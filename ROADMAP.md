@@ -1,10 +1,20 @@
 # Roadmap
 
-**Current release:** 21.0.0, Source Health & Data Quality
+**Current release:** 21.0.1, Codex Sign-in Diagnostics
 
-**Last updated:** 2026-09-24
+**Last updated:** 2026-09-28
 
 ## Current release
+
+### 21.0.1 Codex Sign-in Diagnostics
+
+Patch release for [swills' PR #65](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/pull/65).
+Local Codex quota HTTP 401/403 now leads to `Run codex login` in the card and
+a sign-in action in Source Health. Credential changes still clear the retry
+latch; explicit Browser Sync retains its browser-cookie fallback. The release
+is distributed through [GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v21.0.1),
+[Fedora COPR](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/),
+and the [KDE Store](https://store.kde.org/p/2353976/).
 
 ### 21.0.0 Source Health & Data Quality
 

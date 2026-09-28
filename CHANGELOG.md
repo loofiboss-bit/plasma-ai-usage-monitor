@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [21.0.1] — 2026-09-28
+
+### Fixed
+
+- Show `Run codex login` and a sign-in action in Source Health when the local
+  Codex quota endpoint rejects credentials with HTTP 401 or 403. Keep automatic
+  retry paused until the local credentials change.
+- Preserve the explicitly selected browser-cookie fallback for Codex sync.
+  Contributed by [swills](https://github.com/swills) in [PR #65](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/pull/65).
+
 ## [21.0.0] — 2026-09-24
 
 ### Added
@@ -1027,7 +1037,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.0...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.1...HEAD
+[21.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.0...v21.0.1
 [21.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v20.1.1...v21.0.0
 [20.1.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v20.1.0...v20.1.1
 [18.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v17.0.0...v18.0.0

@@ -78,6 +78,14 @@
 
   <releases>
 
+    <release version="21.0.1" date="2026-09-28">
+      <description>
+        <ul>
+          <li>Show Run codex login when local Codex quota credentials are rejected.</li>
+          <li>Keep explicit browser fallback and credential-change retry recovery.</li>
+        </ul>
+      </description>
+    </release>
     <release version="21.0.0" date="2026-09-24">
       <description>
         <ul>

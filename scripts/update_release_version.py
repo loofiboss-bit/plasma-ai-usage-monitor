@@ -68,7 +68,7 @@ def render(version: str) -> dict[Path, str]:
     readme = readme_path.read_text(encoding="utf-8")
     readme = replace_once(
         readme,
-        r"(Version \*\*)[0-9]+\.[0-9]+\.[0-9]+( \([^\n]+\)\*\*)",
+        r"(The \*\*)[0-9]+\.[0-9]+\.[0-9]+( release \()",
         rf"\g<1>{version}\g<2>",
         "README current release",
     )

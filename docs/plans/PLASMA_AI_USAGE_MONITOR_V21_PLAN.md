@@ -1,7 +1,7 @@
 # Plasma AI Usage Monitor v21 Plan
 
-- **Target release:** `21.0.0`
-- **Status:** released as `v21.0.0`; see the [release checklist](../release/v21.0.0-checklist.md)
+- **Target release:** `21.0.1`
+- **Status:** v21.0.0 released; v21.0.1 Codex sign-in diagnostic patch in qualification. See the [v21.0.0 release checklist](../release/v21.0.0-checklist.md) and [v21.0.1 checklist](../release/v21.0.1-checklist.md).
 - **Theme:** Source Health and Data Quality
 
 ## Goal

@@ -122,6 +122,13 @@ after refresh and restart. Risk becoming unavailable is not a recovery, and
 unavailable becoming safe is not a recovery. DND/cooldown/delivery failures
 retain pending or suppressed evidence for retry.
 
+## Codex local quota says `Run codex login`
+
+Run `codex login` in a terminal and finish sign-in, then refresh the Codex
+source. The local quota endpoint rejected the saved login; the widget pauses
+automatic retries until valid local credentials change. Explicit Browser Sync
+can still use its selected browser session as a fallback.
+
 ## Browser Sync Labs fails
 
 - Sign in again in the selected browser.
