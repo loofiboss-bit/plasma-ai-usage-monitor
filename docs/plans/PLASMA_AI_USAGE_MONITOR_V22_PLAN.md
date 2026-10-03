@@ -2,8 +2,9 @@
 
 - **Target release:** `22.0.0`
 
-Status: implementation qualified in PR #67; publication in progress under the
-explicit V22 release request. This plan targets reliable
+Status: implemented in merged PR #67 and published on GitHub, Fedora COPR, KDE
+Store and the generated wiki on 2026-10-03. Remaining manual qualification is
+recorded in the checklist. This plan targets reliable
 existing everyday workflows; new providers, cloud sync, new dependencies and
 broad UI redesign are excluded. Qualification is tracked in
 [the V22 checklist](../release/v22.0.0-checklist.md).
