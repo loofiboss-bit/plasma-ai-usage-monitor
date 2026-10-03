@@ -12,7 +12,7 @@ Published on GitHub, Fedora COPR (43/44), KDE Store and the generated wiki on
 2026-10-03. Canonical CI, package signatures and public artifacts are verified.
 Fedora package lifecycle and isolated database rollback passed. Physical Plasma
 navigation and manual screen-reader qualification remain unverified; see the
-release checklist for evidence and the Store file-version column limitation.
+release checklist for the complete publication evidence.
 
 - Stage configuration imports until Apply; preserve saved values on Cancel or
   policy transaction failure and prevent native OK from hiding that failure.
