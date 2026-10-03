@@ -1,6 +1,6 @@
 # Roadmap
 
-**Current release:** 22.0.0, Reliable Everyday Control (qualified for publication)
+**Current release:** 22.0.0, Reliable Everyday Control (published)
 
 **Last updated:** 2026-10-03
 
@@ -8,10 +8,11 @@
 
 ### 22.0.0 Reliable Everyday Control
 
-Implementation and canonical PR CI are qualified. Fedora package lifecycle and
-isolated database rollback passed. Publication is in progress under the V22
-release request; physical Plasma navigation and manual screen-reader
-qualification remain unverified.
+Published on GitHub, Fedora COPR (43/44), KDE Store and the generated wiki on
+2026-10-03. Canonical CI, package signatures and public artifacts are verified.
+Fedora package lifecycle and isolated database rollback passed. Physical Plasma
+navigation and manual screen-reader qualification remain unverified; see the
+release checklist for evidence and the Store file-version column limitation.
 
 - Stage configuration imports until Apply; preserve saved values on Cancel or
   policy transaction failure and prevent native OK from hiding that failure.
