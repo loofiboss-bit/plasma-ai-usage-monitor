@@ -6,6 +6,10 @@ permissions:
   contents: write
 jobs:
   exact-tag-artifacts:
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     environment: release
     runs-on: ubuntu-latest
     container: fedora:44
@@ -20,6 +24,10 @@ jobs:
       - run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_plasmoid.sh --output-dir dist
       - run: python3 scripts/generate_source_sbom.py --tag "$GITHUB_REF_NAME" --output dist/source.spdx.json
       - run: cd dist && sha256sum * > SHA256SUMS.txt
+      - name: Attest exact-tag release artifacts
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: '${{ github.workspace }}/dist/*'
       - name: Create published exact-commit release
         shell: bash
         run: |
