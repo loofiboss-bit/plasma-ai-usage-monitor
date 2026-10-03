@@ -3,6 +3,7 @@
 #include <QCoreApplication>
 #include <QDir>
 #include <QFile>
+#include <QSaveFile>
 #include <QFileInfo>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -512,13 +513,12 @@ bool AppInfo::exportConfig(const QString &jsonConfig, const QString &filePath) c
     {
         localPath = QUrl(filePath).toLocalFile();
     }
-    QFile file(localPath);
+    QSaveFile file(localPath);
     if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
         return false;
 
-    QTextStream out(&file);
-    out << jsonConfig;
-    return true;
+    const QByteArray bytes = jsonConfig.toUtf8();
+    return file.write(bytes) == bytes.size() && file.commit();
 }
 
 QString AppInfo::importConfig(const QString &filePath) const

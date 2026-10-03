@@ -46,10 +46,9 @@ def main() -> None:
         controller,
         "NotificationController.qml",
         "budgetPolicyRepository.prepareTransitions",
-        "budgetPolicyRepository.markEventDelivered",
-        "budgetPolicyRepository.markEventFailed",
+        "budgetPolicyRepository.prepareChannelDeliveries",
+        "budgetPolicyRepository.completeChannelDelivery",
         'return "dnd"',
-        '? "cooldown" : ""',
         "policyRequested(string policyId)",
         'i18n("Open Budget Control")',
     )

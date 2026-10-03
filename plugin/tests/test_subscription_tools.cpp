@@ -7,6 +7,12 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
+#include <QSaveFile>
+#include <QFileSystemWatcher>
+#include <QSemaphore>
+#include <QScopeGuard>
+#include <QThreadPool>
+#include <QtConcurrentRun>
 
 #include "claudecodemonitor.h"
 #include "codexclimonitor.h"
@@ -37,6 +43,19 @@ private:
     bool m_hadValue = false;
 };
 
+class TestActivityMonitor : public CopilotMonitor
+{
+public:
+    explicit TestActivityMonitor(const QString &root)
+    {
+        setInstallPaths({root});
+        setWatchedPaths({root});
+        setIgnoredPathSuffixes({QStringLiteral(".log")});
+        setDebounceIntervalMs(250);
+    }
+    void checkToolInstalled() override { LocalActivityMonitorBase::checkToolInstalled(); }
+};
+
 class SubscriptionToolsTest : public QObject
 {
     Q_OBJECT
@@ -51,6 +70,10 @@ private Q_SLOTS:
     void codexSyncWithoutLiveQuotaKeepsConfiguredPro();
     void codexLiveQuotaPayload();
     void copilotBillingModeLabels();
+    void localWatchLifecycleAndReplacement();
+    void localWatchBounds();
+    void localWatchActivityDuringBaseline_data();
+    void localWatchActivityDuringBaseline();
 };
 
 void SubscriptionToolsTest::planDefaults()
@@ -148,7 +171,7 @@ void SubscriptionToolsTest::copilotDetectActivityIncrementsUsage()
     const QString stateDir = tempHome.path() + QStringLiteral("/.config/Code/User/globalStorage/github.copilot-chat");
     QVERIFY(QDir().mkpath(stateDir));
     QVERIFY(QDir().mkpath(tempHome.path() + QStringLiteral("/.vscode/extensions/github.copilot")));
-    const QString stateFilePath = stateDir + QStringLiteral("/state.json");
+    const QString stateFilePath = stateDir + QStringLiteral("/state.db");
 
     QFile stateFile(stateFilePath);
     QVERIFY(stateFile.open(QIODevice::WriteOnly | QIODevice::Text));
@@ -164,8 +187,10 @@ void SubscriptionToolsTest::copilotDetectActivityIncrementsUsage()
     QSignalSpy activitySpy(&copilot, &SubscriptionToolBackend::activityDetected);
     QSignalSpy usageSpy(&copilot, &SubscriptionToolBackend::usageUpdated);
 
-    // Baseline only — first pass should not increment usage.
-    copilot.detectActivity();
+    // Installation establishes the baseline and watches files automatically.
+    auto *watcher = copilot.findChild<QFileSystemWatcher *>();
+    QVERIFY(watcher);
+    QTRY_VERIFY_WITH_TIMEOUT(watcher->files().contains(stateFilePath), 3000);
     QCOMPARE(copilot.usageCount(), 0);
 
     QTest::qWait(2100);
@@ -173,10 +198,8 @@ void SubscriptionToolsTest::copilotDetectActivityIncrementsUsage()
     stateFile.write("{\"status\":\"active\"}\n");
     stateFile.close();
 
-    copilot.detectActivity();
-
-    // Wait for debounce timer (250ms + buffer)
-    QTest::qWait(500);
+    // Detect filesystem activity without a manual scan.
+    QTRY_COMPARE_WITH_TIMEOUT(copilot.usageCount(), 1, 3000);
 
     QCOMPARE(copilot.usageCount(), 1);
     QCOMPARE(activitySpy.count(), 1);
@@ -349,5 +372,134 @@ void SubscriptionToolsTest::copilotBillingModeLabels()
     QVERIFY(copilot.usageSourceLabel().contains(QStringLiteral("AI credits")));
 }
 
+void SubscriptionToolsTest::localWatchLifecycleAndReplacement()
+{
+    QTemporaryDir root;
+    QVERIFY(root.isValid());
+    const QString filePath = root.filePath(QStringLiteral("activity.db"));
+    const auto write = [](const QString &path, const QByteArray &contents)
+    {
+        QSaveFile file(path);
+        return file.open(QIODevice::WriteOnly) && file.write(contents) == contents.size() && file.commit();
+    };
+    QVERIFY(write(filePath, "baseline"));
+    TestActivityMonitor monitor(root.path());
+    monitor.setEnabled(true);
+    auto *watcher = monitor.findChild<QFileSystemWatcher *>();
+    QTRY_VERIFY_WITH_TIMEOUT(watcher->files().contains(filePath), 3000);
+    QCOMPARE(monitor.usageCount(), 0);
+
+    QVERIFY(write(filePath, "pending activity"));
+    QTest::qWait(50);
+    monitor.setEnabled(false);
+    QTest::qWait(500);
+    QCOMPARE(monitor.usageCount(), 0);
+    QVERIFY(watcher->files().isEmpty());
+    QVERIFY(watcher->directories().isEmpty());
+
+    QVERIFY(write(filePath, "disabled activity"));
+    monitor.setEnabled(true);
+    QTRY_VERIFY_WITH_TIMEOUT(watcher->files().contains(filePath), 3000);
+    QCOMPARE(monitor.usageCount(), 0);
+    const QString session = root.filePath(QStringLiteral("new-session"));
+    QVERIFY(QDir().mkpath(session));
+    const QString sessionFile = session + QStringLiteral("/activity.db");
+    QVERIFY(write(sessionFile, "new session activity"));
+    QTRY_COMPARE_WITH_TIMEOUT(monitor.usageCount(), 1, 3000);
+    QVERIFY(watcher->files().contains(sessionFile));
+
+    QVERIFY(write(sessionFile, "atomically replaced session activity"));
+    QTRY_COMPARE_WITH_TIMEOUT(monitor.usageCount(), 2, 3000);
+    QVERIFY(watcher->files().contains(sessionFile));
+    QVERIFY(write(session + QStringLiteral("/ignored.log"), "ignore"));
+    QTest::qWait(500);
+    QCOMPARE(monitor.usageCount(), 2);
+
+    for (int i = 0; i < 20; ++i)
+        QVERIFY(write(sessionFile, QByteArray::number(i)));
+    QTRY_COMPARE_WITH_TIMEOUT(monitor.usageCount(), 3, 3000);
+    QTest::qWait(500);
+    QCOMPARE(monitor.usageCount(), 3);
+}
+
+void SubscriptionToolsTest::localWatchActivityDuringBaseline_data()
+{
+    QTest::addColumn<bool>("disableBeforeCompletion");
+    QTest::newRow("activity during baseline") << false;
+    QTest::newRow("disabled during baseline") << true;
+}
+
+void SubscriptionToolsTest::localWatchActivityDuringBaseline()
+{
+    QFETCH(bool, disableBeforeCompletion);
+    QTemporaryDir root;
+    QVERIFY(root.isValid());
+    const QString session = root.filePath(QStringLiteral("existing-session"));
+    QVERIFY(QDir().mkpath(session));
+    const QString path = session + QStringLiteral("/activity.db");
+    QFile file(path);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    QCOMPARE(file.write("historical activity"), qint64(19));
+    file.close();
+
+    // Hold the worker before its first metadata read. A nested file has no
+    // watcher yet, so this write must be found by the baseline itself.
+    auto *pool = QThreadPool::globalInstance();
+    pool->waitForDone();
+    const int previousMaximum = pool->maxThreadCount();
+    pool->setMaxThreadCount(1);
+    QSemaphore entered;
+    QSemaphore release;
+    auto blocker = QtConcurrent::run([&]() { entered.release(); release.acquire(); });
+    const auto cleanup = qScopeGuard([&]() {
+        release.release();
+        blocker.waitForFinished();
+        pool->setMaxThreadCount(previousMaximum);
+    });
+    entered.acquire();
+    TestActivityMonitor monitor(root.path());
+    monitor.setEnabled(true);
+    auto *watcher = monitor.findChild<QFileSystemWatcher *>();
+    QVERIFY(!watcher->files().contains(path));
+    QTest::qWait(5);
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(file.write("new activity"), qint64(12));
+    file.close();
+    if (disableBeforeCompletion)
+        monitor.setEnabled(false);
+    release.release();
+    if (disableBeforeCompletion)
+    {
+        QTest::qWait(500);
+        QCOMPARE(monitor.usageCount(), 0);
+        QVERIFY(watcher->files().isEmpty());
+        QVERIFY(watcher->directories().isEmpty());
+        return;
+    }
+    QTRY_COMPARE_WITH_TIMEOUT(monitor.usageCount(), 1, 3000);
+    QTRY_VERIFY_WITH_TIMEOUT(watcher->files().contains(path), 3000);
+    QTest::qWait(500);
+    QCOMPARE(monitor.usageCount(), 1);
+}
+
+void SubscriptionToolsTest::localWatchBounds()
+{
+    QTemporaryDir root;
+    QVERIFY(root.isValid());
+    for (int i = 0; i < 4010; ++i)
+    {
+        QFile file(root.filePath(QString::number(i)));
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("baseline");
+    }
+    TestActivityMonitor monitor(root.path());
+    monitor.setEnabled(true);
+    QTRY_COMPARE_WITH_TIMEOUT(monitor.watchDiagnosticCode(), QStringLiteral("watch_incomplete"), 10000);
+    auto *watcher = monitor.findChild<QFileSystemWatcher *>();
+    QVERIFY(watcher->files().size() + watcher->directories().size() <= 4000);
+    QCOMPARE(monitor.usageCount(), 0);
+    monitor.setEnabled(false);
+    QCOMPARE(monitor.watchDiagnosticCode(), QString());
+}
 QTEST_MAIN(SubscriptionToolsTest)
 #include "test_subscription_tools.moc"

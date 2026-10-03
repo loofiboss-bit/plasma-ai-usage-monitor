@@ -2,6 +2,7 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QSaveFile>
 #include <QSqlError>
 #include <QSqlQuery>
 
@@ -206,6 +207,106 @@ bool BudgetPolicySchema::migrate(QSqlDatabase &database, QString *error,
     if (error && error->isEmpty()) {
       *error = database.lastError().text();
     }
+    database.rollback();
+    return false;
+  }
+  return true;
+}
+
+bool BudgetPolicySchema::migrateDeliverySchema(QSqlDatabase &database,
+                                               QString *error,
+                                               bool injectFailure) {
+  QSqlQuery version(database);
+  if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next())
+    return false;
+  const int current = version.value(0).toInt();
+  version.finish();
+  if (current == 8) {
+    if (tableExists(database, QStringLiteral("budget_policy_deliveries")) &&
+        tableExists(database, QStringLiteral("history_operations")))
+      return true;
+    if (error)
+      *error = QStringLiteral("Incomplete schema v8");
+    return false;
+  }
+  if (current != 7) {
+    if (error)
+      *error = QStringLiteral("Delivery migration requires schema v7");
+    return false;
+  }
+  const QString path = database.databaseName();
+  const QString backupPath = path + QStringLiteral(".v21-backup");
+  if (current == 7 && path != QLatin1String(":memory:") &&
+      QFileInfo::exists(path)) {
+    QSqlQuery checkpoint(database);
+    if (!checkpoint.exec(QStringLiteral("PRAGMA wal_checkpoint(FULL)")) ||
+        !checkpoint.next() || checkpoint.value(0).toInt() != 0) {
+      if (error)
+        *error = QStringLiteral("Unable to checkpoint pre-v22 database");
+      return false;
+    }
+    checkpoint.finish();
+    // Refresh the rollback snapshot on every v7 upgrade. A user may have
+    // restored an earlier snapshot and added history before upgrading again.
+    QFile source(path);
+    QSaveFile backup(backupPath);
+    backup.setDirectWriteFallback(false);
+    if (!source.open(QIODevice::ReadOnly) ||
+        !backup.open(QIODevice::WriteOnly)) {
+      if (error)
+        *error = QStringLiteral("Unable to create pre-v22 database backup");
+      return false;
+    }
+    while (!source.atEnd()) {
+      const QByteArray chunk = source.read(64 * 1024);
+      if (source.error() != QFileDevice::NoError ||
+          backup.write(chunk) != chunk.size()) {
+        backup.cancelWriting();
+        if (error)
+          *error = QStringLiteral("Unable to write pre-v22 database backup");
+        return false;
+      }
+    }
+    if (!backup.commit()) {
+      if (error)
+        *error = QStringLiteral("Unable to commit pre-v22 database backup");
+      return false;
+    }
+  }
+  if (!database.transaction())
+    return false;
+  QSqlQuery query(database);
+  const QStringList statements{
+      QStringLiteral(
+          "CREATE TABLE IF NOT EXISTS budget_policy_deliveries ("
+          "event_id INTEGER NOT NULL, channel TEXT NOT NULL CHECK(channel IN "
+          "('kde','slack','discord')),"
+          "status TEXT NOT NULL CHECK(status IN "
+          "('pending','in_flight','delivered','failed','suppressed')),"
+          "attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at_utc TEXT, "
+          "delivered_at_utc TEXT,"
+          "reason_key TEXT NOT NULL DEFAULT '', PRIMARY KEY(event_id,channel),"
+          "FOREIGN KEY(event_id) REFERENCES budget_policy_events(id) ON DELETE "
+          "CASCADE)"),
+      QStringLiteral(
+          "CREATE TABLE IF NOT EXISTS history_operations (kind TEXT PRIMARY "
+          "KEY,"
+          "status TEXT NOT NULL,error_key TEXT NOT NULL DEFAULT "
+          "'',completed_at_utc TEXT,result_json TEXT NOT NULL DEFAULT '{}')"),
+      QStringLiteral("PRAGMA user_version=8")};
+  for (const auto &statement : statements) {
+    if (!exec(query, statement, error)) {
+      database.rollback();
+      return false;
+    }
+  }
+  if (injectFailure) {
+    if (error)
+      *error = QStringLiteral("Injected schema v8 migration failure");
+    database.rollback();
+    return false;
+  }
+  if (!database.commit()) {
     database.rollback();
     return false;
   }

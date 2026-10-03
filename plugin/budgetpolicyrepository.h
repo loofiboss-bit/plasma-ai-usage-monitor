@@ -57,6 +57,15 @@ public:
   Q_INVOKABLE bool markEventFailed(qint64 eventId, const QString &reasonKey);
   Q_INVOKABLE QDateTime lastDeliveredAt(const QString &policyId);
 
+  Q_INVOKABLE QVariantList prepareChannelDeliveries(
+      qint64 eventId, const QStringList &enabledChannels, int cooldownMinutes,
+      int desktopCooldownMinutes = -1);
+  Q_INVOKABLE bool
+  completeChannelDelivery(qint64 eventId, const QString &channel, bool accepted,
+                          bool retryable, const QString &reasonKey,
+                          int retryAfterSeconds, int cooldownMinutes);
+  Q_INVOKABLE QVariantList deliveryStatus();
+
 Q_SIGNALS:
   void ownerIdChanged();
   void databasePathChanged();

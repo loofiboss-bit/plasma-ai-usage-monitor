@@ -133,6 +133,7 @@ TestCase {
 
     function init() {
         controller.verificationTimeout.stop();
+        controller.verificationTimeout.interval = 30000;
         fakeConfiguration.setupWizardCompleted = false;
         fakeConfiguration.setupWizardDismissed = false;
         fakeConfiguration.setupWizardInProgress = false;
@@ -296,4 +297,59 @@ TestCase {
         verify(fakeConfiguration.setupWizardInProgress);
         verify(fakeConfiguration.codexEnabled);
     }
+    function test_resumeActiveVerificationStartsFreshTimeout() {
+        fakeConfiguration.setupWizardSourceId = "codex-cli";
+        fakeConfiguration.setupWizardStep = controller.verificationStep;
+        fakeReadiness.update("codex-cli", { readinessStateKey: "verifying" });
+        controller.initialize();
+        compare(controller.step, controller.verificationStep);
+        verify(controller.verificationTimeout.running);
+        controller.skip();
+        verify(!controller.verificationTimeout.running);
+        controller.resume();
+        verify(controller.verificationTimeout.running);
+        compare(fakeReadiness.verifyCalls, 0);
+    }
+
+    function test_resumeInterruptedVerificationReturnsToConfiguration() {
+        fakeConfiguration.setupWizardSourceId = "codex-cli";
+        fakeConfiguration.setupWizardStep = controller.verificationStep;
+        fakeReadiness.update("codex-cli", { readinessStateKey: "ready_to_verify" });
+        controller.initialize();
+        compare(controller.step, controller.configureStep);
+        verify(!controller.verificationTimeout.running);
+        verify(controller.statusMessage.indexOf("interrupted") >= 0);
+        compare(fakeReadiness.verifyCalls, 0);
+    }
+
+    function test_resumeCompletedQuotaUsesActualQuality() {
+        fakeConfiguration.setupWizardSourceId = "codex-cli";
+        fakeConfiguration.setupWizardStep = controller.verificationStep;
+        fakeReadiness.update("codex-cli", { readinessStateKey: "reporting_actual", monitoringLevel: "actual_quota" });
+        controller.initialize();
+        compare(controller.step, controller.resultStep);
+        compare(controller.resultQuality, "Actual provider-reported quota");
+        verify(controller.resultSummary.indexOf("actual quota data") >= 0);
+        verify(!controller.verificationTimeout.running);
+    }
+
+    function test_connectivityResultDoesNotPromiseUsage() {
+        compare(controller.qualityLabel({ sourceKindKey: "provider", monitoringLevel: "actual_usage_spend",
+            readinessStateKey: "connected_connectivity_only" }), "Connectivity only");
+        verify(controller.qualitySummary({ sourceKindKey: "provider", monitoringLevel: "actual_usage_spend",
+            readinessStateKey: "connected_connectivity_only" }).indexOf("No usage") >= 0);
+    }
+
+    function test_resumedVerificationTimeoutGivesRetryFeedback() {
+        fakeConfiguration.setupWizardSourceId = "codex-cli";
+        fakeConfiguration.setupWizardStep = controller.verificationStep;
+        fakeReadiness.update("codex-cli", { readinessStateKey: "verifying" });
+        controller.verificationTimeout.interval = 10;
+        controller.initialize();
+        tryVerify(function() { return controller.statusError; });
+        verify(controller.statusMessage.indexOf("timed out") >= 0);
+        verify(!controller.verificationTimeout.running);
+        verify(!fakeConfiguration.setupWizardCompleted);
+    }
+
 }

@@ -71,7 +71,7 @@ TestCase {
         property bool enabled: false
         signal observationsChanged()
         function init() {}
-        function pruneOldData() {}
+        function requestPrune(requestId) {}
     }
 
     QtObject {

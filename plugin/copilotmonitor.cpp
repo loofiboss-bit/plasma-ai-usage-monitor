@@ -16,46 +16,6 @@ CopilotMonitor::CopilotMonitor(QObject *parent)
     setInstallExecutableNames({QStringLiteral("gh")});
     setIgnoredPathSuffixes({QStringLiteral(".log"), QStringLiteral(".json")});
     setDebounceIntervalMs(250);
-}
-
-void CopilotMonitor::checkToolInstalled()
-{
-    // Use base class logic for executables
-    LocalActivityMonitorBase::checkToolInstalled();
-    if (isInstalled()) return;
-
-    // Check for VS Code Copilot extension directory (specific for Copilot)
-    QString vscodeExtDir = QDir::homePath() + QStringLiteral("/.vscode/extensions");
-    QDir extDir(vscodeExtDir);
-    if (extDir.exists()) {
-        const auto entries = extDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
-        for (const auto &entry : entries) {
-            if (entry.startsWith(QStringLiteral("github.copilot"))) {
-                setInstalled(true);
-                return;
-            }
-        }
-    }
-
-    // Check for Neovim Copilot plugin
-    QString nvimDataDir = QDir::homePath() + QStringLiteral("/.local/share/nvim");
-    QStringList copilotPluginPaths = {
-        nvimDataDir + QStringLiteral("/plugged/copilot.vim"),
-        nvimDataDir + QStringLiteral("/lazy/copilot.lua"),
-        nvimDataDir + QStringLiteral("/lazy/copilot.vim"),
-        nvimDataDir + QStringLiteral("/site/pack/packer/start/copilot.vim"),
-        nvimDataDir + QStringLiteral("/site/pack/packer/start/copilot.lua"),
-    };
-    for (const auto &pluginPath : copilotPluginPaths) {
-        if (QDir(pluginPath).exists()) {
-            setInstalled(true);
-            return;
-        }
-    }
-}
-
-void CopilotMonitor::detectActivity()
-{
     if (watchedPaths().isEmpty()) {
         const QString home = QDir::homePath();
         setWatchedPaths({
@@ -73,6 +33,34 @@ void CopilotMonitor::detectActivity()
             home + QStringLiteral("/.config/Code - OSS/logs")
         });
     }
+
+}
+
+void CopilotMonitor::checkToolInstalled()
+{
+    // Collect alternate installations before the shared lifecycle check, so a
+    // repeated probe does not temporarily disable an extension-only install.
+    const QString home = QDir::homePath();
+    const QString nvim = home + QStringLiteral("/.local/share/nvim");
+    QStringList paths = {
+        nvim + QStringLiteral("/plugged/copilot.vim"),
+        nvim + QStringLiteral("/lazy/copilot.lua"),
+        nvim + QStringLiteral("/lazy/copilot.vim"),
+        nvim + QStringLiteral("/site/pack/packer/start/copilot.vim"),
+        nvim + QStringLiteral("/site/pack/packer/start/copilot.lua")
+    };
+    const QDir extensions(home + QStringLiteral("/.vscode/extensions"));
+    const auto entries = extensions.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+    for (const auto &entry : entries) {
+        if (entry.startsWith(QStringLiteral("github.copilot")))
+            paths.append(extensions.absoluteFilePath(entry));
+    }
+    setInstallPaths(paths);
+    LocalActivityMonitorBase::checkToolInstalled();
+}
+
+void CopilotMonitor::detectActivity()
+{
 
     LocalActivityMonitorBase::detectActivity();
 }

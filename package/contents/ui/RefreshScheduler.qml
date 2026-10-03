@@ -218,7 +218,7 @@ Item {
         interval: 24 * 60 * 60 * 1000
         running: true
         repeat: true
-        onTriggered: scheduler.usageDatabase.pruneOldData()
+        onTriggered: scheduler.usageDatabase.requestPrune("daily-prune-" + Date.now())
     }
 
     Timer {

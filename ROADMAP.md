@@ -1,10 +1,32 @@
 # Roadmap
 
-**Current release:** 21.0.1, Codex Sign-in Diagnostics
+**Current release:** 22.0.0, Reliable Everyday Control (local candidate; not published)
 
-**Last updated:** 2026-09-28
+**Last updated:** 2026-10-02
 
 ## Current release
+
+### 22.0.0 Reliable Everyday Control
+
+Local implementation candidate. Public publication, package lifecycle evidence,
+physical Plasma navigation, and manual screen-reader qualification remain
+pending. The latest published release remains 21.0.1.
+
+- Stage configuration imports until Apply; preserve saved values on Cancel or
+  policy transaction failure and prevent native OK from hiding that failure.
+- Resume active setup verification with a fresh timeout and distinguish actual
+  tool quotas, local estimates, waiting for activity, and connection checks.
+- Establish local-watch baselines before counting activity; use bounded
+  background scans, debounce, cancellation, and incomplete-watch diagnostics.
+- Inspect database/WAL storage, prune expired rows, and export asynchronously
+  with visible results and the latest scheduled-export outcome.
+- Persist KDE, Slack, and Discord budget delivery separately, with bounded
+  retries, Retry-After, independent policy/channel cooldown, and safe export.
+- Migrate real SQLite schema v7 to v8 with pre-migration `.v21-backup`;
+  full-history export schema v7 remains separate from config schema v3.
+
+See the [implementation plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V22_PLAN.md)
+and [qualification checklist](docs/release/v22.0.0-checklist.md).
 
 ### 21.0.1 Codex Sign-in Diagnostics
 

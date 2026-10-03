@@ -127,8 +127,15 @@ freshness, and normalized quota windows; one source produces at most one
 grouped quota notification per cooldown. Stale snapshots suppress cached quota
 changes. Recovery is emitted only after a real failed readiness state.
 
-Policy notifications observe `GuardrailModel` separately. Schema-v6 policy
-state and events are committed atomically before delivery. KDE actions keep the
+Policy notifications observe `GuardrailModel` separately. Policy state and
+events are committed atomically before delivery. SQLite schema v8 tracks each
+event's KDE, Slack and Discord channel independently; successful KDE submission
+and HTTP 2xx webhook acceptance are distinct from a user's reading the message.
+A started webhook request is `in_flight`, not delivered. Only unacknowledged
+channels retry, at most three attempts per event/channel, using policy/channel
+cooldown and Retry-After. Permanent URL/credential errors require user action;
+disabled channels and stale/superseded events carry suppression reasons. Pending
+work survives restart, and legacy events gain no fabricated channel receipts. KDE actions keep the
 local policy identity internal; Slack and Discord receive only provider display
 name, risk, coarse percentage class, period and local link text. DND, cooldown,
 snooze and failed delivery retain pending/suppressed evidence.
@@ -178,9 +185,16 @@ project identifiers, credentials, cookies, webhook URLs, wallet contents, and
 free-form backend errors are excluded. The frontend-only bootstrap produces a
 separate minimal report for missing or mismatched native plugins.
 
-## SQLite schema v6
+## SQLite schema v8
 
-History stays local and uses WAL mode. Schema v6 preserves nullable
+V22 upgrades the real runtime schema v7 to v8. WAL is checkpointed before a
+`.v21-backup` copy, then the migration transaction adds
+`budget_policy_deliveries` and `history_operations` without changing existing
+observations, provenance, policies or events. Failed migration rolls back; a
+future schema is rejected rather than relabeled. V21 must not open v8. Test
+rollback only with an isolated copy of the verified pre-migration v7 backup.
+
+The schema-v6 policy foundations below remain part of v8. History stays local and uses WAL mode. Schema v6 preserves nullable
 observations and the v5 `guardrail_events` table, then adds:
 
 - `budget_policies` for owner-isolated typed policy definitions
@@ -349,6 +363,20 @@ SecretsManager opens KWallet, caches secret availability, and invalidates indivi
 
 BrowserSyncService owns profile discovery, cookie extraction, authenticated requests, timeouts, and circuit breaking. Cookie headers do not cross into QML or enter diagnostics, logs, history, or exports. Browser Sync remains off by default.
 
+## Local activity watching
+
+Tool paths are configured before installation detection can start watching.
+Every installed/enabled path establishes a baseline; old files are not counted
+as new activity. Disable stops watchers/debounce, requests worker cancellation,
+and invalidates outstanding generations. Re-enable starts a new baseline.
+
+Filesystem events debounce before a background scan. Scans and their watch
+sets are bounded to 4,000 discovered entries per root; root/ancestor watches
+support newly created sessions and replaced files without periodic full-tree
+polling. Late generations cannot update activity. Limits or failed watch
+installation set incomplete-watch source health. Filesystem-derived activity
+remains an estimate, independent of authenticated quota observations.
+
 ## Local integrations
 
 The Prometheus server binds to loopback by default. Users can explicitly bind
@@ -372,7 +400,23 @@ Scheduled JSON and CSV export writes to a user-selected local directory. Slack
 and Discord webhooks are explicit outbound integrations and use KWallet-stored
 URLs plus alert cooldowns.
 
-Configuration export uses schema v2 and excludes every secret-bearing field.
+Configuration export uses schema v3 with settings and owner-isolated policies;
+v2 remains a documented settings-only import. File selection stages a validated
+window-owned draft. Apply replaces policies transactionally before KConfig;
+failure protects stored values, preserves the draft and blocks native OK's
+immediate close. ConfigApplyGuard releases that close block on the next event
+loop, allowing a later deliberate Cancel. Explicit backups can include local
+policy scope identity for restoration, but exclude secrets.
+
+History Settings explicitly initializes its database. Storage inspection,
+pruning and export run on worker-owned connections, return request-ID-scoped
+results with status and stable error keys, and keep failed opens distinct from
+empty/zero storage. The page shows database/WAL bytes, pruning row count,
+written export paths and the last completed scheduled export. Busy controls
+prevent overlapping jobs. Full-history JSON schema v7 adds policy transitions
+and channel outcomes through explicit projections; its corresponding CSV uses
+a separate policy-events file. Single-series JSON remains schema v6. Each file
+is atomic, and a multi-file batch can report partial success.
 
 ## Distribution contract
 

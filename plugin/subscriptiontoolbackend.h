@@ -39,6 +39,7 @@ class SubscriptionToolBackend : public QObject
     Q_PROPERTY(QString toolColor READ toolColor CONSTANT)
 
     // State
+    Q_PROPERTY(QString watchDiagnosticCode READ watchDiagnosticCode NOTIFY watchHealthChanged)
     Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(bool installed READ isInstalled NOTIFY installedChanged)
     Q_PROPERTY(QString planTier READ planTier WRITE setPlanTier NOTIFY planTierChanged)
@@ -125,6 +126,7 @@ public:
     // State
     bool isEnabled() const;
     void setEnabled(bool enabled);
+    virtual QString watchDiagnosticCode() const { return {}; }
     bool isInstalled() const;
     QString planTier() const;
     void setPlanTier(const QString &tier);
@@ -221,6 +223,7 @@ public:
     Q_INVOKABLE QString planIdForLabel(const QString &planLabelOrId) const;
 
 Q_SIGNALS:
+    void watchHealthChanged();
     void enabledChanged();
     void installedChanged();
     void planTierChanged();

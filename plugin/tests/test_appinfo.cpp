@@ -31,6 +31,7 @@ class AppInfoTest : public QObject
     Q_OBJECT
 
 private Q_SLOTS:
+    void configurationBackupIsAtomicAndReportsWriteFailures();
     void supportReportSnapshot();
     void supportReportRejectsSensitiveValues();
     void installationInspectionDetectsShadowingAndMismatch();
@@ -38,6 +39,19 @@ private Q_SLOTS:
     void installationInspectionUsesNeutralGuidanceForFreeBsd();
     void databaseInspectionIsReadOnlyAndTyped();
 };
+
+void AppInfoTest::configurationBackupIsAtomicAndReportsWriteFailures()
+{
+    QTemporaryDir root;
+    QVERIFY(root.isValid());
+    AppInfo info;
+    const QString file = root.filePath("backup.json");
+    QVERIFY(info.exportConfig(QStringLiteral("{\"schemaVersion\":3}"), file));
+    QCOMPARE(info.importConfig(file), QStringLiteral("{\"schemaVersion\":3}"));
+    QVERIFY(!info.exportConfig(QStringLiteral("replacement"), root.path()));
+    QCOMPARE(info.importConfig(file), QStringLiteral("{\"schemaVersion\":3}"));
+    QVERIFY(!info.exportConfig(QStringLiteral("failed"), root.filePath("missing/backup.json")));
+}
 
 void AppInfoTest::supportReportSnapshot()
 {

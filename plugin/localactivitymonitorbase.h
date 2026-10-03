@@ -3,10 +3,12 @@
 
 #include "subscriptiontoolbackend.h"
 
-#include <QDateTime>
 #include <QFileSystemWatcher>
+#include <QHash>
 #include <QStringList>
 #include <QTimer>
+#include <atomic>
+#include <memory>
 
 /**
  * Shared helper for local subscription-tool monitors that infer usage from
@@ -23,6 +25,7 @@ public:
 
     Q_INVOKABLE void checkToolInstalled() override;
     Q_INVOKABLE void detectActivity() override;
+    QString watchDiagnosticCode() const override;
 
 protected:
     void setInstallExecutableNames(const QStringList &names);
@@ -32,10 +35,6 @@ protected:
     void setDebounceIntervalMs(int intervalMs);
 
     QStringList watchedPaths() const;
-    QDateTime latestKnownModification() const;
-    void setLatestKnownModification(const QDateTime &time);
-
-    static QDateTime latestModification(const QString &path, int maxEntries = 4000);
 
 private Q_SLOTS:
     void onDirectoryChanged(const QString &path);
@@ -43,8 +42,9 @@ private Q_SLOTS:
 
 private:
     void setupWatcher();
-    void scheduleIncrement(const QDateTime &modified);
-    bool shouldIgnorePath(const QString &path) const;
+    void stopWatching();
+    void requestScan();
+    void updateWatchHealth(bool incomplete);
 
     QFileSystemWatcher *m_watcher = nullptr;
     QTimer *m_debounceTimer = nullptr;
@@ -52,8 +52,15 @@ private:
     QStringList m_installPaths;
     QStringList m_watchedPaths;
     QStringList m_ignoredPathSuffixes;
-    QDateTime m_lastKnownModification;
-    bool m_pendingIncrement = false;
+    QHash<QString, QString> m_fileSnapshot;
+    bool m_watching = false;
+    bool m_baselinePending = true;
+    qint64 m_baselineStartedNs = 0;
+    bool m_scanRunning = false;
+    bool m_scanAgain = false;
+    quint64 m_generation = 0;
+    std::shared_ptr<std::atomic_bool> m_cancelScan;
+    QString m_watchDiagnosticCode;
 };
 
 #endif // LOCALACTIVITYMONITORBASE_H

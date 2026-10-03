@@ -90,8 +90,21 @@ def main() -> None:
         fail("schema-v2 imports must use the portable settings filter")
     if "ConfigPortability.schemaV3Payload(" not in qml:
         fail("schema-v3 imports must validate settings and policies before mutation")
-    if "budgetPolicyRepository.replacePolicies(staged.budgetPolicies)" not in qml:
+    import_body = qml.split("function importConfigData(configData)", 1)[1].split(
+        "function enabledProviderCount()", 1
+    )[0]
+    if ".replacePolicies(" in import_body or re.search(
+        r"Plasmoid\.configuration\[[^\]]+\]\s*=", import_body
+    ):
+        fail("file selection must not persist imported settings or policies")
+    if "importDraft.stage(staged)" not in import_body or "importDraft.apply(" not in qml:
+        fail("configuration import must use a transient draft and the Apply hook")
+    draft = (ROOT / "package/contents/ui/components/ConfigImportDraftStore.qml").read_text(encoding="utf-8")
+    if "repository.replacePolicies(payload.budgetPolicies)" not in draft:
         fail("schema-v3 policy restore must use the repository transaction boundary")
+
+    if "if (importDraft && !retainDraftOnDeparture) importDraft.destroy();" not in qml:
+        fail("native Discard must release imports while failed Apply retains them")
 
     print(
         "Config portability check OK: "

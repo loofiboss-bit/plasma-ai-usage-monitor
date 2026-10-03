@@ -41,6 +41,21 @@ KCM.SimpleKCM {
 
     property ProviderCatalog providerCatalog: ProviderCatalog {}
 
+    property var channelDeliveryRows: []
+    BudgetPolicyRepository {
+        id: deliveryRepository
+        // qmllint disable unresolved-type
+        ownerId: "applet:" + String(Plasmoid["id"])
+        // qmllint enable unresolved-type
+        Component.onCompleted: { init(); alertsPage.channelDeliveryRows = deliveryStatus(); }
+    }
+    Timer {
+        interval: 10000
+        running: alertsPage.visible
+        repeat: true
+        onTriggered: alertsPage.channelDeliveryRows = deliveryRepository.deliveryStatus()
+    }
+
     SecretsManager {
         id: alertSecrets
 
@@ -343,6 +358,34 @@ KCM.SimpleKCM {
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
             Kirigami.FormData.label: i18n("Webhooks")
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Recent budget delivery:")
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: {
+                var rows = alertsPage.channelDeliveryRows;
+                if (deliveryRepository.errorString.length > 0)
+                    return i18n("Delivery history could not be opened. Check History and recovery settings.");
+                if (rows.length === 0) return i18n("No channel deliveries recorded.");
+                return rows.slice(0, 6).map(function(row) {
+                    var state = row.status === "delivered" ? i18n("Accepted")
+                        : row.status === "failed" ? i18n("Action required")
+                        : row.status === "suppressed" ? i18n("Suppressed")
+                        : row.status === "in_flight" ? i18n("Sending") : i18n("Retry pending");
+                    var retry = row.status === "pending" && row.nextAttemptAt
+                        ? i18n("; next attempt %1", new Date(row.nextAttemptAt).toLocaleString(Qt.locale(), Locale.ShortFormat)) : "";
+                    return i18n("%1: %2 (%3 attempts)%4", row.channel.toUpperCase(), state, row.attempts, retry)
+                        + (row.reasonKey === "invalid-webhook-url" ? i18n(" — Configure a valid HTTPS webhook.")
+                           : row.reasonKey === "webhook-rejected" ? i18n(" — Check webhook permissions and credentials.")
+                           : row.reasonKey === "rate-limited" ? i18n(" — The service requested a later retry.")
+                           : row.reasonKey === "network-error" || row.reasonKey === "server-error" ? i18n(" — The service could not accept the notification.")
+                           : row.reasonKey === "channel-disabled" ? i18n(" — Channel disabled.")
+                           : row.reasonKey === "stale-event" || row.reasonKey === "superseded" ? i18n(" — Event no longer current.")
+                           : row.reasonKey === "attempts-exhausted" ? i18n(" — Retry limit reached.") : "");
+                }).join("\n");
+            }
         }
 
         QQC2.Switch {

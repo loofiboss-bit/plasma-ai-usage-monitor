@@ -66,6 +66,7 @@ QtObject {
     }
 
     function initialize() {
+        verificationTimeout.stop();
         goal = configuration.setupWizardGoal || "";
         selectedSourceId = configuration.setupWizardSourceId || "";
         var savedStep = Number(configuration.setupWizardStep || 0);
@@ -74,7 +75,11 @@ QtObject {
         refreshSelectedSource();
         refreshRecommendation();
         refreshCandidates();
-        if (step === verificationStep) evaluateVerification();
+        if (step === verificationStep) resumeVerification();
+        if (step === resultStep) {
+            resultQuality = qualityLabel(selectedSource);
+            resultSummary = qualitySummary(selectedSource);
+        }
         Qt.callLater(applyPreviewState);
     }
 
@@ -93,6 +98,7 @@ QtObject {
     }
 
     function startAgain() {
+        verificationTimeout.stop();
         configuration.setupWizardDismissed = false;
         configuration.setupWizardInProgress = true;
         configuration.setupWizardStep = goalStep;
@@ -117,6 +123,22 @@ QtObject {
         step = Math.max(goalStep, Math.min(resultStep, savedStep));
         refreshSelectedSource();
         refreshCandidates();
+        if (step === verificationStep) resumeVerification();
+    }
+
+    function resumeVerification() {
+        verificationTimeout.stop();
+        statusError = false;
+        statusMessage = "";
+        evaluateVerification();
+        if (step !== verificationStep || statusError) return;
+        if (selectedSource.readinessStateKey === "verifying") {
+            verificationTimeout.restart();
+            statusMessage = qsTr("Resuming the active read-only verification…");
+        } else {
+            goTo(configureStep);
+            statusMessage = qsTr("Verification was interrupted. Check the source and verify again.");
+        }
     }
 
     function skip() {
@@ -156,6 +178,7 @@ QtObject {
     }
 
     function goTo(nextStep) {
+        if (nextStep !== verificationStep) verificationTimeout.stop();
         step = nextStep;
         configuration.setupWizardStep = nextStep;
     }
@@ -363,12 +386,18 @@ QtObject {
             "gateway_aggregate": qsTr("Gateway-reported usage"),
             "balance_connectivity": qsTr("Balance and connectivity"),
             "connectivity_only": qsTr("Connectivity only"),
+            "actual_quota": qsTr("Actual provider-reported quota"),
             "local_activity_estimate": qsTr("Local activity estimate")
         };
         return labels[source.monitoringLevel] || qsTr("Source status");
     }
 
     function qualityLabel(source) {
+        if (source.readinessStateKey === "connected_connectivity_only")
+            return qsTr("Connectivity only");
+        if (source.sourceKindKey === "local_tool"
+                && source.readinessStateKey === "reporting_actual")
+            return qsTr("Actual provider-reported quota");
         if (source.sourceKindKey === "local_tool")
             return source.readinessStateKey === "waiting_for_activity"
                 ? qsTr("Waiting for local activity")
@@ -384,6 +413,11 @@ QtObject {
     }
 
     function qualitySummary(source) {
+        if (source.readinessStateKey === "connected_connectivity_only")
+            return qsTr("The source connection was verified. No usage, quota or spend data was reported by this check.");
+        if (source.sourceKindKey === "local_tool"
+                && source.readinessStateKey === "reporting_actual")
+            return qsTr("The authenticated source returned a provider-reported quota window. These values are actual quota data, not a local activity estimate or spend history.");
         if (source.sourceKindKey === "local_tool"
                 && source.readinessStateKey === "waiting_for_activity")
             return qsTr("The app was detected and its local activity path was checked. No activity has been observed yet, so no usage estimate is reported. Use the app and its activity will appear when available.");

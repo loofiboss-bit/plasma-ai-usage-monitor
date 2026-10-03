@@ -16,8 +16,11 @@ constexpr int MAX_TITLE_CHARS = 512;
 constexpr int MAX_MESSAGE_CHARS = 4000;
 } // namespace
 
-WebhookNotifier::WebhookNotifier(QObject *parent)
-    : QObject(parent), m_networkManager(new QNetworkAccessManager(this)) {}
+WebhookNotifier::WebhookNotifier(QObject *parent,
+                                 QNetworkAccessManager *networkManager)
+    : QObject(parent),
+      m_networkManager(networkManager ? networkManager
+                                      : new QNetworkAccessManager(this)) {}
 
 WebhookNotifier::~WebhookNotifier() = default;
 
@@ -66,15 +69,19 @@ void WebhookNotifier::setCooldownMinutes(int minutes) {
 
 void WebhookNotifier::sendAlert(const QString &eventKey, const QString &title,
                                 const QString &message, bool critical) {
-  if (!shouldSend(eventKey)) {
+  if (!m_policyEventId && !shouldSend(eventKey)) {
     return;
   }
 
   if (m_slackEnabled &&
+      (m_policyChannel.isEmpty() ||
+       m_policyChannel == QLatin1String("slack")) &&
       validateWebhookUrl(QStringLiteral("slack"), m_slackWebhookUrl)) {
     postSlack(title, message, critical);
   }
   if (m_discordEnabled &&
+      (m_policyChannel.isEmpty() ||
+       m_policyChannel == QLatin1String("discord")) &&
       validateWebhookUrl(QStringLiteral("discord"), m_discordWebhookUrl)) {
     postDiscord(title, message, critical);
   }
@@ -125,6 +132,9 @@ void WebhookNotifier::sendGuardrailEvent(const QVariantMap &event) {
         !allowedPeriods.contains(period) ||
         !safeText.match(provider).hasMatch() ||
         !safeText.match(linkText).hasMatch()) {
+      if (m_policyEventId)
+        Q_EMIT policyChannelResult(m_policyEventId, m_policyChannel, false,
+                                   false, QStringLiteral("invalid-event"), 0);
       Q_EMIT deliveryFailed(QStringLiteral("guardrail"),
                             QStringLiteral("Invalid budget policy event"));
       return;
@@ -217,6 +227,9 @@ bool WebhookNotifier::validateWebhookUrl(const QString &channel,
   const QUrl parsed(url);
   if (!parsed.isValid() || parsed.scheme() != QLatin1String("https") ||
       parsed.host().isEmpty()) {
+    if (m_policyEventId)
+      Q_EMIT policyChannelResult(m_policyEventId, channel, false, false,
+                                 QStringLiteral("invalid-webhook-url"), 0);
     Q_EMIT deliveryFailed(channel,
                           QStringLiteral("Webhook URL must use HTTPS"));
     return false;
@@ -251,20 +264,46 @@ void WebhookNotifier::postSlack(const QString &title, const QString &message,
 
   QNetworkReply *reply = m_networkManager->post(
       request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
-  connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-    const int status =
-        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    if (reply->error() != QNetworkReply::NoError || status < 200 ||
-        status >= 300) {
-      Q_EMIT deliveryFailed(QStringLiteral("slack"),
-                            reply->error() == QNetworkReply::NoError
-                                ? QStringLiteral("HTTP %1").arg(status)
-                                : reply->errorString());
-    } else {
-      Q_EMIT delivered(QStringLiteral("slack"), status);
-    }
-    reply->deleteLater();
-  });
+  const qint64 eventId = m_policyEventId;
+  const QString channel = m_policyChannel;
+  connect(
+      reply, &QNetworkReply::finished, this, [this, reply, eventId, channel]() {
+        const int status =
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (eventId) {
+          const bool accepted = reply->error() == QNetworkReply::NoError &&
+                                status >= 200 && status < 300;
+          const bool retryable =
+              status == 429 || status >= 500 ||
+              (status == 0 &&
+               reply->error() != QNetworkReply::SslHandshakeFailedError);
+          int retryAfter = reply->rawHeader("Retry-After").toInt();
+          const auto date = QDateTime::fromString(
+              QString::fromLatin1(reply->rawHeader("Retry-After")),
+              Qt::RFC2822Date);
+          if (date.isValid())
+            retryAfter =
+                qMax(0, int(QDateTime::currentDateTimeUtc().secsTo(date)));
+          Q_EMIT policyChannelResult(
+              eventId, channel, accepted, retryable,
+              accepted        ? QStringLiteral("")
+              : status == 429 ? QStringLiteral("rate-limited")
+              : status >= 500 ? QStringLiteral("server-error")
+              : status == 0   ? QStringLiteral("network-error")
+                              : QStringLiteral("webhook-rejected"),
+              retryAfter);
+        }
+        if (reply->error() != QNetworkReply::NoError || status < 200 ||
+            status >= 300) {
+          Q_EMIT deliveryFailed(QStringLiteral("slack"),
+                                reply->error() == QNetworkReply::NoError
+                                    ? QStringLiteral("HTTP %1").arg(status)
+                                    : reply->errorString());
+        } else {
+          Q_EMIT delivered(QStringLiteral("slack"), status);
+        }
+        reply->deleteLater();
+      });
 }
 
 void WebhookNotifier::postDiscord(const QString &title, const QString &message,
@@ -285,18 +324,63 @@ void WebhookNotifier::postDiscord(const QString &title, const QString &message,
 
   QNetworkReply *reply = m_networkManager->post(
       request, QJsonDocument(payload).toJson(QJsonDocument::Compact));
-  connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-    const int status =
-        reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-    if (reply->error() != QNetworkReply::NoError || status < 200 ||
-        status >= 300) {
-      Q_EMIT deliveryFailed(QStringLiteral("discord"),
-                            reply->error() == QNetworkReply::NoError
-                                ? QStringLiteral("HTTP %1").arg(status)
-                                : reply->errorString());
-    } else {
-      Q_EMIT delivered(QStringLiteral("discord"), status);
-    }
-    reply->deleteLater();
-  });
+  const qint64 eventId = m_policyEventId;
+  const QString channel = m_policyChannel;
+  connect(
+      reply, &QNetworkReply::finished, this, [this, reply, eventId, channel]() {
+        const int status =
+            reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+        if (eventId) {
+          const bool accepted = reply->error() == QNetworkReply::NoError &&
+                                status >= 200 && status < 300;
+          const bool retryable =
+              status == 429 || status >= 500 ||
+              (status == 0 &&
+               reply->error() != QNetworkReply::SslHandshakeFailedError);
+          int retryAfter = reply->rawHeader("Retry-After").toInt();
+          const auto date = QDateTime::fromString(
+              QString::fromLatin1(reply->rawHeader("Retry-After")),
+              Qt::RFC2822Date);
+          if (date.isValid())
+            retryAfter =
+                qMax(0, int(QDateTime::currentDateTimeUtc().secsTo(date)));
+          Q_EMIT policyChannelResult(
+              eventId, channel, accepted, retryable,
+              accepted        ? QStringLiteral("")
+              : status == 429 ? QStringLiteral("rate-limited")
+              : status >= 500 ? QStringLiteral("server-error")
+              : status == 0   ? QStringLiteral("network-error")
+                              : QStringLiteral("webhook-rejected"),
+              retryAfter);
+        }
+        if (reply->error() != QNetworkReply::NoError || status < 200 ||
+            status >= 300) {
+          Q_EMIT deliveryFailed(QStringLiteral("discord"),
+                                reply->error() == QNetworkReply::NoError
+                                    ? QStringLiteral("HTTP %1").arg(status)
+                                    : reply->errorString());
+        } else {
+          Q_EMIT delivered(QStringLiteral("discord"), status);
+        }
+        reply->deleteLater();
+      });
+}
+
+void WebhookNotifier::sendPolicyChannel(qint64 eventId, const QString &channel,
+                                        const QVariantMap &event) {
+  if (eventId <= 0 || (channel != QLatin1String("slack") &&
+                       channel != QLatin1String("discord")))
+    return;
+  const bool enabled =
+      channel == QLatin1String("slack") ? m_slackEnabled : m_discordEnabled;
+  if (!enabled) {
+    Q_EMIT policyChannelResult(eventId, channel, false, false,
+                               QStringLiteral("channel-disabled"), 0);
+    return;
+  }
+  m_policyEventId = eventId;
+  m_policyChannel = channel;
+  sendGuardrailEvent(event);
+  m_policyEventId = 0;
+  m_policyChannel.clear();
 }

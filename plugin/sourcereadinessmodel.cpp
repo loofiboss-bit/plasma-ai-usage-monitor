@@ -314,6 +314,10 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
         } else if (tool && tool->isSyncing()) {
             result.state = SourceState::Verifying;
             result.nextAction = NextAction::WaitForVerification;
+        } else if (tool && !tool->watchDiagnosticCode().isEmpty()) {
+            result.errorCode = tool->watchDiagnosticCode();
+            result.state = SourceState::Degraded;
+            result.nextAction = NextAction::CompleteConfiguration;
         } else if (!entry.localDiagnosticCode.isEmpty()) {
             result.errorCode = entry.localDiagnosticCode;
             if (entry.localDiagnosticCode == QLatin1String("not_logged_in")
@@ -590,6 +594,7 @@ void SourceReadinessModel::connectLocalTool(int row, SubscriptionToolBackend *ba
         }
         updateRow(row);
     };
+    connect(backend, &SubscriptionToolBackend::watchHealthChanged, this, update);
     connect(backend, &SubscriptionToolBackend::enabledChanged, this, update);
     connect(backend, &SubscriptionToolBackend::installedChanged, this, update);
     connect(backend, &SubscriptionToolBackend::usageUpdated, this, update);

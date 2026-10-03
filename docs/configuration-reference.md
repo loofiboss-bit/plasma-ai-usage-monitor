@@ -48,27 +48,43 @@ Schema v2 import contains settings only. Schema v3 contains:
 }
 ~~~
 
-Import parses and validates every setting and policy before mutation. Apply
+File selection parses and validates every setting and policy into a transient
+window-owned draft. No settings or policies are written at that boundary. Apply
 replaces policies for the current applet by ID in one database transaction,
 then saves KConfig. A policy transaction failure leaves permanent KConfig
-unchanged; Cancel changes neither store.
+unchanged; Cancel changes neither store. Schema-v2 import filters retired and
+unknown legacy settings, validates the retained types and leaves policies
+untouched. V3 rejects unknown keys, invalid types, out-of-range settings, invalid fixed choices, reversed alert thresholds and duplicate policy UUIDs.
+
+`ConfigApplyGuard` rejects the immediate native OK close after failed Apply,
+because Plasma ignores a page's false `saveConfig()` return. Its guard expires
+on the next event-loop turn so deliberate later Cancel remains possible. A
+library-created draft survives a failed page-switch Apply until it is retried,
+discarded or its settings window closes.
 
 Config files exclude provider keys, tokens, cookies, personal access tokens and
 webhook URLs. Schema-v3 policies can contain raw scope identities required for
 exact restoration, so explicit backup files are sensitive. Diagnostics,
 support reports and integrations use separate allowlists and exclude them.
 
-## SQLite schema v6
+## SQLite schema v8
 
-- `budget_policies`: validated owner-scoped policy definitions
-- `budget_policy_migrations`: one-shot legacy migration markers
-- `budget_policy_state`: current policy period/risk and delivery timing
-- `budget_policy_events`: deduplicated pending, delivered or suppressed
-  transitions persisted before delivery
+Runtime schema v8 extends the real v7 provenance database with:
 
-Indexes cover owner, source, scope, enabled state and transition identity.
-Migration from v5 runs in one SQLite transaction after a `.v18-backup` and is
-idempotent. An injected error rolls back schema and data.
+- `budget_policy_deliveries`: event/channel state, attempt count, next retry,
+  acceptance time and stable failure/suppression reason
+- `history_operations`: latest local manual/scheduled operation outcome
+
+Existing policy definitions, observations, provenance, event and migration
+records remain intact. Upgrade from v7 checkpoints WAL and creates a
+`.v21-backup` before the transaction. Migration is idempotent; injected failure
+rolls back schema and data. Existing events are not assigned invented
+per-channel acceptance receipts.
+
+Full-history JSON export is schema v7; selected-series JSON remains v6. These
+format numbers are independent of SQLite schema v8 and config schema v3.
+Per-channel CSV is a separate policy-events file. Explicit export projections
+exclude raw scope identities, secrets and policy identifiers.
 
 Forecasts are derived runtime results. They are never written into raw
 observation history. Provider observations can remain in their existing major
@@ -76,7 +92,15 @@ unit form; conversion to checked minor units occurs at the query boundary.
 
 ## Rollback
 
-The v18 RPM does not delete configuration, secrets or history on removal. v17
-continues to read its legacy KConfig budgets and ignores schema-v6 tables. Keep
-the `.v18-backup` if the database itself must be restored for an older binary.
-Do not copy or delete KWallet data as part of a normal rollback.
+Normal package removal retains user configuration, KWallet and local history.
+V21 must never open the schema-v8 database. Preserve the current v8 database
+and its WAL state before considering any downgrade; do not overwrite live
+history or copy/remove KWallet as part of ordinary rollback.
+
+Qualify rollback in an isolated data directory using a copy of the
+pre-migration `usage_history.db.v21-backup` (schema v7) and the older binary.
+The current v8 database stays separate for re-upgrade. If no verified v7 backup
+exists, database rollback is unavailable; do not treat removing the package as
+a schema downgrade.
+
+Full-history exports omit the free-form `provenance_json` blob. Explicit catalog, pricing period, fingerprint and estimate-status columns remain available; arbitrary provenance keys never cross the export boundary.

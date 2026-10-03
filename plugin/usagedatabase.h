@@ -25,6 +25,8 @@ class UsageDatabase : public QObject
     Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
     Q_PROPERTY(int retentionDays READ retentionDays WRITE setRetentionDays NOTIFY retentionDaysChanged)
     Q_PROPERTY(int pendingWorkerCount READ pendingWorkerCount NOTIFY pendingWorkerCountChanged)
+    Q_PROPERTY(bool initialized READ initialized NOTIFY databaseStateChanged)
+    Q_PROPERTY(QString errorKey READ errorKey NOTIFY databaseStateChanged)
 
 public:
     explicit UsageDatabase(QObject *parent = nullptr);
@@ -36,6 +38,8 @@ public:
     void setRetentionDays(int days);
     int pendingWorkerCount() const;
     int databaseConnectionCount() const;
+    bool initialized() const { return m_initialized; }
+    QString errorKey() const { return m_errorKey; }
 
     /**
      * Record a usage snapshot for a provider.
@@ -266,7 +270,7 @@ public:
      * files in the target directory. Supported formats: "json", "csv".
      * Returns absolute paths written successfully.
      */
-    Q_INVOKABLE QStringList exportAllToDirectory(const QString &dirPath,
+    Q_INVOKABLE QVariantMap exportAllToDirectory(const QString &dirPath,
                                                  const QStringList &formats) const;
     Q_INVOKABLE void
     requestExportAll(const QString &requestId, const QString &dirPath, const QStringList &formats);
@@ -275,12 +279,16 @@ public:
      * Remove data older than retentionDays.
      */
     Q_INVOKABLE void pruneOldData();
+    Q_INVOKABLE void requestStorageStatus(const QString &requestId);
+    Q_INVOKABLE void requestPrune(const QString &requestId);
+    QVariantMap storageStatus() const;
+    QVariantMap pruneResult();
 
     /**
      * Eagerly initialize the database.
      * Call early (e.g., Component.onCompleted) to avoid blocking on first write.
      */
-    Q_INVOKABLE void init();
+    Q_INVOKABLE bool init();
 
     /**
      * Get the total database size in bytes.
@@ -297,13 +305,17 @@ Q_SIGNALS:
     void historyCatalogReady(const QString &requestId, const QVariantList &sources);
     void historySeriesReady(const QString &requestId, const QVariantMap &payload);
     void analystReady(const QString &requestId, const QVariantMap &snapshot);
-    void exportFinished(const QString &requestId, const QStringList &paths);
+    void exportFinished(const QString &requestId, const QVariantMap &result);
+    void maintenanceFinished(const QString &requestId, const QVariantMap &result);
+    void databaseStateChanged();
 
 private:
     void initDatabase();
     void beginWorker();
     void finishWorker();
-    void createTables();
+    bool createTables();
+    void requestMaintenance(const QString &requestId, bool prune);
+    void saveOperation(const QString &kind, const QVariantMap &result) const;
     bool migrateToObservationSchemaV3();
     bool migrateToObservationSchemaV4();
     bool migrateToSchemaV5();
@@ -327,6 +339,7 @@ private:
     bool m_enabled = true;
     int m_retentionDays = 90;
     bool m_initialized = false;
+    QString m_errorKey;
     QString m_latestHistoryCatalogRequestId;
     QString m_latestHistorySeriesRequestId;
     QString m_latestAnalystRequestId;
