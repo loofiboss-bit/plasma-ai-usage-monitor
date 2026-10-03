@@ -1,16 +1,17 @@
 # Roadmap
 
-**Current release:** 22.0.0, Reliable Everyday Control (local candidate; not published)
+**Current release:** 22.0.0, Reliable Everyday Control (qualified for publication)
 
-**Last updated:** 2026-10-02
+**Last updated:** 2026-10-03
 
 ## Current release
 
 ### 22.0.0 Reliable Everyday Control
 
-Local implementation candidate. Public publication, package lifecycle evidence,
-physical Plasma navigation, and manual screen-reader qualification remain
-pending. The latest published release remains 21.0.1.
+Implementation and canonical PR CI are qualified. Fedora package lifecycle and
+isolated database rollback passed. Publication is in progress under the V22
+release request; physical Plasma navigation and manual screen-reader
+qualification remain unverified.
 
 - Stage configuration imports until Apply; preserve saved values on Cancel or
   policy transaction failure and prevent native OK from hiding that failure.
