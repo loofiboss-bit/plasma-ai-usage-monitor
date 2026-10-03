@@ -84,7 +84,7 @@ TestCase {
 
     QtObject {
         id: database
-        function pruneOldData() {}
+        function requestPrune(requestId) {}
         function requestExportAll(requestId, directory, formats) {}
     }
 

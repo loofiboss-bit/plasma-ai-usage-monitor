@@ -12,6 +12,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMap>
+#include <QMutex>
+#include <QMutexLocker>
 #include <QSaveFile>
 #include <QSet>
 #include <QSqlError>
@@ -28,6 +30,31 @@ std::atomic<int> UsageDatabase::s_instanceCounter{0};
 
 namespace {
 constexpr int MAX_SERIES_POINTS = 240;
+QMutex operationMutex;
+QSet<QString> activeOperations;
+QString operationKey(const QString &kind)
+{
+    return QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation)
+        + QStringLiteral("/plasma-ai-usage-monitor/") + kind;
+}
+bool acquireOperation(const QString &key)
+{
+    const QMutexLocker lock(&operationMutex);
+    if (activeOperations.contains(key)) return false;
+    activeOperations.insert(key);
+    return true;
+}
+void releaseOperation(const QString &key)
+{
+    const QMutexLocker lock(&operationMutex);
+    activeOperations.remove(key);
+}
+QVariantMap operationResult(const QString &status, const QString &error = {})
+{
+    return {{QStringLiteral("ok"), status == QLatin1String("success")},
+            {QStringLiteral("status"), status}, {QStringLiteral("errorKey"), error},
+            {QStringLiteral("completedAtUtc"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate)}};
+}
 
 struct BucketAggregate {
     double sum = 0.0;
@@ -421,19 +448,39 @@ void UsageDatabase::initDatabase()
     if (!m_db.open()) {
         qWarning() << "UsageDatabase: Failed to open database:"
                    << m_db.lastError().text();
+        m_errorKey = QStringLiteral("database-open-failed");
+        Q_EMIT databaseStateChanged();
         return;
     }
 
+    QSqlQuery version(m_db);
+    if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next()
+        || version.value(0).toInt() > 8) {
+        m_errorKey = QStringLiteral("unsupported-database-schema");
+        m_db.close();
+        Q_EMIT databaseStateChanged();
+        return;
+    }
+    version.finish();
     // Enable WAL mode for better concurrent read performance
     QSqlQuery pragma(m_db);
     pragma.exec(QStringLiteral("PRAGMA journal_mode=WAL"));
     pragma.exec(QStringLiteral("PRAGMA synchronous=NORMAL"));
+    pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
+    pragma.exec(QStringLiteral("PRAGMA busy_timeout=5000"));
 
-    createTables();
+    if (!createTables()) {
+        m_errorKey = QStringLiteral("database-migration-failed");
+        m_db.close();
+        Q_EMIT databaseStateChanged();
+        return;
+    }
     m_initialized = true;
+    m_errorKey.clear();
+    Q_EMIT databaseStateChanged();
 }
 
-void UsageDatabase::createTables()
+bool UsageDatabase::createTables()
 {
     QSqlQuery query(m_db);
 
@@ -531,12 +578,12 @@ void UsageDatabase::createTables()
     if (!migrateToObservationSchemaV3()) {
         qWarning() << "UsageDatabase: observation schema v3 migration failed; "
                       "legacy history remains intact";
-        return;
+        return false;
     }
     if (!migrateToObservationSchemaV4()) {
         qWarning() << "UsageDatabase: observation schema v4 migration failed; v3 "
                       "history remains intact";
-        return;
+        return false;
     }
 
     // Keep the original labels in migrated rows. This explicit table is the
@@ -579,15 +626,19 @@ void UsageDatabase::createTables()
     if (!migrateToSchemaV5()) {
         qWarning() << "UsageDatabase: schema v5 migration failed; v4 history "
                       "remains intact";
-        return;
+        return false;
     }
     if (!migrateToSchemaV6()) {
         qWarning() << "UsageDatabase: schema v6 migration failed; v5 history remains intact";
-        return;
+        return false;
     }
     if (!migrateToSchemaV7()) {
         qWarning() << "UsageDatabase: schema v7 migration failed; provenance history remains partial";
+        return false;
     }
+    QString error;
+    if (!BudgetPolicySchema::migrateDeliverySchema(m_db, &error)) return false;
+    return true;
 }
 
 bool UsageDatabase::migrateToObservationSchemaV3()
@@ -817,6 +868,10 @@ bool UsageDatabase::migrateToSchemaV6()
 
 bool UsageDatabase::migrateToSchemaV7()
 {
+    QSqlQuery version(m_db);
+    if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next()) return false;
+    if (version.value(0).toInt() >= 7) return true;
+    version.finish();
     QSqlQuery query(m_db);
     const QStringList observationColumns {
         QStringLiteral("catalog_version TEXT"),
@@ -2558,25 +2613,25 @@ QString UsageDatabase::exportJson(const QString &provider,
     return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Indented));
 }
 
-QStringList
+QVariantMap
 UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                     const QStringList &formats) const
 {
     QStringList writtenFiles;
 
     if (!m_initialized || dirPath.trimmed().isEmpty()) {
-        return writtenFiles;
+        return operationResult(QStringLiteral("failed"), !m_initialized ? QStringLiteral("database-unavailable") : QStringLiteral("export-directory-invalid"));
     }
 
     QDir dir(dirPath);
     if (!dir.exists() && !dir.mkpath(QStringLiteral("."))) {
         qWarning() << "UsageDatabase: Failed to create export directory:"
                    << dirPath;
-        return writtenFiles;
+        return operationResult(QStringLiteral("failed"), QStringLiteral("export-directory-unwritable"));
     }
 
     const QString timestamp = QDateTime::currentDateTimeUtc().toString(
-        QStringLiteral("yyyyMMdd-HHmmss"));
+        QStringLiteral("yyyyMMdd-HHmmss-zzz")) + QLatin1Char('-') + QUuid::createUuid().toString(QUuid::WithoutBraces).left(8);
     const QStringList requestedFormats = formats.isEmpty()
         ? QStringList{QStringLiteral("json"), QStringLiteral("csv")}
         : formats;
@@ -2585,7 +2640,7 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
         const QString jsonPath = dir.filePath(QStringLiteral("ai-usage-export-%1.json").arg(timestamp));
         QSaveFile jsonFile(jsonPath);
         if (jsonFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-            jsonFile.write("{\n  \"schemaVersion\": 6,\n  \"exportedAt\": ");
+            jsonFile.write("{\n  \"schemaVersion\": 7,\n  \"exportedAt\": ");
             const QByteArray exportedAt
                 = QJsonDocument(QJsonArray { QDateTime::currentDateTimeUtc().toString(Qt::ISODate) })
                       .toJson(QJsonDocument::Compact);
@@ -2619,7 +2674,7 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                                     "remaining,rl_tokens,rl_tokens_remaining,"
                                                     "cost_source,usage_source,currency,data_quality,"
                                                     "catalog_version,price_id,pricing_effective_from_utc,"
-                                                    "pricing_effective_to_utc,source_fingerprint,provenance_json,"
+                                                    "pricing_effective_to_utc,source_fingerprint,"
                                                     "estimate_status FROM "
                                                     "usage_snapshots ORDER BY id"));
             if (providersOk)
@@ -2641,7 +2696,7 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                                        "window,'' AS model_scope,'' AS project_scope,"
                                                        "reset_at_utc,correlation_id,catalog_version,price_id,"
                                                        "pricing_effective_from_utc,pricing_effective_to_utc,"
-                                                       "source_fingerprint,provenance_json,estimate_status "
+                                                       "source_fingerprint,estimate_status "
                                                        "FROM observations ORDER BY id"));
             if (observationsOk)
                 streamJsonRows(observationQuery);
@@ -2659,6 +2714,17 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
             if (guardrailsOk)
                 streamJsonRows(guardrailQuery);
 
+            jsonFile.write("\n  ],\n  \"budgetPolicyEvents\": [\n");
+            QSqlQuery policyQuery(m_db);
+            policyQuery.setForwardOnly(true);
+            const bool policiesOk = policyQuery.exec(QStringLiteral(
+                "SELECT e.id AS event_index,e.transition,e.period_start_utc,e.period_end_utc,"
+                "e.created_at_utc AS observed_at_utc,e.delivery_status,e.reason_key,d.channel,d.status AS channel_status,"
+                "d.attempts,d.next_attempt_at_utc,d.delivered_at_utc,d.reason_key AS channel_reason_key "
+                "FROM budget_policy_events e LEFT JOIN budget_policy_deliveries d ON d.event_id=e.id "
+                "ORDER BY e.id,d.channel"));
+            if (policiesOk) streamJsonRows(policyQuery);
+
             jsonFile.write("\n  ],\n  \"toolSnapshots\": [\n");
             QSqlQuery toolQuery(m_db);
             toolQuery.setForwardOnly(true);
@@ -2670,7 +2736,7 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                 streamJsonRows(toolQuery);
             jsonFile.write("\n  ]\n}\n");
 
-            if (providersOk && observationsOk && guardrailsOk && toolsOk && jsonFile.commit()) {
+            if (providersOk && observationsOk && guardrailsOk && policiesOk && toolsOk && jsonFile.commit()) {
                 writtenFiles.append(jsonPath);
             } else {
                 jsonFile.cancelWriting();
@@ -2688,7 +2754,7 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                 "value,currency,semantic,source,data_quality,scope,window,model_"
                 "scope,project_scope,reset_at,correlation_id,catalog_version,price_id,"
                 "pricing_effective_from_utc,pricing_effective_to_utc,source_fingerprint,"
-                "provenance_json,estimate_status\r\n");
+                "estimate_status\r\n");
             QSqlQuery query(m_db);
             query.setForwardOnly(true);
             const bool queryOk = query.exec(QStringLiteral(
@@ -2701,11 +2767,11 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                 "THEN 'scoped' ELSE scope END AS scope,window,'' AS model_scope,"
                 "'' AS project_scope,reset_at_utc,correlation_id,catalog_version,price_id,"
                 "pricing_effective_from_utc,pricing_effective_to_utc,source_fingerprint,"
-                "provenance_json,estimate_status FROM "
+                "estimate_status FROM "
                 "observations ORDER BY id"));
             while (queryOk && query.next()) {
                 QStringList fields;
-                for (int i = 0; i < 24; ++i)
+                for (int i = 0; i < 23; ++i)
                     fields.append(csvField(query.value(i).toString()));
                 observationsFile.write(
                     (fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
@@ -2746,6 +2812,26 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
             }
         }
 
+        const QString policyPath = dir.filePath(QStringLiteral("ai-usage-policy-events-%1.csv").arg(timestamp));
+        QSaveFile policyFile(policyPath);
+        if (policyFile.open(QIODevice::WriteOnly)) {
+            policyFile.write("event_index,transition,period_start_utc,period_end_utc,observed_at_utc,delivery_status,reason_key,channel,channel_status,attempts,next_attempt_at_utc,delivered_at_utc,channel_reason_key\r\n");
+            QSqlQuery query(m_db);
+            query.setForwardOnly(true);
+            const bool ok = query.exec(QStringLiteral(
+                "SELECT e.id,e.transition,e.period_start_utc,e.period_end_utc,e.created_at_utc,"
+                "e.delivery_status,e.reason_key,d.channel,d.status,d.attempts,d.next_attempt_at_utc,"
+                "d.delivered_at_utc,d.reason_key FROM budget_policy_events e "
+                "LEFT JOIN budget_policy_deliveries d ON d.event_id=e.id ORDER BY e.id,d.channel"));
+            while (ok && query.next()) {
+                QStringList fields;
+                for (int i = 0; i < 13; ++i) fields.append(csvField(query.value(i).toString()));
+                policyFile.write((fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
+            }
+            if (ok && policyFile.commit()) writtenFiles.append(policyPath);
+            else policyFile.cancelWriting();
+        }
+
         const QString providerCsvPath = dir.filePath(
             QStringLiteral("ai-usage-providers-%1.csv").arg(timestamp));
         QSaveFile providerFile(providerCsvPath);
@@ -2756,7 +2842,7 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                "remaining,rl_tokens,rl_tokens_remaining,"
                                "cost_source,usage_source,currency,data_quality,catalog_version,"
                                "price_id,pricing_effective_from_utc,pricing_effective_to_utc,"
-                               "source_fingerprint,provenance_json,estimate_status\r\n");
+                               "source_fingerprint,estimate_status\r\n");
             QSqlQuery query(m_db);
             query.setForwardOnly(true);
             const bool queryOk = query.exec(
@@ -2767,12 +2853,12 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                "remaining,rl_tokens,rl_tokens_remaining,"
                                "cost_source,usage_source,currency,data_quality,"
                                "catalog_version,price_id,pricing_effective_from_utc,"
-                               "pricing_effective_to_utc,source_fingerprint,provenance_json,"
+                               "pricing_effective_to_utc,source_fingerprint,"
                                "estimate_status FROM "
                                "usage_snapshots ORDER BY id"));
             while (queryOk && query.next()) {
                 QStringList fields;
-                for (int i = 0; i < 25; ++i)
+                for (int i = 0; i < 24; ++i)
                     fields.append(csvField(query.value(i).toString()));
                 providerFile.write(
                     (fields.join(QLatin1Char(',')) + QStringLiteral("\r\n")).toUtf8());
@@ -2813,103 +2899,160 @@ UsageDatabase::exportAllToDirectory(const QString &dirPath,
         }
     }
 
-    return writtenFiles;
+    const int expected = (requestedFormats.contains(QStringLiteral("json")) ? 1 : 0)
+        + (requestedFormats.contains(QStringLiteral("csv")) ? 5 : 0);
+    const QString status = expected > 0 && writtenFiles.size() == expected ? QStringLiteral("success")
+        : writtenFiles.isEmpty() ? QStringLiteral("failed") : QStringLiteral("partial");
+    QVariantMap result = operationResult(status, status == QLatin1String("success") ? QString() : QStringLiteral("export-write-failed"));
+    result.insert(QStringLiteral("paths"), writtenFiles);
+    result.insert(QStringLiteral("expectedFiles"), expected);
+    return result;
 }
 
-void UsageDatabase::requestExportAll(const QString &requestId,
-                                     const QString &dirPath,
-                                     const QStringList &formats)
+void UsageDatabase::saveOperation(const QString &kind, const QVariantMap &result) const
 {
-    initDatabase();
+    if (!m_initialized) return;
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral("INSERT OR REPLACE INTO history_operations(kind,status,error_key,completed_at_utc,result_json) VALUES(?,?,?,?,?)"));
+    query.addBindValue(kind);
+    query.addBindValue(result.value(QStringLiteral("status")));
+    query.addBindValue(result.value(QStringLiteral("errorKey"), QStringLiteral("")));
+    query.addBindValue(result.value(QStringLiteral("completedAtUtc")));
+    // Runtime operation details stay local and are excluded from history exports.
+    query.addBindValue(QString::fromUtf8(QJsonDocument::fromVariant(result).toJson(QJsonDocument::Compact)));
+    query.exec();
+}
+
+void UsageDatabase::requestExportAll(const QString &requestId, const QString &dirPath, const QStringList &formats)
+{
+    const QString key = operationKey(QStringLiteral("export"));
+    if (!acquireOperation(key)) {
+        QVariantMap result = operationResult(QStringLiteral("failed"), QStringLiteral("operation-busy"));
+        result.insert(QStringLiteral("requestId"), requestId);
+        Q_EMIT exportFinished(requestId, result);
+        return;
+    }
     beginWorker();
-    auto *watcher = new QFutureWatcher<QStringList>(this);
-    connect(watcher, &QFutureWatcher<QStringList>::finished, this,
-            [this, watcher, requestId]() {
-                Q_EMIT exportFinished(requestId, watcher->result());
-                finishWorker();
-                watcher->deleteLater();
-            });
-    watcher->setFuture(QtConcurrent::run([dirPath, formats]() {
-        UsageDatabase workerDatabase;
-        workerDatabase.init();
-        return workerDatabase.exportAllToDirectory(dirPath, formats);
+    auto *watcher = new QFutureWatcher<QVariantMap>(this);
+    connect(watcher, &QFutureWatcher<QVariantMap>::finished, this, [this, watcher, requestId]() {
+        QVariantMap result = watcher->result();
+        result.insert(QStringLiteral("requestId"), requestId);
+        finishWorker();
+        watcher->deleteLater();
+        Q_EMIT exportFinished(requestId, result);
+    });
+    watcher->setFuture(QtConcurrent::run([dirPath, formats, requestId, key]() {
+        UsageDatabase database;
+        QVariantMap result;
+        if (!database.init()) result = operationResult(QStringLiteral("failed"), database.errorKey());
+        else result = database.exportAllToDirectory(dirPath, formats);
+        result.insert(QStringLiteral("requestId"), requestId);
+        database.saveOperation(requestId.startsWith(QLatin1String("scheduled-")) ? QStringLiteral("scheduled_export") : QStringLiteral("manual_export"), result);
+        releaseOperation(key);
+        return result;
     }));
 }
 
-void UsageDatabase::init()
+bool UsageDatabase::init()
 {
     initDatabase();
+    return m_initialized;
+}
+
+QVariantMap UsageDatabase::storageStatus() const
+{
+    if (!m_initialized) return operationResult(QStringLiteral("failed"), m_errorKey);
+    QVariantMap result = operationResult(QStringLiteral("success"));
+    const QString path = m_db.databaseName();
+    result.insert(QStringLiteral("databaseBytes"), QFileInfo(path).size());
+    result.insert(QStringLiteral("walBytes"), QFileInfo(path + QStringLiteral("-wal")).size());
+    result.insert(QStringLiteral("sources"), getProviders() + getToolNames());
+    QSqlQuery query(m_db);
+    if (!query.exec(QStringLiteral("SELECT result_json FROM history_operations WHERE kind='scheduled_export'")))
+        return operationResult(QStringLiteral("failed"), QStringLiteral("storage-query-failed"));
+    if (query.next()) result.insert(QStringLiteral("lastScheduledExport"), QJsonDocument::fromJson(query.value(0).toString().toUtf8()).toVariant());
+    return result;
+}
+
+QVariantMap UsageDatabase::pruneResult()
+{
+    if (!m_initialized) return operationResult(QStringLiteral("failed"), m_errorKey);
+    if (!m_db.transaction()) return operationResult(QStringLiteral("failed"), QStringLiteral("maintenance-busy"));
+    const QString cutoff = toDbDateTimeString(QDateTime::currentDateTimeUtc().addDays(-m_retentionDays));
+    const QList<QPair<QString, QString>> tables{
+        {QStringLiteral("usage_snapshots"), QStringLiteral("timestamp")},
+        {QStringLiteral("rate_limit_events"), QStringLiteral("timestamp")},
+        {QStringLiteral("subscription_tool_usage"), QStringLiteral("timestamp")},
+        {QStringLiteral("observations"), QStringLiteral("observed_at_utc")},
+        {QStringLiteral("guardrail_events"), QStringLiteral("observed_at_utc")},
+        {QStringLiteral("estimate_provenance"), QStringLiteral("observed_at_utc")},
+        {QStringLiteral("budget_policy_events"), QStringLiteral("created_at_utc")}
+    };
+    qint64 deleted = 0;
+    for (const auto &table : tables) {
+        QSqlQuery query(m_db);
+        query.prepare(QStringLiteral("DELETE FROM %1 WHERE datetime(%2) < datetime(?)").arg(table.first, table.second));
+        query.addBindValue(cutoff);
+        if (!query.exec()) {
+            m_db.rollback();
+            return operationResult(QStringLiteral("failed"), QStringLiteral("maintenance-delete-failed"));
+        }
+        deleted += query.numRowsAffected();
+    }
+    if (!m_db.commit()) {
+        m_db.rollback();
+        return operationResult(QStringLiteral("failed"), QStringLiteral("maintenance-commit-failed"));
+    }
+    QVariantMap result = storageStatus();
+    result.insert(QStringLiteral("rowsDeleted"), deleted);
+    return result;
 }
 
 void UsageDatabase::pruneOldData()
 {
-    if (!m_initialized)
+    if (init()) pruneResult();
+}
+
+void UsageDatabase::requestStorageStatus(const QString &requestId)
+{
+    requestMaintenance(requestId, false);
+}
+
+void UsageDatabase::requestPrune(const QString &requestId)
+{
+    requestMaintenance(requestId, true);
+}
+
+void UsageDatabase::requestMaintenance(const QString &requestId, bool prune)
+{
+    const QString key = operationKey(prune ? QStringLiteral("prune") : QStringLiteral("storage"));
+    if (!acquireOperation(key)) {
+        QVariantMap result = operationResult(QStringLiteral("failed"), QStringLiteral("operation-busy"));
+        result.insert(QStringLiteral("requestId"), requestId);
+        Q_EMIT maintenanceFinished(requestId, result);
         return;
-
-    QDateTime cutoff = QDateTime::currentDateTimeUtc().addDays(-m_retentionDays);
-    QString cutoffStr = toDbDateTimeString(cutoff);
-
-    // Wrap all deletes in a single transaction for atomicity and performance
-    m_db.transaction();
-
-    int totalDeleted = 0;
-
-    QSqlQuery query(m_db);
-    query.prepare(
-        QStringLiteral("DELETE FROM usage_snapshots WHERE timestamp < ?"));
-    query.addBindValue(cutoffStr);
-    if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to prune snapshots:"
-                   << query.lastError().text();
-    } else {
-        totalDeleted += query.numRowsAffected();
     }
-
-    query.prepare(
-        QStringLiteral("DELETE FROM rate_limit_events WHERE timestamp < ?"));
-    query.addBindValue(cutoffStr);
-    if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to prune events:"
-                   << query.lastError().text();
-    } else {
-        totalDeleted += query.numRowsAffected();
-    }
-
-    query.prepare(QStringLiteral(
-        "DELETE FROM subscription_tool_usage WHERE timestamp < ?"));
-    query.addBindValue(cutoffStr);
-    if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to prune tool usage:"
-                   << query.lastError().text();
-    } else {
-        totalDeleted += query.numRowsAffected();
-    }
-
-    query.prepare(
-        QStringLiteral("DELETE FROM observations WHERE observed_at_utc < ?"));
-    query.addBindValue(cutoffStr);
-    if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to prune observations:"
-                   << query.lastError().text();
-    } else {
-        totalDeleted += query.numRowsAffected();
-    }
-
-    query.prepare(QStringLiteral("DELETE FROM guardrail_events WHERE observed_at_utc < ?"));
-    query.addBindValue(cutoffStr);
-    if (!query.exec()) {
-        qWarning() << "UsageDatabase: Failed to prune guardrail events:" << query.lastError().text();
-    } else {
-        totalDeleted += query.numRowsAffected();
-    }
-
-    m_db.commit();
-
-    // Only vacuum if a meaningful number of rows were deleted
-    if (totalDeleted > 100) {
-        QSqlQuery vacuum(m_db);
-        vacuum.exec(QStringLiteral("PRAGMA incremental_vacuum"));
-    }
+    const int retention = m_retentionDays;
+    beginWorker();
+    auto *watcher = new QFutureWatcher<QVariantMap>(this);
+    connect(watcher, &QFutureWatcher<QVariantMap>::finished, this, [this, watcher, requestId, prune]() {
+        QVariantMap result = watcher->result();
+        result.insert(QStringLiteral("requestId"), requestId);
+        finishWorker();
+        if (prune && result.value(QStringLiteral("ok")).toBool()) Q_EMIT observationsChanged();
+        watcher->deleteLater();
+        Q_EMIT maintenanceFinished(requestId, result);
+    });
+    watcher->setFuture(QtConcurrent::run([key, prune, retention]() {
+        UsageDatabase database;
+        database.setRetentionDays(retention);
+        QVariantMap result;
+        if (!database.init()) result = operationResult(QStringLiteral("failed"), database.errorKey());
+        else result = prune ? database.pruneResult() : database.storageStatus();
+        if (prune) database.saveOperation(QStringLiteral("prune"), result);
+        releaseOperation(key);
+        return result;
+    }));
 }
 
 qint64 UsageDatabase::databaseSize() const

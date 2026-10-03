@@ -1,6 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
+import QtQuick.Window
 import org.kde.plasma.plasmoid
 import QtQuick.Layouts
 import QtQuick.Controls as QQC2
@@ -8,6 +9,7 @@ import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 import com.github.loofi.aiusagemonitor 1.0
 import QtQuick.Dialogs as Dialogs
+import "components" as Components
 import "ConfigPortability.js" as ConfigPortability
 import "DiagnosticsCommands.js" as DiagnosticsCommands
 
@@ -31,6 +33,66 @@ KCM.SimpleKCM {
     readonly property var sourceSnapshot: parseSourceSnapshot()
     property string recoverySelectionMessage: ""
     property string configImportMessage: ""
+    property bool configImportError: false
+    property var importDraft: null
+    property bool retainDraftOnDeparture: false
+    readonly property bool unsavedChanges: importDraft !== null && importDraft.dirty
+    signal configurationChanged()
+
+    Components.ConfigApplyGuard {
+        id: applyGuard
+        window: diagnosticsPage.Window.window
+        onRetryReady: {
+            diagnosticsPage.retainDraftOnDeparture = false;
+            diagnosticsPage.configurationChanged();
+        }
+    }
+
+    function ensureImportDraft() {
+        if (importDraft) return true;
+        if (!Window.window) return false;
+        var host = Window.window.contentItem;
+        var name = "aiUsageConfigurationImportDraft";
+        for (var i = 0; i < host.children.length; ++i) {
+            if (host.children[i].objectName === name) {
+                importDraft = host.children[i];
+                break;
+            }
+        }
+        if (!importDraft)
+            importDraft = ConfigPortability.createImportDraft(host, name);
+        if (importDraft.dirty) {
+            configImportError = importDraft.saveFailed;
+            configImportMessage = i18n("Configuration import is still pending. Retry Apply or discard it.");
+            Qt.callLater(function() { diagnosticsPage.configurationChanged(); });
+        }
+        return importDraft !== null;
+    }
+
+    function discardImport() {
+        if (importDraft) importDraft.discard();
+        retainDraftOnDeparture = false;
+        configImportError = false;
+        configImportMessage = i18n("Configuration import discarded. Saved settings were not changed.");
+    }
+
+    function saveConfig() {
+        if (!importDraft || !importDraft.dirty) return true;
+        var ok = importDraft.apply(budgetPolicyRepository, Plasmoid.configuration);
+        configImportError = !ok;
+        retainDraftOnDeparture = !ok;
+        configImportMessage = ok ? i18n("Configuration and budget policies saved.")
+            : i18n("Configuration was not saved. The budget policy transaction failed. Retry Apply or discard the import.");
+        if (!ok) applyGuard.protectFailedApply();
+        return ok;
+    }
+
+    Component.onCompleted: Qt.callLater(ensureImportDraft)
+    Component.onDestruction: {
+        // Plasma replaces this page after explicit native Discard, or even
+        // after failed Apply. Keep only the latter pending draft in the window.
+        if (importDraft && !retainDraftOnDeparture) importDraft.destroy();
+    }
 
     SecretsManager { id: secrets }
     BrowserSyncService { id: syncDetector }
@@ -109,7 +171,10 @@ KCM.SimpleKCM {
         nameFilters: ["JSON Files (*.json)"]
         currentFile: "ai-usage-monitor-config.json"
         onAccepted: {
-            AppInfo.exportConfig(JSON.stringify(diagnosticsPage.exportConfigData(), null, 2), selectedFile.toString());
+            var ok = AppInfo.exportConfig(JSON.stringify(diagnosticsPage.exportConfigData(), null, 2), selectedFile.toString());
+            diagnosticsPage.configImportError = !ok;
+            diagnosticsPage.configImportMessage = ok ? i18n("Configuration backup saved.")
+                : i18n("The configuration backup could not be written. Check the selected location.");
         }
     }
 
@@ -120,13 +185,16 @@ KCM.SimpleKCM {
         nameFilters: ["JSON Files (*.json)"]
         onAccepted: {
             var jsonStr = AppInfo.importConfig(selectedFile.toString());
-            if (jsonStr.length > 0) {
-                try {
-                    var configData = JSON.parse(jsonStr);
-                    diagnosticsPage.importConfigData(configData);
-                } catch (e) {
-                    console.error("Failed to parse imported config:", e);
-                }
+            if (jsonStr.length === 0) {
+                diagnosticsPage.configImportError = true;
+                diagnosticsPage.configImportMessage = i18n("The configuration file could not be read or is empty.");
+                return;
+            }
+            try {
+                diagnosticsPage.importConfigData(JSON.parse(jsonStr));
+            } catch (error) {
+                diagnosticsPage.configImportError = true;
+                diagnosticsPage.configImportMessage = i18n("The configuration file is not valid JSON.");
             }
         }
     }
@@ -433,6 +501,19 @@ KCM.SimpleKCM {
             Layout.fillWidth: true
         }
 
+        Kirigami.InlineMessage {
+            Layout.fillWidth: true
+            visible: diagnosticsPage.configImportMessage.length > 0
+            text: diagnosticsPage.configImportMessage
+            type: diagnosticsPage.configImportError ? Kirigami.MessageType.Error : Kirigami.MessageType.Information
+        }
+        QQC2.Button {
+            visible: diagnosticsPage.unsavedChanges
+            text: i18n("Discard pending import")
+            icon.name: "edit-undo"
+            onClicked: diagnosticsPage.discardImport()
+        }
+
         RowLayout {
             Kirigami.FormData.label: i18n("Configuration:")
             spacing: Kirigami.Units.smallSpacing
@@ -623,43 +704,35 @@ KCM.SimpleKCM {
     }
 
     function importConfigData(configData) {
-        if (configData.schemaVersion === 2 && configData.settings) {
-            var settings = ConfigPortability.schemaV2Settings(
-                configData, portableConfigKeys);
-            var keys = Object.keys(settings);
-            for (var i = 0; i < keys.length; ++i) {
-                var key = keys[i];
-                Plasmoid.configuration[key] = settings[key];
-            }
-            return;
+        if (!ensureImportDraft()) {
+            configImportError = true;
+            configImportMessage = i18n("The configuration window is not ready. Reopen Settings and retry the import.");
+            return false;
         }
-
-        if (configData.schemaVersion === 3) {
-            var currentSettings = {};
-            for (var currentIndex = 0; currentIndex < portableConfigKeys.length; ++currentIndex) {
-                var currentKey = portableConfigKeys[currentIndex];
-                currentSettings[currentKey] = Plasmoid.configuration[currentKey];
-            }
-            var staged = ConfigPortability.schemaV3Payload(
-                configData, portableConfigKeys, currentSettings);
-            if (!staged.ok) {
-                configImportMessage = staged.error;
-                return false;
-            }
-            if (!budgetPolicyRepository.replacePolicies(staged.budgetPolicies)) {
-                configImportMessage = budgetPolicyRepository.errorString;
-                return false;
-            }
-            var stagedKeys = Object.keys(staged.settings);
-            for (var stagedIndex = 0; stagedIndex < stagedKeys.length; ++stagedIndex) {
-                var stagedKey = stagedKeys[stagedIndex];
-                Plasmoid.configuration[stagedKey] = staged.settings[stagedKey];
-            }
-            configImportMessage = "";
-            return true;
+        var currentSettings = {};
+        for (var i = 0; i < portableConfigKeys.length; ++i) {
+            var key = portableConfigKeys[i];
+            currentSettings[key] = Plasmoid.configuration[key];
         }
-
-        return false;
+        var staged;
+        if (configData && configData.schemaVersion === 2) {
+            var settings = ConfigPortability.schemaV2Settings(configData, portableConfigKeys);
+            staged = ConfigPortability.settingsPayload(settings, portableConfigKeys, currentSettings);
+            if (!configData.settings || typeof configData.settings !== "object"
+                    || Array.isArray(configData.settings)) staged.ok = false;
+        } else {
+            staged = ConfigPortability.schemaV3Payload(configData, portableConfigKeys, currentSettings);
+        }
+        configImportError = !staged.ok;
+        if (!staged.ok) {
+            configImportMessage = i18n("The configuration file failed validation. Saved settings and the pending import were not changed.");
+            return false;
+        }
+        importDraft.stage(staged);
+        retainDraftOnDeparture = false;
+        configImportMessage = i18n("Configuration import prepared. Apply to save it, or discard to keep your saved settings.");
+        configurationChanged();
+        return true;
     }
 
     function enabledProviderCount() {

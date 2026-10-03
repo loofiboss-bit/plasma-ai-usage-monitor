@@ -1,6 +1,8 @@
 #include "budgetpolicymodel.h"
 #include "budgetpolicyrepository.h"
+#include "budgetpolicyschema.h"
 
+#include <QFile>
 #include <QFileInfo>
 #include <QSignalSpy>
 #include <QSqlDatabase>
@@ -33,6 +35,20 @@ private:
                          "VALUES('model-local','project-local')")));
       QVERIFY(query.exec(QStringLiteral("PRAGMA user_version=5")));
       db.close();
+    }
+    QSqlDatabase::removeDatabase(name);
+  }
+
+  static void promoteDeliveryFixtureToV7(const QString &path) {
+    const auto name = QStringLiteral("promote_delivery_fixture");
+    {
+      auto database =
+          QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+      database.setDatabaseName(path);
+      QVERIFY(database.open());
+      QSqlQuery query(database);
+      QVERIFY(query.exec(QStringLiteral("PRAGMA user_version=7")));
+      database.close();
     }
     QSqlDatabase::removeDatabase(name);
   }
@@ -70,6 +86,10 @@ private:
   }
 
 private Q_SLOTS:
+  void deliveryMigrationRollsBackAndRetriesAreBounded();
+  void repeatedUpgradeRefreshesRollbackSnapshot();
+  void channelCooldownAndUnacceptedTimestampAreIndependent();
+  void channelDeliverySurvivesRestartAndIsolatesPolicies();
   void crudDuplicateValidationAndIsolation();
   void legacyMigrationIsIdempotentAndDeletionIsPermanent();
   void replaceIsAtomic();
@@ -700,6 +720,336 @@ void BudgetPolicyRepositoryTest::dndCooldownSnoozeAndFailedDelivery() {
     verify.close();
   }
   QSqlDatabase::removeDatabase(verifyName);
+}
+
+void BudgetPolicyRepositoryTest::
+    channelDeliverySurvivesRestartAndIsolatesPolicies() {
+  QTemporaryDir dir;
+  const auto path = dir.filePath(QStringLiteral("channels.db"));
+  seedV5(path);
+  qint64 eventId = 0;
+  {
+    BudgetPolicyRepository repository;
+    repository.setOwnerId(QStringLiteral("applet:channels"));
+    repository.setDatabasePath(path);
+    QVERIFY(repository.init());
+    promoteDeliveryFixtureToV7(path);
+    const auto policy = repository.createPolicy(validPolicy());
+    QVERIFY(policy.value(QStringLiteral("ok")).toBool());
+    const auto now = QDateTime::currentDateTimeUtc();
+    auto prepared = repository.prepareTransitions(
+        forecast(policy.value(QStringLiteral("policy"))
+                     .toMap()
+                     .value(QStringLiteral("policyId"))
+                     .toString(),
+                 QStringLiteral("warning"), now.addDays(-1), now));
+    QVERIFY(prepared.value(QStringLiteral("ok")).toBool());
+    QCOMPARE(prepared.value(QStringLiteral("events")).toList().size(), 1);
+    eventId = prepared.value(QStringLiteral("events"))
+                  .toList()
+                  .first()
+                  .toMap()
+                  .value(QStringLiteral("eventId"))
+                  .toLongLong();
+    const QStringList channels{QStringLiteral("kde"), QStringLiteral("slack"),
+                               QStringLiteral("discord")};
+    QCOMPARE(repository.prepareChannelDeliveries(eventId, channels, 15).size(),
+             3);
+    QVERIFY(repository.completeChannelDelivery(eventId, QStringLiteral("kde"),
+                                               true, false, {}, 0, 15));
+    QVERIFY(repository.completeChannelDelivery(
+        eventId, QStringLiteral("slack"), false, true,
+        QStringLiteral("rate-limited"), 1200, 15));
+    QVERIFY(repository.completeChannelDelivery(
+        eventId, QStringLiteral("discord"), false, false,
+        QStringLiteral("webhook-rejected"), 0, 15));
+    QVERIFY(
+        repository.prepareChannelDeliveries(eventId, channels, 15).isEmpty());
+    for (const auto &entry : repository.deliveryStatus()) {
+      const auto receipt = entry.toMap();
+      if (receipt.value(QStringLiteral("channel")) == QStringLiteral("slack")) {
+        const auto next =
+            receipt.value(QStringLiteral("nextAttemptAt")).toDateTime();
+        QVERIFY(next >= now.addSecs(1200));
+      }
+    }
+    const auto second = repository.createPolicy(validPolicy());
+    QVERIFY(second.value(QStringLiteral("ok")).toBool());
+    prepared = repository.prepareTransitions(
+        forecast(second.value(QStringLiteral("policy"))
+                     .toMap()
+                     .value(QStringLiteral("policyId"))
+                     .toString(),
+                 QStringLiteral("warning"), now.addDays(-1), now));
+    QVERIFY(prepared.value(QStringLiteral("ok")).toBool());
+    QCOMPARE(prepared.value(QStringLiteral("events")).toList().size(), 1);
+    const auto secondId = prepared.value(QStringLiteral("events"))
+                              .toList()
+                              .first()
+                              .toMap()
+                              .value(QStringLiteral("eventId"))
+                              .toLongLong();
+    QCOMPARE(repository.prepareChannelDeliveries(secondId, channels, 15).size(),
+             3);
+  }
+  BudgetPolicyRepository reopened;
+  reopened.setOwnerId(QStringLiteral("applet:channels"));
+  reopened.setDatabasePath(path);
+  QVERIFY(reopened.init());
+  QVERIFY(reopened
+              .prepareChannelDeliveries(eventId,
+                                        {QStringLiteral("kde"),
+                                         QStringLiteral("slack"),
+                                         QStringLiteral("discord")},
+                                        15)
+              .isEmpty());
+  const auto statuses = reopened.deliveryStatus();
+  bool kdeDelivered = false, slackPending = false;
+  for (const auto &value : statuses) {
+    const auto row = value.toMap();
+    if (row.value(QStringLiteral("eventId")).toLongLong() != eventId)
+      continue;
+    if (row.value(QStringLiteral("channel")) == QStringLiteral("kde"))
+      kdeDelivered =
+          row.value(QStringLiteral("status")) == QStringLiteral("delivered");
+    if (row.value(QStringLiteral("channel")) == QStringLiteral("slack"))
+      slackPending =
+          row.value(QStringLiteral("status")) == QStringLiteral("pending");
+  }
+  QVERIFY(kdeDelivered);
+  QVERIFY(slackPending);
+  // Disabling Slack suppresses its pending retry without resending KDE.
+  QVERIFY(
+      reopened
+          .prepareChannelDeliveries(
+              eventId, {QStringLiteral("kde"), QStringLiteral("discord")}, 15)
+          .isEmpty());
+}
+
+void BudgetPolicyRepositoryTest::
+    deliveryMigrationRollsBackAndRetriesAreBounded() {
+  QTemporaryDir dir;
+  const auto path = dir.filePath(QStringLiteral("migration.db"));
+  seedV5(path);
+  BudgetPolicyRepository repository;
+  repository.setDatabasePath(path);
+  repository.setOwnerId(QStringLiteral("applet:bounded"));
+  QVERIFY(repository.init());
+  const QString name = QStringLiteral("verify_delivery_migration");
+  {
+    auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+    database.setDatabaseName(path);
+    QVERIFY(database.open());
+    QSqlQuery query(database);
+    QVERIFY(query.exec(QStringLiteral("PRAGMA user_version=7")));
+    QString error;
+    QVERIFY(!BudgetPolicySchema::migrateDeliverySchema(database, &error, true));
+    QVERIFY(!database.tables().contains(
+        QStringLiteral("budget_policy_deliveries")));
+    QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")));
+    QVERIFY(query.next());
+    QCOMPARE(query.value(0).toInt(), 7);
+    query.finish();
+    QVERIFY(BudgetPolicySchema::migrateDeliverySchema(database, &error));
+    QVERIFY(query.exec(QStringLiteral("PRAGMA user_version=9")));
+    QVERIFY(!BudgetPolicySchema::migrateDeliverySchema(database, &error));
+    {
+      BudgetPolicyRepository future;
+      future.setDatabasePath(path);
+      future.setOwnerId(QStringLiteral("applet:future"));
+      QVERIFY(!future.init());
+    }
+    QVERIFY(query.exec(QStringLiteral("PRAGMA user_version=8")));
+
+    query.finish();
+    const auto policy = repository.createPolicy(validPolicy());
+    QVERIFY2(policy.value(QStringLiteral("ok")).toBool(),
+             qPrintable(policy.value(QStringLiteral("error")).toString()));
+    const auto now = QDateTime::currentDateTimeUtc();
+    auto prepared = repository.prepareTransitions(
+        forecast(policy.value(QStringLiteral("policy"))
+                     .toMap()
+                     .value(QStringLiteral("policyId"))
+                     .toString(),
+                 QStringLiteral("warning"), now.addDays(-1), now));
+    QVERIFY2(prepared.value(QStringLiteral("ok")).toBool(),
+             qPrintable(prepared.value(QStringLiteral("error")).toString()));
+    QCOMPARE(prepared.value(QStringLiteral("events")).toList().size(), 1);
+    auto id = prepared.value(QStringLiteral("events"))
+                  .toList()
+                  .first()
+                  .toMap()
+                  .value(QStringLiteral("eventId"))
+                  .toLongLong();
+    for (int attempt = 0; attempt < 3; ++attempt) {
+      QCOMPARE(
+          repository.prepareChannelDeliveries(id, {QStringLiteral("slack")}, 15)
+              .size(),
+          1);
+      QVERIFY(repository.completeChannelDelivery(
+          id, QStringLiteral("slack"), false, true,
+          QStringLiteral("server-error"), 0, 15));
+      QVERIFY(query.exec(
+          QStringLiteral("UPDATE budget_policy_deliveries SET "
+                         "next_attempt_at_utc='2000-01-01T00:00:00.000Z'")));
+    }
+    QVERIFY(
+        repository.prepareChannelDeliveries(id, {QStringLiteral("slack")}, 15)
+            .isEmpty());
+    QCOMPARE(repository.deliveryStatus()
+                 .first()
+                 .toMap()
+                 .value(QStringLiteral("attempts"))
+                 .toInt(),
+             3);
+    QCOMPARE(repository.deliveryStatus()
+                 .first()
+                 .toMap()
+                 .value(QStringLiteral("status"))
+                 .toString(),
+             QStringLiteral("failed"));
+    database.close();
+  }
+  QSqlDatabase::removeDatabase(name);
+}
+
+void BudgetPolicyRepositoryTest::
+    channelCooldownAndUnacceptedTimestampAreIndependent() {
+  QTemporaryDir dir;
+  const auto path = dir.filePath(QStringLiteral("cooldowns.db"));
+  seedV5(path);
+  BudgetPolicyRepository repository;
+  repository.setOwnerId(QStringLiteral("applet:cooldown"));
+  repository.setDatabasePath(path);
+  QVERIFY(repository.init());
+  promoteDeliveryFixtureToV7(path);
+  const auto created = repository.createPolicy(validPolicy());
+  QVERIFY(created.value(QStringLiteral("ok")).toBool());
+  const auto policyId = created.value(QStringLiteral("policy"))
+                            .toMap()
+                            .value(QStringLiteral("policyId"))
+                            .toString();
+  const auto now = QDateTime::currentDateTimeUtc();
+  auto prepared = repository.prepareTransitions(
+      forecast(policyId, QStringLiteral("warning"), now.addDays(-1), now));
+  QVERIFY(prepared.value(QStringLiteral("ok")).toBool());
+  QCOMPARE(prepared.value(QStringLiteral("events")).toList().size(), 1);
+  const auto warningId = prepared.value(QStringLiteral("events"))
+                             .toList()
+                             .first()
+                             .toMap()
+                             .value(QStringLiteral("eventId"))
+                             .toLongLong();
+  QCOMPARE(
+      repository
+          .prepareChannelDeliveries(warningId, {QStringLiteral("kde")}, 0, 15)
+          .size(),
+      1);
+  QVERIFY(repository.completeChannelDelivery(warningId, QStringLiteral("kde"),
+                                             true, false, {}, 0, 15));
+  prepared = repository.prepareTransitions(
+      forecast(policyId, QStringLiteral("critical"), now.addDays(-1), now));
+  QVERIFY(prepared.value(QStringLiteral("ok")).toBool());
+  QCOMPARE(prepared.value(QStringLiteral("events")).toList().size(), 1);
+  const auto criticalId = prepared.value(QStringLiteral("events"))
+                              .toList()
+                              .first()
+                              .toMap()
+                              .value(QStringLiteral("eventId"))
+                              .toLongLong();
+  auto due = repository.prepareChannelDeliveries(
+      criticalId, {QStringLiteral("kde"), QStringLiteral("slack")}, 0, 15);
+  QCOMPARE(due.size(), 1);
+  QCOMPARE(due.first().toMap().value(QStringLiteral("channel")).toString(),
+           QStringLiteral("slack"));
+  QVERIFY(repository
+              .prepareChannelDeliveries(criticalId, {QStringLiteral("slack")},
+                                        0, 15)
+              .isEmpty());
+  QVERIFY(repository.completeChannelDelivery(
+      criticalId, QStringLiteral("slack"), false, false,
+      QStringLiteral("webhook-rejected"), 0, 0));
+  const auto name = QStringLiteral("verify_no_unaccepted_timestamp");
+  {
+    auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+    database.setDatabaseName(path);
+    QVERIFY(database.open());
+    QSqlQuery query(database);
+    query.prepare(QStringLiteral("SELECT delivery_status,delivered_at_utc FROM "
+                                 "budget_policy_events WHERE id=?"));
+    query.addBindValue(criticalId);
+    QVERIFY(query.exec() && query.next());
+    QCOMPARE(query.value(0).toString(), QStringLiteral("failed"));
+    QVERIFY(query.value(1).isNull());
+    database.close();
+  }
+  QSqlDatabase::removeDatabase(name);
+}
+
+void BudgetPolicyRepositoryTest::repeatedUpgradeRefreshesRollbackSnapshot() {
+  QTemporaryDir dir;
+  const auto path = dir.filePath(QStringLiteral("reupgrade.db"));
+  const auto backupPath = path + QStringLiteral(".v21-backup");
+  seedV5(path);
+  {
+    BudgetPolicyRepository repository;
+    repository.setOwnerId(QStringLiteral("applet:rollback"));
+    repository.setDatabasePath(path);
+    QVERIFY(repository.init());
+  }
+  promoteDeliveryFixtureToV7(path);
+  const auto name = QStringLiteral("upgrade_rollback_snapshot");
+  {
+    auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+    database.setDatabaseName(path);
+    QVERIFY(database.open());
+    QSqlQuery query(database);
+    QVERIFY(query.exec(QStringLiteral("PRAGMA journal_mode=WAL")));
+    query.finish();
+    QString error;
+    QVERIFY2(BudgetPolicySchema::migrateDeliverySchema(database, &error),
+             qPrintable(error));
+    database.close();
+  }
+  QSqlDatabase::removeDatabase(name);
+  // Restore the v7 backup rather than opening the migrated database with V21.
+  QVERIFY(QFile::remove(path));
+  QVERIFY(QFile::copy(backupPath, path));
+  {
+    auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+    database.setDatabaseName(path);
+    QVERIFY(database.open());
+    QSqlQuery query(database);
+    QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")) && query.next());
+    QCOMPARE(query.value(0).toInt(), 7);
+    query.finish();
+    QVERIFY(query.exec(QStringLiteral("PRAGMA journal_mode=WAL")));
+    query.finish();
+    QVERIFY(query.exec(QStringLiteral(
+        "INSERT INTO preserved(value) VALUES('post-rollback-history')")));
+    QString error;
+    QVERIFY2(BudgetPolicySchema::migrateDeliverySchema(database, &error),
+             qPrintable(error));
+    database.close();
+  }
+  QSqlDatabase::removeDatabase(name);
+  {
+    auto database = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), name);
+    database.setDatabaseName(backupPath);
+    database.setConnectOptions(QStringLiteral("QSQLITE_OPEN_READONLY"));
+    QVERIFY(database.open());
+    QSqlQuery query(database);
+    QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")) && query.next());
+    QCOMPARE(query.value(0).toInt(), 7);
+    QVERIFY(query.exec(QStringLiteral("SELECT COUNT(*) FROM preserved WHERE "
+                                      "value='post-rollback-history'")) &&
+            query.next());
+    QCOMPARE(query.value(0).toInt(), 1);
+    QVERIFY(!database.tables().contains(
+        QStringLiteral("budget_policy_deliveries")));
+    database.close();
+  }
+  QSqlDatabase::removeDatabase(name);
 }
 
 QTEST_MAIN(BudgetPolicyRepositoryTest)

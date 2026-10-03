@@ -5,6 +5,7 @@ import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 import com.github.loofi.aiusagemonitor 1.0
+import "components" as Components
 
 KCM.SimpleKCM {
     id: historyPage
@@ -24,6 +25,17 @@ KCM.SimpleKCM {
         id: historyDb
         enabled: Plasmoid.configuration.historyEnabled
         retentionDays: Plasmoid.configuration.historyRetentionDays
+    }
+
+    Components.HistoryMaintenanceController {
+        id: maintenance
+        database: historyDb
+    }
+    Timer {
+        interval: 30000
+        running: historyPage.visible && !maintenance.busy
+        repeat: true
+        onTriggered: maintenance.refreshStorage()
     }
 
     Kirigami.FormLayout {
@@ -97,17 +109,37 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: i18n("Storage")
         }
 
+        Kirigami.InlineMessage {
+            Layout.fillWidth: true
+            visible: maintenance.storage.status === "failed"
+            type: Kirigami.MessageType.Error
+            text: i18n("History storage could not be opened or inspected. Error: %1", maintenance.storage.errorKey || "")
+            Accessible.name: text
+        }
+        Kirigami.InlineMessage {
+            Layout.fillWidth: true
+            visible: maintenance.busy || !!maintenance.lastResult.status
+            type: maintenance.lastResult.status === "failed" ? Kirigami.MessageType.Error
+                : maintenance.lastResult.status === "partial" ? Kirigami.MessageType.Warning : Kirigami.MessageType.Information
+            text: maintenance.busy ? i18n("History operation in progress…")
+                : historyPage.operationText(maintenance.lastResult)
+            Accessible.name: text
+        }
+
         // Database size
         QQC2.Label {
             Kirigami.FormData.label: i18n("Database size:")
-            text: historyPage.formatBytes(historyDb.databaseSize())
+            text: maintenance.storageAvailable
+                ? i18n("%1 database + %2 WAL", historyPage.formatBytes(maintenance.storage.databaseBytes), historyPage.formatBytes(maintenance.storage.walBytes))
+                : i18n("Unavailable")
         }
 
         // Providers with data
         QQC2.Label {
             Kirigami.FormData.label: i18n("Providers tracked:")
             text: {
-                var providers = historyDb.getProviders();
+                if (!maintenance.storageAvailable) return i18n("Unavailable");
+                var providers = maintenance.storage.sources || [];
                 return providers.length > 0 ? providers.join(", ") : i18n("None");
             }
             wrapMode: Text.WordWrap
@@ -119,21 +151,17 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: i18n("Maintenance:")
             text: i18n("Prune Old Data Now")
             icon.name: "edit-clear-history"
-            enabled: historySwitch.checked
-            onClicked: {
-                historyDb.pruneOldData();
-                // Force refresh of displayed size
-                dbSizeRefreshTimer.restart();
-            }
+            enabled: maintenance.storageAvailable && !maintenance.busy
+            onClicked: maintenance.prune()
         }
 
-        // Invisible timer to refresh the db size after pruning
-        Timer {
-            id: dbSizeRefreshTimer
-            interval: 500
-            repeat: false
-            // Trigger a binding re-evaluation by toggling a dummy property
-            onTriggered: historyPage.forceActiveFocus()
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Last scheduled export:")
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: maintenance.storage.lastScheduledExport
+                ? historyPage.operationText(maintenance.storage.lastScheduledExport)
+                : i18n("No completed scheduled export")
         }
 
         Kirigami.Separator {
@@ -242,7 +270,7 @@ KCM.SimpleKCM {
 
         QQC2.Button {
             Kirigami.FormData.label: i18n("Export now:")
-            enabled: autoExportDirectoryField.text.length > 0
+            enabled: autoExportDirectoryField.text.trim().length > 0 && !maintenance.busy
             text: i18n("Write Export Files")
             onClicked: {
                 var formats = ["json", "csv"];
@@ -251,9 +279,22 @@ KCM.SimpleKCM {
                 } else if (historyPage.cfg_autoExportFormat === "csv") {
                     formats = ["csv"];
                 }
-                historyDb.requestExportAll("manual-" + Date.now(), autoExportDirectoryField.text, formats);
+                maintenance.exportFiles(autoExportDirectoryField.text, formats);
             }
         }
+    }
+
+    function operationText(result) {
+        if (result.status === "failed")
+            return i18n("Operation failed. Error: %1", result.errorKey || "");
+        if (result.rowsDeleted !== undefined)
+            return i18n("Removed %1 expired rows. Storage statistics are up to date.", result.rowsDeleted);
+        var paths = result.paths || [];
+        var summary = result.status === "partial"
+            ? i18n("Export partially completed: %1 of %2 files.", paths.length, result.expectedFiles || 0)
+            : i18n("Export completed: %1 files.", paths.length);
+        return summary + "\n" + paths.join("\n")
+            + (result.completedAtUtc ? "\n" + result.completedAtUtc : "");
     }
 
     function formatBytes(bytes) {

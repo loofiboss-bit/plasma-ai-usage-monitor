@@ -6,13 +6,14 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-The **21.0.1 release (Codex sign-in diagnostics)** shows `Run codex login` when
-local Codex quota sync is rejected with HTTP 401 or 403. Automatic retry remains
-paused until credentials change, and explicitly selected Browser Sync keeps its
-fallback. The Source Health & Data Quality behavior from 21.0.0 remains in place.
-Get it from [GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v21.0.1),
-[Fedora COPR](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/),
+The **22.0.0 release (Reliable Everyday Control)** makes configuration restore,
+local activity watching, history maintenance and budget-alert delivery reliable.
+The release targets [GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v22.0.0),
+[Fedora COPR](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/)
 and the [KDE Store](https://store.kde.org/p/2353976/).
+See the [V22 qualification checklist](docs/release/v22.0.0-checklist.md) for
+verification evidence and publication status. Screenshots below show V22 in
+isolated demo fixtures; physical keyboard and screen-reader qualification remain unverified.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 

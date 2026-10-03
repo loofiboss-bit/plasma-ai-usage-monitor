@@ -215,7 +215,7 @@ void UsageDatabaseExtendedTest::testRealLegacyFixtureMigration()
         QVERIFY(check.open());
         QSqlQuery query(check);
         QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")) && query.next());
-        QCOMPARE(query.value(0).toInt(), 7);
+        QCOMPARE(query.value(0).toInt(), 8);
         query.prepare(QStringLiteral("SELECT COUNT(*), MIN(source) FROM observations WHERE provider=? AND metric_kind='cost'"));
         query.addBindValue(provider);
         QVERIFY(query.exec() && query.next());
@@ -310,7 +310,7 @@ void UsageDatabaseExtendedTest::testObservationSchemaV4AndCurrencyIsolation()
         QSqlQuery query(check);
         QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")));
         QVERIFY(query.next());
-        QCOMPARE(query.value(0).toInt(), 7);
+        QCOMPARE(query.value(0).toInt(), 8);
 
         QVERIFY(query.exec(QStringLiteral("PRAGMA table_info(observations)")));
         bool nullableValue = false;
@@ -413,7 +413,7 @@ void UsageDatabaseExtendedTest::testSchemaV5MigrationRollbackAndRecovery()
         QVERIFY(db.open());
         QSqlQuery query(db);
         QVERIFY(query.exec(QStringLiteral("PRAGMA user_version")) && query.next());
-        QCOMPARE(query.value(0).toInt(), 7);
+        QCOMPARE(query.value(0).toInt(), 8);
         QVERIFY(query.exec(QStringLiteral("SELECT COUNT(*) FROM observations")) && query.next());
         QCOMPARE(query.value(0).toInt(), 1);
         db.close();
@@ -492,13 +492,13 @@ void UsageDatabaseExtendedTest::testGuardrailEventExportAndRetention()
     QVERIFY(db.recordGuardrailTransition(forecast.toVariantMap(), QStringLiteral("critical")));
 
     const QString exportDir = tmp.path() + QStringLiteral("/guardrail-export");
-    const QStringList exports = db.exportAllToDirectory(exportDir, { QStringLiteral("json"), QStringLiteral("csv") });
-    QCOMPARE(exports.size(), 5);
+    const QStringList exports = db.exportAllToDirectory(exportDir, { QStringLiteral("json"), QStringLiteral("csv") }).value(QStringLiteral("paths")).toStringList();
+    QCOMPARE(exports.size(), 6);
     const QString jsonPath = exports.filter(QRegularExpression(QStringLiteral("\\.json$"))).value(0);
     QFile jsonFile(jsonPath);
     QVERIFY(jsonFile.open(QIODevice::ReadOnly));
     const QJsonObject root = QJsonDocument::fromJson(jsonFile.readAll()).object();
-    QCOMPARE(root.value(QStringLiteral("schemaVersion")).toInt(), 6);
+    QCOMPARE(root.value(QStringLiteral("schemaVersion")).toInt(), 7);
     QCOMPARE(root.value(QStringLiteral("guardrailEvents")).toArray().size(), 2);
     const QString guardrailCsv
         = exports.filter(QRegularExpression(QStringLiteral("guardrail-events-.*\\.csv$"))).value(0);
@@ -584,8 +584,8 @@ void UsageDatabaseExtendedTest::testNullableTypedMetricPersistence()
     QSqlDatabase::removeDatabase(connectionName);
 
     const QString exportDir = tmp.path() + QStringLiteral("/typed-export");
-    const QStringList exports = db.exportAllToDirectory(exportDir, {QStringLiteral("json"), QStringLiteral("csv")});
-    QCOMPARE(exports.size(), 5); // combined JSON plus four typed CSV files
+    const QStringList exports = db.exportAllToDirectory(exportDir, {QStringLiteral("json"), QStringLiteral("csv")}).value(QStringLiteral("paths")).toStringList();
+    QCOMPARE(exports.size(), 6); // combined JSON plus four typed CSV files
     const QString jsonPath = exports.filter(QRegularExpression(QStringLiteral("\\.json$"))).value(0);
     QFile jsonFile(jsonPath);
     QVERIFY(jsonFile.open(QIODevice::ReadOnly));

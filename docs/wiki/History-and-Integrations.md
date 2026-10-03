@@ -57,7 +57,11 @@ The database is stored at:
 ~/.local/share/plasma-ai-usage-monitor/usage_history.db
 ~~~
 
-Use the History settings page to inspect its size or prune rows older than the retention period.
+Use **Settings → History** to inspect database and WAL-file size separately
+or prune rows older than the retention period. These operations run in the
+background. The page reports how many rows were removed and refreshes storage
+statistics when pruning finishes. A database-open or migration failure appears
+as an error rather than an empty history or `0 B`.
 
 ## JSON and CSV export
 
@@ -65,20 +69,38 @@ The popup's **Export file** action writes the selected series as JSON or CSV.
 Copying CSV to the clipboard is available as a separate secondary action.
 History settings can also write JSON or CSV on a schedule.
 
-Choose a directory you own. Scheduled export writes atomically so a partial run does not replace the last complete file.
+Choose a directory you own. **Settings → History → Write Export Files** reports
+progress, the written paths, complete or partial success, and failures. Repeated
+clicks cannot overlap an active export. **Last scheduled export** shows the last
+completed scheduled result. Each file is written atomically; a partially
+successful batch reports the files actually written.
 
-Schema-v6 exports contain usage observations, source metadata, legacy guardrail
-transitions and policy transition evidence. They do not contain API keys,
-browser cookies, personal access tokens or webhook URLs. Explicit local history
-exports can contain raw provider scope identifiers, so review them before
-sharing.
+Full-history JSON uses export schema v7, independently of SQLite schema v8.
+It includes observations, metadata, legacy guardrail transitions, policy
+transitions, and per-channel delivery status. CSV writes policy/channel evidence
+in a separate `ai-usage-policy-events-*.csv` alongside the other history files.
+The popup's selected-series JSON retains schema v6 and does not represent a
+full-history backup.
+
+Full-history exports use explicit field lists and omit API keys, cookies,
+personal access tokens, webhook URLs, raw scope identities, policy identifiers. Values and source names can still reveal
+usage patterns, so review any export before sharing.
 
 ## Configuration backup
 
 Open **Settings → Diagnostics** to export or import non-secret settings. Schema
 v3 includes settings and the current applet's policies; schema v2 remains a
-settings-only import. All objects are validated before Apply and policy
-replacement is atomic.
+settings-only import. File selection validates the objects and prepares a
+transient draft; it does not write settings or policies. Choose **Apply** to
+save, or **Discard pending import** to retain your current saved values.
+
+Changing settings pages prompts for Apply, Discard or Cancel. Applying replaces
+policies in one transaction before changing applet settings. A policy-save
+failure changes neither saved store, keeps the draft available for retry, and
+prevents native OK from immediately closing the failed operation. Returning to
+Diagnostics after a failed page-switch Apply restores the pending draft within
+the same settings window. Closing or discarding the window releases its
+transient payload.
 
 Policy scope identities can appear in an explicit schema-v3 backup because they
 are needed for exact restore. Treat the file as sensitive and do not attach it
@@ -160,10 +182,19 @@ Webhook URLs are stored in KWallet. Alerts can contain provider names, status, a
 
 Policy alerts are configured per policy under **Settings → Budget Control**.
 They fire only for warning, critical, exceeded, real recovery and period reset.
-Schema-v6 state/events persist before delivery and suppress the same transition
-after refresh or restart. DND, cooldown and failed delivery remain pending or
-suppressed rather than disappearing. Raw model, project, workspace, line-item,
-policy and API-key identifiers are not sent.
+Policy state/events persist before delivery and suppress the same transition
+after refresh or restart. SQLite schema v8 records KDE, Slack and Discord
+separately. **Settings → Alerts → Recent budget delivery** shows accepted,
+sending, retry-pending, suppressed and action-required states.
+
+KDE acceptance means submitted to the desktop notification system. Webhook
+acceptance means HTTP 2xx from Slack or Discord. Neither proves that a person
+read the message. A failed channel does not resend a channel already accepted.
+Network failures, timeouts, HTTP 429 and server errors allow at most three
+attempts per event/channel, with cooldown and Retry-After. Invalid URLs or
+rejected credentials require configuration repair. Disabled channels and
+outdated events are suppressed with a reason. Raw model, project, workspace,
+line-item, policy and API-key identifiers are not sent.
 
 ## Alert tuning
 

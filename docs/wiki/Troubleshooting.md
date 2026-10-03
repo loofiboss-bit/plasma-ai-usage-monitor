@@ -122,6 +122,12 @@ after refresh and restart. Risk becoming unavailable is not a recovery, and
 unavailable becoming safe is not a recovery. DND/cooldown/delivery failures
 retain pending or suppressed evidence for retry.
 
+Open **Settings → Alerts → Recent budget delivery** for per-channel outcomes.
+Accepted KDE delivery means submitted to the desktop system; accepted webhooks
+mean HTTP 2xx, not that someone read the message. Retry pending includes the
+next allowed attempt. After three attempts or a permanent URL/credential error,
+repair the destination configuration instead of expecting unlimited retries.
+
 ## Codex local quota says `Run codex login`
 
 Run `codex login` in a terminal and finish sign-in, then refresh the Codex
@@ -169,3 +175,40 @@ rpm -q plasma-ai-usage-monitor
 ~~~
 
 Attach the native **Copy support report** output and the smallest relevant log excerpt to the GitHub issue. The report includes install, database, and source-readiness state without credentials or identifying endpoint details.
+
+## Configuration import did not apply
+
+File selection only prepares an import. Read its status under **Settings →
+Diagnostics**, then choose Apply. Invalid JSON, unsupported settings/types or
+invalid policies leave saved values and any earlier pending draft unchanged.
+
+If policy storage fails, the applet settings are not changed. Native OK keeps
+the failed operation open; retry Apply after repairing storage or choose
+**Discard pending import**. A failed page-switch Apply retains its draft in the
+same settings window; reopen Diagnostics to retry. Schema-v2 imports restore
+settings only and do not replace budget policies.
+
+## History maintenance or export failed
+
+Read the error and operation status in **Settings → History**. Check that the
+local database and selected export directory are writable. Storage includes the
+main database and WAL file separately; a failure is not a zero-size database.
+A partial export lists only successfully written files. The latest completed
+scheduled export result is shown on the same page. Avoid repeated export
+requests while an operation is busy.
+
+SQLite v8 is a V22 database. Do not start V21 against it. For rollback, preserve
+the current database and use a separate isolated copy of the pre-migration
+`usage_history.db.v21-backup`; see the [configuration reference](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/blob/main/docs/configuration-reference.md#rollback).
+
+## Local activity is waiting or incomplete
+
+Detected tools establish a baseline before counting new activity. Existing
+files do not become fresh usage when watching starts or is re-enabled. Use the
+tool and wait for its new activity; filesystem activity remains an estimate.
+
+Scans run outside the UI thread and are limited to 4,000 entries per watched
+root. An incomplete-watch source-health warning means that limit was reached or a
+watch could not be installed. It is a source-health warning, not proof of zero
+usage. Check path access and avoid relying on a partial estimate as provider
+quota or billing truth.

@@ -112,4 +112,31 @@ TestCase {
         }, activeKeys, {});
         verify(!unknownSetting.ok);
     }
+    function test_legacyTypesAreValidatedBeforeStaging() {
+        var settings = ConfigPortability.schemaV2Settings({ schemaVersion: 2,
+            settings: { refreshInterval: "600", unknownFutureKey: true } }, activeKeys);
+        verify(!ConfigPortability.settingsPayload(settings, activeKeys,
+            { refreshInterval: 300 }).ok);
+        verify(!ConfigPortability.settingsPayload({ refreshInterval: 0.5 }, activeKeys,
+            { refreshInterval: 300 }).ok);
+    }
+
+    function test_duplicatePoliciesAreRejected() {
+        var policy = validPolicy();
+        verify(!ConfigPortability.schemaV3Payload({ schemaVersion: 3,
+            settings: {}, budgetPolicies: [policy, policy] }, activeKeys, {}).ok);
+    }
+
+    function test_settingRangesEnumsAndThresholdOrder() {
+        var current = {warningThreshold: 80, criticalThreshold: 95, prometheusPort: 9464, autoExportFormat: "both"};
+        var keys = Object.keys(current);
+        var invalid = [{warningThreshold: -1}, {criticalThreshold: 101}, {prometheusPort: 1},
+                       {autoExportFormat: "unknown"}, {warningThreshold: 95, criticalThreshold: 90}];
+        for (var i = 0; i < invalid.length; ++i) {
+            verify(!ConfigPortability.settingsPayload(invalid[i], keys, current).ok);
+            verify(!ConfigPortability.schemaV3Payload({schemaVersion: 3, settings: invalid[i], budgetPolicies: []}, keys, current).ok);
+        }
+        verify(ConfigPortability.settingsPayload({warningThreshold: 85, prometheusPort: 1024}, keys, current).ok);
+    }
+
 }

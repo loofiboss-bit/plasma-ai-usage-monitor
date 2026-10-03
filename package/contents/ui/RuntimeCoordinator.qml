@@ -715,7 +715,7 @@ Item {
         id: initialPruneTimer
         interval: 2000
         repeat: false
-        onTriggered: runtime.usageDatabase.pruneOldData()
+        onTriggered: runtime.usageDatabase.requestPrune("startup-prune-" + Date.now())
     }
 
     Timer {

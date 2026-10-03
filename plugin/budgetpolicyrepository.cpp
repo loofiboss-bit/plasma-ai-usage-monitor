@@ -104,6 +104,23 @@ bool BudgetPolicyRepository::ensureOpen() {
   QSqlQuery pragma(m_database);
   pragma.exec(QStringLiteral("PRAGMA foreign_keys=ON"));
   QString error;
+  QSqlQuery version(m_database);
+  if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next()) {
+    setError(QStringLiteral("Unable to read database schema"));
+    m_database.close();
+    return false;
+  }
+  const int schemaVersion = version.value(0).toInt();
+  version.finish();
+  if (schemaVersion > 8 ||
+      (schemaVersion == 8 &&
+       !BudgetPolicySchema::migrateDeliverySchema(m_database, &error))) {
+    setError(error.isEmpty()
+                 ? QStringLiteral("Unsupported future database schema")
+                 : error);
+    m_database.close();
+    return false;
+  }
   const bool inject = qEnvironmentVariableIntValue(
                           "PLASMA_AI_MONITOR_INJECT_SCHEMA_V6_FAILURE") != 0;
   if (!BudgetPolicySchema::migrate(m_database, &error, inject)) {
@@ -913,6 +930,35 @@ BudgetPolicyRepository::prepareTransitions(const QVariantMap &forecast,
     }
   }
 
+  QSqlQuery staleEvents(m_database);
+  staleEvents.prepare(QStringLiteral(
+      "UPDATE budget_policy_events SET "
+      "delivery_status='suppressed',reason_key='stale-event' WHERE policy_id=? "
+      "AND delivery_status='pending' AND period_start_utc<>?"));
+  staleEvents.addBindValue(policyId);
+  staleEvents.addBindValue(startText);
+  if (!staleEvents.exec()) {
+    m_database.rollback();
+    return {{QStringLiteral("ok"), false}};
+  }
+  // Keep channel suppression in step with the persisted transition lifecycle.
+  if (m_database.tables().contains(
+          QStringLiteral("budget_policy_deliveries"))) {
+    QSqlQuery suppressChannels(m_database);
+    suppressChannels.prepare(QStringLiteral(
+        "UPDATE budget_policy_deliveries SET "
+        "status='suppressed',reason_key=(SELECT reason_key FROM "
+        "budget_policy_events WHERE id=event_id) WHERE status "
+        "IN('pending','in_flight') AND event_id IN(SELECT e.id FROM "
+        "budget_policy_events e JOIN budget_policies p USING(policy_id) WHERE "
+        "p.owner_id=? AND e.delivery_status='suppressed')"));
+    suppressChannels.addBindValue(m_ownerId);
+    if (!suppressChannels.exec()) {
+      m_database.rollback();
+      return {{QStringLiteral("ok"), false}};
+    }
+  }
+
   if (!m_database.commit()) {
     setError(m_database.lastError().text());
     m_database.rollback();
@@ -984,4 +1030,230 @@ QDateTime BudgetPolicyRepository::lastDeliveredAt(const QString &policyId) {
       QDateTime::fromString(query.value(0).toString(), Qt::ISODateWithMs);
   setError({});
   return deliveredAt.toUTC();
+}
+
+QVariantList BudgetPolicyRepository::prepareChannelDeliveries(
+    qint64 eventId, const QStringList &enabledChannels, int cooldownMinutes,
+    int desktopCooldownMinutes) {
+  QString error;
+  if (!ensureOpen() ||
+      !BudgetPolicySchema::migrateDeliverySchema(m_database, &error)) {
+    setError(error);
+    return {};
+  }
+  const QString now =
+      QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+  if (!m_database.transaction())
+    return {};
+  auto fail = [&]() {
+    m_database.rollback();
+    return QVariantList{};
+  };
+  QSqlQuery event(m_database);
+  event.prepare(QStringLiteral(
+      "SELECT e.delivery_status,e.period_end_utc FROM budget_policy_events e "
+      "JOIN budget_policies p USING(policy_id) WHERE e.id=? AND p.owner_id=?"));
+  event.addBindValue(eventId);
+  event.addBindValue(m_ownerId);
+  if (!event.exec() || !event.next())
+    return fail();
+  const bool stale =
+      event.value(0).toString() != QLatin1String("pending") ||
+      QDateTime::fromString(event.value(1).toString(), Qt::ISODateWithMs) <=
+          QDateTime::currentDateTimeUtc();
+  event.finish();
+  QSqlQuery count(m_database);
+  count.prepare(QStringLiteral(
+      "SELECT COUNT(*) FROM budget_policy_deliveries WHERE event_id=?"));
+  count.addBindValue(eventId);
+  if (!count.exec() || !count.next())
+    return fail();
+  const bool snapshot = count.value(0).toInt() == 0;
+  count.finish();
+  if (snapshot && !stale) {
+    for (const QString &channel : enabledChannels) {
+      if (!QStringList{QStringLiteral("kde"), QStringLiteral("slack"),
+                       QStringLiteral("discord")}
+               .contains(channel))
+        continue;
+      QSqlQuery insert(m_database);
+      insert.prepare(QStringLiteral("INSERT OR IGNORE INTO "
+                                    "budget_policy_deliveries(event_id,channel,"
+                                    "status) VALUES(?,?,'pending')"));
+      insert.addBindValue(eventId);
+      insert.addBindValue(channel);
+      if (!insert.exec())
+        return fail();
+    }
+  }
+  QSqlQuery rows(m_database);
+  rows.prepare(
+      QStringLiteral("SELECT channel,status,attempts,next_attempt_at_utc FROM "
+                     "budget_policy_deliveries WHERE event_id=?"));
+  rows.addBindValue(eventId);
+  if (!rows.exec())
+    return fail();
+  QVariantList values;
+  while (rows.next())
+    values.append(QVariantMap{{QStringLiteral("channel"), rows.value(0)},
+                              {QStringLiteral("status"), rows.value(1)},
+                              {QStringLiteral("attempts"), rows.value(2)},
+                              {QStringLiteral("next"), rows.value(3)}});
+  rows.finish();
+  QVariantList due;
+  for (const auto &value : values) {
+    const auto row = value.toMap();
+    const auto channel = row.value(QStringLiteral("channel")).toString();
+    const int channelCooldown =
+        channel == QLatin1String("kde") && desktopCooldownMinutes >= 0
+            ? desktopCooldownMinutes
+            : cooldownMinutes;
+    const auto status = row.value(QStringLiteral("status")).toString();
+    if (status == QLatin1String("delivered") ||
+        status == QLatin1String("failed") ||
+        status == QLatin1String("suppressed"))
+      continue;
+    QSqlQuery update(m_database);
+    if (stale || !enabledChannels.contains(channel)) {
+      update.prepare(QStringLiteral(
+          "UPDATE budget_policy_deliveries SET "
+          "status='suppressed',reason_key=? WHERE event_id=? AND channel=?"));
+      update.addBindValue(stale ? QStringLiteral("stale-event")
+                                : QStringLiteral("channel-disabled"));
+    } else {
+      const auto next = QDateTime::fromString(
+          row.value(QStringLiteral("next")).toString(), Qt::ISODateWithMs);
+      if (next.isValid() && next > QDateTime::currentDateTimeUtc())
+        continue;
+      if (row.value(QStringLiteral("attempts")).toInt() == 0) {
+        QSqlQuery recent(m_database);
+        recent.prepare(QStringLiteral(
+            "SELECT MAX(d.delivered_at_utc) FROM budget_policy_deliveries d "
+            "JOIN budget_policy_events e ON e.id=d.event_id WHERE "
+            "e.policy_id=(SELECT policy_id FROM budget_policy_events WHERE "
+            "id=?) AND d.channel=?"));
+        recent.addBindValue(eventId);
+        recent.addBindValue(channel);
+        if (!recent.exec() || !recent.next())
+          return fail();
+        const auto last = QDateTime::fromString(recent.value(0).toString(),
+                                                Qt::ISODateWithMs);
+        if (last.isValid() && last.secsTo(QDateTime::currentDateTimeUtc()) <
+                                  qMax(0, channelCooldown) * 60)
+          continue;
+      }
+      if (row.value(QStringLiteral("attempts")).toInt() >= 3) {
+        update.prepare(
+            QStringLiteral("UPDATE budget_policy_deliveries SET "
+                           "status='failed',reason_key='attempts-exhausted' "
+                           "WHERE event_id=? AND channel=?"));
+      } else {
+        update.prepare(
+            QStringLiteral("UPDATE budget_policy_deliveries SET "
+                           "status='in_flight',attempts=attempts+1,next_"
+                           "attempt_at_utc=? WHERE event_id=? AND channel=?"));
+        update.addBindValue(QDateTime::currentDateTimeUtc()
+                                .addSecs(qMax(60, channelCooldown * 60) + 15)
+                                .toString(Qt::ISODateWithMs));
+        due.append(QVariantMap{{QStringLiteral("eventId"), eventId},
+                               {QStringLiteral("channel"), channel}});
+      }
+    }
+    update.addBindValue(eventId);
+    update.addBindValue(channel);
+    if (!update.exec())
+      return fail();
+  }
+  QSqlQuery aggregate(m_database);
+  aggregate.prepare(QStringLiteral(
+      "UPDATE budget_policy_events SET delivery_status=CASE WHEN EXISTS(SELECT "
+      "1 FROM budget_policy_deliveries WHERE event_id=? AND status='failed') "
+      "THEN 'failed' WHEN EXISTS(SELECT 1 FROM budget_policy_deliveries WHERE "
+      "event_id=? AND status='delivered') THEN 'delivered' ELSE 'suppressed' "
+      "END,delivered_at_utc=(SELECT MAX(delivered_at_utc) FROM "
+      "budget_policy_deliveries WHERE event_id=?) WHERE id=? AND "
+      "delivery_status='pending' AND NOT EXISTS(SELECT 1 FROM "
+      "budget_policy_deliveries WHERE event_id=? AND status "
+      "IN('pending','in_flight'))"));
+  for (int i = 0; i < 5; ++i)
+    aggregate.addBindValue(eventId);
+  if (!aggregate.exec())
+    return fail();
+  if (!m_database.commit())
+    return fail();
+  Q_UNUSED(now)
+  return due;
+}
+
+bool BudgetPolicyRepository::completeChannelDelivery(
+    qint64 eventId, const QString &channel, bool accepted, bool retryable,
+    const QString &reasonKey, int retryAfterSeconds, int cooldownMinutes) {
+  if (!ensureOpen() || !m_database.transaction())
+    return false;
+  QSqlQuery query(m_database);
+  query.prepare(QStringLiteral(
+      "UPDATE budget_policy_deliveries SET status=CASE WHEN ? THEN 'delivered' "
+      "WHEN ? AND attempts<3 THEN 'pending' ELSE 'failed' "
+      "END,reason_key=?,delivered_at_utc=?,next_attempt_at_utc=? WHERE "
+      "event_id=? AND channel=? AND status='in_flight' AND event_id IN(SELECT "
+      "e.id FROM budget_policy_events e JOIN budget_policies p "
+      "USING(policy_id) WHERE p.owner_id=?)"));
+  const auto now = QDateTime::currentDateTimeUtc();
+  query.addBindValue(accepted);
+  query.addBindValue(retryable);
+  query.addBindValue(accepted ? QStringLiteral("") : reasonKey);
+  query.addBindValue(accepted ? QVariant(now.toString(Qt::ISODateWithMs))
+                              : QVariant());
+  query.addBindValue(now.addSecs(qMax(qMax(60, cooldownMinutes * 60),
+                                      qMax(0, retryAfterSeconds)))
+                         .toString(Qt::ISODateWithMs));
+  query.addBindValue(eventId);
+  query.addBindValue(channel);
+  query.addBindValue(m_ownerId);
+  if (!query.exec() || query.numRowsAffected() != 1) {
+    m_database.rollback();
+    return false;
+  }
+  query.prepare(QStringLiteral(
+      "UPDATE budget_policy_events SET delivery_status=CASE WHEN EXISTS(SELECT "
+      "1 FROM budget_policy_deliveries WHERE event_id=? AND status='failed') "
+      "THEN 'failed' ELSE 'delivered' END,delivered_at_utc=(SELECT "
+      "MAX(delivered_at_utc) FROM budget_policy_deliveries WHERE event_id=?) "
+      "WHERE id=? AND "
+      "delivery_status='pending' AND NOT EXISTS(SELECT 1 FROM "
+      "budget_policy_deliveries WHERE event_id=? AND status "
+      "IN('pending','in_flight'))"));
+  query.addBindValue(eventId);
+  query.addBindValue(eventId);
+  query.addBindValue(eventId);
+  query.addBindValue(eventId);
+  if (!query.exec() || !m_database.commit()) {
+    m_database.rollback();
+    return false;
+  }
+  return true;
+}
+
+QVariantList BudgetPolicyRepository::deliveryStatus() {
+  if (!ensureOpen())
+    return {};
+  QSqlQuery query(m_database);
+  query.prepare(QStringLiteral(
+      "SELECT "
+      "d.event_id,d.channel,d.status,d.attempts,d.next_attempt_at_utc,d.reason_"
+      "key FROM budget_policy_deliveries d JOIN budget_policy_events e ON "
+      "e.id=d.event_id JOIN budget_policies p USING(policy_id) WHERE "
+      "p.owner_id=? ORDER BY e.id DESC LIMIT 30"));
+  query.addBindValue(m_ownerId);
+  if (!query.exec())
+    return {};
+  QVariantList result;
+  while (query.next())
+    result.append(QVariantMap{{QStringLiteral("eventId"), query.value(0)},
+                              {QStringLiteral("channel"), query.value(1)},
+                              {QStringLiteral("status"), query.value(2)},
+                              {QStringLiteral("attempts"), query.value(3)},
+                              {QStringLiteral("nextAttemptAt"), query.value(4)},
+                              {QStringLiteral("reasonKey"), query.value(5)}});
+  return result;
 }

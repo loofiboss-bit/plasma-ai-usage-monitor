@@ -84,7 +84,7 @@ TestCase {
 
     QtObject {
         id: noOpDatabase
-        function pruneOldData() {}
+        function requestPrune(requestId) {}
         function requestExportAll(requestId, directory, formats) {}
     }
 

@@ -9,6 +9,8 @@ constexpr int Version = 6;
 
 bool migrate(QSqlDatabase &database, QString *error = nullptr,
              bool injectFailure = false);
+bool migrateDeliverySchema(QSqlDatabase &database, QString *error = nullptr,
+                           bool injectFailure = false);
 } // namespace BudgetPolicySchema
 
 #endif

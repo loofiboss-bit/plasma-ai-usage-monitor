@@ -244,7 +244,7 @@ target_include_directories(test_subscription_tools
 )
 
 target_link_libraries(test_subscription_tools
-    PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n
+    PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Concurrent KF6::I18n
 )
 
 add_test(NAME subscription_tools COMMAND test_subscription_tools)
@@ -258,7 +258,7 @@ add_executable(test_codexlocalauth
 )
 target_include_directories(test_codexlocalauth PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
 target_link_libraries(test_codexlocalauth
-    PRIVATE Qt6::Core Qt6::Test Qt6::Network KF6::I18n
+    PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Concurrent KF6::I18n
 )
 add_test(NAME codexlocalauth COMMAND test_codexlocalauth)
 
@@ -542,7 +542,7 @@ target_include_directories(test_subscriptiontoolbackend
 )
 
 target_link_libraries(test_subscriptiontoolbackend
-    PRIVATE Qt6::Core Qt6::Test Qt6::Network
+    PRIVATE Qt6::Core Qt6::Test Qt6::Network Qt6::Concurrent
 )
 
 add_test(NAME subscriptiontoolbackend COMMAND test_subscriptiontoolbackend)
@@ -732,3 +732,8 @@ add_test(NAME no_hardcoded_pricing COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/c
 add_test(NAME non_invasive_monitoring COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_non_invasive_monitoring.py)
 add_test(NAME provider_capability_docs COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_provider_capability_docs.py)
 add_test(NAME config_portability COMMAND python3 ${CMAKE_SOURCE_DIR}/scripts/check_config_portability.py)
+
+add_executable(test_historymaintenance test_historymaintenance.cpp ${TEST_USAGE_DB_SRC})
+target_include_directories(test_historymaintenance PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_historymaintenance PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent)
+add_test(NAME historymaintenance COMMAND test_historymaintenance)

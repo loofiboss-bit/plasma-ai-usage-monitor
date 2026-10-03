@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [22.0.0] — 2026-10-03
+
+### Fixed
+
+- Keep imported settings and budget policies staged until Apply; Cancel keeps
+  saved stores unchanged and policy transaction failure prevents KConfig writes.
+  Failed native OK keeps the configuration window open for retry.
+- Resume active guided verification with a new timeout, return interrupted
+  checks to configuration, and label authenticated local-tool quota as actual.
+- Start Copilot activity watching after configuring its paths; establish fresh
+  baselines, cancel disabled scans, discover sessions, and debounce bounded
+  background scans with incomplete-watch diagnostics.
+- Initialize History settings storage and expose asynchronous database/WAL
+  statistics, pruning row counts, manual export results and scheduled outcomes.
+- Record each policy event's KDE, Slack and Discord outcomes independently.
+  Webhook attempts wait for HTTP 2xx before acceptance; temporary failures use
+  at most three attempts per channel and respect Retry-After.
+
+### Changed
+
+- Migrate SQLite schema v7 to v8 transactionally with a `.v21-backup` for
+  isolated rollback; historical events receive no invented channel receipts.
+- Full-history JSON schema v7 and a separate policy-events CSV include policy
+  transitions and channel status while omitting raw scope identities and
+  policy identifiers. Single-series JSON remains schema v6;
+  configuration backups remain schema v3 with v2 settings-only import.
+
+
 ## [21.0.1] — 2026-09-28
 
 ### Fixed
@@ -1038,6 +1066,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KDE notifications for rate limit warnings
 
 [Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.1...HEAD
+[22.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.1...HEAD
 [21.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.0...v21.0.1
 [21.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v20.1.1...v21.0.0
 [20.1.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v20.1.0...v20.1.1

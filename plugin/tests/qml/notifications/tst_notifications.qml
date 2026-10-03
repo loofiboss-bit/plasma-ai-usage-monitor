@@ -126,16 +126,17 @@ TestCase {
             };
             return { ok: true, events: [pendingEvent] };
         }
-        function markEventDelivered(eventId) {
-            sequence.push("delivered");
-            pendingEvent.status = "delivered";
+        function prepareChannelDeliveries(eventId, channels, cooldown) {
+            if (pendingEvent.retryDeferred) return [];
+            return [{eventId: eventId, channel: "kde"}];
+        }
+        function completeChannelDelivery(eventId, channel, accepted, retryable, reasonKey, retryAfter, cooldown) {
+            sequence.push(accepted ? "delivered" : "pending");
+            pendingEvent.status = accepted ? "delivered" : "pending";
+            pendingEvent.retryDeferred = !accepted;
             return true;
         }
-        function markEventFailed(eventId, reasonKey) {
-            sequence.push("failed");
-            pendingEvent.status = "failed";
-            return true;
-        }
+
     }
 
     Component {
@@ -537,14 +538,14 @@ TestCase {
         compare(notificationSpy.count, 1);
     }
 
-    function test_budgetPolicyFailedDeliveryIsPersistedAndTerminal() {
+    function test_budgetPolicyFailedDeliveryIsPersistedAndDeferred() {
         controller.injectDeliveryFailure = true;
         verify(!controller.processGuardrail(budgetPolicyForecast("exceeded", {
             consumedPercent: 125
         })));
         compare(fakeBudgetPolicyRepository.sequence.join(","),
-                "persist,notify,failed");
-        compare(fakeBudgetPolicyRepository.pendingEvent.status, "failed");
+                "persist,notify,pending");
+        compare(fakeBudgetPolicyRepository.pendingEvent.status, "pending");
         compare(notificationSpy.count, 1);
         verify(!controller.processGuardrail(budgetPolicyForecast("exceeded", {
             consumedPercent: 125

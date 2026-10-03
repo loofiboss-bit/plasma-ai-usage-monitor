@@ -2,20 +2,57 @@
 
 #include <QDir>
 #include <QFile>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QSignalSpy>
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTemporaryDir>
+#include <QTimer>
 
 #include "awssigv4signer.h"
 #include "localmetricsserver.h"
 #include "usagedatabase.h"
 #include "webhooknotifier.h"
 
+class TestWebhookReply : public QNetworkReply {
+public:
+  TestWebhookReply(int status, QObject *parent) : QNetworkReply(parent) {
+    open(QIODevice::ReadOnly);
+    setAttribute(QNetworkRequest::HttpStatusCodeAttribute, status);
+    if (status == 0)
+      setError(QNetworkReply::RemoteHostClosedError,
+               QStringLiteral("connection closed"));
+    if (status == 429)
+      setRawHeader("Retry-After", "1200");
+    QTimer::singleShot(0, this, [this]() {
+      setFinished(true);
+      Q_EMIT finished();
+    });
+  }
+  void abort() override {}
+
+protected:
+  qint64 readData(char *, qint64) override { return -1; }
+};
+class TestWebhookManager : public QNetworkAccessManager {
+public:
+  QList<int> responses{429, 503, 204, 400, 0};
+  QList<QByteArray> payloads;
+
+protected:
+  QNetworkReply *createRequest(Operation, const QNetworkRequest &,
+                               QIODevice *data) override {
+    payloads.append(data->readAll());
+    return new TestWebhookReply(responses.takeFirst(), this);
+  }
+};
+
 class LocalIntegrationsTest : public QObject {
   Q_OBJECT
 
 private Q_SLOTS:
+  void webhookPolicyResultsAreCorrelatedAndBounded();
   void metricsServerResponds();
   void metricsServerStaysDisabledUntilEnabled();
   void metricsServerBindingIsExplicit();
@@ -26,6 +63,46 @@ private Q_SLOTS:
   void webhookNotifierUsesStrictBudgetPolicyAllowlist();
   void awsSigV4SignerShapesHeaders();
 };
+
+void LocalIntegrationsTest::webhookPolicyResultsAreCorrelatedAndBounded() {
+  TestWebhookManager network;
+  WebhookNotifier notifier(nullptr, &network);
+  notifier.setSlackEnabled(true);
+  notifier.setSlackWebhookUrl(
+      QStringLiteral("https://hooks.example.test/secret"));
+  QSignalSpy result(&notifier, &WebhookNotifier::policyChannelResult);
+  const QVariantMap event{
+      {QStringLiteral("type"), QStringLiteral("guardrail")},
+      {QStringLiteral("contractVersion"), QStringLiteral("budget-pacing-v2")},
+      {QStringLiteral("eventKey"),
+       QStringLiteral("budget-policy-transition-warning")},
+      {QStringLiteral("transition"), QStringLiteral("warning")},
+      {QStringLiteral("risk"), QStringLiteral("warning")},
+      {QStringLiteral("percentClass"), QStringLiteral("warning")},
+      {QStringLiteral("period"), QStringLiteral("calendar_month")},
+      {QStringLiteral("providerDisplayName"), QStringLiteral("OpenAI")},
+      {QStringLiteral("linkText"), QStringLiteral("Open Budget Control")},
+      {QStringLiteral("policyId"), QStringLiteral("secret-internal-policy")}};
+  notifier.sendPolicyChannel(11, QStringLiteral("slack"), event);
+  notifier.sendPolicyChannel(12, QStringLiteral("slack"), event);
+  notifier.sendPolicyChannel(13, QStringLiteral("slack"), event);
+  notifier.sendPolicyChannel(14, QStringLiteral("slack"), event);
+  notifier.sendPolicyChannel(15, QStringLiteral("slack"), event);
+  QTRY_COMPARE(result.count(), 5);
+  QCOMPARE(result.at(0).at(0).toLongLong(), 11);
+  QVERIFY(!result.at(0).at(2).toBool());
+  QVERIFY(result.at(0).at(3).toBool());
+  QCOMPARE(result.at(0).at(5).toInt(), 1200);
+  QVERIFY(result.at(1).at(3).toBool());
+  QVERIFY(result.at(2).at(2).toBool());
+  QVERIFY(!result.at(3).at(2).toBool());
+  QVERIFY(!result.at(3).at(3).toBool());
+  QVERIFY(result.at(4).at(3).toBool());
+  for (const auto &payload : network.payloads) {
+    QVERIFY(!payload.contains("secret-internal-policy"));
+    QVERIFY(!payload.contains("eventId"));
+  }
+}
 
 void LocalIntegrationsTest::metricsServerResponds() {
   LocalMetricsServer server;
@@ -177,9 +254,12 @@ void LocalIntegrationsTest::usageDatabaseExportsFiles() {
   QTemporaryDir dir;
   QVERIFY(dir.isValid());
 
-  const QStringList files = db.exportAllToDirectory(
+  const auto result = db.exportAllToDirectory(
       dir.path(), {QStringLiteral("json"), QStringLiteral("csv")});
-  QCOMPARE(files.size(), 5);
+  QCOMPARE(result.value(QStringLiteral("status")).toString(),
+           QStringLiteral("success"));
+  const auto files = result.value(QStringLiteral("paths")).toStringList();
+  QCOMPARE(files.size(), 6);
   for (const QString &path : files) {
     QVERIFY(QFileInfo::exists(path));
     QVERIFY(QFileInfo(path).size() > 0);

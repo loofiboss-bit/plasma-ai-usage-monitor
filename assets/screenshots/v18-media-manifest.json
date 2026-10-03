@@ -1,99 +1,99 @@
 {
-  "version": "21.0.1",
-  "sessionId": "7b1c725e-09be-403f-9831-e0f510f5c9b0",
+  "version": "22.0.0",
+  "sessionId": "7965019d-b568-418f-bcc9-5fc677b8e6e9",
   "fixtureSha256": "3a6e4d9088ab8e60ccedb9c0a01448f3ae6434bb4a5275144b88a72e9d9dae89",
-  "sourceTreeSha256": "61c816e89ca54b6235744cd705293a60af8cd9120e1b17121d272f631934a5c3",
-  "archiveSourceTreeSha256": "61c816e89ca54b6235744cd705293a60af8cd9120e1b17121d272f631934a5c3",
-  "sourceTreeCommit": "87698795bd722ef98fb61f10c68bc1634124409c",
-  "sourceTreeMode": "git-commit",
+  "sourceTreeSha256": "53d3c07ae91cd03ee8bf7b790af6a0a763b3caba99c4f93fb111a2cde7e7495f",
+  "archiveSourceTreeSha256": "53d3c07ae91cd03ee8bf7b790af6a0a763b3caba99c4f93fb111a2cde7e7495f",
+  "sourceTreeCommit": "944a5bc55eb2e962d0b47c16b08b41000ecbf42b",
+  "sourceTreeMode": "filesystem-release-candidate",
   "plasmaSession": "Fedora KDE Plasma",
   "theme": "Breeze Dark",
   "environment": "isolated demo user",
-  "captureCommit": "87698795bd722ef98fb61f10c68bc1634124409c",
-  "capturedAt": "2026-09-28T21:22:22Z",
+  "captureCommit": "944a5bc55eb2e962d0b47c16b08b41000ecbf42b",
+  "capturedAt": "2026-10-03T02:29:56Z",
   "plasmaVersion": "6.7.5",
   "scale": "100%",
   "captureEvidence": {
     "overview-popup.png": {
-      "pid": 18899,
-      "windowId": "{3cedcbc7-62c7-4109-9c84-8ad547ba31c4}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 1180 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 18899 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{3cedcbc7-62c7-4109-9c84-8ad547ba31c4}\" \"width\" d 896 \"x\" d 512 \"y\" d 10",
+      "pid": 51905,
+      "windowId": "{5b88832f-e806-49b2-b673-9638f4c959d5}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 1180 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 51905 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{5b88832f-e806-49b2-b673-9638f4c959d5}\" \"width\" d 896 \"x\" d 512 \"y\" d 10",
       "marker": "Overview view ready",
-      "markerBefore": "accessible_ready_ms=577 pid=18899 window='AI Usage Monitor' marker='Overview view ready'",
-      "markerAfter": "accessible_ready_ms=24 pid=18899 window='AI Usage Monitor' marker='Overview view ready'"
+      "markerBefore": "accessible_ready_ms=5782 pid=51905 window='AI Usage Monitor' marker='Overview view ready'",
+      "markerAfter": "accessible_ready_ms=28 pid=51905 window='AI Usage Monitor' marker='Overview view ready'"
     },
     "attention-state.png": {
-      "pid": 19067,
-      "windowId": "{ec961809-e64e-4fc4-a3dd-092030518acd}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 19067 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{ec961809-e64e-4fc4-a3dd-092030518acd}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
+      "pid": 52395,
+      "windowId": "{2f497464-96a4-4d2c-8a55-a198bbf8cb91}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 52395 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{2f497464-96a4-4d2c-8a55-a198bbf8cb91}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
       "marker": "Overview view ready",
-      "markerBefore": "accessible_ready_ms=1153 pid=19067 window='AI Usage Monitor' marker='Overview view ready'",
-      "markerAfter": "accessible_ready_ms=18 pid=19067 window='AI Usage Monitor' marker='Overview view ready'"
+      "markerBefore": "accessible_ready_ms=3176 pid=52395 window='AI Usage Monitor' marker='Overview view ready'",
+      "markerAfter": "accessible_ready_ms=19 pid=52395 window='AI Usage Monitor' marker='Overview view ready'"
     },
     "source-detail.png": {
-      "pid": 19204,
-      "windowId": "{b7f1a4ed-78ec-4491-9d55-b8642ca1630c}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 19204 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{b7f1a4ed-78ec-4491-9d55-b8642ca1630c}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
+      "pid": 52777,
+      "windowId": "{33b8a1d7-354b-4d28-badd-da48bc40d00f}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 52777 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{33b8a1d7-354b-4d28-badd-da48bc40d00f}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
       "marker": "Back to source list",
-      "markerBefore": "accessible_ready_ms=466 pid=19204 window='AI Usage Monitor' marker='Back to source list'",
-      "markerAfter": "accessible_ready_ms=27 pid=19204 window='AI Usage Monitor' marker='Back to source list'"
+      "markerBefore": "accessible_ready_ms=1244 pid=52777 window='AI Usage Monitor' marker='Back to source list'",
+      "markerAfter": "accessible_ready_ms=21 pid=52777 window='AI Usage Monitor' marker='Back to source list'"
     },
     "history-gap.png": {
-      "pid": 19369,
-      "windowId": "{091ca436-f061-4cab-89f4-bd81b624b8f4}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 19369 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{091ca436-f061-4cab-89f4-bd81b624b8f4}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
+      "pid": 53639,
+      "windowId": "{83a0b3e6-30c8-4825-84ed-b0641fa8d81b}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 53639 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{83a0b3e6-30c8-4825-84ed-b0641fa8d81b}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
       "marker": "History view ready",
-      "markerBefore": "accessible_ready_ms=19 pid=19369 window='AI Usage Monitor' marker='History view ready'",
-      "markerAfter": "accessible_ready_ms=17 pid=19369 window='AI Usage Monitor' marker='History view ready'"
+      "markerBefore": "accessible_ready_ms=2325 pid=53639 window='AI Usage Monitor' marker='History view ready'",
+      "markerAfter": "accessible_ready_ms=26 pid=53639 window='AI Usage Monitor' marker='History view ready'"
     },
     "analyst-sufficient.png": {
-      "pid": 19547,
-      "windowId": "{00d07a60-9101-4b7e-8d5c-ced220bc7e4d}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 19547 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{00d07a60-9101-4b7e-8d5c-ced220bc7e4d}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
+      "pid": 54004,
+      "windowId": "{d8a8e0d3-ce1f-44b2-82b4-98b3d5b27bfe}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 54004 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{d8a8e0d3-ce1f-44b2-82b4-98b3d5b27bfe}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
       "marker": "Insights view ready",
-      "markerBefore": "accessible_ready_ms=814 pid=19547 window='AI Usage Monitor' marker='Insights view ready'",
-      "markerAfter": "accessible_ready_ms=20 pid=19547 window='AI Usage Monitor' marker='Insights view ready'"
+      "markerBefore": "accessible_ready_ms=2117 pid=54004 window='AI Usage Monitor' marker='Insights view ready'",
+      "markerAfter": "accessible_ready_ms=25 pid=54004 window='AI Usage Monitor' marker='Insights view ready'"
     },
     "analyst-insufficient.png": {
-      "pid": 19696,
-      "windowId": "{37c55b8f-7ff6-490b-a1ca-17b371e7e8fc}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 19696 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{37c55b8f-7ff6-490b-a1ca-17b371e7e8fc}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
+      "pid": 54235,
+      "windowId": "{298dc274-4980-40ca-8d26-032eb4a9a37d}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 54235 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{298dc274-4980-40ca-8d26-032eb4a9a37d}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
       "marker": "Insights view ready",
-      "markerBefore": "accessible_ready_ms=767 pid=19696 window='AI Usage Monitor' marker='Insights view ready'",
-      "markerAfter": "accessible_ready_ms=24 pid=19696 window='AI Usage Monitor' marker='Insights view ready'"
+      "markerBefore": "accessible_ready_ms=809 pid=54235 window='AI Usage Monitor' marker='Insights view ready'",
+      "markerAfter": "accessible_ready_ms=18 pid=54235 window='AI Usage Monitor' marker='Insights view ready'"
     },
     "guided-first-success.png": {
-      "pid": 19829,
-      "windowId": "{ef168815-911d-489e-b4a8-b36e0d7883c6}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 19829 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{ef168815-911d-489e-b4a8-b36e0d7883c6}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
+      "pid": 54447,
+      "windowId": "{3575cc1d-3f15-4740-ad8c-1ab2e57cc932}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 54447 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{3575cc1d-3f15-4740-ad8c-1ab2e57cc932}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
       "marker": "Guided first success",
-      "markerBefore": "accessible_ready_ms=1338 pid=19829 window='AI Usage Monitor' marker='Guided first success'",
-      "markerAfter": "accessible_ready_ms=14 pid=19829 window='AI Usage Monitor' marker='Guided first success'"
+      "markerBefore": "accessible_ready_ms=12 pid=54447 window='AI Usage Monitor' marker='Guided first success'",
+      "markerAfter": "accessible_ready_ms=14 pid=54447 window='AI Usage Monitor' marker='Guided first success'"
     },
     "budget-control.png": {
-      "pid": 19992,
-      "windowId": "{a66f5775-b90a-4440-b630-f4635ae1c03a}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor Settings\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 19992 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{a66f5775-b90a-4440-b630-f4635ae1c03a}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
+      "pid": 54698,
+      "windowId": "{632661ed-b328-458c-902f-39ed1f58fc96}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor Settings\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 54698 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{632661ed-b328-458c-902f-39ed1f58fc96}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
       "marker": "Budget Control",
-      "markerBefore": "accessible_ready_ms=36 pid=19992 window='AI Usage Monitor Settings' marker='Budget Control'",
-      "markerAfter": "accessible_ready_ms=45 pid=19992 window='AI Usage Monitor Settings' marker='Budget Control'"
+      "markerBefore": "accessible_ready_ms=51 pid=54698 window='AI Usage Monitor Settings' marker='Budget Control'",
+      "markerAfter": "accessible_ready_ms=29 pid=54698 window='AI Usage Monitor Settings' marker='Budget Control'"
     },
     "plugin-recovery.png": {
-      "pid": 20167,
-      "windowId": "{4ec26b3d-1cc4-4e62-bfb5-7d7d8b5b9935}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 20167 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{4ec26b3d-1cc4-4e62-bfb5-7d7d8b5b9935}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
+      "pid": 55141,
+      "windowId": "{c10df39f-e220-48f2-a192-4fd4739bef04}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"AI Usage Monitor\" \"clientMachine\" s \"\" \"desktopFile\" s \"org.kde.plasmawindowed\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 900 \"keepAbove\" b true \"keepBelow\" b false \"layer\" i 3 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 55141 \"resourceClass\" s \"org.kde.plasmawindowed\" \"resourceName\" s \"plasmawindowed\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{c10df39f-e220-48f2-a192-4fd4739bef04}\" \"width\" d 1600 \"x\" d 160 \"y\" d 150",
       "marker": "The native plugin is older than the widget",
-      "markerBefore": "accessible_ready_ms=6 pid=20167 window='AI Usage Monitor' marker='The native plugin is older than the widget'",
-      "markerAfter": "accessible_ready_ms=5 pid=20167 window='AI Usage Monitor' marker='The native plugin is older than the widget'"
+      "markerBefore": "accessible_ready_ms=4 pid=55141 window='AI Usage Monitor' marker='The native plugin is older than the widget'",
+      "markerAfter": "accessible_ready_ms=5 pid=55141 window='AI Usage Monitor' marker='The native plugin is older than the widget'"
     },
     "panel-lowest-quota.png": {
-      "pid": 20285,
-      "accessiblePid": 20307,
-      "windowId": "{d322a76d-1a7f-43e3-bcb8-c12391615da8}",
-      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"KDE Wayland Compositor WL-0 \\342\\200\\224 Press right control key to grab pointer\" \"clientMachine\" s \"\" \"desktopFile\" s \"\" \"desktops\" as 1 \"e80be8dc-d396-411d-a4a3-ad1bc58e8473\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 940 \"keepAbove\" b false \"keepBelow\" b false \"layer\" i 2 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 20285 \"resourceClass\" s \"\" \"resourceName\" s \"\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{d322a76d-1a7f-43e3-bcb8-c12391615da8}\" \"width\" d 1612 \"x\" d 154 \"y\" d 130",
+      "pid": 55436,
+      "accessiblePid": 55466,
+      "windowId": "{f89e1eeb-9459-47a0-93c3-cfcb072ca507}",
+      "windowIdentity": "a{sv} 29 \"activities\" as 1 \"ee41292c-3db9-4fa7-8b14-8d40911078b8\" \"caption\" s \"KDE Wayland Compositor WL-0 \\342\\200\\224 Press right control key to grab pointer\" \"clientMachine\" s \"\" \"desktopFile\" s \"\" \"desktops\" as 1 \"291a491e-68b0-4ec8-ae2f-af444b117d3f\" \"excludeFromCapture\" b false \"fullscreen\" b false \"hasTransientParent\" b false \"height\" d 940 \"keepAbove\" b false \"keepBelow\" b false \"layer\" i 2 \"localhost\" b true \"maximizeHorizontal\" i 0 \"maximizeVertical\" i 0 \"minimized\" b false \"noBorder\" b false \"pid\" i 55436 \"resourceClass\" s \"\" \"resourceName\" s \"\" \"role\" s \"\" \"skipPager\" b false \"skipSwitcher\" b false \"skipTaskbar\" b false \"type\" i 0 \"uuid\" s \"{f89e1eeb-9459-47a0-93c3-cfcb072ca507}\" \"width\" d 1612 \"x\" d 154 \"y\" d 130",
       "marker": "AI Usage Monitor:",
-      "markerBefore": "accessible_ready_ms=5084 pid=20307 window='' marker='AI Usage Monitor:'",
-      "markerAfter": "accessible_ready_ms=15 pid=20307 window='' marker='AI Usage Monitor:'"
+      "markerBefore": "accessible_ready_ms=7902 pid=55466 window='' marker='AI Usage Monitor:'",
+      "markerAfter": "accessible_ready_ms=29 pid=55466 window='' marker='AI Usage Monitor:'"
     }
   },
   "scenarios": {
@@ -111,13 +111,13 @@
   "assets": {
     "overview-popup.png": "8ba2654836b90ee17ce40bbf87290790b8b25ebaba337ad3e3b7e06402a8fe1d",
     "attention-state.png": "01097bd441781e92b2dc47336e0fe31a8273ec0f09f225eb4ae3950f7298f3f3",
-    "source-detail.png": "9d8f22e6e36f43a95420af191f375b27d13578148c54d297f5eb4e7dfad0caac",
-    "history-gap.png": "c4a62802426c442a00fe7e9855266344d1d7461dae8470cd4441db6707e0c232",
+    "source-detail.png": "7fa709caa0e15347bc40d36f429d6fa58aea51d9afb8d81be6176b9f454109b7",
+    "history-gap.png": "c5a9fe03d1f3f81deca5d1ea088fc15a4671101b9531a66bb97b5dfacdf6ba1e",
     "analyst-sufficient.png": "ae499a179c438bb4863cade12b73b1bd652f25ed18183c561d68dce4927586e3",
     "analyst-insufficient.png": "7a1cea6d5e186389d2c7d3571bbc59a571a7da86055a82bc00edde28d7b404d9",
     "guided-first-success.png": "7cf5f72f2d9d407672fced27511583bc310239fd222aba3e348d0f6e5201161c",
     "budget-control.png": "842078d5564e146acf07d1bd0bca4c9677669b79e4a43b0849ea48925b2ed1f7",
-    "plugin-recovery.png": "bdd3eb11c4da49330ac2a604f9d0e404555c464660dd090025f890b8f10da153",
-    "panel-lowest-quota.png": "c0d9c76e191531302385c13711030dce6eb38e52ae50e97165f2278b01c8e7a1"
+    "plugin-recovery.png": "c186d38e607d36da5ac85e1bfb1a6cd0d6ca663656e063e4a5f2c931bb32c39f",
+    "panel-lowest-quota.png": "7ea7f107b1c70599f31073b1800913fb771639e0d75884b79734911f6fd9d00f"
   }
 }

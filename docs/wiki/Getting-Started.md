@@ -11,7 +11,11 @@ Use **Guided first success** to configure and verify one provider or detected lo
 4. Add it to the panel or desktop.
 5. Open the widget. The guided setup starts on a new installation.
 
-If setup was skipped earlier, reopen the widget and choose **Resume setup**. Full controls remain available in Settings.
+If setup was skipped earlier, reopen the widget and choose **Resume setup**.
+An active verification resumes with a new 30-second timeout. If no check is
+still active, setup returns to configuration and asks you to verify again;
+it does not leave an interrupted check waiting forever. Full controls remain
+available in Settings.
 
 ## Complete Guided first success
 
@@ -26,7 +30,9 @@ Connectivity-only verification is a successful connection test, not proof of
 token usage or spend. A detected local tool with no observed activity completes
 setup as **Waiting for local activity** and is not counted as reporting an
 estimate. Local activity becomes an estimate only after it is observed, unless
-an authenticated source reports a live quota window.
+an authenticated source reports a live quota window. That result is labeled
+**Actual provider-reported quota**, not a local activity estimate or billing
+history.
 
 ## Add another source in Settings
 

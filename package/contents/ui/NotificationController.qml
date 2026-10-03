@@ -136,18 +136,7 @@ Item {
             return "notifications-disabled";
         if (!guardrailSourceEnabled(forecast)) return "source-disabled";
         if (dndActive()) return "dnd";
-        var eventKey = "budget_policy_" + forecast.policyId;
-        var cooldown = Math.max(0,
-            Number(configuration.notificationCooldownMinutes || 0)) * 60000;
-        var last = lastNotificationTimes[eventKey] || 0;
-        if (budgetPolicyRepository
-                && budgetPolicyRepository.lastDeliveredAt) {
-            var persisted = new Date(
-                budgetPolicyRepository.lastDeliveredAt(forecast.policyId));
-            if (!isNaN(persisted.getTime()))
-                last = Math.max(last, persisted.getTime());
-        }
-        return Date.now() - last < cooldown ? "cooldown" : "";
+        return "";
     }
 
     function sourceNotificationsEnabled(row) {
@@ -645,32 +634,46 @@ Item {
     }
 
     function processBudgetPolicy(forecast) {
-        if (!budgetPolicyRepository
-                || !budgetPolicyRepository.prepareTransitions
-                || !budgetPolicyRepository.markEventDelivered
-                || !budgetPolicyRepository.markEventFailed) {
+        if (!budgetPolicyRepository || !budgetPolicyRepository.prepareTransitions)
             return false;
-        }
         var prepared = budgetPolicyRepository.prepareTransitions(
             forecast, policySuppressionReason(forecast));
         if (!prepared || !prepared.ok) return false;
         var events = prepared.events || [];
-        var delivered = false;
+        var handedOff = false;
         for (var i = 0; i < events.length; ++i) {
             var event = events[i] || {};
             if (!event.deliver) continue;
             var payload = budgetPolicyPayload(forecast, event);
-            lastNotificationTimes["budget_policy_" + forecast.policyId]
-                = Date.now();
-            if (deliverPrepared(payload)) {
-                budgetPolicyRepository.markEventDelivered(event.eventId);
-                delivered = true;
-            } else {
-                budgetPolicyRepository.markEventFailed(
-                    event.eventId, "notification-delivery-failed");
+            var channels = ["kde"];
+            if (configuration.slackWebhookEnabled) channels.push("slack");
+            if (configuration.discordWebhookEnabled) channels.push("discord");
+            var due = budgetPolicyRepository.prepareChannelDeliveries(
+                event.eventId, channels, Number(configuration.webhookCooldownMinutes || 15),
+                Number(configuration.notificationCooldownMinutes || 0));
+            for (var j = 0; j < due.length; ++j) {
+                var channel = due[j].channel;
+                if (channel === "kde") {
+                    notificationPrepared(payload);
+                    var accepted = !injectDeliveryFailure;
+                    if (accepted && deliveryEnabled) {
+                        actionPolicyId = payload.policyId || "";
+                        budgetPolicyNotification.title = payload.title;
+                        budgetPolicyNotification.text = payload.message;
+                        budgetPolicyNotification.urgency = payload.critical
+                            ? Notification.CriticalUrgency : Notification.NormalUrgency;
+                        budgetPolicyNotification.sendEvent();
+                    }
+                    budgetPolicyRepository.completeChannelDelivery(event.eventId,
+                        "kde", accepted, !accepted, "notification-delivery-failed", 0,
+                        Number(configuration.notificationCooldownMinutes || 15));
+                    handedOff = handedOff || accepted;
+                } else if (webhookNotifier.sendPolicyChannel) {
+                    webhookNotifier.sendPolicyChannel(event.eventId, channel, payload);
+                }
             }
         }
-        return delivered;
+        return handedOff;
     }
 
     function processGuardrail(forecast) {
@@ -736,6 +739,18 @@ Item {
         updateNotification.text = i18n("Version %1 is available! Visit %2 to update.",
                                        latestVersion, releaseUrl);
         updateNotification.sendEvent();
+    }
+
+    Connections {
+        target: notifications.webhookNotifier
+        ignoreUnknownSignals: true
+        function onPolicyChannelResult(eventId, channel, accepted, retryable, reasonKey, retryAfterSeconds) {
+            if (notifications.budgetPolicyRepository
+                    && notifications.budgetPolicyRepository.completeChannelDelivery)
+                notifications.budgetPolicyRepository.completeChannelDelivery(eventId, channel,
+                    accepted, retryable, reasonKey, retryAfterSeconds,
+                    Number(notifications.configuration.webhookCooldownMinutes || 15));
+        }
     }
 
     Connections {
