@@ -2,6 +2,7 @@
 
 #include <QDir>
 #include <QFile>
+#include <QJsonDocument>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QSignalSpy>
@@ -23,6 +24,8 @@ public:
     if (status == 0)
       setError(QNetworkReply::RemoteHostClosedError,
                QStringLiteral("connection closed"));
+    if (status < 0)
+      setError(QNetworkReply::TimeoutError, QStringLiteral("request timed out"));
     if (status == 429)
       setRawHeader("Retry-After", "1200");
     QTimer::singleShot(0, this, [this]() {
@@ -61,6 +64,7 @@ private Q_SLOTS:
   void webhookNotifierRejectsInsecureEndpoints();
   void webhookNotifierSanitizesGuardrailPayload();
   void webhookNotifierUsesStrictBudgetPolicyAllowlist();
+  void webhookRuntimeResultsAreTypedAndRedacted();
   void awsSigV4SignerShapesHeaders();
 };
 
@@ -230,16 +234,54 @@ void LocalIntegrationsTest::metricsServerRecoversAfterBindFailure() {
 
   server.setPort(blocker.serverPort());
   QVERIFY(!server.isListening());
+  QCOMPARE(server.errorCode(), QStringLiteral("address-in-use"));
   QCOMPARE(errorSpy.count(), 1);
   QCOMPARE(listeningSpy.count(), 2);
 
   blocker.close();
-  server.setEnabled(false);
-  server.setEnabled(true);
-  QVERIFY(server.isListening());
+  QTRY_VERIFY_WITH_TIMEOUT(server.isListening(), 3000);
+  QVERIFY(server.errorCode().isEmpty());
   QCOMPARE(server.listeningAddress(),
            QHostAddress(QHostAddress::LocalHost).toString());
   QCOMPARE(listeningSpy.count(), 3);
+}
+
+void LocalIntegrationsTest::webhookRuntimeResultsAreTypedAndRedacted() {
+  TestWebhookManager network;
+  network.responses = {204, 401, -1};
+  WebhookNotifier notifier(nullptr, &network);
+  notifier.setSlackEnabled(true);
+  notifier.setSlackWebhookUrl(
+      QStringLiteral("https://hooks.example.test/private-sentinel"));
+  QList<QVariantMap> snapshots;
+  connect(&notifier, &WebhookNotifier::runtimeStatusChanged, &notifier,
+          [&]() { snapshots.append(notifier.lastDeliveryResults()); });
+
+  notifier.sendAlert(QStringLiteral("first"), QStringLiteral("First"),
+                     QStringLiteral("Test"));
+  notifier.sendAlert(QStringLiteral("second"), QStringLiteral("Second"),
+                     QStringLiteral("Test"));
+  notifier.sendAlert(QStringLiteral("third"), QStringLiteral("Third"),
+                     QStringLiteral("Test"));
+  QTRY_COMPARE(snapshots.size(), 3);
+
+  const QVariantMap accepted = snapshots.at(0).value(QStringLiteral("slack")).toMap();
+  QCOMPARE(accepted.value(QStringLiteral("status")).toString(),
+           QStringLiteral("delivered"));
+  QCOMPARE(accepted.value(QStringLiteral("httpStatus")).toInt(), 204);
+
+  const QVariantMap unauthorized = snapshots.at(1).value(QStringLiteral("slack")).toMap();
+  QCOMPARE(unauthorized.value(QStringLiteral("reasonKey")).toString(),
+           QStringLiteral("authentication-or-permission"));
+  QCOMPARE(unauthorized.value(QStringLiteral("httpStatus")).toInt(), 401);
+
+  const QVariantMap timeout = snapshots.at(2).value(QStringLiteral("slack")).toMap();
+  QCOMPARE(timeout.value(QStringLiteral("reasonKey")).toString(),
+           QStringLiteral("timeout"));
+  const QByteArray safeSnapshot =
+      QJsonDocument::fromVariant(snapshots.at(2)).toJson(QJsonDocument::Compact);
+  QVERIFY(!safeSnapshot.contains("private-sentinel"));
+  QVERIFY(!safeSnapshot.contains("hooks.example.test"));
 }
 
 void LocalIntegrationsTest::usageDatabaseExportsFiles() {

@@ -160,6 +160,7 @@ private Q_SLOTS:
     void testExportCsv();
     void testExportCsvRfc4180Quoting();
     void testExportJson();
+    void testSelectedSeriesExportUsesAllowlistAndRedactsScopes();
     void testSourceMetadataSchemaMigration();
     void testObservationSchemaV4AndCurrencyIsolation();
     void testSchemaV5MigrationRollbackAndRecovery();
@@ -697,6 +698,82 @@ void UsageDatabaseExtendedTest::testExportJson()
     QVERIFY(first.contains(QStringLiteral("cost")));
     QVERIFY(!first.contains(QStringLiteral("model")));
     QVERIFY(qAbs(first.value(QStringLiteral("cost")).toDouble() - 3.0) < 0.01);
+}
+
+void UsageDatabaseExtendedTest::testSelectedSeriesExportUsesAllowlistAndRedactsScopes()
+{
+    UsageDatabase database;
+    const QDateTime from(QDate(2026, 10, 1), QTime(0, 0), QTimeZone::utc());
+    const QDateTime to(QDate(2026, 10, 8), QTime(0, 0), QTimeZone::utc());
+    const QVariantList points{
+        QVariantMap{{QStringLiteral("timestamp"), QStringLiteral("2026-10-01T00:00:00Z")},
+                    {QStringLiteral("available"), true},
+                    {QStringLiteral("value"), 0.0}},
+        QVariantMap{{QStringLiteral("timestamp"), QStringLiteral("2026-10-02T00:00:00Z")},
+                    {QStringLiteral("available"), false},
+                    {QStringLiteral("value"), 123.456}}};
+    const QVariantMap series{
+        {QStringLiteral("sourceId"), QStringLiteral("provider:openai")},
+        {QStringLiteral("displayName"), QStringLiteral("OpenAI")},
+        {QStringLiteral("sourceKind"), QStringLiteral("provider")},
+        {QStringLiteral("dbName"), QStringLiteral("internal-database-sentinel")},
+        {QStringLiteral("metricKind"), QStringLiteral("cost")},
+        {QStringLiteral("unit"), QStringLiteral("USD")},
+        {QStringLiteral("currency"), QStringLiteral("USD")},
+        {QStringLiteral("semantic"), QStringLiteral("interval_total")},
+        {QStringLiteral("source"), QStringLiteral("billing_api")},
+        {QStringLiteral("scope"), QStringLiteral("raw-scope-sentinel")},
+        {QStringLiteral("privateInternalField"), QStringLiteral("internal-field-sentinel")},
+        {QStringLiteral("window"), QStringLiteral("day")},
+        {QStringLiteral("resetAt"), QString()},
+        {QStringLiteral("sourceQualityClasses"), QStringList{QStringLiteral("actual")}},
+        {QStringLiteral("sampleCount"), 2},
+        {QStringLiteral("availablePointCount"), 1},
+        {QStringLiteral("bucketSizeSeconds"), 3600},
+        {QStringLiteral("firstObservation"), from},
+        {QStringLiteral("lastObservation"), to},
+        {QStringLiteral("containsGaps"), true},
+        {QStringLiteral("stale"), false},
+        {QStringLiteral("historyOnly"), false},
+        {QStringLiteral("points"), points}};
+
+    const QString jsonText = database.exportSelectedSeries(
+        {series}, QStringLiteral("json"), QStringLiteral("cost"), from, to, 60);
+    QVERIFY(!jsonText.isEmpty());
+    QVERIFY(!jsonText.contains(QStringLiteral("raw-scope-sentinel")));
+    QVERIFY(!jsonText.contains(QStringLiteral("internal-database-sentinel")));
+    QVERIFY(!jsonText.contains(QStringLiteral("internal-field-sentinel")));
+    const QJsonObject root = QJsonDocument::fromJson(jsonText.toUtf8()).object();
+    QCOMPARE(root.value(QStringLiteral("schemaVersion")).toInt(), 6);
+    QCOMPARE(root.value(QStringLiteral("metricKind")).toString(), QStringLiteral("cost"));
+    QCOMPARE(QDateTime::fromString(root.value(QStringLiteral("from")).toString(),
+                                   Qt::ISODateWithMs).toUTC(), from.toUTC());
+    QCOMPARE(QDateTime::fromString(root.value(QStringLiteral("to")).toString(),
+                                   Qt::ISODateWithMs).toUTC(), to.toUTC());
+    const QJsonObject exportedSeries = root.value(QStringLiteral("series")).toArray().first().toObject();
+    QVERIFY(!exportedSeries.contains(QStringLiteral("scope")));
+    QVERIFY(!exportedSeries.contains(QStringLiteral("dbName")));
+    QVERIFY(!exportedSeries.contains(QStringLiteral("privateInternalField")));
+    QCOMPARE(exportedSeries.value(QStringLiteral("currency")).toString(), QStringLiteral("USD"));
+    QCOMPARE(exportedSeries.value(QStringLiteral("window")).toString(), QStringLiteral("day"));
+    QCOMPARE(exportedSeries.value(QStringLiteral("sourceQualityClasses")).toArray().first().toString(),
+             QStringLiteral("actual"));
+    const QJsonArray exportedPoints = exportedSeries.value(QStringLiteral("points")).toArray();
+    QCOMPARE(exportedPoints.at(0).toObject().value(QStringLiteral("value")).toDouble(), 0.0);
+    QVERIFY(exportedPoints.at(0).toObject().value(QStringLiteral("available")).toBool());
+    QCOMPARE(exportedPoints.at(0).toObject().value(QStringLiteral("timestamp")).toString(),
+             QStringLiteral("2026-10-01T00:00:00.000Z"));
+    QVERIFY(exportedPoints.at(1).toObject().value(QStringLiteral("value")).isNull());
+    QVERIFY(!exportedPoints.at(1).toObject().value(QStringLiteral("available")).toBool());
+
+    const QString csv = database.exportSelectedSeries(
+        {series}, QStringLiteral("csv"), QStringLiteral("cost"), from, to, 60);
+    QVERIFY(!csv.contains(QStringLiteral("raw-scope-sentinel")));
+    QVERIFY(!csv.contains(QStringLiteral("internal-database-sentinel")));
+    QVERIFY(!csv.contains(QStringLiteral("internal-field-sentinel")));
+    QVERIFY(csv.contains(QStringLiteral(",0,true\r\n")));
+    QVERIFY(csv.contains(QStringLiteral(",,false\r\n")));
+    QVERIFY(csv.contains(QStringLiteral("selection_from")));
 }
 
 void UsageDatabaseExtendedTest::testExportCsvRfc4180Quoting()

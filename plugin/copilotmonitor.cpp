@@ -9,6 +9,7 @@
 #include <QDirIterator>
 #include <QDebug>
 #include <QDate>
+#include <KLocalizedString>
 
 CopilotMonitor::CopilotMonitor(QObject *parent)
     : LocalActivityMonitorBase(parent)
@@ -71,7 +72,10 @@ QString CopilotMonitor::githubToken() const { return m_githubToken; }
 void CopilotMonitor::setGithubToken(const QString &token)
 {
     if (m_githubToken != token) {
+        if (isSyncing()) cancelSync();
+        ++m_fetchGeneration;
         m_githubToken = token;
+        resetSyncRetry();
         Q_EMIT githubTokenChanged();
     }
 }
@@ -80,7 +84,10 @@ QString CopilotMonitor::orgName() const { return m_orgName; }
 void CopilotMonitor::setOrgName(const QString &name)
 {
     if (m_orgName != name) {
+        if (isSyncing()) cancelSync();
+        ++m_fetchGeneration;
         m_orgName = name;
+        resetSyncRetry();
         Q_EMIT orgNameChanged();
     }
 }
@@ -160,10 +167,13 @@ int CopilotMonitor::orgTotalSeats() const { return m_orgTotalSeats; }
 
 void CopilotMonitor::fetchOrgMetrics()
 {
-    if (m_githubToken.isEmpty() || m_orgName.isEmpty()) return;
+    if (!isEnabled() || isSyncing() || m_githubToken.isEmpty() || m_orgName.isEmpty()) return;
+    const quint64 syncGeneration = beginSyncGeneration();
+    if (syncGeneration == 0) return;
 
     m_fetchGeneration++;
     int gen = m_fetchGeneration;
+    setSyncing(true);
 
     // GET /orgs/{org}/copilot/billing
     QString demoUrl = QString::fromLocal8Bit(qgetenv("PLASMA_AI_MONITOR_DEMO_BASE_URL")).trimmed();
@@ -184,24 +194,36 @@ void CopilotMonitor::fetchOrgMetrics()
     request.setRawHeader("X-GitHub-Api-Version", "2022-11-28");
 
     QNetworkReply *reply = networkManager()->get(request);
-    connect(reply, &QNetworkReply::finished, this, [this, reply, gen]() {
-        if (gen != m_fetchGeneration) { reply->deleteLater(); return; }
+    connect(reply, &QNetworkReply::finished, this, [this, reply, gen, syncGeneration]() {
+        if (!syncReplyIsCurrent(reply) || syncGeneration == 0
+                || gen != m_fetchGeneration) { reply->deleteLater(); return; }
         onBillingReply(reply);
     });
 }
 
 void CopilotMonitor::onBillingReply(QNetworkReply *reply)
 {
-    reply->deleteLater();
-
-    if (reply->error() != QNetworkReply::NoError) {
-        qWarning() << "CopilotMonitor: GitHub API error:" << reply->errorString();
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    if (reply->error() != QNetworkReply::NoError || status < 200 || status >= 300) {
+        recordSyncHttpFailure(status,
+                              reply->rawHeader("Retry-After"));
+        setSyncStatus(status == 401 || status == 403
+                          ? i18n("GitHub organization access needs attention")
+                          : i18n("GitHub organization metrics could not be refreshed"));
+        setSyncing(false);
+        reply->deleteLater();
         return;
     }
 
     QByteArray data = reply->readAll();
     QJsonDocument doc = QJsonDocument::fromJson(data);
-    if (doc.isNull()) return;
+    if (doc.isNull() || !doc.isObject()) {
+        recordSyncHttpFailure(502, {});
+        setSyncStatus(i18n("GitHub returned an unsupported metrics response"));
+        setSyncing(false);
+        reply->deleteLater();
+        return;
+    }
 
     QJsonObject root = doc.object();
 
@@ -214,7 +236,11 @@ void CopilotMonitor::onBillingReply(QNetworkReply *reply)
     m_orgTotalSeats = totalSeats;
     m_orgActiveUsers = activeUsers;
     m_hasOrgMetrics = true;
-
+    setLastSyncTime(QDateTime::currentDateTimeUtc());
+    resetSyncRetry();
+    setSyncStatus(i18n("Organization metrics updated"));
+    setSyncing(false);
+    reply->deleteLater();
     Q_EMIT orgMetricsUpdated();
 }
 

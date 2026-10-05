@@ -8,6 +8,20 @@ ProviderBackend::requestRefresh() is the public refresh entry point. It owns sin
 
 Scheduled and popup refreshes coalesce. A manual request may supersede one older request. A reply from an invalid generation cannot change state or write history.
 
+Provider schedules use one single-shot deadline per source. Success schedules
+from completed `lastSuccess`; retryable failures schedule from the failed
+attempt with deterministic jitter, bounded backoff, and the later of the
+computed delay or provider `Retry-After`. Disabled, unconfigured, in-flight,
+and user-action sources have no deadline. Explicitly disconnected network
+reachability pauses external automatic calls; unknown reachability allows them.
+Manual refreshes and loopback sources remain available. Wake and reconnect
+recovery coalesce to one pending refresh per source.
+
+Subscription-tool network sync has a separate generation and tracked reply set.
+Disabling a monitor aborts active replies and invalidates their generation;
+stale callbacks cannot start fallback calls, update observations, or notify.
+Local watchers and the Antigravity loopback monitor use their local lifecycle.
+
 The scheduler consumes typed error kind, retryability, Retry-After, and freshness. It does not parse localized UI text. Authentication, permission, configuration, and schema errors wait for user action. A failed secondary endpoint can produce a degraded state while preserving valid primary metrics.
 
 Scheduled provider traffic is read-only. Explicit inference tests are separate actions and never run on the background schedule.
@@ -22,6 +36,13 @@ ProviderManager and Catalog v6 descriptors own stable identity, adapter type,
 authentication slots, endpoints, models, capability claims, budget policy
 contracts, source expectations and safe refresh policy. QML reads this catalog
 instead of maintaining a second provider truth table.
+
+Pricing-catalog `hardExpiresAt` is checked on each estimate and by a live
+expiry timer. The loader refreshes its status after wake and after verified
+catalog installation. Expiry blocks only new estimates; actual billing metrics
+remain usable. Replacing a verified catalog reloads the active pricing data
+without restarting Plasma. Historical estimate provenance and model choices
+are immutable.
 
 The generated [provider capability matrix](../provider-capabilities.md) is checked against the shipped catalog during validation.
 
@@ -50,6 +71,10 @@ Setup ranking is deterministic: detected local tools come first, then actual
 usage/spend and gateway sources, then balance/connectivity sources, and finally
 local tools that are not detected. Onboarding, Settings, Overview, and
 Diagnostics must consume this model instead of independently deriving status.
+Onboarding source search filters the stable ranked list and presents a short
+capability explanation. Overview search and attention filtering affect the
+visible source rows only; focus, totals, and warning counts use every enabled
+source.
 
 ## Daily state contract
 
@@ -69,7 +94,9 @@ or `never`.
 
 Metric state is exposed through `hasUsefulData`, `hasActualData`,
 `hasEstimatedData`, `hasBalance`, `connectivityOnly`, `primaryMetricKind`,
-`primaryMetricAvailable`, `primaryMetricValue`, and `primaryMetricUnit`.
+`primaryMetricAvailable`, `primaryMetricValue`, `primaryMetricUnit`,
+`primaryMetricCurrency`, `primaryMetricWindow`, `primaryMetricPeriodStart`,
+`primaryMetricPeriodEnd`, and `primaryMetricQuality`.
 Optional quota, reset, cost, and budget scalars always have a matching
 availability role. An available numeric zero remains zero. An unavailable value
 is an invalid `QVariant`; callers must check its availability role and must not
@@ -97,6 +124,14 @@ recent successful aggregate completion time. Mixed currencies are never summed
 into a scalar. A row with multiple cost currencies reports `currency` as
 `MIXED`, leaves `costAvailable` false, and remains represented in the aggregate
 currency maps.
+
+`summary.spendGroups` carries currency, window, exact period bounds, semantic,
+quality, amount, and source identities. Groups combine only compatible actual
+or estimated interval totals. Actual and estimated values remain separate.
+Unbounded current values, unknown periods, and all-time values are kept per
+source; an all-time amount cannot stand in for absent daily or monthly data.
+Source cards, the panel, and Overview format the primary metric from that
+metric's own unit, currency, period, and quality.
 
 Attention order is deterministic: actionable failure, exhausted quota,
 critical quota, critical budget, stale useful data, warning threshold, ready to
@@ -236,6 +271,12 @@ point. Missing buckets become explicit chart gaps. Source, semantic, scope,
 window, or currency changes start a separate series. Multi-source comparisons
 fail closed when units, semantics, or currencies differ. Rolling tool quota is
 a gauge and is never summed or relabeled as calendar-day usage.
+
+Popup selected-series JSON and CSV use a native schema-v6 serializer with an
+explicit field allowlist. Exports preserve selection bounds, metric, unit,
+currency, period, semantics, quality, gaps, and point availability. Available
+zero remains numeric and unavailable remains null/empty. Raw scopes and
+internal database identifiers are not exported.
 
 The Analyst output/input query retains the schema-v6 compatibility projection
 and returns only days with positive total input. It does not synthesize ratios
@@ -381,6 +422,12 @@ remains an estimate, independent of authenticated quota observations.
 
 The Prometheus server binds to loopback by default. Users can explicitly bind
 its unauthenticated endpoint to all IPv4 interfaces for remote collection.
+The existing runtime publishes a short-lived redacted status snapshot with
+session identity, timestamp, actual bound address, port, interface mode, and a
+typed start error. Settings reads that snapshot without constructing another
+server and displays unknown when it is missing or stale. Ordinary webhook
+channels expose similarly redacted latest results; budget-policy delivery
+continues to use its per-event SQLite receipt.
 Guardrail series are collapsed to the worst state and earliest event per
 provider, risk kind, and value class. They never use scope, model, project,
 workspace, stable-ID, or API-key labels.

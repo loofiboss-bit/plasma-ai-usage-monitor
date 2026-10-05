@@ -9,6 +9,13 @@ LocalMetricsServer::LocalMetricsServer(QObject *parent)
     : QObject(parent)
     , m_server(new QTcpServer(this))
 {
+    m_retryTimer.setSingleShot(true);
+    m_retryTimer.setInterval(1000);
+    connect(&m_retryTimer, &QTimer::timeout, this, [this]() {
+        if (m_enabled && !m_server->isListening())
+            restartServer();
+    });
+
     connect(m_server, &QTcpServer::newConnection, this, [this]() {
         while (m_server->hasPendingConnections()) {
             QTcpSocket *socket = m_server->nextPendingConnection();
@@ -116,6 +123,11 @@ QString LocalMetricsServer::listeningAddress() const
     return m_server->isListening() ? m_server->serverAddress().toString() : QString();
 }
 
+QString LocalMetricsServer::errorCode() const
+{
+    return m_errorCode;
+}
+
 QString LocalMetricsServer::payload() const
 {
     return m_payload;
@@ -136,21 +148,49 @@ bool LocalMetricsServer::isListening() const
 
 void LocalMetricsServer::restartServer()
 {
+    m_retryTimer.stop();
     const bool wasListening = m_server->isListening();
+    const QString previousAddress = listeningAddress();
+    const QString previousError = m_errorCode;
     if (wasListening) {
         m_server->close();
     }
+
+    m_errorCode.clear();
 
     if (m_enabled) {
         const QHostAddress address = m_listenOnAllInterfaces
             ? QHostAddress::AnyIPv4
             : QHostAddress::LocalHost;
         if (!m_server->listen(address, static_cast<quint16>(m_port))) {
-            Q_EMIT error(m_server->errorString());
+            switch (m_server->serverError()) {
+            case QAbstractSocket::AddressInUseError:
+                m_errorCode = QStringLiteral("address-in-use");
+                break;
+            case QAbstractSocket::SocketAddressNotAvailableError:
+                m_errorCode = QStringLiteral("address-unavailable");
+                break;
+            case QAbstractSocket::SocketAccessError:
+                m_errorCode = QStringLiteral("permission-denied");
+                break;
+            case QAbstractSocket::UnsupportedSocketOperationError:
+                m_errorCode = QStringLiteral("unsupported-operation");
+                break;
+            default:
+                m_errorCode = QStringLiteral("listen-failed");
+                break;
+            }
+            if (previousError != m_errorCode)
+                Q_EMIT error(m_server->errorString());
+            m_retryTimer.start();
         }
     }
 
     if (wasListening != m_server->isListening()) {
         Q_EMIT listeningChanged();
+    }
+    if (previousAddress != listeningAddress() || previousError != m_errorCode ||
+        wasListening != m_server->isListening()) {
+        Q_EMIT runtimeStatusChanged();
     }
 }

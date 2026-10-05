@@ -91,6 +91,18 @@ ColumnLayout {
                 }
             }
 
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.largeSpacing
+                visible: catalogRow.modelData.label === i18n("Providers")
+                    && !catalogRow.modelData.estimatesAllowed
+                text: catalogRow.modelData.verificationState === "expired"
+                    ? i18n("The provider price catalog has expired. New local cost estimates are unavailable; actual billing values remain available.")
+                    : i18n("Local cost estimates are unavailable under this catalog policy. Actual billing values remain available.")
+                wrapMode: Text.WordWrap
+                color: Kirigami.Theme.neutralTextColor
+            }
+
             Repeater {
                 model: catalogRow.modelData.reviewItems
 

@@ -20,6 +20,39 @@ KCM.SimpleKCM {
     property alias cfg_autoExportIntervalMinutes: autoExportIntervalSpin.value
     property string cfg_autoExportFormat: Plasmoid.configuration.autoExportFormat
 
+    function readRuntimeSnapshot(value) {
+        try {
+            var snapshot = JSON.parse(value || "{}");
+            var updated = Date.parse(snapshot.timestamp || "");
+            if (!snapshot.sessionId || !isFinite(updated) || Date.now() - updated > 60000
+                    || updated > Date.now() + 5000) return null;
+            return snapshot;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function prometheusRuntimeText() {
+        var snapshot = readRuntimeSnapshot(Plasmoid.configuration.prometheusRuntimeSnapshot);
+        if (!snapshot) return i18n("Runtime status unknown. No recent status snapshot is available.");
+        if (snapshot.status === "disabled") return i18n("Runtime status: disabled.");
+        if (snapshot.status === "starting") return i18n("Runtime status: starting the metrics endpoint.");
+        if (snapshot.status === "error") {
+            var detail = snapshot.errorCode === "address-in-use" ? i18n("the port is already in use")
+                : snapshot.errorCode === "address-unavailable" ? i18n("the listen address is unavailable")
+                : snapshot.errorCode === "permission-denied" ? i18n("permission was denied")
+                : snapshot.errorCode === "unsupported-operation" ? i18n("the listen operation is unsupported")
+                : i18n("the endpoint could not start");
+            return i18n("Runtime status: failed to listen on port %1 because %2.", snapshot.port, detail);
+        }
+        if (snapshot.status === "listening") {
+            var access = snapshot.interfaceMode === "all-interfaces"
+                ? i18n("all IPv4 interfaces") : i18n("local interface only");
+            return i18n("Runtime status: listening at %1:%2 (%3).", snapshot.address, snapshot.port, access);
+        }
+        return i18n("Runtime status unknown. The last status value was not recognized.");
+    }
+
     // Database reference for size display
     UsageDatabase {
         id: historyDb
@@ -173,6 +206,14 @@ KCM.SimpleKCM {
             id: prometheusSwitch
             Kirigami.FormData.label: i18n("Enable metrics endpoint:")
             checked: Plasmoid.configuration.prometheusEnabled
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Runtime status:")
+            text: historyPage.prometheusRuntimeText()
+            wrapMode: Text.WordWrap
+            Layout.fillWidth: true
+            Accessible.name: text
         }
 
         RowLayout {

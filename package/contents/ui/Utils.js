@@ -45,6 +45,67 @@ function formatCurrencyTotals(totals) {
     return parts.join(" + ");
 }
 
+function spendWindowText(group) {
+    var window = (group && group.window) || "";
+    var labels = {
+        day: i18n("today"),
+        week: i18n("this week"),
+        month: i18n("this month"),
+        current: i18n("current period"),
+        all_time: i18n("all time"),
+        session: i18n("session"),
+        "five-hour": i18n("five-hour window"),
+        rolling: i18n("rolling window")
+    };
+    var period = window ? (labels[window] || window) : i18n("period not reported");
+    var start = group && group.periodStart ? new Date(group.periodStart) : null;
+    var end = group && group.periodEnd ? new Date(group.periodEnd) : null;
+    if (group && group.bounded === true && start && end
+            && Number.isFinite(start.getTime()) && Number.isFinite(end.getTime())) {
+        period += i18n(" (%1 – %2)", Qt.formatDate(start, Qt.DefaultLocaleShortDate),
+                       Qt.formatDate(end, Qt.DefaultLocaleShortDate));
+    }
+    var sources = group && group.sourceNames ? group.sourceNames : [];
+    if (sources.length === 1)
+        period += i18n(" · %1", sources[0]);
+    else if (!group || group.bounded !== true)
+        period += i18n(" · source-specific");
+    return period;
+}
+
+function formatSpendGroup(group) {
+    if (!group || !Number.isFinite(Number(group.value))) return "";
+    var currency = (group.currency || "").toString().trim().toUpperCase();
+    var amount = Number(group.value).toLocaleString(Qt.locale(), "f", 2);
+    return currency ? formatMoney(group.value, currency)
+                    : i18n("%1 · currency unavailable", amount);
+}
+
+function formatSpendGroups(groups, quality, window) {
+    var values = [];
+    var candidates = groups || [];
+    for (var i = 0; i < candidates.length; ++i) {
+        var group = candidates[i] || {};
+        if (quality && group.quality !== quality) continue;
+        if (window && group.window !== window) continue;
+        var amount = formatSpendGroup(group);
+        if (amount === "") continue;
+        values.push(i18n("%1 · %2", amount, spendWindowText(group)));
+    }
+    return values.join(i18n(" / "));
+}
+
+function filterOverviewSourceRows(rows, searchText, needsAttention) {
+    var query = String(searchText || "").trim().toLocaleLowerCase();
+    return (rows || []).filter(function(row) {
+        if (needsAttention && (!row.attentionSeverity || row.attentionSeverity === "none"))
+            return false;
+        if (!query) return true;
+        return [row.displayName, row.stableId, row.qualityClass, row.nextActionText]
+            .join(" ").toLocaleLowerCase().indexOf(query) >= 0;
+    });
+}
+
 function availableMetric(backend, kind, window) {
     if (!backend) return null;
     var metrics = backend.metrics || [];

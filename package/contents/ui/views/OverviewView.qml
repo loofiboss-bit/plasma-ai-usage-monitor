@@ -9,11 +9,15 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import ".." as Monitor
 import "../components" as Components
+import "../Utils.js" as Utils
 
 QQC2.ScrollView {
     id: overview
 
     property var monitor: null
+    property string sourceSearchText: ""
+    property int sourceFilterIndex: 0
+    readonly property var visibleSourceRows: filterSourceRows()
     signal sourceRequested(string stableId)
     Accessible.role: Accessible.Pane
     Accessible.name: i18n("Overview view ready")
@@ -35,6 +39,12 @@ QQC2.ScrollView {
             // qmllint enable missing-property
         }
         return false;
+    }
+
+    function filterSourceRows() {
+        return Utils.filterOverviewSourceRows(overviewState.sourceRows,
+                                              sourceSearchText,
+                                              sourceFilterIndex === 1);
     }
 
     ColumnLayout {
@@ -78,7 +88,10 @@ QQC2.ScrollView {
                 Layout.fillWidth: true
             }
             PlasmaComponents.Label {
-                text: overviewState.sourceRows.length
+                text: overview.visibleSourceRows.length === overviewState.sourceRows.length
+                    ? overviewState.sourceRows.length
+                    : i18n("%1 shown · %2 total", overview.visibleSourceRows.length,
+                           overviewState.sourceRows.length)
                 color: Kirigami.Theme.disabledTextColor
                 Accessible.name: i18np("%1 source", "%1 sources",
                                              overviewState.sourceRows.length)
@@ -95,9 +108,45 @@ QQC2.ScrollView {
             color: Kirigami.Theme.disabledTextColor
         }
 
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            visible: overviewState.sourceRows.length > 0
+
+            Kirigami.SearchField {
+                Layout.fillWidth: true
+                placeholderText: i18n("Search sources")
+                Accessible.name: i18n("Search monitoring sources")
+                text: overview.sourceSearchText
+                onTextChanged: overview.sourceSearchText = text
+            }
+
+            QQC2.ComboBox {
+                Layout.minimumWidth: Kirigami.Units.gridUnit * 8
+                model: [i18n("All"), i18n("Needs attention")]
+                currentIndex: overview.sourceFilterIndex
+                Accessible.name: i18n("Filter sources")
+                onActivated: function(index) { overview.sourceFilterIndex = index; }
+            }
+        }
+
+        PlasmaComponents.Label {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.largeSpacing
+            Layout.rightMargin: Kirigami.Units.largeSpacing
+            visible: overviewState.sourceRows.length > 0
+                && overview.visibleSourceRows.length === 0
+            text: overview.sourceFilterIndex === 1
+                ? i18n("No sources currently need attention.")
+                : i18n("No source matches your search.")
+            wrapMode: Text.WordWrap
+            color: Kirigami.Theme.disabledTextColor
+        }
+
         Repeater {
             id: sourceRepeater
-            model: overviewState.sourceRows
+            model: overview.visibleSourceRows
 
             Monitor.DailySourceCard {
                 required property var modelData

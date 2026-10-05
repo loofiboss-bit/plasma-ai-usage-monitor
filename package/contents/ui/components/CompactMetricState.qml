@@ -63,12 +63,16 @@ QtObject {
             return reset.stableId
                 ? relativeReset(reset.resetAt) : formatter.unavailableValue();
         }
-        if (normalized === "actual-spend")
-            return Utils.formatCurrencyTotals(summary.providerActualSpendTotals || {});
+        if (normalized === "actual-spend") {
+            var actualSpend = Utils.formatSpendGroups(summary.spendGroups || [], "actual");
+            return actualSpend !== "" ? actualSpend : formatter.unavailableValue();
+        }
         if (normalized === "active-sources")
             return Number(summary.reportingUsefulSourceCount || 0).toString();
-        if (normalized === "dailycost")
-            return Utils.formatCurrencyTotals(summary.providerDailyActualSpendTotals || {});
+        if (normalized === "dailycost") {
+            var dailySpend = Utils.formatSpendGroups(summary.spendGroups || [], "actual", "day");
+            return dailySpend !== "" ? dailySpend : formatter.unavailableValue();
+        }
         if (normalized === "requests") {
             var requests = summary.remainingRequests || {};
             return requests.stableId

@@ -23,6 +23,8 @@ class WebhookNotifier : public QObject {
                  setDiscordWebhookUrl NOTIFY configChanged)
   Q_PROPERTY(int cooldownMinutes READ cooldownMinutes WRITE setCooldownMinutes
                  NOTIFY configChanged)
+  Q_PROPERTY(QVariantMap lastDeliveryResults READ lastDeliveryResults NOTIFY
+                 runtimeStatusChanged)
 
 public:
   explicit WebhookNotifier(QObject *parent = nullptr,
@@ -43,6 +45,7 @@ public:
 
   int cooldownMinutes() const;
   void setCooldownMinutes(int minutes);
+  QVariantMap lastDeliveryResults() const;
 
   Q_INVOKABLE void sendAlert(const QString &eventKey, const QString &title,
                              const QString &message, bool critical = false);
@@ -59,12 +62,15 @@ Q_SIGNALS:
   void deliveryFailed(const QString &channel, const QString &message);
   void delivered(const QString &channel, int httpStatus);
   void guardrailEventAccepted(const QVariantMap &event);
+  void runtimeStatusChanged();
 
 private:
   bool shouldSend(const QString &eventKey);
   void postSlack(const QString &title, const QString &message, bool critical);
   void postDiscord(const QString &title, const QString &message, bool critical);
   bool validateWebhookUrl(const QString &channel, const QString &url);
+  void recordDeliveryResult(const QString &channel, const QString &status,
+                            const QString &reason, int httpStatus);
 
   qint64 m_policyEventId = 0;
   QString m_policyChannel;
@@ -75,6 +81,7 @@ private:
   QString m_discordWebhookUrl;
   int m_cooldownMinutes = 15;
   QHash<QString, QDateTime> m_lastSent;
+  QVariantMap m_lastDeliveryResults;
 };
 
 #endif // WEBHOOKNOTIFIER_H

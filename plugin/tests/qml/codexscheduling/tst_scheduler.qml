@@ -11,6 +11,7 @@ TestCase {
     property int codexLocalCalls: 0
     property int genericGateCalls: 0
     property int localAuthGateCalls: 0
+    property int antigravityCalls: 0
 
     QtObject {
         id: configuration
@@ -31,15 +32,54 @@ TestCase {
     QtObject {
         id: codexMonitor
         property bool installed: true
+        property bool syncNeedsAction: false
+        property bool syncing: false
+        property date lastSyncTime: new Date(NaN)
+        property date lastSyncCompletionTime: new Date(NaN)
+        property date syncRetryAfter: new Date(NaN)
+        property date nextScheduledRefresh: new Date(NaN)
+        signal syncStatusChanged()
         function canAutoSync() { testCase.genericGateCalls++; return true; }
         function canAutoSyncFromLocalAuth() { testCase.localAuthGateCalls++; return true; }
-        function syncFromLocalAuth() { testCase.codexLocalCalls++; }
+        function syncFromLocalAuth() {
+            testCase.codexLocalCalls++;
+            lastSyncTime = new Date();
+            lastSyncCompletionTime = lastSyncTime;
+            syncStatusChanged();
+        }
+        function setNextScheduledRefresh(value) { nextScheduledRefresh = value; }
     }
 
     QtObject {
         id: claudeMonitor
         property bool installed: true
+        property bool syncNeedsAction: false
+        property bool syncing: false
+        property date lastSyncTime: new Date(NaN)
+        property date lastSyncCompletionTime: new Date(NaN)
+        property date syncRetryAfter: new Date(NaN)
+        property date nextScheduledRefresh: new Date(NaN)
+        signal syncStatusChanged()
         function canAutoSync() { return true; }
+        function setNextScheduledRefresh(value) { nextScheduledRefresh = value; }
+    }
+
+    QtObject {
+        id: antigravityMonitor
+        property bool installed: true
+        property bool syncing: false
+        property bool syncNeedsAction: false
+        property string readinessCode: "ready"
+        property date lastSyncTime: new Date()
+        property date lastSyncCompletionTime: new Date(NaN)
+        property date syncRetryAfter: new Date(NaN)
+        property date lastSuccessfulRefresh: new Date(0)
+        property date nextScheduledRefresh: new Date(NaN)
+        signal syncStatusChanged()
+        signal antigravityStatusChanged()
+        signal syncCompleted(bool success)
+        function setNextScheduledRefresh(value) { nextScheduledRefresh = value; }
+        function refreshQuota() { testCase.antigravityCalls++; }
     }
 
     QtObject {
@@ -99,6 +139,20 @@ TestCase {
         codexLocalCalls = 0;
         genericGateCalls = 0;
         localAuthGateCalls = 0;
+        antigravityCalls = 0;
+        codexMonitor.syncNeedsAction = false;
+        codexMonitor.syncing = false;
+        codexMonitor.lastSyncTime = new Date(NaN);
+        codexMonitor.lastSyncCompletionTime = new Date(NaN);
+        codexMonitor.syncRetryAfter = new Date(NaN);
+        codexMonitor.nextScheduledRefresh = new Date(NaN);
+        claudeMonitor.syncNeedsAction = false;
+        claudeMonitor.syncing = false;
+        claudeMonitor.lastSyncTime = new Date(NaN);
+        claudeMonitor.lastSyncCompletionTime = new Date(NaN);
+        claudeMonitor.syncRetryAfter = new Date(NaN);
+        claudeMonitor.nextScheduledRefresh = new Date(NaN);
+        configuration.antigravityEnabled = false;
         configuration.browserSyncEnabled = false;
         configuration.claudeCodeEnabled = false;
         configuration.codexEnabled = false;
@@ -113,16 +167,17 @@ TestCase {
             claudeCodeMonitor: claudeMonitor,
             codexCliMonitor: codexMonitor,
             copilotMonitor: noOpMonitor,
-            antigravityMonitor: noOpMonitor,
+            antigravityMonitor: antigravityMonitor,
             usageDatabase: database,
             popupOpen: false
         });
     }
 
-    function repeatingTimerWithInterval(owner, interval) {
+    function scheduledTimer(owner) {
         for (var index = 0; index < owner.data.length; ++index) {
             var candidate = owner.data[index];
-            if (candidate && candidate.repeat && candidate.interval === interval)
+            if (candidate && candidate.repeat === false && candidate.dueAt
+                    && isFinite(candidate.dueAt.getTime()))
                 return candidate;
         }
         return null;
@@ -179,19 +234,80 @@ TestCase {
         compare(genericGateCalls, 0);
     }
 
-    function test_periodicTimerRunsLocalAuthWithoutBrowserSync() {
+    function test_singleShotTimerRunsLocalAuthWithoutBrowserSync() {
         configuration.codexEnabled = true;
         var scheduler = createScheduler();
         verify(scheduler);
-        var timer = repeatingTimerWithInterval(scheduler, 61000);
+        var timer = scheduledTimer(scheduler);
         verify(timer);
         compare(timer.running, true);
+        compare(timer.repeat, false);
+        var dueBefore = timer.dueAt;
 
+        wait(10);
         timer.triggered();
         compare(codexLocalCalls, 1);
         compare(browserCalls, 0);
         compare(localAuthGateCalls, 1);
         compare(genericGateCalls, 0);
+        verify(timer.dueAt > dueBefore);
+        compare(codexMonitor.nextScheduledRefresh.getTime(), timer.dueAt.getTime());
+    }
+
+    function test_retryAfterAndActionNeededControlNextDeadline() {
+        configuration.codexEnabled = true;
+        var scheduler = createScheduler();
+        verify(scheduler);
+        var timer = scheduledTimer(scheduler);
+        verify(timer);
+
+        var retryAt = new Date(Date.now() + 5 * 60 * 1000);
+        codexMonitor.lastSyncCompletionTime = new Date();
+        codexMonitor.syncRetryAfter = retryAt;
+        codexMonitor.syncStatusChanged();
+        verify(timer.dueAt >= retryAt);
+
+        codexMonitor.syncNeedsAction = true;
+        codexMonitor.syncStatusChanged();
+        compare(timer.running, false);
+        verify(!isFinite(timer.dueAt.getTime()));
+        verify(!isFinite(codexMonitor.nextScheduledRefresh.getTime()));
+    }
+
+    function test_offlinePausesExternalAutomaticSyncButKeepsLocalAndManualSync() {
+        configuration.browserSyncEnabled = true;
+        configuration.claudeCodeEnabled = true;
+        configuration.codexEnabled = true;
+        var scheduler = createScheduler();
+        verify(scheduler);
+
+        scheduler.networkPolicy.observeReachability(false);
+        scheduler.performAutomaticSubscriptionSync();
+        compare(browserCalls, 0);
+        compare(codexLocalCalls, 1);
+
+        scheduler.performBrowserSync();
+        compare(browserCalls, 2);
+        verify(browserServices.indexOf("claude") >= 0);
+        verify(browserServices.indexOf("codex") >= 0);
+    }
+
+    function test_offlineAntigravityTimerDoesNotCallNetworkAndRecoversOnce() {
+        configuration.antigravityEnabled = true;
+        var scheduler = createScheduler();
+        verify(scheduler);
+        var timer = scheduledTimer(scheduler);
+        verify(timer);
+
+        scheduler.networkPolicy.observeReachability(false);
+        compare(timer.running, false);
+        verify(!isFinite(antigravityMonitor.nextScheduledRefresh.getTime()));
+        timer.triggered();
+        compare(antigravityCalls, 0);
+
+        scheduler.networkPolicy.observeReachability(true);
+        tryCompare(testCase, "antigravityCalls", 1, 2000);
+        compare(antigravityCalls, 1);
     }
 
     function test_nextScheduledRefreshAdvancesAfterSuccessfulRefresh() {

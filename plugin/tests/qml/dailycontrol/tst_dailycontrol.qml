@@ -98,11 +98,8 @@ TestCase {
             nearestReset: values.nearestReset || ({}),
             lowestActualRemainingQuota: values.lowestActualRemainingQuota || ({}),
             nearestActualReset: values.nearestActualReset || ({}),
-            actualSpendTotals: values.actualSpendTotals || ({}),
-            estimatedSpendTotals: values.estimatedSpendTotals || ({}),
+            spendGroups: values.spendGroups || [],
             fixedSubscriptionFees: values.fixedSubscriptionFees || ({}),
-            providerActualSpendTotals: values.providerActualSpendTotals || ({}),
-            providerDailyActualSpendTotals: values.providerDailyActualSpendTotals || ({}),
             remainingRequests: values.remainingRequests || ({})
         };
     }
@@ -213,8 +210,12 @@ TestCase {
         load({}, summary({
             enabledSourceCount: 1,
             reportingUsefulSourceCount: 1,
-            providerActualSpendTotals: { USD: 0 },
-            providerDailyActualSpendTotals: { USD: 0 },
+            spendGroups: [
+                { currency: "USD", value: 0, quality: "actual", window: "current",
+                    bounded: false, sourceNames: ["OpenAI"] },
+                { currency: "USD", value: 0, quality: "actual", window: "day",
+                    bounded: false, sourceNames: ["OpenAI"] }
+            ],
             remainingRequests: { stableId: "openai", value: 0 },
             lowestActualRemainingQuota: {
                 stableId: "openai", displayName: "OpenAI", percentRemaining: 0
@@ -318,15 +319,19 @@ TestCase {
     function test_spendCategoriesStaySeparateAndKeepAvailableZero() {
         load({}, summary({
             enabledSourceCount: 1,
-            actualSpendTotals: { USD: 0 },
-            estimatedSpendTotals: { EUR: 2.5 },
+            spendGroups: [
+                { currency: "USD", value: 0, quality: "actual", window: "month",
+                    bounded: false, sourceNames: ["OpenAI"] },
+                { currency: "EUR", value: 2.5, quality: "estimated", window: "day",
+                    bounded: false, sourceNames: ["Cursor"] }
+            ],
             fixedSubscriptionFees: { USD: 20 }
         }));
         var card = createTemporaryObject(spendComponent, testCase);
         verify(card);
         compare(card.spendRows.length, 3);
-        compare(card.spendRows[0].totals.USD, 0);
-        compare(card.spendRows[1].totals.EUR, 2.5);
+        compare(card.spendRows[0].group.value, 0);
+        compare(card.spendRows[1].group.value, 2.5);
         compare(card.spendRows[2].totals.USD, 20);
     }
 

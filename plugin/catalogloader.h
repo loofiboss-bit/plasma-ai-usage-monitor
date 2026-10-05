@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QStringList>
 #include <QVariantList>
+#include <QTimer>
 #include <QtQmlIntegration/qqmlintegration.h>
 
 class CatalogLoader : public QObject
@@ -35,6 +36,7 @@ public:
 
     Q_INVOKABLE bool load();
     Q_INVOKABLE bool isStale(int maxAgeDays) const;
+    Q_INVOKABLE void refreshStatus(const QDateTime &now = QDateTime());
 
     bool isValid() const;
     bool stale() const;
@@ -64,6 +66,7 @@ protected:
 
 private:
     void countReviewFlags();
+    bool hardExpired(const QDateTime &now) const;
 
     QString m_fileName;
     int m_expectedSchemaVersion = 0;
@@ -82,9 +85,12 @@ private:
     qint64 m_sequence = 0;
     QString m_hardExpiresAt;
     bool m_estimatesAllowed = true;
+    bool m_catalogAllowsEstimates = true;
+    QString m_unexpiredVerificationState;
     int m_freshnessSloDays = 30;
     QStringList m_diagnostics;
     QJsonObject m_root;
+    QTimer m_expiryTimer;
 };
 
 #endif // CATALOGLOADER_H

@@ -21,9 +21,12 @@ public:
 
   void addMetric(MetricKind kind, const QVariant &value, const QString &unit,
                  const QString &currency, const QString &window,
-                 MetricSource source, const QDateTime &resetAt = QDateTime()) {
+                 MetricSource source, const QDateTime &resetAt = QDateTime(),
+                 const QDateTime &periodStart = QDateTime(),
+                 const QDateTime &periodEnd = QDateTime()) {
     setProviderMetric(kind, value, unit, currency, QStringLiteral("account"),
-                      window, source, QStringLiteral("actual"), resetAt);
+                      window, source, QStringLiteral("actual"), resetAt,
+                      periodStart, periodEnd);
   }
 
   void addScopedCost(double value, const QString &model,
@@ -133,6 +136,8 @@ private Q_SLOTS:
   void expiredCostRemainsLastKnownButDoesNotAggregate();
   void retryAfterIsPresentInSourceDetail();
   void providerToolMixedCurrencyAndFeesAggregateSeparately();
+  void spendGroupsKeepPeriodsQualityAndUnboundedSourcesSeparate();
+  void subscriptionScheduleIsExposedInDailyState();
   void rangePricedToolPreservesRange();
   void staleBalanceAndConnectivityRemainDistinct();
   void priorityRules_data();
@@ -483,7 +488,7 @@ void DailyStateModelTest::expiredCostRemainsLastKnownButDoesNotAggregate() {
   const QVariantMap row = daily.source(QStringLiteral("openai"));
   QVERIFY(!row.value(QStringLiteral("costAvailable")).toBool());
   QVERIFY(!row.value(QStringLiteral("hasActualData")).toBool());
-  QVERIFY(daily.summary().value(QStringLiteral("actualSpendTotals")).toMap().isEmpty());
+  QVERIFY(daily.summary().value(QStringLiteral("spendGroups")).toList().isEmpty());
   bool foundLastKnown = false;
   for (const QVariant &entry : row.value(QStringLiteral("detailMetrics")).toList()) {
     const QVariantMap metric = entry.toMap();
@@ -559,19 +564,145 @@ void DailyStateModelTest::
   daily.registerLocalTool(QStringLiteral("claude-code"), &tool);
 
   const QVariantMap summary = daily.summary();
-  const QVariantMap actual =
-      summary.value(QStringLiteral("actualSpendTotals")).toMap();
-  QCOMPARE(actual.size(), 2);
-  QCOMPARE(actual.value(QStringLiteral("USD")).toDouble(), 10.0);
-  QCOMPARE(actual.value(QStringLiteral("EUR")).toDouble(), 4.0);
+  const QVariantList spendGroups =
+      summary.value(QStringLiteral("spendGroups")).toList();
+  QCOMPARE(spendGroups.size(), 3);
+  QSet<QString> actualCurrencies;
+  bool foundEstimate = false;
+  for (const QVariant &entry : spendGroups) {
+    const QVariantMap group = entry.toMap();
+    if (group.value(QStringLiteral("quality")) == QLatin1String("estimated")) {
+      foundEstimate = true;
+      QCOMPARE(group.value(QStringLiteral("currency")).toString(),
+               QStringLiteral("USD"));
+      QCOMPARE(group.value(QStringLiteral("value")).toDouble(), 2.5);
+    } else {
+      actualCurrencies.insert(group.value(QStringLiteral("currency")).toString());
+    }
+  }
+  QCOMPARE(actualCurrencies.size(), 2);
+  QVERIFY(actualCurrencies.contains(QStringLiteral("USD")));
+  QVERIFY(actualCurrencies.contains(QStringLiteral("EUR")));
+  QVERIFY(foundEstimate);
   const QVariantMap fixedFees =
       summary.value(QStringLiteral("fixedSubscriptionFees")).toMap();
   QCOMPARE(fixedFees.value(QStringLiteral("USD")).toDouble(), 20.0);
-  QCOMPARE(summary.value(QStringLiteral("estimatedSpendTotals"))
-               .toMap()
-               .value(QStringLiteral("USD"))
-               .toDouble(),
-           2.5);
+}
+
+void DailyStateModelTest::
+    spendGroupsKeepPeriodsQualityAndUnboundedSourcesSeparate() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider monthA;
+  DailyProvider monthB;
+  DailyProvider day;
+  DailyProvider allTimeA;
+  DailyProvider allTimeB;
+  DailyProvider estimate;
+  monthA.makeReady();
+  monthB.makeReady();
+  day.makeReady();
+  allTimeA.makeReady();
+  allTimeB.makeReady();
+  estimate.makeReady();
+
+  const QDateTime monthStart(QDate(2026, 10, 1), QTime(0, 0), QTimeZone::utc());
+  const QDateTime nextMonth(QDate(2026, 11, 1), QTime(0, 0), QTimeZone::utc());
+  const QDateTime dayStart(QDate(2026, 10, 5), QTime(0, 0), QTimeZone::utc());
+  const QDateTime nextDay(QDate(2026, 10, 6), QTime(0, 0), QTimeZone::utc());
+  monthA.addMetric(ProviderBackend::MetricKind::Cost, 10.0, QStringLiteral("USD"),
+                   QStringLiteral("USD"), QStringLiteral("month"),
+                   ProviderBackend::MetricSource::BillingApi, {}, monthStart,
+                   nextMonth);
+  monthB.addMetric(ProviderBackend::MetricKind::Cost, 2.0, QStringLiteral("USD"),
+                   QStringLiteral("USD"), QStringLiteral("month"),
+                   ProviderBackend::MetricSource::BillingApi, {}, monthStart,
+                   nextMonth);
+  day.addMetric(ProviderBackend::MetricKind::Cost, 5.0, QStringLiteral("USD"),
+                QStringLiteral("USD"), QStringLiteral("day"),
+                ProviderBackend::MetricSource::BillingApi, {}, dayStart, nextDay);
+  allTimeA.addMetric(ProviderBackend::MetricKind::Cost, 100.0,
+                     QStringLiteral("USD"), QStringLiteral("USD"),
+                     QStringLiteral("all_time"),
+                     ProviderBackend::MetricSource::BillingApi);
+  allTimeB.addMetric(ProviderBackend::MetricKind::Cost, 200.0,
+                     QStringLiteral("USD"), QStringLiteral("USD"),
+                     QStringLiteral("all_time"),
+                     ProviderBackend::MetricSource::BillingApi);
+  estimate.addMetric(ProviderBackend::MetricKind::Cost, 1.5,
+                     QStringLiteral("USD"), QStringLiteral("USD"),
+                     QStringLiteral("day"),
+                     ProviderBackend::MetricSource::EstimatedPricing, {},
+                     dayStart, nextDay);
+
+  const QList<QPair<QString, DailyProvider *>> providers{
+      {QStringLiteral("openai"), &monthA},
+      {QStringLiteral("anthropic"), &monthB},
+      {QStringLiteral("google"), &day},
+      {QStringLiteral("mistral"), &allTimeA},
+      {QStringLiteral("deepseek"), &allTimeB},
+      {QStringLiteral("groq"), &estimate}};
+  for (const auto &entry : providers) {
+    readiness.registerProviderBackend(entry.first, entry.second);
+    readiness.setSourceEnabled(entry.first, true);
+    daily.registerProviderBackend(entry.first, entry.second);
+  }
+  daily.registerReadinessModel(&readiness);
+
+  const QVariantList groups = daily.summary().value(QStringLiteral("spendGroups")).toList();
+  QCOMPARE(groups.size(), 5);
+  bool foundMonth = false;
+  bool foundDay = false;
+  int allTimeGroups = 0;
+  bool foundEstimate = false;
+  for (const QVariant &entry : groups) {
+    const QVariantMap group = entry.toMap();
+    const QString window = group.value(QStringLiteral("window")).toString();
+    const QString quality = group.value(QStringLiteral("quality")).toString();
+    const double value = group.value(QStringLiteral("value")).toDouble();
+    if (window == QLatin1String("month")) {
+      QVERIFY(!foundMonth);
+      foundMonth = true;
+      QCOMPARE(quality, QStringLiteral("actual"));
+      QCOMPARE(value, 12.0);
+      QCOMPARE(group.value(QStringLiteral("sourceCount")).toInt(), 2);
+      QVERIFY(group.value(QStringLiteral("bounded")).toBool());
+    } else if (window == QLatin1String("day") && quality == QLatin1String("actual")) {
+      foundDay = true;
+      QCOMPARE(value, 5.0);
+    } else if (window == QLatin1String("day") && quality == QLatin1String("estimated")) {
+      foundEstimate = true;
+      QCOMPARE(value, 1.5);
+    } else if (window == QLatin1String("all_time")) {
+      ++allTimeGroups;
+      QCOMPARE(group.value(QStringLiteral("sourceCount")).toInt(), 1);
+      QVERIFY(!group.value(QStringLiteral("bounded")).toBool());
+    }
+  }
+  QVERIFY(foundMonth);
+  QVERIFY(foundDay);
+  QVERIFY(foundEstimate);
+  QCOMPARE(allTimeGroups, 2);
+}
+
+void DailyStateModelTest::subscriptionScheduleIsExposedInDailyState() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyTool tool;
+  tool.setEnabled(true);
+  tool.install();
+  const QDateTime due = QDateTime::currentDateTimeUtc().addSecs(90);
+  tool.setNextScheduledRefresh(due);
+  readiness.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+  daily.registerReadinessModel(&readiness);
+  daily.registerLocalTool(QStringLiteral("codex-cli"), &tool);
+
+  QCOMPARE(daily.source(QStringLiteral("codex-cli"))
+               .value(QStringLiteral("nextScheduledRefresh")).toDateTime(),
+           due.toUTC());
+  tool.setNextScheduledRefresh({});
+  QVERIFY(!daily.source(QStringLiteral("codex-cli"))
+               .value(QStringLiteral("nextScheduledRefresh")).toDateTime().isValid());
 }
 
 void DailyStateModelTest::rangePricedToolPreservesRange() {
@@ -784,16 +915,20 @@ void DailyStateModelTest::panelAggregatesUseTypedDailyMetrics() {
   daily.registerProviderBackend(QStringLiteral("openai"), &provider);
 
   const QVariantMap summary = daily.summary();
-  QCOMPARE(summary.value(QStringLiteral("providerActualSpendTotals"))
-               .toMap()
-               .value(QStringLiteral("USD"))
-               .toDouble(),
-           0.0);
-  QCOMPARE(summary.value(QStringLiteral("providerDailyActualSpendTotals"))
-               .toMap()
-               .value(QStringLiteral("USD"))
-               .toDouble(),
-           1.5);
+  const QVariantList spendGroups =
+      summary.value(QStringLiteral("spendGroups")).toList();
+  QCOMPARE(spendGroups.size(), 2);
+  for (const QVariant &entry : spendGroups) {
+    const QVariantMap group = entry.toMap();
+    QCOMPARE(group.value(QStringLiteral("quality")).toString(),
+             QStringLiteral("actual"));
+    QVERIFY(group.value(QStringLiteral("window")).toString() ==
+                QLatin1String("current") ||
+            group.value(QStringLiteral("window")).toString() ==
+                QLatin1String("day"));
+    QCOMPARE(group.value(QStringLiteral("currency")).toString(),
+             QStringLiteral("USD"));
+  }
   const QVariantMap requests =
       summary.value(QStringLiteral("remainingRequests")).toMap();
   QCOMPARE(requests.value(QStringLiteral("stableId")).toString(),
@@ -826,11 +961,10 @@ void DailyStateModelTest::scopedRowsNeverDoubleDailyTotals() {
 
   const QVariantMap source = daily.source(QStringLiteral("openai"));
   QCOMPARE(source.value(QStringLiteral("costValue")).toDouble(), 10.0);
-  QCOMPARE(daily.summary()
-               .value(QStringLiteral("providerDailyActualSpendTotals"))
-               .toMap()
-               .value(QStringLiteral("USD"))
-               .toDouble(),
+  const QVariantList spendGroups =
+      daily.summary().value(QStringLiteral("spendGroups")).toList();
+  QCOMPARE(spendGroups.size(), 1);
+  QCOMPARE(spendGroups.first().toMap().value(QStringLiteral("value")).toDouble(),
            10.0);
 
   SourceDetailModel detail;
