@@ -1,9 +1,11 @@
 # Subscription catalog review — 2026-10-06
 
-The subscription catalog's 30-day evidence window expired on 2026-10-05. This
-review refreshes the official source references, confirms current public plan
-prices, and keeps account-specific usage unavailable until authenticated data is
-present.
+The subscription catalog's previous 30-day evidence window expired on
+2026-10-05. This review refreshes the official source references, confirms
+current public plan prices, and keeps account-specific usage unavailable until
+authenticated data is present. Catalog dates use UTC: this review was completed
+on 2026-10-05 UTC (2026-10-06 in Europe/Stockholm), so the refreshed 30-day
+evidence interval expires on 2026-11-04.
 
 | Tool | Reviewed evidence and decision |
 | --- | --- |
