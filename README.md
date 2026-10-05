@@ -14,7 +14,9 @@ candidate; GitHub, COPR and KDE Store publication is pending. The planned
 will be populated only after its separate release qualification.
 See the [V23 plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V23_PLAN.md) and
 [qualification checklist](docs/release/v23.0.0-checklist.md). Screenshots
-below show V22 in isolated demo fixtures, not the V23 candidate.
+below were recaptured from V23 in isolated Plasma fixtures. They document the
+candidate UI and do not replace physical scaling, keyboard, or screen-reader
+qualification.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 
