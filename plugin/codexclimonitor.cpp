@@ -131,18 +131,21 @@ QByteArray CodexCliMonitor::localAuthRevision() const
 
 void CodexCliMonitor::syncFromLocalAuth()
 {
+    if (!isEnabled()) return;
     startSync(QString(), false);
 }
 
 void CodexCliMonitor::syncFromBrowser(const QString &cookieHeader, int browserType)
 {
     Q_UNUSED(browserType);
+    if (!isEnabled()) return;
     startSync(cookieHeader, true);
 }
 
 void CodexCliMonitor::startSync(const QString &browserCookieHeader, bool browserFallbackRequested)
 {
-    if (isSyncing()) return;
+    if (!isEnabled() || isSyncing()) return;
+    if (beginSyncGeneration() == 0) return;
     setSyncing(true);
     setSyncStatus(QStringLiteral("Syncing..."));
 
@@ -191,7 +194,9 @@ bool CodexCliMonitor::fetchCodexUsage(const QString &cookieHeader)
     request.setTransferTimeout(30000);
 
     QNetworkReply *reply = requestCodexUsage(request);
+    trackSyncReply(reply);
     connect(reply, &QNetworkReply::finished, this, [this, reply, cookieHeader]() {
+        if (!syncReplyIsCurrent(reply)) { reply->deleteLater(); return; }
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError) {
             handleCodexUsageReplyFailure(reply, cookieHeader);
@@ -292,6 +297,7 @@ void CodexCliMonitor::fetchAccountCheck(const QString &cookieHeader)
 
     QNetworkReply *reply = networkManager()->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (!syncReplyIsCurrent(reply)) { reply->deleteLater(); return; }
         reply->deleteLater();
 
         if (reply->error() != QNetworkReply::NoError) {

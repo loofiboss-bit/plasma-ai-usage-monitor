@@ -70,7 +70,8 @@ double ClaudeCodeMonitor::defaultCostForPlan(const QString &plan) const
 void ClaudeCodeMonitor::syncFromBrowser(const QString &cookieHeader, int browserType)
 {
     Q_UNUSED(browserType);
-    if (isSyncing()) return;
+    if (!isEnabled() || isSyncing()) return;
+    if (beginSyncGeneration() == 0) return;
     setSyncing(true);
     setSyncStatus(QStringLiteral("Syncing..."));
 
@@ -111,6 +112,7 @@ void ClaudeCodeMonitor::fetchAccountInfo(const QString &cookieHeader)
 
     QNetworkReply *reply = networkManager()->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply, cookieHeader]() {
+        if (!syncReplyIsCurrent(reply)) { reply->deleteLater(); return; }
         reply->deleteLater();
 
         if (reply->error() != QNetworkReply::NoError) {
@@ -249,6 +251,7 @@ void ClaudeCodeMonitor::fetchUsageData(const QString &orgUuid, const QString &co
 
     QNetworkReply *reply = networkManager()->get(request);
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (!syncReplyIsCurrent(reply)) { reply->deleteLater(); return; }
         reply->deleteLater();
 
         if (reply->error() != QNetworkReply::NoError) {

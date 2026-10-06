@@ -75,13 +75,18 @@ Rectangle {
 
     function buildRows() {
         var rows = [];
-        var actual = summary.actualSpendTotals || {};
-        var estimated = summary.estimatedSpendTotals || {};
+        var groups = summary.spendGroups || [];
+        for (var g = 0; g < groups.length; ++g) {
+            var group = groups[g] || {};
+            if (group.quality !== "actual" && group.quality !== "estimated") continue;
+            var label = group.quality === "estimated"
+                ? i18n("Estimated spend · %1", Utils.spendWindowText(group))
+                : i18n("Actual spend · %1", Utils.spendWindowText(group));
+            rows.push({ label: label,
+                icon: group.quality === "estimated" ? "view-statistics" : "wallet-open",
+                group: group });
+        }
         var fees = summary.fixedSubscriptionFees || {};
-        if (hasTotals(actual))
-            rows.push({ label: i18n("Actual spend"), icon: "wallet-open", totals: actual });
-        if (hasTotals(estimated))
-            rows.push({ label: i18n("Estimated spend"), icon: "view-statistics", totals: estimated });
         if (hasTotals(fees))
             rows.push({ label: i18n("Fixed subscription fees"), icon: "office-chart-ring", totals: fees });
         var ranges = summary.fixedSubscriptionFeeRanges || [];
@@ -94,6 +99,7 @@ Rectangle {
     }
 
     function rowValue(row) {
+        if (row.group) return Utils.formatSpendGroup(row.group);
         if (!row.range) return Utils.formatCurrencyTotals(row.totals);
         return i18n("%1–%2 %3", Number(row.range.rangeMin).toFixed(2),
             Number(row.range.rangeMax).toFixed(2), row.range.currency);

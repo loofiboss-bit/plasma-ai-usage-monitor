@@ -68,6 +68,14 @@ The popup's **Export file** action writes the selected series as JSON or CSV.
 Copying CSV to the clipboard is available as a separate secondary action.
 History settings can also write JSON or CSV on a schedule.
 
+Selected-series JSON follows schema v6 and contains the metric, selected time
+bounds, bucket size, series metadata, quality classes, coverage flags, and
+timestamped points. CSV uses the same selection and explicit columns. Both
+formats preserve unit, currency, period, quality, gaps, and unavailable `null`
+separately from available numeric zero. They use an explicit field allowlist;
+raw scope identities, internal database names, and other internal fields are
+omitted.
+
 Choose a directory you own. **Settings → History → Write Export Files** reports
 progress, the written paths, complete or partial success, and failures. Repeated
 clicks cannot overlap an active export. **Last scheduled export** shows the last
@@ -123,6 +131,12 @@ when possible. **Listen on all IPv4 interfaces** is an explicit opt-in for a
 Prometheus server on another host. It binds to `0.0.0.0`; the endpoint has no
 authentication or TLS, so restrict the selected port with a host or network
 firewall. Anyone who can connect can read the exported metrics.
+
+**Settings → History** shows the actual runtime state, bound address, and port.
+If startup fails, it reports a typed reason such as a port already in use. A
+missing or older-than-one-minute runtime snapshot is shown as **unknown**.
+Opening Settings reads the existing endpoint state and does not start another
+server.
 
 Guardrail metrics use fixed source/risk/value-class labels.
 Authenticated local-tool quota windows are exported as
@@ -194,6 +208,12 @@ attempts per event/channel, with cooldown and Retry-After. Invalid URLs or
 rejected credentials require configuration repair. Disabled channels and
 outdated events are suppressed with a reason. Raw model, project, workspace,
 line-item, policy and API-key identifiers are not sent.
+
+**Settings → Alerts → Recent direct delivery** shows the latest safe result for
+each ordinary Slack or Discord webhook: accepted HTTP status or a short reason
+such as timeout, rate limiting, or permission failure. It never displays a
+webhook URL or free-form network error. Budget-policy deliveries continue to
+use their per-event receipts above.
 
 ## Alert tuning
 

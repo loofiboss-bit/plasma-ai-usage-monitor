@@ -46,6 +46,7 @@ public:
 Q_SIGNALS:
     void configurationChanged();
     void statusChanged();
+    void catalogInstalled(qint64 sequence);
 
 private:
     void finishNetworkCheck(const QByteArray &body, const QString &etag,

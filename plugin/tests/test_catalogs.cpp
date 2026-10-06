@@ -44,6 +44,7 @@ private Q_SLOTS:
     void subscriptionCatalogLoads();
     void subscriptionEvidenceBoundaries();
     void staleCatalogDetection();
+    void catalogExpiryIsRecheckedWithoutReloading();
     void invalidCatalogExposesStatus();
 };
 
@@ -194,7 +195,7 @@ void CatalogsTest::subscriptionCatalogLoads()
 
     QVERIFY(catalog.isValid());
     QCOMPARE(catalog.schemaVersion(), 1);
-    QCOMPARE(catalog.catalogVersion(), QStringLiteral("2026.09.05"));
+    QVERIFY(QDate::fromString(catalog.catalogVersion(), QStringLiteral("yyyy.MM.dd")).isValid());
     QCOMPARE(catalog.runtimeScraping(), false);
     QVERIFY(catalog.manualReviewCount() > 0);
     QVERIFY(catalog.sourceConflictCount() > 0);
@@ -203,13 +204,33 @@ void CatalogsTest::subscriptionCatalogLoads()
     QVERIFY(catalog.reviewItems().first().toMap().value(QStringLiteral("sourceConflictReason")).toString().contains(QStringLiteral("Windsurf")));
 
     QCOMPARE(catalog.planIdForLabel(QStringLiteral("claude-code"), QStringLiteral("Max 20x")), QStringLiteral("max_20x"));
-    QCOMPARE(catalog.planIdForLabel(QStringLiteral("codex-cli"), QStringLiteral("Pro $100")), QStringLiteral("pro_100"));
+    QCOMPARE(catalog.planIdForLabel(QStringLiteral("codex-cli"), QStringLiteral("Pro 100")), QStringLiteral("pro_100"));
+    QCOMPARE(catalog.planLabelForId(QStringLiteral("codex-cli"), QStringLiteral("pro")), QStringLiteral("Pro 200"));
+    QCOMPARE(catalog.planLabelForId(QStringLiteral("codex-cli"), QStringLiteral("pro_500")), QStringLiteral("Pro 500"));
     QCOMPARE(catalog.planLabelForId(QStringLiteral("github-copilot"), QStringLiteral("pro_plus")), QStringLiteral("Pro+"));
+    QCOMPARE(catalog.planLabelForId(QStringLiteral("github-copilot"), QStringLiteral("student")), QStringLiteral("Student"));
+    QCOMPARE(catalog.planLabelForId(QStringLiteral("github-copilot"), QStringLiteral("max")), QStringLiteral("Max"));
     QCOMPARE(catalog.planLabelForId(QStringLiteral("cursor"), QStringLiteral("pro_plus")), QStringLiteral("Pro+"));
     QCOMPARE(catalog.planLabelForId(QStringLiteral("google-antigravity"), QStringLiteral("ultra_20x")),
              QStringLiteral("Google AI Ultra 20x"));
     QVERIFY(catalog.quotaWindows(QStringLiteral("google-antigravity"), QStringLiteral("pro")).isEmpty());
     QVERIFY(!catalog.quotaWindows(QStringLiteral("claude-code"), QStringLiteral("pro")).isEmpty());
+
+    const QVariantMap pro500Price = catalog.price(QStringLiteral("codex-cli"), QStringLiteral("pro_500"));
+    QVERIFY(pro500Price.value(QStringLiteral("available")).toBool());
+    QCOMPARE(pro500Price.value(QStringLiteral("amount")).toDouble(), 500.0);
+    const QVariantList pro200Rows = catalog.quotaWindows(QStringLiteral("codex-cli"), QStringLiteral("pro"));
+    QVERIFY(!pro200Rows.isEmpty());
+    QCOMPARE(pro200Rows.first().toMap().value(QStringLiteral("precision")).toString(), QStringLiteral("official_qualitative"));
+    QVERIFY(!pro200Rows.first().toMap().contains(QStringLiteral("limit")));
+    const QVariantMap copilotMaxPrice = catalog.price(QStringLiteral("github-copilot"), QStringLiteral("max"));
+    QVERIFY(copilotMaxPrice.value(QStringLiteral("available")).toBool());
+    QCOMPARE(copilotMaxPrice.value(QStringLiteral("amount")).toDouble(), 100.0);
+    const QVariantMap jetBrainsProPrice = catalog.price(QStringLiteral("jetbrains-ai"), QStringLiteral("ai_pro"));
+    QVERIFY(jetBrainsProPrice.value(QStringLiteral("available")).toBool());
+    QCOMPARE(jetBrainsProPrice.value(QStringLiteral("rangeMin")).toDouble(), 10.0);
+    QCOMPARE(jetBrainsProPrice.value(QStringLiteral("rangeMax")).toDouble(), 20.0);
+    QCOMPARE(jetBrainsProPrice.value(QStringLiteral("precision")).toString(), QStringLiteral("official_range"));
 
     const QVariantList copilotProPlusRows = catalog.quotaWindows(QStringLiteral("github-copilot"), QStringLiteral("pro_plus"));
     QVERIFY(!copilotProPlusRows.isEmpty());
@@ -293,6 +314,43 @@ void CatalogsTest::staleCatalogDetection()
     ProviderPricingCatalog catalog;
     QVERIFY(catalog.isValid());
     QVERIFY(catalog.isStale(1));
+}
+
+void CatalogsTest::catalogExpiryIsRecheckedWithoutReloading()
+{
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    EnvVarGuard guard("AIUSAGE_MONITOR_CATALOG_DIR");
+    qputenv("AIUSAGE_MONITOR_CATALOG_DIR", dir.path().toUtf8());
+    const QDateTime before = QDateTime::currentDateTimeUtc();
+    const QDateTime expiresAt = before.addSecs(60);
+    QFile file(dir.filePath(QStringLiteral("providers-v4.json")));
+    QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Text));
+    file.write(QString::fromLatin1(R"JSON({
+        "schemaVersion": 7,
+        "catalogVersion": "test-expiry",
+        "release": "8.0.0",
+        "lastReviewed": "2026-10-01",
+        "sequence": 1,
+        "hardExpiresAt": "%1",
+        "runtimeScraping": false,
+        "providers": []
+    })JSON").arg(expiresAt.toString(Qt::ISODateWithMs)).toUtf8());
+    file.close();
+
+    ProviderPricingCatalog catalog;
+    QVERIFY(catalog.isValid());
+    QSignalSpy statusSpy(&catalog, &CatalogLoader::statusChanged);
+    catalog.refreshStatus(before);
+    QVERIFY(catalog.estimatesAllowed());
+    QCOMPARE(catalog.verificationState(), QStringLiteral("packaged"));
+    catalog.refreshStatus(expiresAt.addMSecs(1));
+    QVERIFY(!catalog.estimatesAllowed());
+    QCOMPARE(catalog.verificationState(), QStringLiteral("expired"));
+    QVERIFY(statusSpy.count() >= 1);
+    catalog.refreshStatus(before);
+    QVERIFY(catalog.estimatesAllowed());
+    QCOMPARE(catalog.verificationState(), QStringLiteral("packaged"));
 }
 
 void CatalogsTest::invalidCatalogExposesStatus()

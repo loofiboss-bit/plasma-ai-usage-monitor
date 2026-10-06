@@ -91,8 +91,7 @@ def main() -> None:
     if "property var providers" in cost_summary or "property var subscriptionTools" in cost_summary:
         fail("cost summary must not rebuild spend state from provider or tool loops")
     for aggregate in (
-        "actualSpendTotals",
-        "estimatedSpendTotals",
+        "spendGroups",
         "fixedSubscriptionFees",
     ):
         if aggregate not in cost_summary:

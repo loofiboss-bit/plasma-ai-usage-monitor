@@ -19,6 +19,8 @@ QtObject {
     property string seriesRequestId: ""
     property string activeMetric: ""
     property string errorKey: ""
+    property var requestedFrom: null
+    property var requestedTo: null
     property var seriesData: []
     property var querySources: []
     signal catalogAccepted()
@@ -196,6 +198,8 @@ QtObject {
         querySources = selectedRows.map(queryDescriptor);
         var now = new Date();
         var from = new Date(now.getTime() - rangeDays() * 86400000);
+        requestedFrom = from;
+        requestedTo = now;
         seriesRequestId = "series-" + (++requestGeneration);
         loading = true;
         usageDb.requestHistorySeries(seriesRequestId, querySources, from, now,
@@ -268,30 +272,12 @@ QtObject {
         return text;
     }
 
-    function csvEscape(value) {
-        var text = String(value ?? "");
-        return /[",\r\n]/.test(text)
-            ? "\"" + text.replace(/"/g, "\"\"") + "\"" : text;
-    }
-
     function exportPayload(format) {
-        if (format === "json") return JSON.stringify(seriesData, null, 2);
-        var lines = ["source,kind,metric,unit,currency,semantic,timestamp,value,available"];
-        for (var i = 0; i < seriesData.length; i++) {
-            var series = seriesData[i];
-            var points = series.points || [];
-            for (var p = 0; p < points.length; p++) {
-                var point = points[p];
-                lines.push([
-                    csvEscape(series.dbName), csvEscape(series.sourceKind),
-                    csvEscape(series.metricKind), csvEscape(series.unit),
-                    csvEscape(series.currency), csvEscape(series.semantic),
-                    csvEscape(point.timestamp),
-                    point.available === false ? "" : point.value,
-                    point.available === false ? "false" : "true"
-                ].join(","));
-            }
-        }
-        return lines.join("\r\n") + "\r\n";
+        if (!usageDb || typeof usageDb.exportSelectedSeries !== "function"
+                || !requestedFrom || !requestedTo || seriesData.length === 0)
+            return "";
+        return usageDb.exportSelectedSeries(seriesData, format, activeMetric,
+                                             requestedFrom, requestedTo,
+                                             bucketMinutes());
     }
 }

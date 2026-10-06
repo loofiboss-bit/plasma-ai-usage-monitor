@@ -126,6 +126,11 @@ CatalogLoader::CatalogLoader(QString fileName, int expectedSchemaVersion, QObjec
     , m_fileName(std::move(fileName))
     , m_expectedSchemaVersion(expectedSchemaVersion)
 {
+    m_expiryTimer.setInterval(60000);
+    connect(&m_expiryTimer, &QTimer::timeout, this, [this]() {
+        refreshStatus(QDateTime::currentDateTimeUtc());
+    });
+    m_expiryTimer.start();
 }
 
 bool CatalogLoader::load()
@@ -145,6 +150,8 @@ bool CatalogLoader::load()
     m_sequence = 0;
     m_hardExpiresAt.clear();
     m_estimatesAllowed = true;
+    m_catalogAllowsEstimates = true;
+    m_unexpiredVerificationState.clear();
     m_freshnessSloDays = DEFAULT_STALE_DAYS;
     m_diagnostics.clear();
     m_root = QJsonObject();
@@ -208,18 +215,9 @@ bool CatalogLoader::load()
         m_verificationState = m_root.value(QStringLiteral("verificationState")).toString(
             QStringLiteral("packaged"));
     }
-    m_estimatesAllowed = m_root.value(QStringLiteral("estimatesAllowed")).toBool(true);
-    const QDateTime expiry = QDateTime::fromString(m_hardExpiresAt, Qt::ISODateWithMs).toUTC();
-    if (!expiry.isValid()) {
-        const QDateTime isoExpiry = QDateTime::fromString(m_hardExpiresAt, Qt::ISODate).toUTC();
-        if (isoExpiry.isValid() && QDateTime::currentDateTimeUtc() >= isoExpiry) {
-            m_estimatesAllowed = false;
-            m_verificationState = QStringLiteral("expired");
-        }
-    } else if (QDateTime::currentDateTimeUtc() >= expiry) {
-        m_estimatesAllowed = false;
-        m_verificationState = QStringLiteral("expired");
-    }
+    m_catalogAllowsEstimates = m_root.value(QStringLiteral("estimatesAllowed")).toBool(true);
+    m_estimatesAllowed = m_catalogAllowsEstimates;
+    m_unexpiredVerificationState = m_verificationState;
     countReviewFlags();
 
     if (m_schemaVersion != m_expectedSchemaVersion) {
@@ -252,8 +250,35 @@ bool CatalogLoader::load()
         }
     }
 
+    refreshStatus(QDateTime::currentDateTimeUtc());
     Q_EMIT statusChanged();
     return m_valid;
+}
+
+bool CatalogLoader::hardExpired(const QDateTime &now) const
+{
+    QDateTime expiry = QDateTime::fromString(m_hardExpiresAt, Qt::ISODateWithMs);
+    if (!expiry.isValid())
+        expiry = QDateTime::fromString(m_hardExpiresAt, Qt::ISODate);
+    return expiry.isValid() && now.isValid() && now.toUTC() >= expiry.toUTC();
+}
+
+void CatalogLoader::refreshStatus(const QDateTime &requestedNow)
+{
+    if (!m_loadAttempted || !m_valid)
+        return;
+    const QDateTime now = requestedNow.isValid()
+        ? requestedNow.toUTC() : QDateTime::currentDateTimeUtc();
+    const bool expired = hardExpired(now);
+    const bool nextEstimatesAllowed = m_catalogAllowsEstimates && !expired;
+    const QString nextVerificationState = expired
+        ? QStringLiteral("expired") : m_unexpiredVerificationState;
+    if (m_estimatesAllowed == nextEstimatesAllowed
+        && m_verificationState == nextVerificationState)
+        return;
+    m_estimatesAllowed = nextEstimatesAllowed;
+    m_verificationState = nextVerificationState;
+    Q_EMIT statusChanged();
 }
 
 bool CatalogLoader::ensureLoaded() const
@@ -343,6 +368,8 @@ QString CatalogLoader::sourceFingerprint() const
 QString CatalogLoader::verificationState() const
 {
     ensureLoaded();
+    if (hardExpired(QDateTime::currentDateTimeUtc()))
+        return QStringLiteral("expired");
     return m_verificationState;
 }
 
@@ -361,7 +388,7 @@ QString CatalogLoader::hardExpiresAt() const
 bool CatalogLoader::estimatesAllowed() const
 {
     ensureLoaded();
-    return m_estimatesAllowed;
+    return m_estimatesAllowed && !hardExpired(QDateTime::currentDateTimeUtc());
 }
 
 int CatalogLoader::freshnessSloDays() const

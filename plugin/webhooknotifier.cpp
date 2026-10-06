@@ -67,6 +67,23 @@ void WebhookNotifier::setCooldownMinutes(int minutes) {
   }
 }
 
+QVariantMap WebhookNotifier::lastDeliveryResults() const {
+  return m_lastDeliveryResults;
+}
+
+void WebhookNotifier::recordDeliveryResult(const QString &channel,
+                                          const QString &status,
+                                          const QString &reason,
+                                          int httpStatus) {
+  m_lastDeliveryResults.insert(
+      channel, QVariantMap{{QStringLiteral("status"), status},
+                           {QStringLiteral("reasonKey"), reason},
+                           {QStringLiteral("httpStatus"), httpStatus},
+                           {QStringLiteral("timestamp"),
+                            QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)}});
+  Q_EMIT runtimeStatusChanged();
+}
+
 void WebhookNotifier::sendAlert(const QString &eventKey, const QString &title,
                                 const QString &message, bool critical) {
   if (!m_policyEventId && !shouldSend(eventKey)) {
@@ -232,6 +249,9 @@ bool WebhookNotifier::validateWebhookUrl(const QString &channel,
                                  QStringLiteral("invalid-webhook-url"), 0);
     Q_EMIT deliveryFailed(channel,
                           QStringLiteral("Webhook URL must use HTTPS"));
+    if (!m_policyEventId)
+      recordDeliveryResult(channel, QStringLiteral("failed"),
+                           QStringLiteral("invalid-webhook-url"), 0);
     return false;
   }
   return true;
@@ -295,11 +315,27 @@ void WebhookNotifier::postSlack(const QString &title, const QString &message,
         }
         if (reply->error() != QNetworkReply::NoError || status < 200 ||
             status >= 300) {
+          const QString reason =
+              reply->error() == QNetworkReply::TimeoutError
+                  ? QStringLiteral("timeout")
+              : status == 401 || status == 403
+                  ? QStringLiteral("authentication-or-permission")
+              : status == 429 ? QStringLiteral("rate-limited")
+              : status >= 500 ? QStringLiteral("service-error")
+              : status == 0   ? QStringLiteral("network-error")
+                              : QStringLiteral("http-rejected");
+          if (!eventId)
+            recordDeliveryResult(QStringLiteral("slack"),
+                                 QStringLiteral("failed"), reason, status);
           Q_EMIT deliveryFailed(QStringLiteral("slack"),
                                 reply->error() == QNetworkReply::NoError
                                     ? QStringLiteral("HTTP %1").arg(status)
                                     : reply->errorString());
         } else {
+          if (!eventId)
+            recordDeliveryResult(QStringLiteral("slack"),
+                                 QStringLiteral("delivered"),
+                                 QStringLiteral("accepted"), status);
           Q_EMIT delivered(QStringLiteral("slack"), status);
         }
         reply->deleteLater();
@@ -355,11 +391,27 @@ void WebhookNotifier::postDiscord(const QString &title, const QString &message,
         }
         if (reply->error() != QNetworkReply::NoError || status < 200 ||
             status >= 300) {
+          const QString reason =
+              reply->error() == QNetworkReply::TimeoutError
+                  ? QStringLiteral("timeout")
+              : status == 401 || status == 403
+                  ? QStringLiteral("authentication-or-permission")
+              : status == 429 ? QStringLiteral("rate-limited")
+              : status >= 500 ? QStringLiteral("service-error")
+              : status == 0   ? QStringLiteral("network-error")
+                              : QStringLiteral("http-rejected");
+          if (!eventId)
+            recordDeliveryResult(QStringLiteral("discord"),
+                                 QStringLiteral("failed"), reason, status);
           Q_EMIT deliveryFailed(QStringLiteral("discord"),
                                 reply->error() == QNetworkReply::NoError
                                     ? QStringLiteral("HTTP %1").arg(status)
                                     : reply->errorString());
         } else {
+          if (!eventId)
+            recordDeliveryResult(QStringLiteral("discord"),
+                                 QStringLiteral("delivered"),
+                                 QStringLiteral("accepted"), status);
           Q_EMIT delivered(QStringLiteral("discord"), status);
         }
         reply->deleteLater();

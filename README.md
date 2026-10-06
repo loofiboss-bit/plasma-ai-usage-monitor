@@ -6,14 +6,17 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-The **22.0.0 release (Reliable Everyday Control)** makes configuration restore,
-local activity watching, history maintenance and budget-alert delivery reliable.
-The release targets [GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v22.0.0),
-[Fedora COPR](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/)
-and the [KDE Store](https://store.kde.org/p/2353976/).
-See the [V22 qualification checklist](docs/release/v22.0.0-checklist.md) for
-verification evidence and publication status. Screenshots below show V22 in
-isolated demo fixtures; physical keyboard and screen-reader qualification remain unverified.
+The **23.0.0 release (Clearer and More Reliable Daily Use)** makes spend
+periods, source status, catalog expiry, local-tool cancellation and refresh
+timing easier to understand and more predictable. This version is a review
+candidate; GitHub, COPR and KDE Store publication is pending. The planned
+[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v23.0.0)
+will be populated only after its separate release qualification.
+See the [V23 plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V23_PLAN.md) and
+[qualification checklist](docs/release/v23.0.0-checklist.md). Screenshots
+below were recaptured from V23 in isolated Plasma fixtures. They document the
+candidate UI and do not replace physical scaling, keyboard, or screen-reader
+qualification.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 

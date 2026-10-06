@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add source search and capability summaries to guided setup, plus search and
+  attention filtering to Overview without changing whole-monitor totals.
+- Show the bound Prometheus address, port and typed start failure from its
+  existing runtime, and expose redacted latest direct webhook results by
+  channel.
+
+### Changed
+
+- Group spend only across matching currency, exact period, semantics and
+  actual/estimated quality. Show units, periods and quality from each primary
+  metric, keeping unbounded and all-time values source-specific.
+- Schedule each source with a single-shot deadline from completion or failed
+  attempt, including retry delay. Pause external automatic requests only when
+  the system explicitly reports offline.
+- Serialize popup selected-series exports natively with the documented schema-v6
+  allowlist, preserving point gaps, periods, units, quality, null and zero.
+- Refresh official subscription evidence, add the current ChatGPT Pro 500 and
+  Copilot Student/Max choices, and avoid fixed Codex usage multipliers where
+  current limits are account-specific.
+
+### Fixed
+
+- Cancel and invalidate in-flight subscription-tool network replies when a
+  monitor is disabled, preventing late fallback requests and data writes.
+- Recheck pricing-catalog expiry during long sessions and after wake, and apply
+  verified catalog updates without a widget restart while retaining actual
+  billing data and historical estimate provenance.
+
 ## [22.0.0] — 2026-10-03
 
 ### Fixed

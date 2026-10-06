@@ -102,6 +102,13 @@ TestCase {
         sourceApi: fakeSourceApi
     }
 
+    Onboarding.SetupSourceStep {
+        id: sourceSelection
+        controller: controller
+        width: 460
+        visible: false
+    }
+
     function baseSources() {
         return {
             "codex-cli": {
@@ -170,6 +177,23 @@ TestCase {
         compare(controller.step, controller.resultStep);
         compare(controller.resultQuality, "Gateway-reported usage");
         compare(fakeReadiness.verifyCalls, 0);
+    }
+
+    function test_sourceSelectionSearchPreservesRecommendationOrder() {
+        controller.chooseGoal("usage");
+        compare(sourceSelection.filteredCandidates.length, 2);
+        compare(sourceSelection.filteredCandidates[0].stableId, "openai");
+
+        sourceSelection.searchText = "anthropic";
+        compare(sourceSelection.filteredCandidates.length, 1);
+        compare(sourceSelection.filteredCandidates[0].stableId, "anthropic");
+        verify(sourceSelection.reportSummary(sourceSelection.filteredCandidates[0])
+               .indexOf("Provider-reported") >= 0);
+
+        sourceSelection.searchText = "no such source";
+        compare(sourceSelection.filteredCandidates.length, 0);
+        sourceSelection.searchText = "";
+        compare(sourceSelection.filteredCandidates[0].stableId, "openai");
     }
 
     function test_localToolSuccess() {

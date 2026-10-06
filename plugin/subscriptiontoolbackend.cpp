@@ -3,11 +3,36 @@
 #include <QDate>
 #include <QDebug>
 #include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QTimeZone>
 #include <QVariantMap>
+#include <algorithm>
 #include <cmath>
+#include <functional>
+#include <utility>
 
 namespace {
+class ReplyTrackingNetworkAccessManager final : public QNetworkAccessManager {
+public:
+  using Tracker = std::function<void(QNetworkReply *)>;
+  ReplyTrackingNetworkAccessManager(QObject *parent, Tracker tracker)
+      : QNetworkAccessManager(parent), m_tracker(std::move(tracker)) {}
+
+protected:
+  QNetworkReply *createRequest(Operation operation,
+                               const QNetworkRequest &request,
+                               QIODevice *outgoingData = nullptr) override {
+    QNetworkReply *reply =
+        QNetworkAccessManager::createRequest(operation, request, outgoingData);
+    if (m_tracker)
+      m_tracker(reply);
+    return reply;
+  }
+
+private:
+  Tracker m_tracker;
+};
+
 bool authenticatedQuotaSource(const QVariantMap &row) {
   const QString source = row.value(QStringLiteral("source")).toString();
   return source == QLatin1String("browser_sync") ||
@@ -159,6 +184,7 @@ void SubscriptionToolBackend::setEnabled(bool enabled)
             }
             m_resetCheckTimer->start();
         } else {
+            cancelSync();
             m_resetCheckTimer->stop();
         }
         Q_EMIT enabledChanged();
@@ -888,6 +914,8 @@ void SubscriptionToolBackend::setSyncEnabled(bool enabled)
 {
     if (m_syncEnabled != enabled) {
         m_syncEnabled = enabled;
+        if (!enabled)
+            cancelSync();
         Q_EMIT syncEnabledChanged();
     }
 }
@@ -895,13 +923,28 @@ void SubscriptionToolBackend::setSyncEnabled(bool enabled)
 QString SubscriptionToolBackend::syncStatus() const { return m_syncStatus; }
 QDateTime SubscriptionToolBackend::lastSyncTime() const { return m_lastSyncTime; }
 QDateTime SubscriptionToolBackend::lastAttemptTime() const { return m_lastAttemptTime; }
+QDateTime SubscriptionToolBackend::lastSyncCompletionTime() const { return m_lastSyncCompletionTime; }
+QDateTime SubscriptionToolBackend::nextScheduledRefresh() const { return m_nextScheduledRefresh; }
 bool SubscriptionToolBackend::isSyncing() const { return m_syncing; }
+bool SubscriptionToolBackend::syncNeedsAction() const { return m_syncNeedsAction; }
+QDateTime SubscriptionToolBackend::syncRetryAfter() const { return m_syncRetryAfter; }
+
+void SubscriptionToolBackend::setNextScheduledRefresh(const QDateTime &when)
+{
+    const QDateTime normalized = when.isValid() ? when.toUTC() : QDateTime();
+    if (m_nextScheduledRefresh == normalized)
+        return;
+    m_nextScheduledRefresh = normalized;
+    Q_EMIT syncStatusChanged();
+}
 
 void SubscriptionToolBackend::setSyncing(bool syncing)
 {
     if (m_syncing != syncing) {
         if (syncing)
             m_lastAttemptTime = QDateTime::currentDateTimeUtc();
+        else
+            m_lastSyncCompletionTime = QDateTime::currentDateTimeUtc();
         m_syncing = syncing;
         Q_EMIT syncStatusChanged();
     }
@@ -935,9 +978,58 @@ void SubscriptionToolBackend::syncFromBrowser(const QString &cookieHeader, int b
 QNetworkAccessManager *SubscriptionToolBackend::networkManager()
 {
     if (m_networkManager == nullptr) {
-        m_networkManager = new QNetworkAccessManager(this);
+        m_networkManager = new ReplyTrackingNetworkAccessManager(
+            this, [this](QNetworkReply *reply) { trackSyncReply(reply); });
     }
     return m_networkManager;
+}
+
+quint64 SubscriptionToolBackend::beginSyncGeneration()
+{
+    if (!m_enabled)
+        return 0;
+    return ++m_syncGeneration;
+}
+
+bool SubscriptionToolBackend::syncReplyIsCurrent(const QNetworkReply *reply) const
+{
+    return reply != nullptr && m_enabled
+        && reply->property("subscriptionSyncGeneration").toULongLong()
+            == m_syncGeneration;
+}
+
+void SubscriptionToolBackend::trackSyncReply(QNetworkReply *reply)
+{
+    if (!reply)
+        return;
+    for (const QPointer<QNetworkReply> &active : m_activeReplies) {
+        if (active.data() == reply)
+            return;
+    }
+    reply->setProperty("subscriptionSyncGeneration",
+                       QVariant::fromValue<qulonglong>(m_syncGeneration));
+    m_activeReplies.append(QPointer<QNetworkReply>(reply));
+    connect(reply, &QObject::destroyed, this, [this, reply]() {
+        m_activeReplies.erase(
+            std::remove_if(m_activeReplies.begin(), m_activeReplies.end(),
+                           [reply](const QPointer<QNetworkReply> &active) {
+                             return active.isNull() || active.data() == reply;
+                           }),
+            m_activeReplies.end());
+    });
+}
+
+void SubscriptionToolBackend::cancelSync()
+{
+    ++m_syncGeneration;
+    QList<QPointer<QNetworkReply>> activeReplies;
+    activeReplies.swap(m_activeReplies);
+    for (const QPointer<QNetworkReply> &reply : activeReplies) {
+        if (reply && !reply->isFinished())
+            reply->abort();
+    }
+    if (m_syncing)
+        setSyncing(false);
 }
 
 QVariantList
@@ -1014,6 +1106,7 @@ void SubscriptionToolBackend::resetSyncRetry() {
   m_syncNeedsAction = false;
   m_syncRetryAfter = {};
   m_syncFailures = 0;
+  Q_EMIT syncStatusChanged();
 }
 
 void SubscriptionToolBackend::recordSyncHttpFailure(
@@ -1033,4 +1126,5 @@ void SubscriptionToolBackend::recordSyncHttpFailure(
   if (declared.isValid() && declared > next)
     next = declared;
   m_syncRetryAfter = next;
+  Q_EMIT syncStatusChanged();
 }

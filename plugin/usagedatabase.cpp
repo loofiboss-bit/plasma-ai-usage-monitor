@@ -2613,6 +2613,143 @@ QString UsageDatabase::exportJson(const QString &provider,
     return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Indented));
 }
 
+QString UsageDatabase::exportSelectedSeries(const QVariantList &series,
+                                             const QString &format,
+                                             const QString &metric,
+                                             const QDateTime &from,
+                                             const QDateTime &to,
+                                             int bucketMinutes) const
+{
+    static const QSet<QString> supportedMetrics{
+        QStringLiteral("cost"), QStringLiteral("tokens"),
+        QStringLiteral("requests"), QStringLiteral("rateLimitUsed"),
+        QStringLiteral("usageCount"), QStringLiteral("percentUsed"),
+        QStringLiteral("remaining")};
+    if ((format != QLatin1String("json") && format != QLatin1String("csv"))
+        || !supportedMetrics.contains(metric) || !from.isValid() || !to.isValid()
+        || from >= to || series.isEmpty()) {
+        return {};
+    }
+
+    const QDateTime fromUtc = from.toUTC();
+    const QDateTime toUtc = to.toUTC();
+    const auto iso = [](const QVariant &value) {
+        QDateTime dateTime = value.toDateTime();
+        if (!dateTime.isValid())
+            dateTime = QDateTime::fromString(value.toString(), Qt::ISODateWithMs);
+        if (!dateTime.isValid())
+            dateTime = QDateTime::fromString(value.toString(), Qt::ISODate);
+        return dateTime.isValid() ? dateTime.toUTC().toString(Qt::ISODateWithMs)
+                                  : QString();
+    };
+    QJsonArray projectedSeries;
+    QString csv = QStringLiteral(
+        "schema_version,selection_from,selection_to,source_id,source_name,source_kind,"
+        "metric_kind,unit,currency,semantic,source,quality,window,reset_at,"
+        "first_observation,last_observation,sample_count,available_point_count,"
+        "bucket_size_seconds,contains_gaps,stale,history_only,timestamp,value,available\r\n");
+    for (const QVariant &seriesValue : series) {
+        const QVariantMap input = seriesValue.toMap();
+        QVariantMap item;
+        static const QStringList textFields{
+            QStringLiteral("sourceId"), QStringLiteral("displayName"),
+            QStringLiteral("sourceKind"), QStringLiteral("metricKind"),
+            QStringLiteral("unit"), QStringLiteral("currency"),
+            QStringLiteral("semantic"), QStringLiteral("source"),
+            QStringLiteral("window")};
+        for (const QString &field : textFields) {
+            if (input.contains(field))
+                item.insert(field, input.value(field).toString());
+        }
+        item.insert(QStringLiteral("metricKind"), metric);
+        item.insert(QStringLiteral("resetAt"), iso(input.value(QStringLiteral("resetAt"))));
+        item.insert(QStringLiteral("firstObservation"),
+                    iso(input.value(QStringLiteral("firstObservation"))));
+        item.insert(QStringLiteral("lastObservation"),
+                    iso(input.value(QStringLiteral("lastObservation"))));
+        for (const QString &field : {QStringLiteral("sampleCount"),
+                                     QStringLiteral("availablePointCount"),
+                                     QStringLiteral("bucketSizeSeconds")}) {
+            if (input.contains(field))
+                item.insert(field, input.value(field).toLongLong());
+        }
+        for (const QString &field : {QStringLiteral("containsGaps"),
+                                     QStringLiteral("stale"),
+                                     QStringLiteral("historyOnly")}) {
+            item.insert(field, input.value(field).toBool());
+        }
+        QJsonArray qualityClasses;
+        QStringList qualityLabels;
+        for (const QVariant &qualityValue :
+             input.value(QStringLiteral("sourceQualityClasses")).toList()) {
+            const QString quality = qualityValue.toString();
+            if (quality.isEmpty() || quality.size() > 40)
+                continue;
+            qualityClasses.append(quality);
+            qualityLabels.append(quality);
+        }
+        item.insert(QStringLiteral("sourceQualityClasses"), qualityClasses);
+
+        QJsonArray points;
+        for (const QVariant &pointValue : input.value(QStringLiteral("points")).toList()) {
+            const QVariantMap pointInput = pointValue.toMap();
+            QJsonObject point;
+            point.insert(QStringLiteral("timestamp"),
+                         iso(pointInput.value(QStringLiteral("timestamp"))));
+            const bool available = pointInput.value(QStringLiteral("available")).toBool();
+            point.insert(QStringLiteral("available"), available);
+            const QVariant value = pointInput.value(QStringLiteral("value"));
+            point.insert(QStringLiteral("value"),
+                         available && value.isValid() && !value.isNull()
+                             ? QJsonValue::fromVariant(value) : QJsonValue(QJsonValue::Null));
+            points.append(point);
+
+            const QStringList fields{
+                QStringLiteral("6"), fromUtc.toString(Qt::ISODateWithMs),
+                toUtc.toString(Qt::ISODateWithMs),
+                item.value(QStringLiteral("sourceId")).toString(),
+                item.value(QStringLiteral("displayName")).toString(),
+                item.value(QStringLiteral("sourceKind")).toString(), metric,
+                item.value(QStringLiteral("unit")).toString(),
+                item.value(QStringLiteral("currency")).toString(),
+                item.value(QStringLiteral("semantic")).toString(),
+                item.value(QStringLiteral("source")).toString(),
+                qualityLabels.join(QLatin1Char(';')),
+                item.value(QStringLiteral("window")).toString(),
+                item.value(QStringLiteral("resetAt")).toString(),
+                item.value(QStringLiteral("firstObservation")).toString(),
+                item.value(QStringLiteral("lastObservation")).toString(),
+                QString::number(item.value(QStringLiteral("sampleCount")).toLongLong()),
+                QString::number(item.value(QStringLiteral("availablePointCount")).toLongLong()),
+                QString::number(item.value(QStringLiteral("bucketSizeSeconds")).toLongLong()),
+                item.value(QStringLiteral("containsGaps")).toBool() ? QStringLiteral("true") : QStringLiteral("false"),
+                item.value(QStringLiteral("stale")).toBool() ? QStringLiteral("true") : QStringLiteral("false"),
+                item.value(QStringLiteral("historyOnly")).toBool() ? QStringLiteral("true") : QStringLiteral("false"),
+                point.value(QStringLiteral("timestamp")).toString(),
+                available && value.isValid() && !value.isNull() ? value.toString() : QString(),
+                available ? QStringLiteral("true") : QStringLiteral("false")};
+            QStringList escaped;
+            escaped.reserve(fields.size());
+            for (const QString &field : fields)
+                escaped.append(csvField(field));
+            csv += escaped.join(QLatin1Char(',')) + QStringLiteral("\r\n");
+        }
+        item.insert(QStringLiteral("points"), points);
+        projectedSeries.append(QJsonObject::fromVariantMap(item));
+    }
+
+    if (format == QLatin1String("csv"))
+        return csv;
+    QJsonObject root;
+    root.insert(QStringLiteral("schemaVersion"), 6);
+    root.insert(QStringLiteral("metricKind"), metric);
+    root.insert(QStringLiteral("from"), fromUtc.toString(Qt::ISODateWithMs));
+    root.insert(QStringLiteral("to"), toUtc.toString(Qt::ISODateWithMs));
+    root.insert(QStringLiteral("bucketMinutes"), qBound(1, bucketMinutes, 1440));
+    root.insert(QStringLiteral("series"), projectedSeries);
+    return QString::fromUtf8(QJsonDocument(root).toJson(QJsonDocument::Indented));
+}
+
 QVariantMap
 UsageDatabase::exportAllToDirectory(const QString &dirPath,
                                     const QStringList &formats) const

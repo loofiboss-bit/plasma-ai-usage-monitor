@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QNetworkRequest>
 #include <QNetworkReply>
+#include <QPointer>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QtTest>
@@ -100,6 +101,7 @@ private Q_SLOTS:
     void localAuthHttpRejectionReportsCodexLoginInsteadOfGenericSyncFailure();
     void explicitBrowserHttpRejectionFallsBackWithOriginalCookie_data();
     void explicitBrowserHttpRejectionFallsBackWithOriginalCookie();
+    void disablingMonitorDropsDelayedReplyWithoutFallback();
 };
 
 void CodexLocalAuthTest::localAuthIsInvokableAndReportsMissingLogin()
@@ -110,6 +112,7 @@ void CodexLocalAuthTest::localAuthIsInvokableAndReportsMissingLogin()
     qputenv("HOME", home.path().toUtf8());
 
     CodexCliMonitor monitor;
+    monitor.setEnabled(true);
     QSignalSpy completionSpy(&monitor, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy diagnosticSpy(&monitor, &SubscriptionToolBackend::syncDiagnostic);
 
@@ -194,13 +197,14 @@ void CodexLocalAuthTest::localAuthHttpRejectionReportsCodexLoginInsteadOfGeneric
     authFile.close();
 
     TestCodexCliMonitor monitor;
+    monitor.setEnabled(true);
     monitor.setRejectedStatus(status);
     QVERIFY(monitor.canAutoSyncFromLocalAuth());
     QSignalSpy completionSpy(&monitor, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy diagnosticSpy(&monitor, &SubscriptionToolBackend::syncDiagnostic);
 
     monitor.syncFromLocalAuth();
-    RejectedReply *reply = monitor.pendingReply();
+    QPointer<RejectedReply> reply = monitor.pendingReply();
     QVERIFY(reply);
     QVERIFY(!reply->isFinished());
     QCOMPARE(completionSpy.count(), 0);
@@ -233,6 +237,40 @@ void CodexLocalAuthTest::localAuthHttpRejectionReportsCodexLoginInsteadOfGeneric
     QVERIFY(!monitor.canAutoSyncFromLocalAuth());
 }
 
+void CodexLocalAuthTest::disablingMonitorDropsDelayedReplyWithoutFallback()
+{
+    QTemporaryDir home;
+    QVERIFY(home.isValid());
+    HomeGuard homeGuard;
+    qputenv("HOME", home.path().toUtf8());
+    QVERIFY(QDir().mkpath(home.filePath(QStringLiteral(".codex"))));
+    QFile authFile(home.filePath(QStringLiteral(".codex/auth.json")));
+    QVERIFY(authFile.open(QIODevice::WriteOnly));
+    const QByteArray auth = QByteArrayLiteral("{\"tokens\":{\"access_token\":\"dummy-token\"}}");
+    QCOMPARE(authFile.write(auth), auth.size());
+    authFile.close();
+
+    TestCodexCliMonitor monitor;
+    monitor.setEnabled(true);
+    monitor.setRejectedStatus(401);
+    QSignalSpy completionSpy(&monitor, &SubscriptionToolBackend::syncCompleted);
+    QSignalSpy diagnosticSpy(&monitor, &SubscriptionToolBackend::syncDiagnostic);
+    monitor.syncFromBrowser(QStringLiteral("session=delayed"), 0);
+    QPointer<RejectedReply> reply = monitor.pendingReply();
+    QVERIFY(reply);
+    QVERIFY(monitor.isSyncing());
+
+    monitor.setEnabled(false);
+    QVERIFY(!monitor.isSyncing());
+    reply->finish();
+    QTRY_VERIFY(reply.isNull());
+
+    QCOMPARE(monitor.browserFallbackCount(), 0);
+    QCOMPARE(completionSpy.count(), 0);
+    QCOMPARE(diagnosticSpy.count(), 0);
+    QVERIFY(!monitor.lastSyncTime().isValid());
+}
+
 void CodexLocalAuthTest::explicitBrowserHttpRejectionFallsBackWithOriginalCookie_data()
 {
     QTest::addColumn<int>("status");
@@ -258,6 +296,7 @@ void CodexLocalAuthTest::explicitBrowserHttpRejectionFallsBackWithOriginalCookie
     authFile.close();
 
     TestCodexCliMonitor monitor;
+    monitor.setEnabled(true);
     monitor.setRejectedStatus(status);
     QSignalSpy completionSpy(&monitor, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy diagnosticSpy(&monitor, &SubscriptionToolBackend::syncDiagnostic);

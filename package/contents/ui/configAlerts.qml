@@ -34,6 +34,37 @@ KCM.SimpleKCM {
     property string secretStatusMessage: ""
     property bool secretStatusError: false
 
+    function webhookRuntimeSnapshot() {
+        try {
+            var value = JSON.parse(Plasmoid.configuration.webhookRuntimeSnapshot || "{}");
+            var updated = Date.parse(value.timestamp || "");
+            if (!value.sessionId || !isFinite(updated) || Date.now() - updated > 60000
+                    || updated > Date.now() + 5000) return null;
+            return value;
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function webhookRuntimeText(channel) {
+        var snapshot = webhookRuntimeSnapshot();
+        if (!snapshot) return i18n("%1: runtime status unknown; no recent status snapshot.", channel.toUpperCase());
+        var result = snapshot.channels ? snapshot.channels[channel] : null;
+        if (!result) return i18n("%1: no delivery recorded in this runtime session.", channel.toUpperCase());
+        var time = result.timestamp
+            ? new Date(result.timestamp).toLocaleString(Qt.locale(), Locale.ShortFormat) : "";
+        if (result.status === "delivered")
+            return i18n("%1: accepted by the endpoint (HTTP %2) at %3.", channel.toUpperCase(), result.httpStatus, time);
+        var reason = result.reasonKey === "invalid-webhook-url" ? i18n("configure a valid HTTPS webhook")
+            : result.reasonKey === "authentication-or-permission" ? i18n("check the endpoint credentials and permissions")
+            : result.reasonKey === "rate-limited" ? i18n("the endpoint requested a later retry")
+            : result.reasonKey === "timeout" ? i18n("the request timed out")
+            : result.reasonKey === "channel-disabled" ? i18n("the channel was disabled")
+            : result.reasonKey === "service-error" ? i18n("the endpoint returned a server error")
+            : i18n("the endpoint did not accept the request");
+        return i18n("%1: delivery failed (%2) at %3.", channel.toUpperCase(), reason, time);
+    }
+
     // DND hours: config stores -1 (disabled) or 0-23 (hour).
     // ComboBox index: 0 = "Disabled", 1-24 = hours 0-23.
     property int cfg_dndStartHour: Plasmoid.configuration.dndStartHour
@@ -386,6 +417,15 @@ KCM.SimpleKCM {
                            : row.reasonKey === "attempts-exhausted" ? i18n(" — Retry limit reached.") : "");
                 }).join("\n");
             }
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Recent direct delivery:")
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: alertsPage.webhookRuntimeText("slack") + "\n"
+                + alertsPage.webhookRuntimeText("discord")
+            Accessible.name: text
         }
 
         QQC2.Switch {

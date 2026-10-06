@@ -24,14 +24,28 @@ void RefreshSchedulerModel::startMonitoring() {
   m_wakeTimer.start();
   QNetworkInformation::loadDefaultBackend();
   if (auto *network = QNetworkInformation::instance()) {
-    m_seenOffline = network->reachability() ==
-                    QNetworkInformation::Reachability::Disconnected;
+    const auto initialReachability = network->reachability();
+    m_networkStateKnown = initialReachability !=
+                          QNetworkInformation::Reachability::Unknown;
+    m_externalRefreshAllowed = !m_networkStateKnown ||
+        initialReachability != QNetworkInformation::Reachability::Disconnected;
+    m_seenOffline = m_networkStateKnown && !m_externalRefreshAllowed;
+    Q_EMIT reachabilityChanged();
     connect(network, &QNetworkInformation::reachabilityChanged, this,
             [this](QNetworkInformation::Reachability reachability) {
-              if (reachability == QNetworkInformation::Reachability::Unknown)
+              const bool known = reachability !=
+                  QNetworkInformation::Reachability::Unknown;
+              const bool externalAllowed = !known || reachability !=
+                  QNetworkInformation::Reachability::Disconnected;
+              const bool changed = m_networkStateKnown != known ||
+                                   m_externalRefreshAllowed != externalAllowed;
+              m_networkStateKnown = known;
+              m_externalRefreshAllowed = externalAllowed;
+              if (changed)
+                Q_EMIT reachabilityChanged();
+              if (!known)
                 return;
-              observeReachability(reachability ==
-                                  QNetworkInformation::Reachability::Online);
+              observeReachability(externalAllowed);
             });
   }
 }
@@ -48,6 +62,12 @@ void RefreshSchedulerModel::observeWakeClock(const QDateTime &now) {
 }
 
 void RefreshSchedulerModel::observeReachability(bool online) {
+  const bool changed = !m_networkStateKnown ||
+                       m_externalRefreshAllowed != online;
+  m_networkStateKnown = true;
+  m_externalRefreshAllowed = online;
+  if (changed)
+    Q_EMIT reachabilityChanged();
   if (!online) {
     m_seenOffline = true;
     return;
@@ -55,6 +75,14 @@ void RefreshSchedulerModel::observeReachability(bool online) {
   if (m_seenOffline && !m_recoveryTimer.isActive())
     m_recoveryTimer.start();
   m_seenOffline = false;
+}
+
+bool RefreshSchedulerModel::networkStateKnown() const {
+  return m_networkStateKnown;
+}
+
+bool RefreshSchedulerModel::externalRefreshAllowed() const {
+  return m_externalRefreshAllowed;
 }
 
 int RefreshSchedulerModel::deterministicJitterMs(const QString &providerKey) const

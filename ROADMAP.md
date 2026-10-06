@@ -1,10 +1,26 @@
 # Roadmap
 
-**Current release:** 22.0.0, Reliable Everyday Control (published)
+**Current release:** 23.0.0, Clearer and More Reliable Daily Use (candidate; not published)
 
-**Last updated:** 2026-10-03
+**Last updated:** 2026-10-05
 
 ## Current release
+
+### 23.0.0 Clearer and More Reliable Daily Use
+
+Candidate implementation is ready for review. Public GitHub, Fedora COPR,
+KDE Store and wiki publication remain pending. The [V23 plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V23_PLAN.md)
+and [qualification checklist](docs/release/v23.0.0-checklist.md) track the
+implementation, test results and remaining visual qualification.
+
+- Group spend only when currency, period, semantics and actual/estimated
+  quality match; show each source's own units, period and data quality.
+- Cancel in-flight local-tool sync on disable, use allowlisted selected-series
+  exports, and enforce catalog expiry throughout a Plasma session.
+- Schedule refreshes from a single per-source deadline with retry guidance,
+  and pause external automatic calls while explicitly offline.
+- Add source search and capability guidance, overview filtering, and visible
+  Prometheus and webhook runtime results.
 
 ### 22.0.0 Reliable Everyday Control
 

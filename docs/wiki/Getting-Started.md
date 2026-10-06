@@ -20,7 +20,7 @@ available in Settings.
 ## Complete Guided first success
 
 1. Choose what you want to track first: a local coding tool, provider usage or spend, or a gateway or provider connection.
-2. Choose one source. Sources that can return useful reporting data appear before connectivity-only checks.
+2. Search and choose one source. Sources that can return useful reporting data appear before connectivity-only checks, and each choice summarizes the kind of data it can report.
 3. Review the monitoring level and expected result.
 4. Enter only the required credential and endpoint fields. Provider credentials are saved in KWallet when you choose **Save and verify**.
 5. Run the verification. Provider verification uses the scheduled read-only request and never sends inference. Local-tool verification checks the detected activity path.
