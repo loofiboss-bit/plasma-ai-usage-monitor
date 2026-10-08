@@ -666,7 +666,7 @@ Item {
         function onCopilotOrgNameChanged() {
             runtime.loadIntegrationSecrets();
             if (runtime.copilotMonitor.enabled) {
-                runtime.copilotMonitor.fetchOrgMetrics();
+                runtime.scheduler.fetchCopilotOrgMetrics(false);
             }
         }
 

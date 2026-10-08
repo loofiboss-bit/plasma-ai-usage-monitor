@@ -17,6 +17,7 @@ QtObject {
     // Provider identity, adapter profile, and capabilities come from Catalog v7.
     // Only runtime backend association remains in ProviderRegistry.
     readonly property var providers: {
+        var activeSequence = ProviderPricingCatalog.sequence;
         var catalogProviders = ProviderPricingCatalog.providers();
         var result = [];
         for (var i = 0; i < catalogProviders.length; i++) {
@@ -58,6 +59,7 @@ QtObject {
                 secretKey: (entry.auth?.credentialSlots || [])[0] || ""
             });
         }
+        if (activeSequence < 0) return [];
         return result;
     }
 

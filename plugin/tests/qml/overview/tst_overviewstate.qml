@@ -78,6 +78,26 @@ TestCase {
         verify(formatted.indexOf("+") >= 0);
     }
 
+    function test_overviewSearchAndAttentionFilterOnlyChangeVisibleRows() {
+        var allRows = [
+            { stableId: "openai", displayName: "OpenAI", qualityClass: "actual",
+                attentionSeverity: "none", nextActionText: "" },
+            { stableId: "anthropic", displayName: "Anthropic", qualityClass: "actual",
+                attentionSeverity: "warning", nextActionText: "Check permissions" },
+            { stableId: "cursor", displayName: "Cursor", qualityClass: "estimated",
+                attentionSeverity: "none", nextActionText: "" }
+        ];
+        var searchMatches = Utils.filterOverviewSourceRows(allRows, "permissions", false);
+        compare(searchMatches.length, 1);
+        compare(searchMatches[0].stableId, "anthropic");
+
+        var attentionMatches = Utils.filterOverviewSourceRows(allRows, "", true);
+        compare(attentionMatches.length, 1);
+        compare(attentionMatches[0].stableId, "anthropic");
+        compare(allRows.length, 3);
+        compare(allRows[0].stableId, "openai");
+    }
+
     function test_compactNumbersUseLocaleAndNonBreakingSpacing() {
         var formatted = Utils.formatNumber(1250, Qt.locale("sv_SE"));
         verify(formatted.indexOf("\u202fK") > 0);
@@ -87,16 +107,22 @@ TestCase {
     function test_costCardKeepsTypedCategoriesSeparate() {
         var card = createTemporaryObject(costCardComponent, testCase, {
             summary: {
-                actualSpendTotals: { USD: 0 },
-                estimatedSpendTotals: { EUR: 2.5 },
+                spendGroups: [
+                    { currency: "USD", value: 0, quality: "actual", window: "month",
+                        bounded: false, sourceNames: ["OpenAI"] },
+                    { currency: "EUR", value: 2.5, quality: "estimated", window: "day",
+                        bounded: false, sourceNames: ["Cursor"] }
+                ],
                 fixedSubscriptionFees: { USD: 20 }
             }
         });
         verify(card);
         compare(card.spendRows.length, 3);
-        compare(card.spendRows[0].totals.USD, 0);
-        compare(card.spendRows[1].totals.EUR, 2.5);
+        compare(card.spendRows[0].group.value, 0);
+        compare(card.spendRows[1].group.value, 2.5);
         compare(card.spendRows[2].totals.USD, 20);
+        verify(card.spendRows[0].label.indexOf("this month") >= 0);
+        verify(card.spendRows[1].label.indexOf("Estimated") >= 0);
     }
 
     function test_antigravityCardUsesLocalSourceAndDetectedPlan() {

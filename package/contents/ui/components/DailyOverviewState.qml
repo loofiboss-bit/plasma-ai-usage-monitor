@@ -1,4 +1,5 @@
 import QtQuick
+import "../Utils.js" as Utils
 
 QtObject {
     id: state
@@ -52,11 +53,8 @@ QtObject {
             nearestReset: ({}),
             lowestActualRemainingQuota: ({}),
             nearestActualReset: ({}),
-            actualSpendTotals: ({}),
-            estimatedSpendTotals: ({}),
+            spendGroups: [],
             fixedSubscriptionFees: ({}),
-            providerActualSpendTotals: ({}),
-            providerDailyActualSpendTotals: ({}),
             remainingRequests: ({})
         };
     }
@@ -140,8 +138,25 @@ QtObject {
                         facts.push(i18n("Local activity · estimated"));
                     else if (row.connectivityOnly || row.qualityClass === "connectivity_only")
                         facts.push(i18n("Connectivity only"));
-                    else if (row.costAvailable && typeof row.costValue === "number")
-                        facts.push(i18n("Actual spend · %1 %2", row.currency, row.costValue));
+                    else if (row.primaryMetricAvailable === true
+                            && row.primaryMetricKind === "cost") {
+                        var spend = {
+                            currency: row.primaryMetricCurrency || "",
+                            value: row.primaryMetricValue
+                        };
+                        var period = {
+                            window: row.primaryMetricWindow || "",
+                            periodStart: row.primaryMetricPeriodStart,
+                            periodEnd: row.primaryMetricPeriodEnd,
+                            bounded: !!row.primaryMetricPeriodStart
+                                && !!row.primaryMetricPeriodEnd,
+                            sourceNames: [row.displayName || row.stableId]
+                        };
+                        var quality = row.primaryMetricQuality === "estimated"
+                            ? i18n("Estimated spend") : i18n("Actual spend");
+                        facts.push(i18n("%1 · %2 · %3", quality,
+                            Utils.formatSpendGroup(spend), Utils.spendWindowText(period)));
+                    }
                     else
                         facts.push(i18n("Quota unavailable"));
                 }
@@ -258,28 +273,25 @@ QtObject {
                     Number(fee.rangeMax).toFixed(2), fee.currency),
                 label: i18n("Published fee range · %1", fee.displayName) });
         }
-        var actual = formatTotals(summary.actualSpendTotals);
-        var estimated = formatTotals(summary.estimatedSpendTotals);
         var fixed = formatTotals(summary.fixedSubscriptionFees);
-        if (actual !== "") {
+        var groups = summary.spendGroups || [];
+        for (var g = 0; g < groups.length; ++g) {
+            var group = groups[g] || {};
+            if (group.quality !== "actual" && group.quality !== "estimated") continue;
             facts.push({
-                icon: "view-financial-account",
-                value: actual,
-                label: i18n("Actual spend")
-            });
-        }
-        if (estimated !== "") {
-            facts.push({
-                icon: "accessories-calculator",
-                value: estimated,
-                label: i18n("Local estimate")
+                icon: group.quality === "estimated"
+                    ? "accessories-calculator" : "view-financial-account",
+                value: Utils.formatSpendGroup(group),
+                label: i18n("%1 · %2",
+                    group.quality === "estimated" ? i18n("Local estimate") : i18n("Actual spend"),
+                    Utils.spendWindowText(group))
             });
         }
         if (fixed !== "") {
             facts.push({
                 icon: "wallet-open",
                 value: fixed,
-                label: i18n("Fixed fee")
+                label: i18n("Fixed monthly fee")
             });
         }
         if (facts.length === 0 && Number(summary.enabledSourceCount || 0) > 0) {

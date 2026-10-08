@@ -966,7 +966,9 @@ QList<AntigravityMonitor::Endpoint> AntigravityMonitor::discoverEndpoints(QStrin
 
 void AntigravityMonitor::refreshQuota()
 {
-    if (isSyncing())
+    if (!isEnabled() || isSyncing())
+        return;
+    if (beginSyncGeneration() == 0)
         return;
     checkToolInstalled();
     if (!isInstalled())
@@ -1055,6 +1057,7 @@ void AntigravityMonitor::requestEndpoint(const Endpoint &endpoint)
         reply->setProperty("antigravityTlsError", true);
     });
     connect(reply, &QNetworkReply::finished, this, [this, endpoint, reply]() {
+        if (!syncReplyIsCurrent(reply)) { reply->deleteLater(); return; }
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError)
         {
@@ -1135,6 +1138,7 @@ void AntigravityMonitor::requestLegacyEndpoint(const Endpoint &endpoint)
     connect(reply, &QNetworkReply::sslErrors, this,
             [reply](const QList<QSslError> &) { reply->setProperty("antigravityTlsError", true); });
     connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        if (!syncReplyIsCurrent(reply)) { reply->deleteLater(); return; }
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError)
         {
@@ -1208,6 +1212,7 @@ void AntigravityMonitor::requestQuotaSummary(const Endpoint &endpoint, const QVa
     connect(reply, &QNetworkReply::sslErrors, this,
             [reply](const QList<QSslError> &) { reply->setProperty("antigravityTlsError", true); });
     connect(reply, &QNetworkReply::finished, this, [this, reply, userStatus]() {
+        if (!syncReplyIsCurrent(reply)) { reply->deleteLater(); return; }
         reply->deleteLater();
         if (reply->error() != QNetworkReply::NoError || reply->property("antigravityTlsError").toBool())
         {

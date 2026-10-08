@@ -34,6 +34,10 @@ QtObject {
             primaryMetricAvailable: false,
             primaryMetricValue: undefined,
             primaryMetricUnit: "",
+            primaryMetricCurrency: "",
+            primaryMetricWindow: "",
+            primaryMetricKind: "",
+            primaryMetricQuality: qualityClass,
             currency: "",
             quotaWindows: []
         };
@@ -92,7 +96,10 @@ QtObject {
         openRouter.nextActionText = "No action is required.";
         openRouter.primaryMetricAvailable = true;
         openRouter.primaryMetricValue = 0.42;
-        openRouter.primaryMetricUnit = "currency";
+        openRouter.primaryMetricKind = "cost";
+        openRouter.primaryMetricQuality = "actual";
+        openRouter.primaryMetricCurrency = "USD";
+        openRouter.primaryMetricWindow = "day";
         openRouter.currency = "USD";
         openRouter.historyDbName = "OpenRouter";
         if (scenario === "media-source-detail") {
@@ -137,7 +144,9 @@ QtObject {
         deepSeek.readinessState = "reporting_actual";
         deepSeek.primaryMetricAvailable = true;
         deepSeek.primaryMetricValue = 42.75;
-        deepSeek.primaryMetricUnit = "currency";
+        deepSeek.primaryMetricKind = "credit_balance";
+        deepSeek.primaryMetricQuality = "balance";
+        deepSeek.primaryMetricCurrency = "USD";
         deepSeek.currency = "USD";
 
         var cursor = baseRow("cursor", "Cursor", "local_tool", "estimated");
@@ -196,11 +205,18 @@ QtObject {
             nearestReset: reset,
             lowestActualRemainingQuota: quota,
             nearestActualReset: reset,
-            actualSpendTotals: scenario === "media-overview" ? { USD: 0.42 } : {},
-            estimatedSpendTotals: scenario === "media-overview" ? { USD: 0.18 } : {},
+            spendGroups: scenario === "media-overview" ? [
+                { currency: "USD", value: 6.25, window: "month", quality: "actual",
+                    semantic: "interval_total", bounded: false, sourceCount: 1,
+                    sourceIds: ["openrouter"], sourceNames: ["OpenRouter"] },
+                { currency: "USD", value: 0.42, window: "day", quality: "actual",
+                    semantic: "interval_total", bounded: false, sourceCount: 1,
+                    sourceIds: ["openrouter"], sourceNames: ["OpenRouter"] },
+                { currency: "USD", value: 0.18, window: "current", quality: "estimated",
+                    semantic: "interval_total", bounded: false, sourceCount: 1,
+                    sourceIds: ["cursor"], sourceNames: ["Cursor"] }
+            ] : [],
             fixedSubscriptionFees: scenario === "media-overview" ? { USD: 20 } : {},
-            providerActualSpendTotals: scenario === "media-overview" ? { USD: 6.25 } : {},
-            providerDailyActualSpendTotals: scenario === "media-overview" ? { USD: 0.42 } : {},
             remainingRequests: {}
         };
     }

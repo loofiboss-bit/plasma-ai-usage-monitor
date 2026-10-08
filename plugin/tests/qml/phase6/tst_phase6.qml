@@ -35,6 +35,10 @@ TestCase {
         property var historySources: []
         property string historyMetric: ""
         property int historyBucketMinutes: 0
+        property var exportSeries: []
+        property string exportFormat: ""
+        property var exportFrom: null
+        property var exportTo: null
 
         signal analystReady(string requestId, var result)
         signal historyCatalogReady(string requestId, var sources)
@@ -54,6 +58,17 @@ TestCase {
             historySources = sources;
             historyMetric = metric;
             historyBucketMinutes = bucketMinutes;
+        }
+
+        function exportSelectedSeries(series, format, metric, from, to,
+                                       bucketMinutes) {
+            exportSeries = series;
+            exportFormat = format;
+            exportFrom = from;
+            exportTo = to;
+            historyMetric = metric;
+            historyBucketMinutes = bucketMinutes;
+            return "native-selected-series-export";
         }
     }
 
@@ -97,6 +112,10 @@ TestCase {
         fakeDb.historySources = [];
         fakeDb.historyMetric = "";
         fakeDb.historyBucketMinutes = 0;
+        fakeDb.exportSeries = [];
+        fakeDb.exportFormat = "";
+        fakeDb.exportFrom = null;
+        fakeDb.exportTo = null;
 
         compactState.summary = {};
 
@@ -367,8 +386,14 @@ TestCase {
             historyController.seriesData[0]).indexOf("contains gaps") >= 0);
 
         var csv = historyController.exportPayload("csv");
-        verify(csv.indexOf(",0,true") >= 0);
-        verify(csv.indexOf(",,false") >= 0);
+        compare(csv, "native-selected-series-export");
+        compare(fakeDb.exportFormat, "csv");
+        compare(fakeDb.exportSeries.length, 1);
+        verify(fakeDb.exportFrom instanceof Date);
+        verify(fakeDb.exportTo instanceof Date);
+        verify(fakeDb.exportFrom.getTime() < fakeDb.exportTo.getTime());
+        compare(fakeDb.historyMetric, "cost");
+        compare(fakeDb.historyBucketMinutes, 60);
     }
 
     function test_historyControllerExposesCompatibilityFailure() {

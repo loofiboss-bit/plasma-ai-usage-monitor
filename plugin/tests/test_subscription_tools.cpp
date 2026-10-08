@@ -70,6 +70,7 @@ private Q_SLOTS:
     void codexSyncWithoutLiveQuotaKeepsConfiguredPro();
     void codexLiveQuotaPayload();
     void copilotBillingModeLabels();
+    void copilotOrgMetricsRequireEnabledMonitor();
     void localWatchLifecycleAndReplacement();
     void localWatchBounds();
     void localWatchActivityDuringBaseline_data();
@@ -90,11 +91,13 @@ void SubscriptionToolsTest::planDefaults()
     QCOMPARE(codex.defaultLimitForPlan(QStringLiteral("Plus")), 0);
     QCOMPARE(codex.defaultLimitForPlan(QStringLiteral("Pro")), 0);
     QCOMPARE(codex.defaultSecondaryLimitForPlan(QStringLiteral("Pro")), 0);
-    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro $100")), 100.0);
-    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro")), 200.0);
+    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro 100")), 100.0);
+    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro 200")), 200.0);
+    QCOMPARE(codex.defaultCostForPlan(QStringLiteral("Pro 500")), 500.0);
     QVERIFY(codex.availablePlans().size() > 4);
-    QCOMPARE(codex.availablePlans().at(3), QStringLiteral("Pro"));
-    QCOMPARE(codex.availablePlans().at(4), QStringLiteral("Pro $100"));
+    QCOMPARE(codex.availablePlans().at(3), QStringLiteral("Pro 100"));
+    QCOMPARE(codex.availablePlans().at(4), QStringLiteral("Pro 200"));
+    QCOMPARE(codex.availablePlans().at(5), QStringLiteral("Pro 500"));
     codex.setPlanTier(QStringLiteral("pro"));
     QVERIFY(!codex.quotaWindows().isEmpty());
 
@@ -214,6 +217,7 @@ void SubscriptionToolsTest::browserSyncEmptyCookieDiagnostics()
     qputenv("HOME", tempHome.path().toUtf8());
 
     ClaudeCodeMonitor claude;
+    claude.setEnabled(true);
     QSignalSpy claudeCompletedSpy(&claude, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy claudeDiagnosticSpy(&claude, &SubscriptionToolBackend::syncDiagnostic);
 
@@ -232,6 +236,7 @@ void SubscriptionToolsTest::browserSyncEmptyCookieDiagnostics()
     QCOMPARE(claudeDiagnosticArgs.at(1).toString(), QStringLiteral("not_logged_in"));
 
     CodexCliMonitor codex;
+    codex.setEnabled(true);
     QSignalSpy codexCompletedSpy(&codex, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy codexDiagnosticSpy(&codex, &SubscriptionToolBackend::syncDiagnostic);
 
@@ -258,6 +263,7 @@ void SubscriptionToolsTest::browserSyncChromeEmptyCookieDiagnostics()
     qputenv("HOME", tempHome.path().toUtf8());
 
     ClaudeCodeMonitor claude;
+    claude.setEnabled(true);
     QSignalSpy claudeCompletedSpy(&claude, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy claudeDiagnosticSpy(&claude, &SubscriptionToolBackend::syncDiagnostic);
 
@@ -276,6 +282,7 @@ void SubscriptionToolsTest::browserSyncChromeEmptyCookieDiagnostics()
     QCOMPARE(claudeDiagnosticArgs.at(1).toString(), QStringLiteral("not_logged_in"));
 
     CodexCliMonitor codex;
+    codex.setEnabled(true);
     QSignalSpy codexCompletedSpy(&codex, &SubscriptionToolBackend::syncCompleted);
     QSignalSpy codexDiagnosticSpy(&codex, &SubscriptionToolBackend::syncDiagnostic);
 
@@ -320,6 +327,7 @@ void SubscriptionToolsTest::codexSyncWithoutLiveQuotaKeepsConfiguredPro()
     qputenv("PLASMA_AI_MONITOR_DEMO_BASE_URL", QStringLiteral("http://127.0.0.1:%1").arg(server.serverPort()).toUtf8());
 
     CodexCliMonitor codex;
+    codex.setEnabled(true);
     codex.setPlanTier(QStringLiteral("pro"));
 
     QSignalSpy completedSpy(&codex, &SubscriptionToolBackend::syncCompleted);
@@ -370,6 +378,50 @@ void SubscriptionToolsTest::copilotBillingModeLabels()
     copilot.setBillingMode(QStringLiteral("credits"));
     QCOMPARE(copilot.billingMode(), QStringLiteral("ai_credits_usage_based"));
     QVERIFY(copilot.usageSourceLabel().contains(QStringLiteral("AI credits")));
+}
+
+void SubscriptionToolsTest::copilotOrgMetricsRequireEnabledMonitor()
+{
+    EnvVarGuard demoGuard("PLASMA_AI_MONITOR_DEMO");
+    EnvVarGuard baseUrlGuard("PLASMA_AI_MONITOR_DEMO_BASE_URL");
+    qputenv("PLASMA_AI_MONITOR_DEMO", "1");
+
+    QTcpServer server;
+    QVERIFY(server.listen(QHostAddress::LocalHost, 0));
+    qputenv("PLASMA_AI_MONITOR_DEMO_BASE_URL",
+            QStringLiteral("http://127.0.0.1:%1").arg(server.serverPort()).toUtf8());
+    connect(&server, &QTcpServer::newConnection, &server, [&server]() {
+        while (server.hasPendingConnections()) {
+            QTcpSocket *socket = server.nextPendingConnection();
+            connect(socket, &QTcpSocket::readyRead, socket, [socket]() {
+                socket->readAll();
+                const QByteArray body =
+                    R"({"total_seats":12,"seat_breakdown":{"active_this_cycle":8}})";
+                socket->write("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: "
+                              + QByteArray::number(body.size())
+                              + "\r\nConnection: close\r\n\r\n" + body);
+                socket->disconnectFromHost();
+            });
+            connect(socket, &QTcpSocket::disconnected, socket, &QObject::deleteLater);
+        }
+    });
+
+    CopilotMonitor monitor;
+    monitor.setGithubToken(QStringLiteral("saved-token"));
+    monitor.setOrgName(QStringLiteral("example-org"));
+    QVERIFY(!monitor.isEnabled());
+    monitor.fetchOrgMetrics();
+    QTest::qWait(100);
+    QVERIFY(!server.hasPendingConnections());
+    QVERIFY(!monitor.hasOrgMetrics());
+
+    monitor.setEnabled(true);
+    monitor.fetchOrgMetrics();
+    QTRY_VERIFY_WITH_TIMEOUT(monitor.hasOrgMetrics(), 3000);
+    QCOMPARE(monitor.orgTotalSeats(), 12);
+    QCOMPARE(monitor.orgActiveUsers(), 8);
+    QVERIFY(monitor.lastSyncTime().isValid());
+    QVERIFY(!monitor.isSyncing());
 }
 
 void SubscriptionToolsTest::localWatchLifecycleAndReplacement()

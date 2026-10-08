@@ -5,6 +5,7 @@
 #include <QString>
 #include <QStringList>
 #include <QDateTime>
+#include <QPointer>
 #include <QTimer>
 #include <QJsonObject>
 #include <QVariantList>
@@ -94,7 +95,11 @@ class SubscriptionToolBackend : public QObject
     Q_PROPERTY(QString syncStatus READ syncStatus NOTIFY syncStatusChanged)
     Q_PROPERTY(QDateTime lastSyncTime READ lastSyncTime NOTIFY syncStatusChanged)
     Q_PROPERTY(QDateTime lastAttemptTime READ lastAttemptTime NOTIFY syncStatusChanged)
+    Q_PROPERTY(QDateTime lastSyncCompletionTime READ lastSyncCompletionTime NOTIFY syncStatusChanged)
+    Q_PROPERTY(QDateTime nextScheduledRefresh READ nextScheduledRefresh NOTIFY syncStatusChanged)
     Q_PROPERTY(bool syncing READ isSyncing NOTIFY syncStatusChanged)
+    Q_PROPERTY(bool syncNeedsAction READ syncNeedsAction NOTIFY syncStatusChanged)
+    Q_PROPERTY(QDateTime syncRetryAfter READ syncRetryAfter NOTIFY syncStatusChanged)
 
     // Tertiary usage (e.g., Codex code‐review cap)
     Q_PROPERTY(bool hasTertiaryLimit READ hasTertiaryLimit NOTIFY usageUpdated)
@@ -188,7 +193,13 @@ public:
     QString syncStatus() const;
     QDateTime lastSyncTime() const;
     QDateTime lastAttemptTime() const;
+    QDateTime lastSyncCompletionTime() const;
+    QDateTime nextScheduledRefresh() const;
+    Q_INVOKABLE void setNextScheduledRefresh(const QDateTime &when);
     bool isSyncing() const;
+    bool syncNeedsAction() const;
+    QDateTime syncRetryAfter() const;
+    Q_INVOKABLE void cancelSync();
 
     // Tertiary (code review, etc.)
     virtual bool hasTertiaryLimit() const;
@@ -281,6 +292,9 @@ protected:
                                const QDateTime &start) const;
 
   QNetworkAccessManager *networkManager();
+  quint64 beginSyncGeneration();
+  bool syncReplyIsCurrent(const QNetworkReply *reply) const;
+  void trackSyncReply(QNetworkReply *reply);
 
 private:
     void checkLimitWarnings();
@@ -330,9 +344,13 @@ private:
     QString m_syncStatus;
     QDateTime m_lastSyncTime;
     QDateTime m_lastAttemptTime;
+    QDateTime m_lastSyncCompletionTime;
+    QDateTime m_nextScheduledRefresh;
 
     QTimer *m_resetCheckTimer;
     QNetworkAccessManager *m_networkManager = nullptr;
+    quint64 m_syncGeneration = 0;
+    QList<QPointer<QNetworkReply>> m_activeReplies;
 };
 
 #endif // SUBSCRIPTIONTOOLBACKEND_H

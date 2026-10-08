@@ -12,6 +12,10 @@ availability, freshness, provenance, coverage, and compatible recent history
 visible without treating a connection check as usage. The same daily state
 drives the panel and notifications.
 
+Use the Overview search field to find a source by name, ID, quality, or next
+action. **Needs attention** filters only the source list. Daily focus, warning
+counts, and summary totals continue to describe every enabled source.
+
 The panel and popup footer use the same source summary. **Active sources** means
 sources with verified actual data, an estimate, or a balance; connectivity-only
 and needs-attention sources are called out separately. A verified local tool can
@@ -71,6 +75,14 @@ Compact cost modes include only available provider-reported spend and keep each
 currency separate. Remaining requests show an em dash when no compatible metric
 exists and `0 req` only when a source explicitly reports zero.
 
+Spend is shown with its currency, period, and quality. The monitor combines
+values only when currency, exact time bounds, measurement semantics, and
+actual/estimated quality match. For example, USD 10 this month, USD 5 today,
+and USD 100 all time remain three rows. Unbounded current values, unknown
+periods, and cumulative values stay source-specific. Missing monthly or daily
+data is not replaced with an all-time amount. Tokens, requests, and credits keep
+their own units and are never formatted as money.
+
 The Analyst activity heatmap uses a neutral cell for both missing days and
 explicit zero activity. Hover text distinguishes them: only a missing day says
 **No recorded data**. The **Output / Input Ratio** is descriptive, not a score of
@@ -105,9 +117,24 @@ candidates for review, not causal conclusions.
 
 Daily, weekly, monthly, rolling, and cumulative values are not interchangeable. History keeps the source window and aggregation meaning. A rolling provider value is not relabeled as calendar-day spend.
 
+The reviewed pricing catalog is checked for hard expiry throughout a running
+session and after the computer wakes. Once expired, new local price estimates
+become unavailable with an explanation; reported billing values remain usable.
+A successfully verified catalog update takes effect without restarting the
+widget. Existing observations keep the catalog provenance and model selection
+with which they were recorded.
+
 ## Background traffic
 
-Scheduled provider calls are read-only and do not run inference. The Trust Center lists the scheduled endpoint and request budget for each provider.
+Scheduled provider calls are read-only and do not run inference. The Trust
+Center lists the scheduled endpoint and request budget for each provider.
+Refresh deadlines are based on the completed request. Temporary failures wait
+for backoff and any provider `Retry-After` value; authentication, permission,
+configuration, and other user-action errors have no automatic deadline. When
+the system explicitly reports that it is offline, external automatic requests
+pause until reconnection. Manual refreshes, local file watchers, and loopback
+services remain available. An unknown network state permits attempts because
+reachability is only an indication.
 
 Some settings pages offer an explicit manual inference test. That action may use quota or incur a small provider charge. It does not run on the background schedule.
 

@@ -10,12 +10,16 @@ class RefreshSchedulerModel : public QObject
 {
     Q_OBJECT
     QML_ELEMENT
+    Q_PROPERTY(bool networkStateKnown READ networkStateKnown NOTIFY reachabilityChanged)
+    Q_PROPERTY(bool externalRefreshAllowed READ externalRefreshAllowed NOTIFY reachabilityChanged)
 public:
     explicit RefreshSchedulerModel(QObject *parent = nullptr);
 
     Q_INVOKABLE void startMonitoring();
     void observeWakeClock(const QDateTime &now);
-    void observeReachability(bool online);
+    Q_INVOKABLE void observeReachability(bool online);
+    bool networkStateKnown() const;
+    bool externalRefreshAllowed() const;
 
     Q_INVOKABLE int deterministicJitterMs(const QString &providerKey) const;
     Q_INVOKABLE int effectiveIntervalMs(int providerSeconds,
@@ -42,12 +46,15 @@ public:
                                                bool retryable) const;
   Q_SIGNALS:
     void recoveryRequested();
+    void reachabilityChanged();
 
   private:
     QTimer m_wakeTimer;
     QTimer m_recoveryTimer;
     QDateTime m_lastWakeCheck;
     bool m_seenOffline = false;
+    bool m_networkStateKnown = false;
+    bool m_externalRefreshAllowed = true;
     bool m_monitoring = false;
 };
 

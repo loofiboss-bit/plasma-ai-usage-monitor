@@ -199,6 +199,12 @@ public:
                                              const QDateTime &to,
                                              const QString &metric,
                                              int bucketMinutes = 60) const;
+    Q_INVOKABLE QString exportSelectedSeries(const QVariantList &series,
+                                               const QString &format,
+                                               const QString &metric,
+                                               const QDateTime &from,
+                                               const QDateTime &to,
+                                               int bucketMinutes) const;
     Q_INVOKABLE void requestHistorySeries(const QString &requestId,
                                           const QVariantList &sources,
                                           const QDateTime &from,

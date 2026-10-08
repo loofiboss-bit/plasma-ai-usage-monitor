@@ -316,6 +316,7 @@ bool CatalogUpdateManager::installSignedFeed(const QByteArray &envelope, QString
     m_status = QStringLiteral("remote-verified");
     m_diagnostic.clear();
     Q_EMIT statusChanged();
+    Q_EMIT catalogInstalled(sequence);
     return true;
 }
 

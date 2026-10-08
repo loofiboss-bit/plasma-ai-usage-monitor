@@ -129,7 +129,14 @@ def outer(args):
         prefix = temporary / "prefix"
         run(["cmake", "--install", str(args.build_dir), "--prefix", str(prefix)], stdout=subprocess.DEVNULL)
         qml = next(prefix.glob("**/qt6/qml"))
-        plasma_version = subprocess.check_output(["plasmashell", "--version"], text=True).split()[-1]
+        # Read the package metadata instead of starting plasmashell outside a
+        # session. In container runners the shell can abort while initializing
+        # Qt, even though the installed Plasma package is usable by KWin.
+        plasma_version = subprocess.check_output(
+            ["rpm", "-q", "--qf", "%{VERSION}", "plasma-workspace"], text=True
+        ).strip()
+        if not plasma_version:
+            raise RuntimeError("Could not determine the installed Plasma version")
         sessions = list(itertools.product(args.scenarios, args.scales, args.themes))
         for index, (scenario, scale, theme) in enumerate(sessions):
             session = temporary / f"session-{index}"

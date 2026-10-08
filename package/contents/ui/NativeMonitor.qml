@@ -13,6 +13,7 @@ Item {
     property int pendingSettingsVerificationId: 0
     property string pendingSettingsVerificationSourceId: ""
     property bool diagnosticsSnapshotScheduled: false
+    readonly property string runtimeSessionId: Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
     readonly property string pluginVersion: AppInfo.version
     readonly property string smokeView: AppInfo.smokeView
     // Plasma's KPluginMetaData value type is absent from its installed qmltypes.
@@ -263,6 +264,31 @@ Item {
             if (Plasmoid.configuration.diagnosticsSourceSnapshot !== snapshot)
                 Plasmoid.configuration.diagnosticsSourceSnapshot = snapshot;
         });
+    }
+
+    function updateIntegrationRuntimeSnapshots() {
+        var timestamp = new Date().toISOString();
+        var metricsStatus = JSON.stringify({
+            sessionId: runtimeSessionId,
+            timestamp: timestamp,
+            status: !metricsServer.enabled ? "disabled"
+                : metricsServer.listening ? "listening"
+                : metricsServer.errorCode ? "error" : "starting",
+            port: metricsServer.port,
+            address: metricsServer.listeningAddress,
+            interfaceMode: metricsServer.listenOnAllInterfaces ? "all-interfaces" : "loopback",
+            errorCode: metricsServer.errorCode
+        });
+        if (Plasmoid.configuration.prometheusRuntimeSnapshot !== metricsStatus)
+            Plasmoid.configuration.prometheusRuntimeSnapshot = metricsStatus;
+
+        var webhookStatus = JSON.stringify({
+            sessionId: runtimeSessionId,
+            timestamp: timestamp,
+            channels: webhookNotifier.lastDeliveryResults || ({})
+        });
+        if (Plasmoid.configuration.webhookRuntimeSnapshot !== webhookStatus)
+            Plasmoid.configuration.webhookRuntimeSnapshot = webhookStatus;
     }
 
     function refreshAll() {
@@ -626,11 +652,31 @@ Item {
         listenOnAllInterfaces: Plasmoid.configuration.prometheusListenAllInterfaces
     }
 
+    Connections {
+        target: metricsServer
+        function onRuntimeStatusChanged() { root.updateIntegrationRuntimeSnapshots(); }
+        function onEnabledChanged() { root.updateIntegrationRuntimeSnapshots(); }
+        function onPortChanged() { root.updateIntegrationRuntimeSnapshots(); }
+        function onListenOnAllInterfacesChanged() { root.updateIntegrationRuntimeSnapshots(); }
+    }
+
     WebhookNotifier {
         id: webhookNotifier
         slackEnabled: Plasmoid.configuration.slackWebhookEnabled
         discordEnabled: Plasmoid.configuration.discordWebhookEnabled
         cooldownMinutes: Plasmoid.configuration.webhookCooldownMinutes
+    }
+
+    Connections {
+        target: webhookNotifier
+        function onRuntimeStatusChanged() { root.updateIntegrationRuntimeSnapshots(); }
+    }
+
+    Timer {
+        interval: 20000
+        running: true
+        repeat: true
+        onTriggered: root.updateIntegrationRuntimeSnapshots()
     }
 
     ProviderRegistry {
@@ -731,6 +777,16 @@ Item {
         Component.onCompleted: checkForUpdate()
     }
 
+    Connections {
+        target: catalogUpdateManager
+        function onCatalogInstalled(sequence) {
+            if (!ProviderPricingCatalog.load()) {
+                console.error("Verified provider catalog was installed but could not be loaded.",
+                              sequence);
+            }
+        }
+    }
+
     property Component compactRepresentationComponent: CompactRepresentation {
         // Component boundaries intentionally capture their owning monitor.
         // qmllint disable unqualified
@@ -750,6 +806,7 @@ Item {
             console.error("Budget policy initialization failed:", budgetPolicyRepository.errorString);
         providerRuntimeRegistration.initialize();
         root.scheduleDiagnosticsSnapshot();
+        root.updateIntegrationRuntimeSnapshots();
         root.processSettingsVerificationRequest();
         var saved = Plasmoid.configuration.deepseekModel || "";
         var effective = ProviderPricingCatalog.effectiveModelId("deepseek", saved);

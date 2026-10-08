@@ -300,6 +300,8 @@ SourceReadinessModel::Snapshot SourceReadinessModel::snapshotFor(const SourceEnt
                                          entry.localVerification);
             result.lastAttempt = latest(tool->lastAttemptTime(),
                                         entry.localVerification);
+            result.retryAfter = tool->syncRetryAfter();
+            result.nextScheduledRefresh = tool->nextScheduledRefresh();
             result.lastSuccess = latest(
                 latest(tool->lastSyncTime(), tool->lastActivity()),
                 latest(tool->lastQuotaObservation(), entry.localVerification));

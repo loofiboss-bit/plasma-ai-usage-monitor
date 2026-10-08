@@ -7,11 +7,26 @@ class RefreshSchedulerModelTest : public QObject
     Q_OBJECT
 private Q_SLOTS:
   void recoveryEventsCoalesce();
+  void networkPauseIsExplicitAndUnknownAllowsAttempts();
   void deterministicJitter();
   void idleAndPopupIntervals();
   void retryBackoff();
   void freshnessAndNextSchedule();
 };
+
+void RefreshSchedulerModelTest::networkPauseIsExplicitAndUnknownAllowsAttempts() {
+  RefreshSchedulerModel model;
+  QVERIFY(!model.networkStateKnown());
+  QVERIFY(model.externalRefreshAllowed());
+
+  model.observeReachability(false);
+  QVERIFY(model.networkStateKnown());
+  QVERIFY(!model.externalRefreshAllowed());
+
+  model.observeReachability(true);
+  QVERIFY(model.networkStateKnown());
+  QVERIFY(model.externalRefreshAllowed());
+}
 
 void RefreshSchedulerModelTest::recoveryEventsCoalesce() {
   RefreshSchedulerModel model;

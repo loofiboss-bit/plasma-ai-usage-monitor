@@ -8,7 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 KCFG = ROOT / "package/contents/config/main.xml"
 DIAGNOSTICS_QML = ROOT / "package/contents/ui/configDiagnostics.qml"
 RETIRED_LEGACY_KEYS = {"dashboardMode", "showOnlyProblems"}
-INTERNAL_RUNTIME_KEYS = {"budgetPolicySelectionRequest"}
+INTERNAL_RUNTIME_KEYS = {
+    "budgetPolicySelectionRequest",
+    "prometheusRuntimeSnapshot",
+    "webhookRuntimeSnapshot",
+}
 KCFG_NAMESPACE = {"k": "http://www.kde.org/standards/kcfg/1.0"}
 
 
@@ -110,7 +114,7 @@ def main() -> None:
         "Config portability check OK: "
         f"{len(actual)} active non-secret keys; "
         f"{len(ignored)} legacy keys accepted and ignored; "
-        f"{len(INTERNAL_RUNTIME_KEYS)} local runtime key excluded"
+        f"{len(INTERNAL_RUNTIME_KEYS)} local runtime keys excluded"
     )
 
 
