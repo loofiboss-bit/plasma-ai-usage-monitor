@@ -13,7 +13,7 @@ candidate_rpm="$(realpath "$2")"
 
 expected_base="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$base_rpm")"
 expected_candidate="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$candidate_rpm")"
-base_version="${BASE_VERSION:-14.1.1}"
+base_version="${BASE_VERSION:-23.0.0}"
 [[ "$expected_base" == "$base_version-"* ]] || {
   echo "Expected the v${base_version} base RPM, got $expected_base" >&2
   exit 1
@@ -38,7 +38,7 @@ run_lifecycle() {
       install -d /root/.local/share/plasma-ai-usage-monitor /root/.local/share/kwalletd /root/.config
       history_db=/root/.local/share/plasma-ai-usage-monitor/usage_history.db
       sqlite3 "$history_db" <<SQL
-PRAGMA user_version = 4;
+PRAGMA user_version = 8;
 CREATE TABLE observations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   provider TEXT NOT NULL,
@@ -59,6 +59,23 @@ INSERT INTO observations
 VALUES
   (1, 1, 1, 1, NULL, 1, 1, 1, 1, 1, 1),
   (1, 2, 1, 1, 0, 1, 1, 1, 1, 1, 2);
+CREATE TABLE budget_policies (
+  owner_id TEXT NOT NULL, policy_id TEXT PRIMARY KEY,
+  source_id TEXT NOT NULL, source_kind TEXT NOT NULL,
+  scope_mode TEXT NOT NULL, scope_kind TEXT NOT NULL DEFAULT '\'''\'',
+  scope_identity TEXT NOT NULL DEFAULT '\'''\'', scope_label TEXT NOT NULL DEFAULT '\'''\'',
+  value_class TEXT NOT NULL, limit_minor INTEGER NOT NULL,
+  currency TEXT NOT NULL, period_type TEXT NOT NULL, anchor_day INTEGER,
+  time_zone_id TEXT NOT NULL, warning_percent INTEGER NOT NULL,
+  critical_percent INTEGER NOT NULL, notify_enabled INTEGER NOT NULL,
+  enabled INTEGER NOT NULL, created_at_utc TEXT NOT NULL,
+  updated_at_utc TEXT NOT NULL, snoozed_until_utc TEXT
+);
+INSERT INTO budget_policies VALUES (
+  '\''fixture-owner'\'','\''00000000-0000-4000-8000-000000000024'\'','\''openai'\'','\''provider'\'',
+  '\''aggregate'\'','\'''\'','\'''\'','\'''\'', '\''actual'\'',2500,'\''USD'\'','\''calendar_month'\'',NULL,'\''UTC'\'',80,90,
+  1,1,'\''2026-10-01T00:00:00.000Z'\'','\''2026-10-01T00:00:00.000Z'\'',NULL
+);
 SQL
       cat > /root/.config/plasma-org.kde.plasma.desktop-appletsrc <<CONFIG
 [Containments][1][Applets][1][Configuration][General]
@@ -77,11 +94,13 @@ CONFIG
           "$history_db" \
           /root/.config/plasma-org.kde.plasma.desktop-appletsrc \
           /root/.local/share/kwalletd/kdewallet.kwl)"
-        test "$(sqlite3 "$history_db" "PRAGMA user_version")" = 4
+        test "$(sqlite3 "$history_db" "PRAGMA user_version")" = 8
         test "$(sqlite3 "$history_db" \
           "SELECT value IS NULL FROM observations WHERE id = 1")" = 1
         test "$(sqlite3 "$history_db" \
           "SELECT value = 0 FROM observations WHERE id = 2")" = 1
+        test "$(sqlite3 "$history_db" \
+          "SELECT limit_minor FROM budget_policies WHERE policy_id = '\''00000000-0000-4000-8000-000000000024'\''")" = 2500
         grep -Fq "historyEnabled=true" /root/.config/plasma-org.kde.plasma.desktop-appletsrc
         grep -Fxq "base-wallet-fixture" /root/.local/share/kwalletd/kdewallet.kwl
       }

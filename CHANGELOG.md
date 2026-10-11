@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Add opt-in local Codex and Claude Code session history with anonymous project
+  filtering, model/token summaries, resumable import, and redacted JSON/CSV
+  export under a separate session-export schema.
+- Add shared SQLite schema v9 session storage while preserving budget policies,
+  quota observations, and existing export formats.
+
+### Changed
+
+- Keep session consent, aliases and private identities local; exclude session
+  data from portable configuration, scheduled exports and diagnostics.
+- Add session views to Overview, Source Detail, History and Analyst without
+  treating reported tokens as plan utilization, cost, or productivity.
+
+## [23.0.0] — 2026-10-06
+
+### Added
+
 - Add source search and capability summaries to guided setup, plus search and
   attention filtering to Overview without changing whole-monitor totals.
 - Show the bound Prometheus address, port and typed start failure from its
@@ -1095,8 +1112,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - KWallet integration for secure API key storage
 - KDE notifications for rate limit warnings
 
-[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.1...HEAD
-[22.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.1...HEAD
+[Unreleased]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v23.0.0...HEAD
+[23.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v22.0.0...v23.0.0
+[22.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.1...v22.0.0
 [21.0.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v21.0.0...v21.0.1
 [21.0.0]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v20.1.1...v21.0.0
 [20.1.1]: https://github.com/loofiboss-bit/plasma-ai-usage-monitor/compare/v20.1.0...v20.1.1

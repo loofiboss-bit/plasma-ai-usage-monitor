@@ -11,6 +11,7 @@ QQC2.ItemDelegate {
     id: card
 
     required property var row
+    property string sessionActivityText: ""
     signal actionRequested(string stableId, string actionKey, string sourceKind)
     signal sourceRequested(string stableId)
 
@@ -18,7 +19,8 @@ QQC2.ItemDelegate {
     width: parent ? parent.width : implicitWidth
     activeFocusOnTab: true
     Accessible.name: row.displayName + ". " + attentionText() + stateText()
-        + ". " + metricText() + ". " + i18n("Open source details")
+        + ". " + metricText() + ". " + sessionActivityText
+        + ". " + i18n("Open source details")
     onClicked: sourceRequested(row.stableId)
 
     background: Rectangle {
@@ -58,6 +60,14 @@ QQC2.ItemDelegate {
                     : card.row.attentionSeverity === "warning"
                       ? Kirigami.Theme.neutralTextColor
                       : Kirigami.Theme.disabledTextColor
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                elide: Text.ElideRight
+            }
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                visible: card.sessionActivityText !== ""
+                text: card.sessionActivityText
+                color: Kirigami.Theme.disabledTextColor
                 font.pointSize: Kirigami.Theme.smallFont.pointSize
                 elide: Text.ElideRight
             }

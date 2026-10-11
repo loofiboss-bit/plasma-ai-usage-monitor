@@ -10,7 +10,7 @@ QtObject {
         && ["media-overview", "media-attention", "media-quota",
             "media-tool-only", "media-panel", "media-panel-disconnected",
             "media-panel-zero", "media-panel-full",
-            "media-source-detail"].indexOf(scenario) >= 0
+            "media-source-detail", "media-coding-sessions"].indexOf(scenario) >= 0
     readonly property var rows: buildRows()
     readonly property var summary: buildSummary()
 
@@ -76,6 +76,8 @@ QtObject {
             return [quotaRow(4, 2, "critical")];
         if (scenario === "media-quota" || scenario === "media-panel")
             return [quotaRow(28, 3, "none")];
+        if (scenario === "media-coding-sessions")
+            return [quotaRow(62, 7, "none")];
         if (scenario === "media-tool-only") {
             var codex = quotaRow(46, 4, "none");
             var claude = baseRow("claude-code", "Claude Code", "local_tool",

@@ -47,12 +47,24 @@
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/source-detail.png</image>
     </screenshot>
     <screenshot>
+      <caption>Local Codex sessions with reported token categories and project filtering</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/coding-sessions-detail.png</image>
+    </screenshot>
+    <screenshot>
       <caption>History chart with a real missing-data gap</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/history-gap.png</image>
     </screenshot>
     <screenshot>
+      <caption>Daily local coding-session tokens and a filtered session list</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/coding-sessions-history.png</image>
+    </screenshot>
+    <screenshot>
       <caption>Analyst snapshot with sufficient compatible history</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-sufficient.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Coding-session token breakdowns by model and project</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/coding-sessions-analyst.png</image>
     </screenshot>
     <screenshot>
       <caption>Analyst explaining unavailable results for insufficient history</caption>
@@ -78,6 +90,7 @@
 
   <releases>
 
+    <release version="24.0.0" date="2026-10-11"/>
     <release version="23.0.0" date="2026-10-05"/>
     <release version="22.0.0" date="2026-10-03"/>
     <release version="21.0.1" date="2026-09-28">

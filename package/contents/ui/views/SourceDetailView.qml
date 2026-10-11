@@ -9,6 +9,7 @@ import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
 import com.github.loofi.aiusagemonitor 1.0
 import ".." as Monitor
+import "../components" as Components
 import "../SourceHealth.js" as SourceHealth
 
 QQC2.ScrollView {
@@ -18,9 +19,11 @@ QQC2.ScrollView {
     property string sourceId: ""
     property bool showAllScopes: false
     property bool technicalDetailsExpanded: mediaMode
+    property var sessionState: null
     property double healthClockMs: Date.now()
     readonly property bool mediaMode: AppInfo.demoMode
-        && AppInfo.smokeView === "media-source-detail"
+        && ["media-source-detail", "media-coding-sessions"]
+            .indexOf(AppInfo.smokeView) >= 0
     readonly property bool retryBlocked: SourceHealth.retryBlocked(
         sourceData.retryAfter, healthClockMs)
     readonly property var mediaSource: mediaMode && monitor
@@ -49,6 +52,8 @@ QQC2.ScrollView {
     signal actionRequested(string stableId, string actionKey, string sourceKind)
     signal settingsRequested(string stableId)
     signal historyRequested(string historyId, string metric, int rangeDays)
+    signal sessionHistoryRequested(string toolId, string projectId, int rangeDays,
+                                   string sessionId, int pageOffset)
     Accessible.role: Accessible.Pane
     Accessible.name: sourceData.displayName
         ? i18n("%1 source details", sourceData.displayName)
@@ -694,6 +699,22 @@ QQC2.ScrollView {
                         color: Kirigami.Theme.disabledTextColor
                     }
                 }
+            }
+        }
+
+        Components.LocalSessionPanel {
+            Layout.fillWidth: true
+            Layout.preferredHeight: Kirigami.Units.gridUnit * 20
+            visible: detail.mediaMode
+                ? AppInfo.smokeView === "media-coding-sessions"
+                : detail.sourceId === "codex-cli" || detail.sourceId === "claude-code"
+            sessionModel: detail.monitor ? detail.monitor.localSessions : null
+            fixedToolId: detail.sourceId
+            sessionState: detail.sessionState
+            onSessionHistoryRequested: function(toolId, projectId, rangeDays,
+                                                sessionId, pageOffset) {
+                detail.sessionHistoryRequested(toolId, projectId, rangeDays,
+                                               sessionId, pageOffset);
             }
         }
 

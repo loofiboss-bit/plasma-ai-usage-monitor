@@ -2,6 +2,7 @@
 
 #include <QFile>
 #include <QFileInfo>
+#include <QRandomGenerator>
 #include <QSaveFile>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -37,6 +38,27 @@ bool columnExists(QSqlDatabase &database, const QString &table,
     }
   }
   return false;
+}
+
+bool verifySqliteIntegrity(const QString &path) {
+  const QString connection = QStringLiteral("session_backup_verify_%1")
+                                 .arg(QRandomGenerator::global()->generate());
+  auto backup =
+      QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+  backup.setDatabaseName(path);
+  const bool opened = backup.open();
+  bool valid = false;
+  if (opened) {
+    QSqlQuery integrity(backup);
+    valid = integrity.exec(QStringLiteral("PRAGMA integrity_check")) &&
+            integrity.next() &&
+            integrity.value(0).toString() == QLatin1String("ok");
+    integrity.finish();
+    backup.close();
+  }
+  backup = {};
+  QSqlDatabase::removeDatabase(connection);
+  return valid;
 }
 } // namespace
 
@@ -221,6 +243,14 @@ bool BudgetPolicySchema::migrateDeliverySchema(QSqlDatabase &database,
     return false;
   const int current = version.value(0).toInt();
   version.finish();
+  if (current == 9) {
+    if (tableExists(database, QStringLiteral("budget_policy_deliveries")) &&
+        tableExists(database, QStringLiteral("history_operations")))
+      return true;
+    if (error)
+      *error = QStringLiteral("Incomplete schema v9 delivery tables");
+    return false;
+  }
   if (current == 8) {
     if (tableExists(database, QStringLiteral("budget_policy_deliveries")) &&
         tableExists(database, QStringLiteral("history_operations")))
@@ -240,7 +270,8 @@ bool BudgetPolicySchema::migrateDeliverySchema(QSqlDatabase &database,
       QFileInfo::exists(path)) {
     QSqlQuery checkpoint(database);
     if (!checkpoint.exec(QStringLiteral("PRAGMA wal_checkpoint(FULL)")) ||
-        !checkpoint.next() || checkpoint.value(0).toInt() != 0) {
+        !checkpoint.next() || checkpoint.value(0).toInt() != 0 ||
+        checkpoint.value(1).toInt() != checkpoint.value(2).toInt()) {
       if (error)
         *error = QStringLiteral("Unable to checkpoint pre-v22 database");
       return false;
@@ -307,6 +338,145 @@ bool BudgetPolicySchema::migrateDeliverySchema(QSqlDatabase &database,
     return false;
   }
   if (!database.commit()) {
+    database.rollback();
+    return false;
+  }
+  return true;
+}
+
+bool BudgetPolicySchema::migrateSessionSchema(QSqlDatabase &database,
+                                              QString *error,
+                                              bool injectFailure) {
+  QSqlQuery version(database);
+  if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next())
+    return false;
+  const int current = version.value(0).toInt();
+  version.finish();
+  if (current == 9) {
+    QSqlQuery conflicts(database);
+    return tableExists(database, QStringLiteral("local_sessions")) &&
+           tableExists(database, QStringLiteral("local_usage_events")) &&
+           exec(conflicts,
+                QStringLiteral(
+                    "CREATE TABLE IF NOT EXISTS local_usage_conflicts "
+                    "(event_id TEXT PRIMARY KEY)"),
+                error);
+  }
+  if (current != 8) {
+    if (error)
+      *error = QStringLiteral("Session migration requires schema v8");
+    return false;
+  }
+
+  const QString path = database.databaseName();
+  if (path != QLatin1String(":memory:") && QFileInfo::exists(path)) {
+    QSqlQuery checkpoint(database);
+    if (!checkpoint.exec(QStringLiteral("PRAGMA wal_checkpoint(FULL)")) ||
+        !checkpoint.next() || checkpoint.value(0).toInt() != 0 ||
+        checkpoint.value(1).toInt() != checkpoint.value(2).toInt()) {
+      if (error)
+        *error = QStringLiteral("Unable to checkpoint pre-v9 database");
+      return false;
+    }
+    checkpoint.finish();
+    QFile source(path);
+    QSaveFile backup(path + QStringLiteral(".v24-backup"));
+    backup.setDirectWriteFallback(false);
+    if (!source.open(QIODevice::ReadOnly) ||
+        !backup.open(QIODevice::WriteOnly)) {
+      if (error)
+        *error = QStringLiteral("Unable to create pre-v9 database backup");
+      return false;
+    }
+    while (!source.atEnd()) {
+      const QByteArray chunk = source.read(64 * 1024);
+      if (source.error() != QFileDevice::NoError ||
+          backup.write(chunk) != chunk.size()) {
+        backup.cancelWriting();
+        if (error)
+          *error = QStringLiteral("Unable to write pre-v9 database backup");
+        return false;
+      }
+    }
+    if (!backup.commit()) {
+      if (error)
+        *error = QStringLiteral("Unable to commit pre-v9 database backup");
+      return false;
+    }
+    if (!verifySqliteIntegrity(path + QStringLiteral(".v24-backup"))) {
+      if (error)
+        *error =
+            QStringLiteral("Pre-v9 database backup failed integrity check");
+      return false;
+    }
+  }
+  if (!database.transaction()) {
+    if (error)
+      *error = database.lastError().text();
+    return false;
+  }
+  QSqlQuery query(database);
+  const QStringList statements{
+      QStringLiteral(
+          "CREATE TABLE local_sessions (session_id TEXT PRIMARY KEY, tool_id "
+          "TEXT NOT NULL CHECK(tool_id IN ('codex','claude-code')), project_id "
+          "TEXT NOT NULL, started_at_utc TEXT NOT NULL, last_seen_at_utc TEXT "
+          "NOT NULL, coverage TEXT NOT NULL DEFAULT 'reported', source_id TEXT "
+          "NOT NULL DEFAULT '')"),
+      QStringLiteral("CREATE INDEX idx_local_sessions_tool_time ON "
+                     "local_sessions(tool_id,last_seen_at_utc)"),
+      QStringLiteral("CREATE INDEX idx_local_sessions_project_time ON "
+                     "local_sessions(project_id,last_seen_at_utc)"),
+      QStringLiteral(
+          "CREATE TABLE local_usage_events (event_id TEXT PRIMARY KEY, "
+          "session_id TEXT NOT NULL, observed_at_utc TEXT NOT NULL, model_id "
+          "TEXT NOT NULL DEFAULT '', input_tokens INTEGER, output_tokens "
+          "INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, "
+          "parser_revision INTEGER NOT NULL, provenance TEXT NOT NULL DEFAULT "
+          "'', FOREIGN KEY(session_id) REFERENCES local_sessions(session_id) "
+          "ON DELETE CASCADE)"),
+      QStringLiteral("CREATE INDEX idx_local_events_session_time ON "
+                     "local_usage_events(session_id,observed_at_utc)"),
+      QStringLiteral(
+          "CREATE TABLE local_import_checkpoints (tool_id TEXT PRIMARY KEY, "
+          "generation INTEGER NOT NULL DEFAULT 0, cutoff_utc TEXT NOT NULL "
+          "DEFAULT '', updated_at_utc TEXT NOT NULL DEFAULT '', coverage TEXT "
+          "NOT NULL DEFAULT 'reported', rebaseline_pending INTEGER NOT NULL "
+          "DEFAULT 0)"),
+      QStringLiteral(
+          "CREATE TABLE local_file_checkpoints (tool_id TEXT NOT NULL, file_id "
+          "TEXT NOT NULL, file_offset INTEGER NOT NULL DEFAULT 0, file_size "
+          "INTEGER NOT NULL DEFAULT 0, modified_at_utc TEXT NOT NULL DEFAULT "
+          "'', PRIMARY KEY(tool_id,file_id))"),
+      QStringLiteral(
+          "CREATE TABLE local_session_counters (session_id TEXT PRIMARY KEY, "
+          "observed_at_utc TEXT NOT NULL, input_tokens INTEGER, output_tokens "
+          "INTEGER, cache_read_tokens INTEGER, cache_write_tokens INTEGER, "
+          "FOREIGN KEY(session_id) REFERENCES local_sessions(session_id) ON "
+          "DELETE CASCADE)"),
+      QStringLiteral("CREATE TABLE local_project_aliases (project_id TEXT "
+                     "PRIMARY KEY, alias TEXT NOT NULL)"),
+      QStringLiteral("CREATE TABLE observed_account_quotas (tool_id TEXT NOT "
+                     "NULL, observed_at_utc TEXT NOT NULL, quota_json TEXT NOT "
+                     "NULL, PRIMARY KEY(tool_id,observed_at_utc))"),
+      QStringLiteral(
+          "CREATE TABLE local_usage_conflicts (event_id TEXT PRIMARY KEY)"),
+      QStringLiteral("PRAGMA user_version=9")};
+  for (const QString &statement : statements) {
+    if (!exec(query, statement, error)) {
+      database.rollback();
+      return false;
+    }
+  }
+  if (injectFailure) {
+    if (error)
+      *error = QStringLiteral("Injected schema v9 migration failure");
+    database.rollback();
+    return false;
+  }
+  if (!database.commit()) {
+    if (error)
+      *error = database.lastError().text();
     database.rollback();
     return false;
   }
