@@ -12,7 +12,7 @@ model/token summaries, and redacted JSON/CSV session exports. Existing provider
 integrations, quotas, budgets, and export formats remain available.
 See the [V24 user guide](docs/user-guide/coding-sessions.md),
 [qualification checklist](docs/release/v24.0.0-checklist.md), and
-[release notes](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v24.0.0).
+[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v24.0.0).
 The screenshots below use deterministic synthetic fixtures.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
