@@ -85,6 +85,24 @@ Antigravity monitoring connects only to a language-server process owned by the c
 
 The monitor reads only account status and quota-summary RPCs. It does not read Antigravity prompts, conversations, OAuth tokens, logs, or the separate `gemini.google.com` session.
 
+## Local coding-session history
+
+Codex and Claude Code session analysis is independently disabled until its
+setting is saved with **Apply**. When enabled, the widget reads supported local
+JSONL session logs and stores only allow-listed session, project, model,
+timestamp, and token-usage metadata. It never stores or logs prompts, replies,
+conversation titles, full project paths, or raw tool identities. Project and
+session keys are user-local HMAC identities; project aliases are stored
+separately on this computer.
+
+Session history, aliases, and private identity keys are excluded from
+configuration backups, scheduled exports, diagnostics, Prometheus and webhook
+integrations. A user-requested session export is a separate JSON/CSV schema and
+uses export-local anonymous identifiers; it omits paths, aliases, credentials,
+and raw identities. Coverage is marked partial when a file is unreadable,
+truncated, or contains unsupported records. See [Coding sessions and
+projects](coding-sessions.md) for token and filter semantics.
+
 ## Support reports
 
 Native Diagnostics builds the support report in the compiled plugin. It includes only allowlisted source IDs, readiness states, typed error kinds, next-action keys, and whether verification has succeeded. It excludes endpoint hosts, query strings, account IDs, project IDs, credentials, cookies, webhook URLs, free-form backend errors, and KWallet values. The dependency-recovery screen has a smaller redacted bootstrap report that omits error details and paths. Review either report before posting it publicly.

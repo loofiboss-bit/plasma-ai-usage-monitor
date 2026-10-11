@@ -112,11 +112,28 @@ bool BudgetPolicyRepository::ensureOpen() {
   }
   const int schemaVersion = version.value(0).toInt();
   version.finish();
-  if (schemaVersion > 8 ||
-      (schemaVersion == 8 &&
+  if (schemaVersion > 9 ||
+      ((schemaVersion == 7 || schemaVersion == 8) &&
        !BudgetPolicySchema::migrateDeliverySchema(m_database, &error))) {
     setError(error.isEmpty()
                  ? QStringLiteral("Unsupported future database schema")
+                 : error);
+    m_database.close();
+    return false;
+  }
+  QSqlQuery currentVersion(m_database);
+  if (!currentVersion.exec(QStringLiteral("PRAGMA user_version")) ||
+      !currentVersion.next()) {
+    setError(QStringLiteral("Unable to reread database schema"));
+    m_database.close();
+    return false;
+  }
+  const int currentSchemaVersion = currentVersion.value(0).toInt();
+  currentVersion.finish();
+  if (currentSchemaVersion >= 8 &&
+      !BudgetPolicySchema::migrateSessionSchema(m_database, &error)) {
+    setError(error.isEmpty()
+                 ? QStringLiteral("Unable to migrate session schema")
                  : error);
     m_database.close();
     return false;

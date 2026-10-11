@@ -237,6 +237,7 @@ capture_view() {
     media-history-*) accessible_marker="History view ready" ;;
     media-analyst-*) accessible_marker="Insights view ready" ;;
     media-source-detail) accessible_marker="Back to source list" ;;
+    media-coding-sessions) accessible_marker="Back to source list" ;;
     onboarding-*) accessible_marker="Guided first success" ;;
     settings) accessible_marker="Providers" ;;
     budget-settings) accessible_marker="Budget Control" ;;
@@ -551,9 +552,12 @@ capture_panel() {
 capture_view media-overview overview-popup.png 6 narrow
 capture_view media-attention attention-state.png 5
 capture_view media-source-detail source-detail.png 6
+capture_view media-coding-sessions coding-sessions-detail.png 8
 capture_view media-history-gap history-gap.png 10
+capture_view media-history-sessions coding-sessions-history.png 8
 capture_view media-analyst-sufficient analyst-sufficient.png 6
 capture_view media-analyst-insufficient analyst-insufficient.png 6
+capture_view media-analyst-sessions coding-sessions-analyst.png 8
 capture_view onboarding-source guided-first-success.png 6
 capture_view budget-settings budget-control.png 8
 capture_view plugin-recovery plugin-recovery.png 6
@@ -566,6 +570,7 @@ FIXTURE_SHA="$(
     scripts/demo/showcase_preset.json \
     scripts/demo/generate_v17_media_history.py \
     package/contents/ui/components/MediaDailyState.qml \
+    package/contents/ui/components/MediaLocalSessionModel.qml \
     | sha256sum | cut -d' ' -f1
 )"
 SOURCE_TREE_SHA="$(python3 "$ROOT_DIR/scripts/demo/source_identity.py")"
@@ -592,7 +597,9 @@ ASSETS_JSON="$(
   for filename in \
     overview-popup.png attention-state.png source-detail.png history-gap.png \
     analyst-sufficient.png analyst-insufficient.png guided-first-success.png \
-    budget-control.png plugin-recovery.png panel-lowest-quota.png; do
+    budget-control.png plugin-recovery.png panel-lowest-quota.png \
+    coding-sessions-detail.png coding-sessions-history.png \
+    coding-sessions-analyst.png; do
     sha256sum "${OUTPUT_DIR}/${filename}"
   done | jq -Rn '[inputs | split("  ") | {(.[1] | split("/") | last): .[0]}] | add'
 )"
@@ -631,9 +638,12 @@ jq -n \
       "overview-popup.png": "media-overview",
       "attention-state.png": "media-attention",
       "source-detail.png": "media-source-detail",
+      "coding-sessions-detail.png": "media-coding-sessions",
       "history-gap.png": "media-history-gap",
+      "coding-sessions-history.png": "media-history-sessions",
       "analyst-sufficient.png": "media-analyst-sufficient",
       "analyst-insufficient.png": "media-analyst-insufficient",
+      "coding-sessions-analyst.png": "media-analyst-sessions",
       "guided-first-success.png": "onboarding-source",
       "budget-control.png": "budget-settings",
       "plugin-recovery.png": "plugin-recovery",

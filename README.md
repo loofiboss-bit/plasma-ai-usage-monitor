@@ -6,17 +6,16 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-The **23.0.0 release (Clearer and More Reliable Daily Use)** makes spend
-periods, source status, catalog expiry, local-tool cancellation and refresh
-timing easier to understand and more predictable. This version is a review
-candidate; GitHub, COPR and KDE Store publication is pending. The planned
-[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v23.0.0)
-will be populated only after its separate release qualification.
-See the [V23 plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V23_PLAN.md) and
-[qualification checklist](docs/release/v23.0.0-checklist.md). Screenshots
-below were recaptured from V23 in isolated Plasma fixtures. They document the
-candidate UI and do not replace physical scaling, keyboard, or screen-reader
-qualification.
+The **24.0.0 release (Coding Sessions & Projects)** is a local review
+candidate built on the published [V23.0.0 release](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v23.0.0).
+It adds explicit opt-in history for Codex and Claude Code, anonymous project
+filters, and a separate redacted session export. Publication to GitHub, COPR
+and KDE Store is handled by a later release task. See the [V24 user guide](docs/user-guide/coding-sessions.md)
+and [qualification checklist](docs/release/v24.0.0-checklist.md). Existing
+screenshots document the V23 baseline, and the images below add the new V24
+views captured from deterministic synthetic fixtures.
+The [GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v24.0.0)
+page will host V24 only after a separate publication task.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
 
@@ -51,6 +50,7 @@ For source builds and other installation details, read the [installation guide](
 - [Understand actual, estimated, and unavailable values](docs/user-guide/understanding-data.md)
 - [Configure API providers](docs/user-guide/providers.md)
 - [Track subscription tools and Browser Sync Labs](docs/user-guide/subscriptions.md)
+- [Review local Codex and Claude Code sessions](docs/user-guide/coding-sessions.md)
 - [Use Budget Control and deterministic runway guardrails](docs/user-guide/runway-guardrails.md)
 - [Use history, exports, Prometheus, and webhooks](docs/user-guide/history-and-integrations.md)
 - [Fix common problems](docs/user-guide/troubleshooting.md)
@@ -74,7 +74,7 @@ Hosted-provider support includes:
 
 The generated [provider capability matrix](docs/provider-capabilities.md) lists the scheduled endpoint and monitoring level for every provider.
 
-The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI. Antigravity 2.x can report the signed-in plan, live per-model quota, and shared five-hour and weekly windows from its read-only localhost daemon; local activity and configured plan limits for other tools remain estimates unless a supported authenticated source provides a live quota window.
+The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI. Antigravity 2.x can report the signed-in plan, live per-model quota, and shared five-hour and weekly windows from its read-only localhost daemon; local activity and configured plan limits for other tools remain estimates unless a supported authenticated source provides a live quota window. In V24, Codex and Claude Code can separately opt in to local session-token history; these reported tokens are not subscription percentages or billed cost.
 
 ## Main features
 
@@ -83,6 +83,7 @@ The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilo
 - Action-first Overview for attention, lowest live quota, next reset, spend categories, and source quality
 - Provider usage, spend, balances, limits, and connection state where the provider exposes them
 - Retained local history for enabled, disabled, and history-only sources, with explicit chart gaps
+- Optional Codex and Claude Code session history with project filtering and manual redacted JSON/CSV export
 - Analyst snapshots with documented sample requirements, coverage, spend trends, activity, anomalies, and compatible drivers
 - Typed Budget Control policies for day, ISO week, month, anchored month and reviewed provider reset periods
 - Deterministic safe-today, remaining allowance, period projection and previous-period comparison
@@ -115,8 +116,11 @@ handled as sensitive files.
 | Narrow Overview | ![Narrow Overview popup with separate actual, estimated, balance, and fixed-fee data](assets/screenshots/overview-popup.png) |
 | Attention | ![Overview prioritizing a critical Codex CLI quota](assets/screenshots/attention-state.png) |
 | Source Detail | ![Source Detail with freshness, quota, typed metrics, and provenance](assets/screenshots/source-detail.png) |
+| Coding sessions in Source Detail | ![Codex session detail with reported token categories and project filters](assets/screenshots/coding-sessions-detail.png) |
 | Real history gap | ![History chart with an explicit missing-data gap](assets/screenshots/history-gap.png) |
+| Coding sessions in History | ![Daily coding-session tokens and a filtered session list](assets/screenshots/coding-sessions-history.png) |
 | Analyst with sufficient data | ![Analyst snapshot with documented coverage and compatible spend](assets/screenshots/analyst-sufficient.png) |
+| Coding sessions in Analyst | ![Coding-session model and project breakdowns](assets/screenshots/coding-sessions-analyst.png) |
 | Analyst with insufficient data | ![Analyst explaining unavailable results when samples are insufficient](assets/screenshots/analyst-insufficient.png) |
 | Guided setup | ![Guided first success source selection](assets/screenshots/guided-first-success.png) |
 | Budget Control | ![Searchable staged Budget Control policy editor](assets/screenshots/budget-control.png) |

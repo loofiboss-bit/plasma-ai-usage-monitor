@@ -56,6 +56,11 @@ auth first and may use the selected browser session as a compatibility fallback.
 
 The standard card tracks local activity against the selected session and weekly plan limits. Browser Sync Labs can add session usage from a supported signed-in browser profile.
 
+Session-token history is a separate opt-in in **Settings → History**. It reads
+local Claude Code JSONL usage records without saving prompts, replies, titles,
+or source paths. See [Coding sessions and projects](coding-sessions.md) for
+filters, coverage and export behavior.
+
 ## GitHub Copilot
 
 The card tracks local activity and the selected billing mode. An optional GitHub token and organization name can expose organization-level seat metrics when the token has the required permission.

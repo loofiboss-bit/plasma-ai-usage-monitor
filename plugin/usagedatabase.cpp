@@ -455,7 +455,7 @@ void UsageDatabase::initDatabase()
 
     QSqlQuery version(m_db);
     if (!version.exec(QStringLiteral("PRAGMA user_version")) || !version.next()
-        || version.value(0).toInt() > 8) {
+        || version.value(0).toInt() > 9) {
         m_errorKey = QStringLiteral("unsupported-database-schema");
         m_db.close();
         Q_EMIT databaseStateChanged();
@@ -637,7 +637,12 @@ bool UsageDatabase::createTables()
         return false;
     }
     QString error;
-    if (!BudgetPolicySchema::migrateDeliverySchema(m_db, &error)) return false;
+    QSqlQuery schemaVersion(m_db);
+    if (!schemaVersion.exec(QStringLiteral("PRAGMA user_version")) || !schemaVersion.next()) return false;
+    const int currentSchema = schemaVersion.value(0).toInt();
+    schemaVersion.finish();
+    if (currentSchema < 8 && !BudgetPolicySchema::migrateDeliverySchema(m_db, &error)) return false;
+    if (!BudgetPolicySchema::migrateSessionSchema(m_db, &error)) return false;
     return true;
 }
 

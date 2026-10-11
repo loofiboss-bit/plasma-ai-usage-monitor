@@ -47,6 +47,7 @@ Item {
     property alias azure: azureBackend
     property alias bedrock: bedrockBackend
     property alias usageDb: usageDatabase
+    property alias localSessions: localSessionModel
     property alias refreshScheduler: refreshScheduler
     property alias sourceReadiness: sourceReadinessModel
     property alias dailyState: dailyStateModel
@@ -332,6 +333,18 @@ Item {
         retentionDays: Plasmoid.configuration.historyRetentionDays
     }
 
+    LocalSessionModel {
+        id: localSessionModel
+        retentionDays: Plasmoid.configuration.historyRetentionDays
+    }
+
+    function syncLocalSessionConsent() {
+        localSessionModel.setToolEnabled("codex-cli",
+            !!Plasmoid.configuration.codexSessionHistoryEnabled);
+        localSessionModel.setToolEnabled("claude-code",
+            !!Plasmoid.configuration.claudeCodeSessionHistoryEnabled);
+    }
+
     ProviderCatalog { id: policyCatalog }
 
     BudgetPolicyRepository {
@@ -614,6 +627,8 @@ Item {
         function onCerebrasEnabledChanged() { root.syncReadinessEnabled("cerebras"); }
         function onFireworksEnabledChanged() { root.syncReadinessEnabled("fireworks"); }
         function onPerplexityEnabledChanged() { root.syncReadinessEnabled("perplexity"); }
+        function onCodexSessionHistoryEnabledChanged() { root.syncLocalSessionConsent(); }
+        function onClaudeCodeSessionHistoryEnabledChanged() { root.syncLocalSessionConsent(); }
         function onSettingsVerificationRequestIdChanged() { root.processSettingsVerificationRequest(); }
         function onAntigravityEnabledChanged() {
             root.syncReadinessEnabled("google-antigravity");
@@ -802,6 +817,7 @@ Item {
 
     Component.onCompleted: {
         usageDatabase.init();
+        root.syncLocalSessionConsent();
         if (!budgetPolicyRepository.init() || !budgetPolicyMigration.migrate())
             console.error("Budget policy initialization failed:", budgetPolicyRepository.errorString);
         providerRuntimeRegistration.initialize();

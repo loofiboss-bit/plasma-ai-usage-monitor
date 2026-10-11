@@ -541,6 +541,14 @@
         <entry name="historyEnabled" type="Bool">
             <default>true</default>
         </entry>
+        <entry name="codexSessionHistoryEnabled" type="Bool">
+            <default>false</default>
+            <label>Allow local Codex session history reading</label>
+        </entry>
+        <entry name="claudeCodeSessionHistoryEnabled" type="Bool">
+            <default>false</default>
+            <label>Allow local Claude Code session history reading</label>
+        </entry>
         <entry name="historyRetentionDays" type="Int">
             <default>90</default>
             <label>Number of days to keep usage history</label>

@@ -33,6 +33,9 @@ REQUIRED = (
     "budget-control.png",
     "plugin-recovery.png",
     "panel-lowest-quota.png",
+    "coding-sessions-detail.png",
+    "coding-sessions-history.png",
+    "coding-sessions-analyst.png",
 )
 SCENARIOS = {
     "overview-popup.png": "media-overview",
@@ -45,6 +48,9 @@ SCENARIOS = {
     "budget-control.png": "budget-settings",
     "plugin-recovery.png": "plugin-recovery",
     "panel-lowest-quota.png": "media-panel",
+    "coding-sessions-detail.png": "media-coding-sessions",
+    "coding-sessions-history.png": "media-history-sessions",
+    "coding-sessions-analyst.png": "media-analyst-sessions",
 }
 
 
@@ -204,11 +210,13 @@ expected_fixture = hashlib.sha256(
             ROOT / "scripts" / "demo" / "generate_v17_media_history.py",
             ROOT / "package" / "contents" / "ui" / "components"
             / "MediaDailyState.qml",
+            ROOT / "package" / "contents" / "ui" / "components"
+            / "MediaLocalSessionModel.qml",
         )
     ).encode()
 ).hexdigest()
 if STRICT and manifest["fixtureSha256"] != expected_fixture:
-    fail("manifest fixture hash does not match the v18 media fixtures")
+    fail("manifest fixture hash does not match the current media fixtures")
 
 source_tree_commit = manifest["sourceTreeCommit"]
 if not re.fullmatch(r"[0-9a-f]{40}", source_tree_commit):
@@ -233,7 +241,7 @@ archive_source_tree = filesystem_source_tree_sha256()
 if STRICT and manifest["archiveSourceTreeSha256"] != archive_source_tree:
     fail("manifest archive source tree hash does not match the packaged source")
 if manifest.get("scenarios") != SCENARIOS:
-    fail("manifest scenarios do not match the v18 capture contract")
+    fail("manifest scenarios do not match the current capture contract")
 try:
     validate_capture_evidence(manifest.get("captureEvidence"), REQUIRED)
 except EvidenceError as error:

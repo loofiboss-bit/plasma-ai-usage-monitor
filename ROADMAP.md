@@ -1,17 +1,34 @@
 # Roadmap
 
-**Current release:** 23.0.0, Clearer and More Reliable Daily Use (candidate; not published)
+**Current release:** 24.0.0, Coding Sessions & Projects (candidate; not published)
 
-**Last updated:** 2026-10-05
+**Last updated:** 2026-10-11
 
 ## Current release
 
+### 24.0.0 Coding Sessions & Projects
+
+Candidate implementation is underway from published V23.0.0. Add independently
+opt-in local session analysis for Codex and Claude Code, with anonymous project
+filters, local aliases, shared token semantics and explicit redacted exports.
+The [qualification checklist](docs/release/v24.0.0-checklist.md) records
+implementation and evidence; no public V24 publication is part of this work.
+
+- Import at most the latest 30 calendar days, limited by configured retention,
+  with resumable background discovery and parser-coverage status.
+- Store allow-listed metadata only, using user-local HMAC identities for
+  projects and sessions; keep aliases and session consent out of portable
+  configuration and automated exports.
+- Add daily/session/model/project views to Source Detail, History and Analyst,
+  plus independent schema-v1 JSON/CSV export.
+- Migrate SQLite v8 to v9 atomically while preserving quota and budget policy
+  data and the established history/configuration export schemas.
+
 ### 23.0.0 Clearer and More Reliable Daily Use
 
-Candidate implementation is ready for review. Public GitHub, Fedora COPR,
-KDE Store and wiki publication remain pending. The [V23 plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V23_PLAN.md)
-and [qualification checklist](docs/release/v23.0.0-checklist.md) track the
-implementation, test results and remaining visual qualification.
+Published on 2026-10-06 as [v23.0.0](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v23.0.0).
+See the [qualification checklist](docs/release/v23.0.0-checklist.md) for the
+release evidence and remaining manual checks.
 
 - Group spend only when currency, period, semantics and actual/estimated
   quality match; show each source's own units, period and data quality.

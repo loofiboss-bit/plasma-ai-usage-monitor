@@ -12,6 +12,8 @@ INTERNAL_RUNTIME_KEYS = {
     "budgetPolicySelectionRequest",
     "prometheusRuntimeSnapshot",
     "webhookRuntimeSnapshot",
+    "codexSessionHistoryEnabled",
+    "claudeCodeSessionHistoryEnabled",
 }
 KCFG_NAMESPACE = {"k": "http://www.kde.org/standards/kcfg/1.0"}
 
@@ -82,7 +84,8 @@ def main() -> None:
             + ", ".join(sorted(stale_kconfig))
         )
 
-    for key in ("prometheusEnabled", "prometheusListenAllInterfaces"):
+    for key in ("prometheusEnabled", "prometheusListenAllInterfaces",
+                "codexSessionHistoryEnabled", "claudeCodeSessionHistoryEnabled"):
         entry = entries.get(key)
         default = entry.find("k:default", KCFG_NAMESPACE) if entry is not None else None
         if (entry is None or entry.attrib.get("type") != "Bool"

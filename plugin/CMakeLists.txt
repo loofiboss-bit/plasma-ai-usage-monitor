@@ -41,6 +41,8 @@ set(aiusagemonitor_SRCS
     guardrailmodel.cpp
     scopebreakdownquery.cpp
     analystquery.cpp
+    localsessionparser.cpp
+    localsessionmodel.cpp
     usagedatabase.cpp
     updatechecker.cpp
     subscriptiontoolbackend.cpp
@@ -103,6 +105,8 @@ set(aiusagemonitor_HDRS
     guardrailmodel.h
     scopebreakdownquery.h
     analystquery.h
+    localsessionparser.h
+    localsessionmodel.h
     usagedatabase.h
     clipboardhelper.h
     updatechecker.h

@@ -11,6 +11,8 @@ import "components" as Components
 Kirigami.ScrollablePage {
     id: analystPage
     required property var monitor
+    property var sessionState: null
+    property bool sessionsMode: false
 
     title: i18n("Insights")
     Accessible.name: analystState.loading
@@ -168,6 +170,13 @@ Kirigami.ScrollablePage {
 
     actions: [
         Kirigami.Action {
+            icon.name: "view-history"
+            text: i18n("Coding sessions")
+            checkable: true
+            checked: analystPage.sessionsMode
+            onTriggered: analystPage.sessionsMode = !analystPage.sessionsMode
+        },
+        Kirigami.Action {
             icon.name: "view-refresh"
             text: i18n("Refresh")
             enabled: analystState.reportRequestId === ""
@@ -199,6 +208,7 @@ Kirigami.ScrollablePage {
     }
 
     ColumnLayout {
+        visible: !analystPage.sessionsMode
         spacing: Kirigami.Units.largeSpacing
 
         Controls.BusyIndicator {
@@ -588,5 +598,20 @@ Kirigami.ScrollablePage {
                 wrapMode: Text.WordWrap
             }
         }
+    }
+
+    Components.LocalSessionPanel {
+        visible: analystPage.sessionsMode
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        sessionModel: analystPage.monitor ? analystPage.monitor.localSessions : null
+        sessionState: analystPage.sessionState
+    }
+
+    onSessionStateChanged: {
+        if (sessionState) sessionsMode = !!sessionState.analystMode;
+    }
+    onSessionsModeChanged: {
+        if (sessionState) sessionState.analystMode = sessionsMode;
     }
 }

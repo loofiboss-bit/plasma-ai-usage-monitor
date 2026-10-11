@@ -20,6 +20,10 @@ ColumnLayout {
     property string requestedSourceId: ""
     property string requestedMetric: ""
     property int requestedRangeDays: 7
+    property bool sessionsMode: false
+    property string sessionToolId: "codex-cli"
+    property string sessionProjectId: ""
+    property var sessionState: null
     Accessible.name: historyController.loading
         ? i18n("History view loading")
         : i18n("History view ready")
@@ -98,9 +102,19 @@ ColumnLayout {
             Layout.fillWidth: true
         }
         PlasmaComponents.ToolButton {
+            objectName: "historySessionsMode"
+            text: i18n("Sessions")
+            checkable: true
+            checked: history.sessionsMode
+            activeFocusOnTab: true
+            Accessible.name: i18n("Show coding session history")
+            onClicked: history.sessionsMode = !history.sessionsMode
+        }
+        PlasmaComponents.ToolButton {
             objectName: "historySingleSourceMode"
             text: i18n("Single source")
             checkable: true
+            visible: !history.sessionsMode
             checked: !historyController.compareMode
             activeFocusOnTab: true
             Accessible.name: i18n("Show one source history")
@@ -114,6 +128,7 @@ ColumnLayout {
             objectName: "historyCompareMode"
             text: i18n("Compare")
             checkable: true
+            visible: !history.sessionsMode
             checked: historyController.compareMode
             activeFocusOnTab: true
             Accessible.name: i18n("Show comparison history")
@@ -125,6 +140,7 @@ ColumnLayout {
         }
         PlasmaComponents.ToolButton {
             icon.name: "view-refresh"
+            visible: history.sessionsMode
             enabled: !historyController.loading
             activeFocusOnTab: true
             Accessible.name: i18n("Refresh history")
@@ -135,6 +151,7 @@ ColumnLayout {
     GridLayout {
         id: historyControls
         Layout.fillWidth: true
+        visible: !history.sessionsMode
         Layout.leftMargin: Kirigami.Units.smallSpacing
         Layout.rightMargin: Kirigami.Units.smallSpacing
         columns: history.width < Kirigami.Units.gridUnit * 30 ? 3 : 5
@@ -224,7 +241,7 @@ ColumnLayout {
 
     PlasmaComponents.BusyIndicator {
         Layout.alignment: Qt.AlignHCenter
-        visible: historyController.loading
+        visible: !history.sessionsMode && historyController.loading
         running: visible
     }
 
@@ -232,7 +249,7 @@ ColumnLayout {
         Layout.fillWidth: true
         Layout.leftMargin: Kirigami.Units.smallSpacing
         Layout.rightMargin: Kirigami.Units.smallSpacing
-        visible: history.exportStatus !== ""
+        visible: !history.sessionsMode && history.exportStatus !== ""
         text: history.exportStatus
         color: Kirigami.Theme.neutralTextColor
         wrapMode: Text.WordWrap
@@ -242,7 +259,7 @@ ColumnLayout {
     Components.EmptyState {
         Layout.fillWidth: true
         Layout.fillHeight: true
-        visible: !historyController.loading
+        visible: !history.sessionsMode && !historyController.loading
             && (historyController.errorKey !== ""
                 || historyController.seriesData.length === 0)
         title: historyController.errorKey !== ""
@@ -256,7 +273,7 @@ ColumnLayout {
     Monitor.MultiSeriesChart {
         Layout.fillWidth: true
         Layout.fillHeight: true
-        visible: !historyController.loading && historyController.errorKey === ""
+        visible: !history.sessionsMode && !historyController.loading && historyController.errorKey === ""
             && historyController.seriesData.length > 0
         seriesData: historyController.seriesData
         metric: historyController.activeMetric || "cost"
@@ -266,7 +283,7 @@ ColumnLayout {
         Layout.fillWidth: true
         Layout.leftMargin: Kirigami.Units.smallSpacing
         Layout.rightMargin: Kirigami.Units.smallSpacing
-        visible: !historyController.loading
+        visible: !history.sessionsMode && !historyController.loading
             && historyController.seriesData.length > 0
         spacing: Kirigami.Units.smallSpacing
 
@@ -301,6 +318,23 @@ ColumnLayout {
 
     ClipboardHelper {
         id: clipboard
+    }
+
+    Components.LocalSessionPanel {
+        id: sessionsPanel
+        Layout.fillWidth: true
+        Layout.fillHeight: true
+        visible: history.sessionsMode
+        sessionModel: history.monitor ? history.monitor.localSessions : null
+        initialToolId: history.sessionToolId
+        initialProjectId: history.sessionProjectId
+        initialRangeDays: history.requestedRangeDays
+        sessionState: history.sessionState
+        onFiltersChanged: function(toolId, projectId, rangeDays) {
+            history.sessionToolId = toolId;
+            history.sessionProjectId = projectId;
+            history.requestedRangeDays = rangeDays;
+        }
     }
 
     Component.onCompleted: historyController.refreshCatalog()

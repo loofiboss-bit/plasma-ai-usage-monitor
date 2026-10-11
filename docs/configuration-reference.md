@@ -67,6 +67,11 @@ webhook URLs. Schema-v3 policies can contain raw scope identities required for
 exact restoration, so explicit backup files are sensitive. Diagnostics,
 support reports and integrations use separate allowlists and exclude them.
 
+The `codexSessionHistoryEnabled` and `claudeCodeSessionHistoryEnabled` settings
+are separate, false-by-default local opt-ins. They are applied only after the
+settings window saves. Session consent, imported session data, project aliases,
+and private identity keys are excluded from portable schema-v3 configuration.
+
 ## SQLite schema v8
 
 Runtime schema v8 extends the real v7 provenance database with:
@@ -85,6 +90,24 @@ Full-history JSON export is schema v7; selected-series JSON remains v6. These
 format numbers are independent of SQLite schema v8 and config schema v3.
 Per-channel CSV is a separate policy-events file. Explicit export projections
 exclude raw scope identities, secrets and policy identifiers.
+
+## Session history schema v9 (V24 candidate)
+
+Schema v9 adds separate local tables for coding sessions, token usage events,
+resumable file checkpoints, Codex cumulative baselines, local project aliases,
+and observed account quotas. Existing provider history, budget policies,
+scheduled-operation state, and established export formats remain separate.
+Session identities and project/file checkpoints are keyed with a random
+user-local HMAC key; source paths are not persisted. Imported rows are retained
+according to the existing History retention setting, and the first collector
+pass is limited to the most recent 30 days.
+
+The v8→v9 database transition is performed with the history schema migration.
+The migration must verify its pre-upgrade snapshot, including the SQLite WAL,
+before creating the session tables. An injected or real migration failure
+rolls back the DDL and preserves the v8 database and existing budget policies.
+V23 does not open schema v9; rollback requires the verified v8 snapshot and
+must keep the current v9 history separate for a later re-upgrade.
 
 Forecasts are derived runtime results. They are never written into raw
 observation history. Provider observations can remain in their existing major

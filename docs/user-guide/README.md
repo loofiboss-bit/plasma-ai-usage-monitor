@@ -16,6 +16,7 @@ across the popup.
 
 - [API providers](providers.md)
 - [Subscription tools and Browser Sync Labs](subscriptions.md)
+- [Local coding sessions and projects](coding-sessions.md)
 
 ## Use the data
 

@@ -18,11 +18,27 @@ Item {
                               || AppInfo.smokeView.indexOf("media-analyst") === 0 ? 2 : 0
     property bool sourceDetailVisible: AppInfo.smokeView === "source-detail"
         || AppInfo.smokeView === "media-source-detail"
-    property string detailSourceId: sourceDetailVisible ? "openrouter" : ""
+        || AppInfo.smokeView === "media-coding-sessions"
+    property string detailSourceId: sourceDetailVisible
+        ? AppInfo.smokeView === "media-coding-sessions" ? "codex-cli" : "openrouter"
+        : ""
     property string returnFocusSourceId: ""
     property string historySourceId: ""
     property string historyMetric: ""
     property int historyRangeDays: 7
+    property bool historySessionsMode: AppInfo.demoMode
+        && AppInfo.smokeView === "media-history-sessions"
+    property string historySessionToolId: "codex-cli"
+    property string historySessionProjectId: ""
+    property var localSessionViewState: ({
+        sourceDetail: ({ toolId: "codex-cli", rangeIndex: 1 }),
+        history: ({ toolId: "codex-cli", rangeIndex: 1 }),
+        analyst: ({
+            analystMode: AppInfo.demoMode
+                && AppInfo.smokeView === "media-analyst-sessions",
+            toolId: "codex-cli", rangeIndex: 1
+        })
+    })
 
     function startGuidedSetupAgain() {
         Plasmoid.configuration.setupWizardDismissed = false;
@@ -188,10 +204,17 @@ Item {
                 item.monitor = fullRoot.monitor;
                 if (fullRoot.sourceDetailVisible) {
                     item.sourceId = fullRoot.detailSourceId;
+                    item.sessionState = fullRoot.localSessionViewState.sourceDetail;
                 } else if (fullRoot.destination === 1) {
                     item.requestedSourceId = fullRoot.historySourceId;
                     item.requestedMetric = fullRoot.historyMetric;
                     item.requestedRangeDays = fullRoot.historyRangeDays;
+                    item.sessionsMode = fullRoot.historySessionsMode;
+                    item.sessionToolId = fullRoot.historySessionToolId;
+                    item.sessionProjectId = fullRoot.historySessionProjectId;
+                    item.sessionState = fullRoot.localSessionViewState.history;
+                } else if (fullRoot.destination === 2) {
+                    item.sessionState = fullRoot.localSessionViewState.analyst;
                 } else if (fullRoot.destination === 0
                            && fullRoot.returnFocusSourceId !== "") {
                     var sourceId = fullRoot.returnFocusSourceId;
@@ -233,6 +256,45 @@ Item {
                 fullRoot.historyRangeDays = rangeDays;
                 fullRoot.sourceDetailVisible = false;
                 fullRoot.destination = 1;
+            }
+            function onSessionHistoryRequested(toolId, projectId, rangeDays,
+                                               sessionId, pageOffset) {
+                fullRoot.historySessionsMode = true;
+                fullRoot.historySessionToolId = toolId;
+                fullRoot.historySessionProjectId = projectId;
+                fullRoot.historyRangeDays = rangeDays;
+                var nextSessionState = Object.assign({},
+                    fullRoot.localSessionViewState.history);
+                nextSessionState.toolId = toolId;
+                nextSessionState.projectId = projectId;
+                nextSessionState.rangeIndex = [1, 7, 30].indexOf(rangeDays);
+                nextSessionState.sessionId = sessionId;
+                nextSessionState.pageOffset = pageOffset;
+                fullRoot.localSessionViewState = Object.assign({},
+                    fullRoot.localSessionViewState, { history: nextSessionState });
+                fullRoot.sourceDetailVisible = false;
+                fullRoot.destination = 1;
+            }
+            function onSessionsModeChanged() {
+                if (fullRoot.destination === 1 && !fullRoot.sourceDetailVisible) {
+                    // qmllint disable missing-property
+                    fullRoot.historySessionsMode = destinationLoader.item.sessionsMode;
+                    // qmllint enable missing-property
+                }
+            }
+            function onSessionToolIdChanged() {
+                if (fullRoot.destination === 1 && !fullRoot.sourceDetailVisible) {
+                    // qmllint disable missing-property
+                    fullRoot.historySessionToolId = destinationLoader.item.sessionToolId;
+                    // qmllint enable missing-property
+                }
+            }
+            function onSessionProjectIdChanged() {
+                if (fullRoot.destination === 1 && !fullRoot.sourceDetailVisible) {
+                    // qmllint disable missing-property
+                    fullRoot.historySessionProjectId = destinationLoader.item.sessionProjectId;
+                    // qmllint enable missing-property
+                }
             }
         }
     }

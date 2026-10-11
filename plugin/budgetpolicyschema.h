@@ -11,6 +11,8 @@ bool migrate(QSqlDatabase &database, QString *error = nullptr,
              bool injectFailure = false);
 bool migrateDeliverySchema(QSqlDatabase &database, QString *error = nullptr,
                            bool injectFailure = false);
+bool migrateSessionSchema(QSqlDatabase &database, QString *error = nullptr,
+                          bool injectFailure = false);
 } // namespace BudgetPolicySchema
 
 #endif

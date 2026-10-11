@@ -852,7 +852,8 @@ void BudgetPolicyRepositoryTest::
     query.finish();
     QVERIFY(BudgetPolicySchema::migrateDeliverySchema(database, &error));
     QVERIFY(query.exec(QStringLiteral("PRAGMA user_version=9")));
-    QVERIFY(!BudgetPolicySchema::migrateDeliverySchema(database, &error));
+    QVERIFY(BudgetPolicySchema::migrateDeliverySchema(database, &error));
+    QVERIFY(query.exec(QStringLiteral("PRAGMA user_version=10")));
     {
       BudgetPolicyRepository future;
       future.setDatabasePath(path);

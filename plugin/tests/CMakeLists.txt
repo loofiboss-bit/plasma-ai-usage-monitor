@@ -156,6 +156,32 @@ target_link_libraries(test_scopebreakdownquery
 
 add_test(NAME scopebreakdownquery COMMAND test_scopebreakdownquery)
 
+add_executable(test_localsessionparser
+    test_localsessionparser.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/localsessionparser.cpp
+)
+target_include_directories(test_localsessionparser PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_localsessionparser PRIVATE Qt6::Core Qt6::Test)
+add_test(NAME localsessionparser COMMAND test_localsessionparser)
+
+add_executable(test_localsessionschema
+    test_localsessionschema.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyschema.cpp
+)
+target_include_directories(test_localsessionschema PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_localsessionschema PRIVATE Qt6::Core Qt6::Test Qt6::Sql)
+add_test(NAME localsessionschema COMMAND test_localsessionschema)
+
+add_executable(test_localsessionmodel
+    test_localsessionmodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/localsessionmodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/localsessionparser.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyschema.cpp
+)
+target_include_directories(test_localsessionmodel PRIVATE ${CMAKE_SOURCE_DIR}/plugin)
+target_link_libraries(test_localsessionmodel PRIVATE Qt6::Core Qt6::Test Qt6::Sql Qt6::Concurrent)
+add_test(NAME localsessionmodel COMMAND test_localsessionmodel)
+
 # --- UsageDatabase series test ---
 add_executable(test_usagedatabase_series
     test_usagedatabase_series.cpp
