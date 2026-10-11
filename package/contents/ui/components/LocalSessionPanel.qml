@@ -10,6 +10,17 @@ import com.github.loofi.aiusagemonitor 1.0
 
 ColumnLayout {
     id: panel
+    spacing: Kirigami.Units.largeSpacing
+
+    component SessionSection: QQC2.Frame {
+        padding: Kirigami.Units.largeSpacing
+        background: Rectangle {
+            color: Kirigami.Theme.alternateBackgroundColor
+            radius: Kirigami.Units.smallSpacing
+            border.width: 1
+            border.color: Qt.alpha(Kirigami.Theme.textColor, 0.18)
+        }
+    }
 
     required property var sessionModel
     property string fixedToolId: ""
@@ -314,155 +325,161 @@ ColumnLayout {
         wrapMode: Text.WordWrap
     }
 
-    ColumnLayout {
+    SessionSection {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled() && panel.dailyRows.length > 0
-        Kirigami.Heading {
-            Layout.fillWidth: true
-            level: 5
-            text: i18n("Daily usage")
-        }
-        ListView {
-            id: dailyList
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(
-                panel.dailyRows.length * Kirigami.Units.gridUnit * 3,
-                Kirigami.Units.gridUnit * 7)
-            Layout.minimumHeight: Kirigami.Units.gridUnit * 3
-            clip: true
-            model: panel.dailyRows
-            spacing: Kirigami.Units.smallSpacing
-            Accessible.name: i18n("Daily session token usage")
+        contentItem: ColumnLayout {
+            Kirigami.Heading {
+                Layout.fillWidth: true
+                level: 5
+                text: i18n("Daily usage")
+            }
+            ListView {
+                id: dailyList
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(
+                    panel.dailyRows.length * Kirigami.Units.gridUnit * 3,
+                    Kirigami.Units.gridUnit * 7)
+                Layout.minimumHeight: Kirigami.Units.gridUnit * 3
+                clip: true
+                model: panel.dailyRows
+                spacing: Kirigami.Units.smallSpacing
+                Accessible.name: i18n("Daily session token usage")
 
-            delegate: ColumnLayout {
-                id: dailyRow
-                required property var modelData
-                width: dailyList.width
-                spacing: 0
-                RowLayout {
-                    Layout.fillWidth: true
+                delegate: ColumnLayout {
+                    id: dailyRow
+                    required property var modelData
+                    width: dailyList.width
+                    spacing: 0
+                    RowLayout {
+                        Layout.fillWidth: true
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            text: dailyRow.modelData.localDate || i18n("Date unavailable")
+                            font.bold: true
+                        }
+                        PlasmaComponents.Label {
+                            text: i18n("%1 sessions",
+                                panel.tokenText(dailyRow.modelData.sessionCount))
+                        }
+                    }
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
-                        text: dailyRow.modelData.localDate || i18n("Date unavailable")
-                        font.bold: true
+                        text: i18n("Input %1 · output %2 · cache read %3 · cache write %4",
+                            panel.tokenText(dailyRow.modelData.inputTokens),
+                            panel.tokenText(dailyRow.modelData.outputTokens),
+                            panel.tokenText(dailyRow.modelData.cacheReadTokens),
+                            panel.tokenText(dailyRow.modelData.cacheWriteTokens))
+                        color: Kirigami.Theme.disabledTextColor
+                        wrapMode: Text.WordWrap
                     }
-                    PlasmaComponents.Label {
-                        text: i18n("%1 sessions",
-                            panel.tokenText(dailyRow.modelData.sessionCount))
-                    }
-                }
-                PlasmaComponents.Label {
-                    Layout.fillWidth: true
-                    text: i18n("Input %1 · output %2 · cache read %3 · cache write %4",
-                        panel.tokenText(dailyRow.modelData.inputTokens),
-                        panel.tokenText(dailyRow.modelData.outputTokens),
-                        panel.tokenText(dailyRow.modelData.cacheReadTokens),
-                        panel.tokenText(dailyRow.modelData.cacheWriteTokens))
-                    color: Kirigami.Theme.disabledTextColor
-                    wrapMode: Text.WordWrap
                 }
             }
         }
     }
 
-    GridLayout {
+    SessionSection {
         Layout.fillWidth: true
-        columns: width < Kirigami.Units.gridUnit * 28 ? 2 : 4
         visible: panel.selectedToolEnabled()
+        contentItem: GridLayout {
+            columns: width < Kirigami.Units.gridUnit * 28 ? 2 : 4
 
-        QQC2.ComboBox {
-            Layout.fillWidth: true
-            visible: panel.fixedToolId === ""
-            model: panel.toolOptions()
-            textRole: "label"
-            valueRole: "value"
-            currentIndex: panel.activeToolId === "claude-code" ? 1 : 0
-            Accessible.name: i18n("Session tool")
-            onActivated: {
-                panel.selectedToolId = currentValue;
-                panel.selectedProjectId = "";
-                panel.pageOffset = 0;
-                panel.persistState();
-                panel.refresh();
-                panel.filtersChanged(panel.activeToolId, panel.selectedProjectId,
-                                     panel.rangeDays);
-            }
-        }
-
-        QQC2.ComboBox {
-            Layout.fillWidth: true
-            model: [i18n("Today"), i18n("7 days"), i18n("30 days")]
-            currentIndex: panel.selectedRangeIndex
-            Accessible.name: i18n("Session period")
-            onActivated: {
-                panel.selectedRangeIndex = currentIndex;
-                panel.pageOffset = 0;
-                panel.persistState();
-                panel.refresh();
-                panel.filtersChanged(panel.activeToolId, panel.selectedProjectId,
-                                     panel.rangeDays);
-            }
-        }
-
-        QQC2.ComboBox {
-            Layout.fillWidth: true
-            model: panel.displayedProjects()
-            textRole: "label"
-            valueRole: "projectId"
-            currentIndex: panel.projectIndex()
-            Accessible.name: i18n("Session project")
-            onActivated: {
-                panel.selectedProjectId = currentValue || "";
-                panel.pageOffset = 0;
-                panel.persistState();
-                panel.refresh();
-                panel.filtersChanged(panel.activeToolId, panel.selectedProjectId,
-                                     panel.rangeDays);
-            }
-        }
-
-        PlasmaComponents.Button {
-            Layout.fillWidth: true
-            text: i18n("Export")
-            icon.name: "document-export"
-            activeFocusOnTab: true
-            enabled: !panel.loading && panel.selectedToolEnabled()
-            Accessible.name: i18n("Export filtered session history")
-            onClicked: exportMenu.open()
-
-            QQC2.Menu {
-                id: exportMenu
-                y: parent.height
-                QQC2.MenuItem {
-                    text: i18n("Export JSON")
-                    onTriggered: panel.openExport("json")
+            QQC2.ComboBox {
+                Layout.fillWidth: true
+                visible: panel.fixedToolId === ""
+                model: panel.toolOptions()
+                textRole: "label"
+                valueRole: "value"
+                currentIndex: panel.activeToolId === "claude-code" ? 1 : 0
+                Accessible.name: i18n("Session tool")
+                onActivated: {
+                    panel.selectedToolId = currentValue;
+                    panel.selectedProjectId = "";
+                    panel.pageOffset = 0;
+                    panel.persistState();
+                    panel.refresh();
+                    panel.filtersChanged(panel.activeToolId, panel.selectedProjectId,
+                                         panel.rangeDays);
                 }
-                QQC2.MenuItem {
-                    text: i18n("Export CSV")
-                    onTriggered: panel.openExport("csv")
+            }
+
+            QQC2.ComboBox {
+                Layout.fillWidth: true
+                model: [i18n("Today"), i18n("7 days"), i18n("30 days")]
+                currentIndex: panel.selectedRangeIndex
+                Accessible.name: i18n("Session period")
+                onActivated: {
+                    panel.selectedRangeIndex = currentIndex;
+                    panel.pageOffset = 0;
+                    panel.persistState();
+                    panel.refresh();
+                    panel.filtersChanged(panel.activeToolId, panel.selectedProjectId,
+                                         panel.rangeDays);
+                }
+            }
+
+            QQC2.ComboBox {
+                Layout.fillWidth: true
+                model: panel.displayedProjects()
+                textRole: "label"
+                valueRole: "projectId"
+                currentIndex: panel.projectIndex()
+                Accessible.name: i18n("Session project")
+                onActivated: {
+                    panel.selectedProjectId = currentValue || "";
+                    panel.pageOffset = 0;
+                    panel.persistState();
+                    panel.refresh();
+                    panel.filtersChanged(panel.activeToolId, panel.selectedProjectId,
+                                         panel.rangeDays);
+                }
+            }
+
+            PlasmaComponents.Button {
+                Layout.fillWidth: true
+                text: i18n("Export")
+                icon.name: "document-export"
+                activeFocusOnTab: true
+                enabled: !panel.loading && panel.selectedToolEnabled()
+                Accessible.name: i18n("Export filtered session history")
+                onClicked: exportMenu.open()
+
+                QQC2.Menu {
+                    id: exportMenu
+                    y: parent.height
+                    QQC2.MenuItem {
+                        text: i18n("Export JSON")
+                        onTriggered: panel.openExport("json")
+                    }
+                    QQC2.MenuItem {
+                        text: i18n("Export CSV")
+                        onTriggered: panel.openExport("csv")
+                    }
                 }
             }
         }
     }
 
-    GridLayout {
+    SessionSection {
         Layout.fillWidth: true
-        columns: width < Kirigami.Units.gridUnit * 28 ? 2 : 4
         visible: panel.selectedToolEnabled()
-        PlasmaComponents.Label { text: i18n("Sessions: %1", panel.tokenText(panel.summary.sessionCount)) }
-        PlasmaComponents.Label { text: i18n("Events: %1", panel.tokenText(panel.summary.eventCount)) }
-        PlasmaComponents.Label { text: i18n("Input: %1", panel.tokenText(panel.summary.inputTokens)) }
-        PlasmaComponents.Label { text: i18n("Output: %1", panel.tokenText(panel.summary.outputTokens)) }
-        PlasmaComponents.Label { text: i18n("Cache read: %1", panel.tokenText(panel.summary.cacheReadTokens)) }
-        PlasmaComponents.Label { text: i18n("Cache write: %1", panel.tokenText(panel.summary.cacheWriteTokens)) }
-        PlasmaComponents.Label {
-            Layout.fillWidth: true
-            Layout.columnSpan: parent.columns
-            visible: !!panel.summary.coverage
-            text: panel.coverageText(panel.summary.coverage)
-            color: panel.summary.coverage === "complete"
-                ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.neutralTextColor
-            Accessible.name: text
+        contentItem: GridLayout {
+            columns: width < Kirigami.Units.gridUnit * 28 ? 2 : 4
+            PlasmaComponents.Label { text: i18n("Sessions: %1", panel.tokenText(panel.summary.sessionCount)) }
+            PlasmaComponents.Label { text: i18n("Events: %1", panel.tokenText(panel.summary.eventCount)) }
+            PlasmaComponents.Label { text: i18n("Input: %1", panel.tokenText(panel.summary.inputTokens)) }
+            PlasmaComponents.Label { text: i18n("Output: %1", panel.tokenText(panel.summary.outputTokens)) }
+            PlasmaComponents.Label { text: i18n("Cache read: %1", panel.tokenText(panel.summary.cacheReadTokens)) }
+            PlasmaComponents.Label { text: i18n("Cache write: %1", panel.tokenText(panel.summary.cacheWriteTokens)) }
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                Layout.columnSpan: parent.columns
+                visible: !!panel.summary.coverage
+                text: panel.coverageText(panel.summary.coverage)
+                color: panel.summary.coverage === "complete"
+                    ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.neutralTextColor
+                Accessible.name: text
+            }
         }
     }
 
@@ -476,85 +493,89 @@ ColumnLayout {
         Accessible.name: text
     }
 
-    ColumnLayout {
+    SessionSection {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled()
             && (panel.summary.modelBreakdown || []).length > 0
-        Kirigami.Heading {
-            Layout.fillWidth: true
-            level: 5
-            text: i18n("By model")
-        }
-        ListView {
-            id: modelBreakdownList
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(
-                (panel.summary.modelBreakdown || []).length
-                    * Kirigami.Units.gridUnit * 2,
-                Kirigami.Units.gridUnit * 5)
-            clip: true
-            model: panel.summary.modelBreakdown || []
-            spacing: Kirigami.Units.smallSpacing
-            Accessible.name: i18n("Token usage by model")
+        contentItem: ColumnLayout {
+            Kirigami.Heading {
+                Layout.fillWidth: true
+                level: 5
+                text: i18n("By model")
+            }
+            ListView {
+                id: modelBreakdownList
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(
+                    (panel.summary.modelBreakdown || []).length
+                        * Kirigami.Units.gridUnit * 2,
+                    Kirigami.Units.gridUnit * 5)
+                clip: true
+                model: panel.summary.modelBreakdown || []
+                spacing: Kirigami.Units.smallSpacing
+                Accessible.name: i18n("Token usage by model")
 
-            delegate: RowLayout {
-                id: modelBreakdownRow
-                required property var modelData
-                width: modelBreakdownList.width
-                PlasmaComponents.Label {
-                    Layout.fillWidth: true
-                    text: modelBreakdownRow.modelData.modelId || i18n("Model unavailable")
-                    elide: Text.ElideRight
-                }
-                PlasmaComponents.Label {
-                    text: i18n("%1 events · input %2 · output %3",
-                        panel.tokenText(modelBreakdownRow.modelData.eventCount),
-                        panel.tokenText(modelBreakdownRow.modelData.inputTokens),
-                        panel.tokenText(modelBreakdownRow.modelData.outputTokens))
-                    color: Kirigami.Theme.disabledTextColor
+                delegate: RowLayout {
+                    id: modelBreakdownRow
+                    required property var modelData
+                    width: modelBreakdownList.width
+                    PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        text: modelBreakdownRow.modelData.modelId || i18n("Model unavailable")
+                        elide: Text.ElideRight
+                    }
+                    PlasmaComponents.Label {
+                        text: i18n("%1 events · input %2 · output %3",
+                            panel.tokenText(modelBreakdownRow.modelData.eventCount),
+                            panel.tokenText(modelBreakdownRow.modelData.inputTokens),
+                            panel.tokenText(modelBreakdownRow.modelData.outputTokens))
+                        color: Kirigami.Theme.disabledTextColor
+                    }
                 }
             }
         }
     }
 
-    ColumnLayout {
+    SessionSection {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled()
             && !panel.selectedProjectId
             && (panel.summary.projectBreakdown || []).length > 0
-        Kirigami.Heading {
-            Layout.fillWidth: true
-            level: 5
-            text: i18n("By project")
-        }
-        ListView {
-            id: projectBreakdownList
-            Layout.fillWidth: true
-            Layout.preferredHeight: Math.min(
-                (panel.summary.projectBreakdown || []).length
-                    * Kirigami.Units.gridUnit * 2,
-                Kirigami.Units.gridUnit * 5)
-            clip: true
-            model: panel.summary.projectBreakdown || []
-            spacing: Kirigami.Units.smallSpacing
-            Accessible.name: i18n("Token usage by project")
+        contentItem: ColumnLayout {
+            Kirigami.Heading {
+                Layout.fillWidth: true
+                level: 5
+                text: i18n("By project")
+            }
+            ListView {
+                id: projectBreakdownList
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(
+                    (panel.summary.projectBreakdown || []).length
+                        * Kirigami.Units.gridUnit * 2,
+                    Kirigami.Units.gridUnit * 5)
+                clip: true
+                model: panel.summary.projectBreakdown || []
+                spacing: Kirigami.Units.smallSpacing
+                Accessible.name: i18n("Token usage by project")
 
-            delegate: RowLayout {
-                id: projectBreakdownRow
-                required property var modelData
-                width: projectBreakdownList.width
-                PlasmaComponents.Label {
-                    Layout.fillWidth: true
-                    text: String(projectBreakdownRow.modelData.alias || "").trim()
-                        || i18n("Unnamed project")
-                    elide: Text.ElideRight
-                }
-                PlasmaComponents.Label {
-                    text: i18n("%1 sessions · input %2 · output %3",
-                        panel.tokenText(projectBreakdownRow.modelData.sessionCount),
-                        panel.tokenText(projectBreakdownRow.modelData.inputTokens),
-                        panel.tokenText(projectBreakdownRow.modelData.outputTokens))
-                    color: Kirigami.Theme.disabledTextColor
+                delegate: RowLayout {
+                    id: projectBreakdownRow
+                    required property var modelData
+                    width: projectBreakdownList.width
+                    PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        text: String(projectBreakdownRow.modelData.alias || "").trim()
+                            || i18n("Unnamed project")
+                        elide: Text.ElideRight
+                    }
+                    PlasmaComponents.Label {
+                        text: i18n("%1 sessions · input %2 · output %3",
+                            panel.tokenText(projectBreakdownRow.modelData.sessionCount),
+                            panel.tokenText(projectBreakdownRow.modelData.inputTokens),
+                            panel.tokenText(projectBreakdownRow.modelData.outputTokens))
+                        color: Kirigami.Theme.disabledTextColor
+                    }
                 }
             }
         }
@@ -574,7 +595,7 @@ ColumnLayout {
         clip: true
         visible: panel.selectedToolEnabled()
         model: panel.sessionRows
-        spacing: Kirigami.Units.smallSpacing
+        spacing: Kirigami.Units.largeSpacing
         Accessible.name: i18n("Coding sessions")
 
         delegate: QQC2.ItemDelegate {
@@ -582,6 +603,16 @@ ColumnLayout {
             required property var modelData
             width: sessionList.width
             activeFocusOnTab: true
+            padding: Kirigami.Units.largeSpacing
+            background: Rectangle {
+                radius: Kirigami.Units.smallSpacing
+                color: sessionDelegate.hovered || sessionDelegate.down
+                    ? Kirigami.Theme.alternateBackgroundColor : Kirigami.Theme.backgroundColor
+                border.width: sessionDelegate.activeFocus ? 2 : 1
+                border.color: sessionDelegate.activeFocus
+                    || panel.selectedSessionId === sessionDelegate.modelData.sessionId
+                    ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.18)
+            }
             Accessible.name: i18n("Session ending %1, %2 events",
                 panel.dateText(modelData.lastSeenAtUtc), panel.tokenText(modelData.eventCount))
             Accessible.description: panel.coverageText(modelData.coverage)
