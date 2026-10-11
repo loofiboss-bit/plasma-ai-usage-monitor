@@ -1,18 +1,18 @@
 # Roadmap
 
-**Current release:** 24.0.0, Coding Sessions & Projects (candidate; not published)
+**Current release:** 24.0.0, Coding Sessions & Projects
 
-**Last updated:** 2026-10-11
+**Last updated:** 2026-10-12
 
 ## Current release
 
 ### 24.0.0 Coding Sessions & Projects
 
-Candidate implementation is underway from published V23.0.0. Add independently
+Built on published V23.0.0 with independently
 opt-in local session analysis for Codex and Claude Code, with anonymous project
 filters, local aliases, shared token semantics and explicit redacted exports.
 The [qualification checklist](docs/release/v24.0.0-checklist.md) records
-implementation and evidence; no public V24 publication is part of this work.
+implementation, publication evidence, and remaining manual qualification.
 
 - Import at most the latest 30 calendar days, limited by configured retention,
   with resumable background discovery and parser-coverage status.
