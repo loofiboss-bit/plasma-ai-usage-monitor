@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
+import "../Utils.js" as Utils
 
 Rectangle {
     id: focus
@@ -122,22 +123,17 @@ Rectangle {
                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
                         Layout.preferredHeight: width
                     }
-                    ColumnLayout {
+                    PlasmaComponents.Label {
+                        text: fact.modelData.label
+                        color: Kirigami.Theme.disabledTextColor
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        elide: Text.ElideRight
                         Layout.fillWidth: true
-                        spacing: 0
-                        PlasmaComponents.Label {
-                            text: fact.modelData.value
-                            font.bold: true
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
-                        PlasmaComponents.Label {
-                            text: fact.modelData.label
-                            color: Kirigami.Theme.disabledTextColor
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
+                    }
+                    PlasmaComponents.Label {
+                        text: fact.modelData.value
+                        font.bold: true
+                        horizontalAlignment: Text.AlignRight
                     }
                 }
             }
@@ -181,10 +177,10 @@ Rectangle {
         if (runwayRisk.kind === "budget_overrun")
             return i18n("%1 is projected to exceed its configured budget on %2.",
                         runwayRisk.sourceId,
-                        predicted.toLocaleString(Qt.locale()));
+                        Utils.formatWhen(predicted, "dateTime"));
         return i18n("%1 is projected to exhaust quota before reset on %2.",
                     runwayRisk.sourceId,
-                    predicted.toLocaleString(Qt.locale()));
+                    Utils.formatWhen(predicted, "dateTime"));
     }
 
     function effectiveActionLabel() {
@@ -226,8 +222,7 @@ Rectangle {
                 ? i18n("Budget pacing") : i18n("Quota runway")
         }, {
             icon: "chronometer",
-            value: new Date(runwayRisk.predictedAt)
-                .toLocaleString(Qt.locale()),
+            value: Utils.formatWhen(runwayRisk.predictedAt, "dateTime"),
             label: i18n("Predicted event")
         }, {
             icon: "documentinfo",
@@ -293,8 +288,6 @@ Rectangle {
     }
 
     function formatShortDate(value) {
-        var date = new Date(value);
-        return isNaN(date.getTime()) ? i18n("unknown")
-                                    : date.toLocaleDateString(Qt.locale());
+        return Utils.formatWhen(value, "date") || i18n("unknown");
     }
 }

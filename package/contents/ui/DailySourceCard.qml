@@ -45,10 +45,9 @@ QQC2.ItemDelegate {
             Layout.preferredHeight: width
         }
 
-        GridLayout {
+        RowLayout {
             Layout.fillWidth: true
-            columns: card.width >= Kirigami.Units.gridUnit * 40 ? 2 : 1
-            columnSpacing: Kirigami.Units.largeSpacing
+            spacing: Kirigami.Units.largeSpacing
 
             ColumnLayout {
                 Layout.fillWidth: true
@@ -82,9 +81,11 @@ QQC2.ItemDelegate {
             }
 
             ColumnLayout {
-                Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 visible: card.row.primaryMetricAvailable === true
                 spacing: 0
+                Layout.alignment: Qt.AlignRight
+
                 PlasmaComponents.Label {
                     objectName: "sourceMetricValue"
                     text: card.metricText()
@@ -93,17 +94,16 @@ QQC2.ItemDelegate {
                     Layout.alignment: Qt.AlignRight
                 }
                 PlasmaComponents.Label {
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
+                    wrapMode: Text.NoWrap
                     text: card.metricStatusText()
                     color: card.row.freshnessState === "stale"
                         ? Kirigami.Theme.neutralTextColor
                         : Kirigami.Theme.disabledTextColor
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    horizontalAlignment: Text.AlignRight
                     Layout.alignment: Qt.AlignRight
                 }
             }
-
         }
 
         Kirigami.Icon {
@@ -207,15 +207,16 @@ QQC2.ItemDelegate {
     }
 
     function metricStatusText() {
-        var status = row.freshnessState === "stale" ? i18n("Stale") : i18n("Current");
         var period = Utils.spendWindowText({
             window: row.primaryMetricWindow || "",
             periodStart: row.primaryMetricPeriodStart,
             periodEnd: row.primaryMetricPeriodEnd,
             bounded: !!row.primaryMetricPeriodStart && !!row.primaryMetricPeriodEnd,
-            sourceNames: [row.displayName || row.stableId]
+            sourceNames: []
         });
-        status += i18n(" · %1", period);
-        return status;
+        if (row.freshnessState === "stale") {
+            return i18n("Stale · %1", period);
+        }
+        return period;
     }
 }
