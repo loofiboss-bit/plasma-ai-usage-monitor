@@ -235,6 +235,7 @@ capture_view() {
   esac
   case "$view" in
     media-history-*) accessible_marker="History view ready" ;;
+    media-analyst-sessions) accessible_marker="History view ready" ;;
     media-analyst-*) accessible_marker="Insights view ready" ;;
     media-source-detail) accessible_marker="Back to source list" ;;
     media-coding-sessions) accessible_marker="Back to source list" ;;
