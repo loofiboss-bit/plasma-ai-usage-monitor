@@ -199,7 +199,7 @@ KCM.SimpleKCM {
         }
     }
 
-    Kirigami.FormLayout {
+    Components.SettingsFormLayout {
         QQC2.Label {
             Kirigami.FormData.label: i18n("Subscription evidence:")
             Layout.fillWidth: true
@@ -228,8 +228,6 @@ KCM.SimpleKCM {
                 }
             }
         }
-
-        anchors.fill: parent
 
         Kirigami.Separator {
             Kirigami.FormData.isSection: true
