@@ -1,10 +1,17 @@
 # Roadmap
 
-**Current release:** 24.0.0, Coding Sessions & Projects
+**Current release:** 24.0.1, Coding Sessions & Projects
 
 **Last updated:** 2026-10-12
 
 ## Current release
+
+### 24.0.1 Coding Sessions Layout Hotfix
+
+The authorized V24.0.1 patch removes the fixed height from Source Detail's
+coding-session panel, keeping Runway and following content below its summaries
+in the scrollable detail view. See the
+[qualification checklist](docs/release/v24.0.1-checklist.md).
 
 ### 24.0.0 Coding Sessions & Projects
 

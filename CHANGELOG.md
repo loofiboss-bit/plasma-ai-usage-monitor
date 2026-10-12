@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [24.0.1] — 2026-10-12
+
+### Fixed
+
+- Let the Source Detail coding-session panel size to its contents so the Runway
+  section no longer overlaps session summaries in a narrow popup.
+
 ## [24.0.0] — 2026-10-12
 
 ### Added
