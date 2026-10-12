@@ -7,6 +7,7 @@ RowLayout {
     id: editor
 
     required property string label
+    property alias text: credentialField.text
     property string placeholderText: ""
     property bool editable: true
     property bool clearEnabled: false

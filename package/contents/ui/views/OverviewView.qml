@@ -21,8 +21,13 @@ QQC2.ScrollView {
     property var sessionSummaryRequests: ({})
     property var sessionSummaryLatestByTool: ({})
     property var sessionSummaryByTool: ({})
+    property bool costsExpanded: false
+    property var viewState: ({})
     readonly property var visibleSourceRows: filterSourceRows()
+    readonly property var visibleSourceGroups:
+        Utils.groupOverviewSourceRows(visibleSourceRows)
     signal sourceRequested(string stableId)
+    signal actionRequested(string stableId, string actionKey, string sourceKind)
     Accessible.role: Accessible.Pane
     Accessible.name: i18n("Overview view ready")
 
@@ -32,18 +37,49 @@ QQC2.ScrollView {
     }
 
     function restoreSourceFocus(stableId) {
-        for (var i = 0; i < sourceRepeater.count; ++i) {
+        for (var i = 0; i < sourceGroupRepeater.count; ++i) {
             // qmllint disable missing-property
-            var card = sourceRepeater.itemAt(i);
-            if (card && card.row.stableId === stableId) {
-                card.forceActiveFocus(Qt.BacktabFocusReason);
-                // qmllint enable missing-property
-                return true;
-            }
+            var group = sourceGroupRepeater.itemAt(i);
+            if (group && group.restoreSourceFocus(stableId)) return true;
             // qmllint enable missing-property
         }
         return false;
     }
+
+    function captureViewState() {
+        var contentY = 0;
+        // Controls exposes a Flickable here at runtime; qmltypes declare QQuickItem.
+        // qmllint disable missing-property
+        if (overview.contentItem && overview.contentItem.contentY !== undefined)
+            contentY = overview.contentItem.contentY;
+        // qmllint enable missing-property
+        return {
+            searchText: sourceSearchText,
+            filterIndex: sourceFilterIndex,
+            costsExpanded: costsExpanded,
+            contentY: contentY
+        };
+    }
+
+    function applyViewState() {
+        var saved = viewState || ({});
+        sourceSearchText = saved.searchText || "";
+        sourceFilterIndex = saved.filterIndex === 1 ? 1 : 0;
+        costsExpanded = !!saved.costsExpanded;
+        Qt.callLater(function() {
+            // The QML type for ScrollView contentItem is generic; at runtime it is a Flickable.
+            // qmllint disable missing-property
+            if (!overview.contentItem || overview.contentItem.contentY === undefined)
+                return;
+            var maxY = Math.max(0, overview.contentItem.contentHeight
+                - overview.contentItem.height);
+            overview.contentItem.contentY = Math.max(0,
+                Math.min(Number(saved.contentY || 0), maxY));
+            // qmllint enable missing-property
+        });
+    }
+
+    onViewStateChanged: applyViewState()
 
     function filterSourceRows() {
         return Utils.filterOverviewSourceRows(overviewState.sourceRows,
@@ -92,6 +128,8 @@ QQC2.ScrollView {
         var enabled = stableId === "codex-cli"
             ? !!model.codexEnabled : !!model.claudeCodeEnabled;
         if (!enabled) return "";
+        if (!Object.prototype.hasOwnProperty.call(sessionSummaryByTool, stableId))
+            return i18n("Loading session summary…");
         var summary = sessionSummaryByTool[stableId] || ({});
         var count = Math.max(0, Number(summary.sessionCount || 0));
         var lastActivity = Date.parse(summary.lastActivityAtUtc || "");
@@ -143,13 +181,36 @@ QQC2.ScrollView {
             guardrails: overview.monitor.guardrails
             forecastsEnabled: Plasmoid.configuration.forecastUiEnabled
             onActionRequested: function(stableId, actionKey, sourceKind) {
-                if (actionKey === "review_runway") {
-                    overview.sourceRequested(stableId);
-                    return;
-                }
-                overview.monitor.fixOverviewSource(stableId, actionKey,
-                                                    sourceKind);
+                overview.actionRequested(stableId, actionKey, sourceKind);
             }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            visible: costSummary.spendRows.length > 0
+
+            PlasmaComponents.Button {
+                objectName: "overviewMoreCostsToggle"
+                text: i18n("More costs")
+                icon.name: overview.costsExpanded ? "arrow-down" : "arrow-right"
+                checkable: true
+                checked: overview.costsExpanded
+                activeFocusOnTab: true
+                Accessible.name: text
+                onClicked: overview.costsExpanded = checked
+            }
+            Item { Layout.fillWidth: true }
+        }
+
+        Monitor.CostSummaryCard {
+            id: costSummary
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            summary: overviewState.summary
+            visible: overview.costsExpanded && spendRows.length > 0
         }
 
         PlasmaComponents.Label {
@@ -173,19 +234,10 @@ QQC2.ScrollView {
                 Layout.fillWidth: true
             }
 
-            PlasmaComponents.ToolButton {
-                visible: overviewState.attentionRows.length > 0
-                checkable: true
-                checked: overview.sourceFilterIndex === 1
-                icon.name: "dialog-warning"
-                text: i18n("Needs attention (%1)", overviewState.attentionRows.length)
-                display: QQC2.AbstractButton.TextBesideIcon
-                onToggled: overview.sourceFilterIndex = checked ? 1 : 0
-            }
-
             PlasmaComponents.Label {
-                text: overview.visibleSourceRows.length === overviewState.sourceRows.length
-                    ? overviewState.sourceRows.length
+                text: overview.sourceSearchText.trim() === ""
+                        && overview.sourceFilterIndex === 0
+                    ? i18np("%1 source", "%1 sources", overviewState.sourceRows.length)
                     : i18n("%1 shown · %2 total", overview.visibleSourceRows.length,
                            overviewState.sourceRows.length)
                 color: Kirigami.Theme.disabledTextColor
@@ -209,7 +261,7 @@ QQC2.ScrollView {
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
             columns: overview.width >= Kirigami.Units.gridUnit * 30 ? 2 : 1
-            visible: overviewState.sourceRows.length > 6
+            visible: overviewState.sourceRows.length > 0
 
             Kirigami.SearchField {
                 Layout.fillWidth: true
@@ -243,18 +295,53 @@ QQC2.ScrollView {
         }
 
         Repeater {
-            id: sourceRepeater
-            model: overview.visibleSourceRows
+            id: sourceGroupRepeater
+            model: overview.visibleSourceGroups
 
-            Monitor.DailySourceCard {
+            delegate: ColumnLayout {
+                id: sourceGroup
                 required property var modelData
                 Layout.fillWidth: true
-                Layout.leftMargin: Kirigami.Units.smallSpacing
-                Layout.rightMargin: Kirigami.Units.smallSpacing
-                row: modelData
-                sessionActivityText: overview.sessionActivityText(modelData.stableId)
-                onSourceRequested: function(stableId) {
-                    overview.sourceRequested(stableId);
+                spacing: Kirigami.Units.smallSpacing
+
+                PlasmaExtras.Heading {
+                    Layout.fillWidth: true
+                    Layout.leftMargin: Kirigami.Units.smallSpacing
+                    Layout.rightMargin: Kirigami.Units.smallSpacing
+                    level: 4
+                    text: i18n("%1 · %2", sourceGroup.modelData.label,
+                               sourceGroup.modelData.rows.length)
+                }
+
+                Repeater {
+                    id: sourceRowsRepeater
+                    model: sourceGroup.modelData.rows
+
+                    Monitor.DailySourceCard {
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Layout.leftMargin: Kirigami.Units.smallSpacing
+                        Layout.rightMargin: Kirigami.Units.smallSpacing
+                        row: modelData
+                        sessionActivityText: overview.sessionActivityText(modelData.stableId)
+                        onSourceRequested: function(stableId) {
+                            overview.sourceRequested(stableId);
+                        }
+                    }
+                }
+
+                function restoreSourceFocus(stableId) {
+                    for (var i = 0; i < sourceRowsRepeater.count; ++i) {
+                        // qmllint disable missing-property
+                        var card = sourceRowsRepeater.itemAt(i);
+                        if (card && card.row.stableId === stableId) {
+                            card.forceActiveFocus(Qt.BacktabFocusReason);
+                            // qmllint enable missing-property
+                            return true;
+                        }
+                        // qmllint enable missing-property
+                    }
+                    return false;
                 }
             }
         }
@@ -265,5 +352,8 @@ QQC2.ScrollView {
         }
     }
 
-    Component.onCompleted: Qt.callLater(refreshSessionSummaries)
+    Component.onCompleted: {
+        applyViewState();
+        Qt.callLater(refreshSessionSummaries);
+    }
 }

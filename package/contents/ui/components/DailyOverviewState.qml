@@ -249,49 +249,25 @@ QtObject {
     function focusFacts() {
         var facts = [];
         var quota = summary.lowestActualRemainingQuota || {};
-        var reset = summary.nearestActualReset || {};
         if (quota.stableId) {
+            var quotaValue = i18n("%1% remaining",
+                                  Math.round(Number(quota.percentRemaining)));
+            if (quota.resetAt)
+                quotaValue += i18n(" · resets in %1", relativeReset(quota.resetAt));
             facts.push({
                 icon: "speedometer",
-                value: i18n("%1% remaining",
-                                 Math.round(Number(quota.percentRemaining))),
-                label: i18n("Live quota · %1", quota.displayName)
+                value: quotaValue,
+                label: i18n("Live quota · %1 · %2", quota.displayName,
+                            quota.window || i18n("current window"))
             });
         }
-        if (reset.stableId) {
-            facts.push({
-                icon: "chronometer",
-                value: relativeReset(reset.resetAt),
-                label: i18n("Live reset · %1", reset.displayName)
-            });
-        }
-        var feeRanges = summary.fixedSubscriptionFeeRanges || [];
-        for (var r = 0; r < feeRanges.length; ++r) {
-            var fee = feeRanges[r];
-            facts.push({ icon: "wallet-open",
-                value: i18n("%1–%2 %3", Number(fee.rangeMin).toFixed(2),
-                    Number(fee.rangeMax).toFixed(2), fee.currency),
-                label: i18n("Published fee range · %1", fee.displayName) });
-        }
-        var fixed = formatTotals(summary.fixedSubscriptionFees);
-        var groups = summary.spendGroups || [];
-        for (var g = 0; g < groups.length; ++g) {
-            var group = groups[g] || {};
-            if (group.quality !== "actual" && group.quality !== "estimated") continue;
-            facts.push({
-                icon: group.quality === "estimated"
-                    ? "accessories-calculator" : "view-financial-account",
-                value: Utils.formatSpendGroup(group),
-                label: i18n("%1 · %2",
-                    group.quality === "estimated" ? i18n("Local estimate") : i18n("Actual spend"),
-                    Utils.spendWindowText(group))
-            });
-        }
-        if (fixed !== "") {
+        var actualToday = Utils.formatSpendGroups(
+            summary.spendGroups || [], "actual", "day");
+        if (actualToday !== "") {
             facts.push({
                 icon: "wallet-open",
-                value: fixed,
-                label: i18n("Fixed monthly fee")
+                value: actualToday,
+                label: i18n("Reported spend · today")
             });
         }
         if (facts.length === 0 && Number(summary.enabledSourceCount || 0) > 0) {
@@ -301,7 +277,7 @@ QtObject {
                 label: i18n("Reporting sources")
             });
         }
-        return facts;
+        return facts.slice(0, 2);
     }
 
     function actionLabel(row) {

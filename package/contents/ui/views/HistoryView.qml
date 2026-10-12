@@ -24,7 +24,14 @@ ColumnLayout {
     property string sessionToolId: "codex-cli"
     property string sessionProjectId: ""
     property var sessionState: null
+    // Transient handoff state owned by FullRepresentation. Call captureViewState()
+    // before replacing this page and assign the returned object on restoration.
+    property var viewState: null
+    property var pendingViewState: null
     property var catalogDatabase: null
+    property bool applyingViewState: false
+    property bool restoreScrollPending: false
+    property real savedContentY: 0
     Accessible.name: historyController.loading
         ? i18n("History view loading")
         : i18n("History view ready")
@@ -55,6 +62,37 @@ ColumnLayout {
         });
     }
 
+    function restoreScrollPosition() {
+        Qt.callLater(function() {
+            if (!history.restoreScrollPending) return;
+            // Controls exposes a Flickable here at runtime, but its qmltypes only declare QQuickItem.
+            // qmllint disable missing-property
+            var flickable = historyScroll.contentItem;
+            if (!flickable || flickable.contentY === undefined) return;
+            var maxY = Math.max(0, flickable.contentHeight - flickable.height);
+            if (history.savedContentY > 0 && maxY === 0) return;
+            flickable.contentY = Math.max(0, Math.min(history.savedContentY, maxY));
+            // qmllint enable missing-property
+            history.restoreScrollPending = false;
+        });
+    }
+
+    Connections {
+        target: historyScroll.contentItem
+        function onContentHeightChanged() {
+            if (history.restoreScrollPending) history.restoreScrollPosition();
+        }
+    }
+
+    function currentScrollPosition() {
+        // Controls exposes a Flickable here at runtime, but its qmltypes only declare QQuickItem.
+        // qmllint disable missing-property
+        var flickable = historyScroll.contentItem;
+        return flickable && flickable.contentY !== undefined
+            ? Number(flickable.contentY) : 0;
+        // qmllint enable missing-property
+    }
+
     function emptyStateTitle() {
         if (historyController.errorKey !== "")
             return i18n("This comparison is not compatible");
@@ -72,6 +110,90 @@ ColumnLayout {
             return i18n("This source has no saved usage snapshots yet. Refresh the source and return after its next snapshot is stored.");
         }
         return i18n("No observations for this metric in this period. Try a wider range or refresh the source.");
+    }
+
+    function selectionSummary() {
+        var parts = [];
+        if (historyController.compareMode) {
+            parts.push(i18n("Compare sources"));
+        } else {
+            var source = historyController.sourceRows[
+                historyController.sourceIndex()];
+            if (source) parts.push(source.displayName);
+        }
+        var metric = historyController.metricLabel(
+            historyController.activeMetric || historyController.selectedMetric);
+        if (metric) parts.push(metric);
+        parts.push(historyController.rangeDays() === 1
+            ? i18n("Last 24 hours")
+            : i18n("Last %1 days", historyController.rangeDays()));
+        return parts.join(" · ");
+    }
+
+    function captureViewState() {
+        var session = ({
+            toolId: sessionsPanel ? sessionsPanel.selectedToolId : sessionToolId,
+            projectId: sessionsPanel ? sessionsPanel.selectedProjectId : sessionProjectId,
+            rangeIndex: sessionsPanel ? sessionsPanel.selectedRangeIndex : 1,
+            pageOffset: sessionsPanel ? sessionsPanel.pageOffset : 0,
+            sessionId: sessionsPanel ? sessionsPanel.selectedSessionId : ""
+        });
+        return {
+            sessionsMode: history.sessionsMode,
+            selectedSourceId: historyController.selectedSourceId,
+            selectedMetric: historyController.selectedMetric,
+            rangeIndex: historyController.rangeIndex,
+            compareMode: historyController.compareMode,
+            contentY: currentScrollPosition(),
+            sessionToolId: session.toolId,
+            sessionProjectId: session.projectId,
+            session: session
+        };
+    }
+
+    function applyViewState(state) {
+        if (!state || typeof state !== "object") return false;
+        pendingViewState = state;
+        applyingViewState = true;
+        sessionsMode = state.sessionsMode === true;
+        applyingViewState = false;
+        savedContentY = Math.max(0, Number(state.contentY || 0));
+        restoreScrollPending = true;
+        sessionToolId = String(state.sessionToolId || "codex-cli");
+        sessionProjectId = String(state.sessionProjectId || "");
+
+        var session = state.session || ({});
+        if (!sessionState || typeof sessionState !== "object")
+            sessionState = ({});
+        sessionState.toolId = String(session.toolId || sessionToolId);
+        sessionState.projectId = String(session.projectId || sessionProjectId);
+        sessionState.rangeIndex = Math.max(0, Math.min(2,
+            Number(session.rangeIndex === undefined ? 1 : session.rangeIndex)));
+        sessionState.pageOffset = Math.max(0, Number(session.pageOffset || 0));
+        sessionState.sessionId = String(session.sessionId || "");
+        sessionsPanel.restoreState();
+
+        var database = history.monitor ? history.monitor.usageDb : null;
+        if (!database || history.catalogDatabase !== database
+                || historyController.catalogLoading
+                || !historyController.sourceRows
+                || historyController.sourceRows.length === 0) {
+            restoreScrollPosition();
+            return false;
+        }
+        historyController.compareMode = state.compareMode === true;
+        historyController.rangeIndex = Math.max(0, Math.min(3,
+            Number(state.rangeIndex === undefined ? 1 : state.rangeIndex)));
+        if (state.selectedSourceId)
+            historyController.selectedSourceId = String(state.selectedSourceId);
+        historyController.normalizeSelection();
+        if (state.selectedMetric)
+            historyController.selectedMetric = String(state.selectedMetric);
+        historyController.normalizeSelection();
+        pendingViewState = null;
+        if (!sessionsMode) Qt.callLater(historyController.refresh);
+        restoreScrollPosition();
+        return true;
     }
 
     Timer {
@@ -142,6 +264,7 @@ ColumnLayout {
 
     function applyRequestedSelection() {
         if (!requestedSourceId) return;
+        if (viewState && viewState.selectedSourceId) return;
         historyController.applyDeepLink(requestedSourceId, requestedMetric,
                                         requestedRangeDays);
     }
@@ -149,7 +272,14 @@ ColumnLayout {
     Connections {
         target: historyController
         function onCatalogAccepted() {
+            if (history.pendingViewState)
+                history.applyViewState(history.pendingViewState);
             history.applyRequestedSelection();
+        }
+
+        function onLoadingChanged() {
+            if (!historyController.loading && history.restoreScrollPending)
+                history.restoreScrollPosition();
         }
     }
 
@@ -157,13 +287,18 @@ ColumnLayout {
         history.refreshHistoryCatalog(false);
     })
     onSessionsModeChanged: {
-        scrollToTop();
+        if (!applyingViewState) scrollToTop();
         if (!sessionsMode)
             catalogRefreshTimer.restart();
     }
     onRequestedSourceIdChanged: Qt.callLater(applyRequestedSelection)
     onRequestedMetricChanged: Qt.callLater(applyRequestedSelection)
     onRequestedRangeDaysChanged: Qt.callLater(applyRequestedSelection)
+    onViewStateChanged: {
+        if (viewState) Qt.callLater(function() {
+            history.applyViewState(history.viewState);
+        });
+    }
 
     RowLayout {
         Layout.fillWidth: true
@@ -215,6 +350,11 @@ ColumnLayout {
             RowLayout {
                 Layout.fillWidth: true
                 visible: !history.sessionsMode
+                PlasmaComponents.Label {
+                    text: i18n("History filters")
+                    font.weight: Font.DemiBold
+                    Accessible.name: text
+                }
                 PlasmaComponents.ToolButton {
                     objectName: "historySingleSourceMode"
                     text: i18n("Single source")
@@ -252,7 +392,7 @@ ColumnLayout {
                 visible: !history.sessionsMode
                 Layout.leftMargin: Kirigami.Units.smallSpacing
                 Layout.rightMargin: Kirigami.Units.smallSpacing
-                columns: history.width < Kirigami.Units.gridUnit * 40 ? 1 : 5
+                columns: history.width < Kirigami.Units.gridUnit * 40 ? 1 : 4
                 columnSpacing: Kirigami.Units.smallSpacing
                 rowSpacing: Kirigami.Units.smallSpacing
 
@@ -324,6 +464,7 @@ ColumnLayout {
 
                     QQC2.Menu {
                         id: exportMenu
+                        objectName: "historyExportMenu"
                         y: parent.height
                         QQC2.MenuItem {
                             text: i18n("Export CSV file")
@@ -333,19 +474,13 @@ ColumnLayout {
                             text: i18n("Export JSON file")
                             onTriggered: history.openExport("json")
                         }
+                        QQC2.MenuItem {
+                            objectName: "historyCopyCsvMenuItem"
+                            text: i18n("Copy history as CSV")
+                            onTriggered: clipboard.setText(
+                                historyController.exportPayload("csv"))
+                        }
                     }
-                }
-                PlasmaComponents.ToolButton {
-                    objectName: "historyCopyCsvButton"
-                    Layout.fillWidth: true
-                    text: i18n("Copy CSV")
-                    display: QQC2.AbstractButton.TextBesideIcon
-                    icon.name: "edit-copy"
-                    enabled: !historyController.loading
-                        && historyController.seriesData.length > 0
-                    activeFocusOnTab: true
-                    Accessible.name: i18n("Copy history as CSV")
-                    onClicked: clipboard.setText(historyController.exportPayload("csv"))
                 }
             }
 
@@ -387,6 +522,15 @@ ColumnLayout {
                 visible: !history.sessionsMode && !historyController.loading
                     && historyController.seriesData.length > 0
                 spacing: Kirigami.Units.smallSpacing
+
+                PlasmaComponents.Label {
+                    objectName: "historySelectionContext"
+                    Layout.fillWidth: true
+                    text: history.selectionSummary()
+                    color: Kirigami.Theme.disabledTextColor
+                    wrapMode: Text.WordWrap
+                    Accessible.name: i18n("Showing %1", text)
+                }
 
                 Repeater {
                     model: historyController.seriesData
@@ -455,6 +599,8 @@ ColumnLayout {
     }
 
     Component.onCompleted: Qt.callLater(function() {
+        if (history.viewState)
+            history.applyViewState(history.viewState);
         history.refreshHistoryCatalog(false);
     })
 }

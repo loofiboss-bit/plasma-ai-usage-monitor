@@ -46,8 +46,8 @@ For source builds and other installation details, read the [installation guide](
 - [Install or update the widget](docs/user-guide/installation.md)
 - [Complete the first setup](docs/user-guide/getting-started.md)
 - [Understand actual, estimated, and unavailable values](docs/user-guide/understanding-data.md)
-- [Configure API providers](docs/user-guide/providers.md)
-- [Track subscription tools and Browser Sync Labs](docs/user-guide/subscriptions.md)
+- [Configure all sources](docs/user-guide/providers.md)
+- [Track AI tools and Browser Sync Labs](docs/user-guide/subscriptions.md)
 - [Review local Codex and Claude Code sessions](docs/user-guide/coding-sessions.md)
 - [Use Budget Control and deterministic runway guardrails](docs/user-guide/runway-guardrails.md)
 - [Use history, exports, Prometheus, and webhooks](docs/user-guide/history-and-integrations.md)
@@ -121,6 +121,7 @@ handled as sensitive files.
 | Coding sessions in Analyst | ![Coding-session model and project breakdowns](assets/screenshots/coding-sessions-analyst.png) |
 | Analyst with insufficient data | ![Analyst explaining unavailable results when samples are insufficient](assets/screenshots/analyst-insufficient.png) |
 | Guided setup | ![Guided first success source selection](assets/screenshots/guided-first-success.png) |
+| Sources settings | ![Unified API services and AI tools source settings](assets/screenshots/provider-settings.png) |
 | Budget Control | ![Searchable staged Budget Control policy editor](assets/screenshots/budget-control.png) |
 | Plugin recovery | ![Native plugin recovery with matching-package instructions](assets/screenshots/plugin-recovery.png) |
 | Panel lowest quota | ![Compact panel showing the lowest provider-reported or synchronized quota](assets/screenshots/panel-lowest-quota.png) |

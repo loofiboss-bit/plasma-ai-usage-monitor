@@ -1,4 +1,4 @@
-# Subscription tools and Browser Sync Labs
+# AI tools and Browser Sync Labs
 
 Subscription cards combine local activity with plan limits. Treat those figures as local estimates unless the card identifies a supported authenticated source.
 
@@ -12,7 +12,7 @@ Subscription cards combine local activity with plan limits. Treat those figures 
 - Windsurf
 - JetBrains AI
 
-Open **Settings → Subscriptions** and enable the tools you use. The detection status checks installed binaries and known local state directories.
+Open **Settings → Sources**, select **AI tools** or use the **Detected tools** filter, and enable the tools you use. The detection status checks installed binaries and known local state directories. Each tool’s detail pane keeps its plan and tool-specific options with its status.
 
 A tool-only setup is supported. Synchronized quota windows can drive the
 Overview lowest-quota and next-reset facts; local activity and configured plan
@@ -24,7 +24,7 @@ Antigravity monitoring is opt-in and supports the current Antigravity 2.x Linux 
 
 The monitor calls only the local, read-only `GetUserStatus` and `RetrieveUserQuotaSummary` RPCs over pinned TLS. It accepts the Antigravity 2.x `resources/bin/language_server` layout and the older extension layout, but only when the process belongs to the current user, listens on loopback, and presents the certificate shipped with that executable. It does not start Antigravity, sign in, read OAuth tokens, prompts, conversations, logs, or other cache data. The daemon CSRF value is kept in memory and sent only to the validated loopback process. It is never logged, persisted, diagnosed, or exported.
 
-Model access and quotas are dynamic, so the catalog does not contain a fixed model matrix or numeric limits. If a temporary error occurs after a successful refresh, the last snapshot remains visible as **Stale**. Use **Refresh / Test connection** after restarting or updating Antigravity.
+Model access and quotas are dynamic, so the catalog does not contain a fixed model matrix or numeric limits. If a temporary error occurs after a successful refresh, the last snapshot remains visible as **Stale**. Choose **Refresh quota** in the source detail pane after restarting or updating Antigravity. Apply pending changes before refreshing.
 
 `gemini.google.com` usage is not included in the Antigravity card. The Gemini web app uses a separate product quota and does not expose a stable, documented read-only quota interface that the widget can query safely.
 
@@ -62,11 +62,11 @@ filters, coverage and export behavior.
 
 ## GitHub Copilot
 
-The card tracks local activity and the selected billing mode. An optional GitHub token and organization name can expose organization-level seat metrics when the token has the required permission.
+The card tracks local activity and the selected billing mode. The connection section accepts an optional GitHub token for organization-level seat metrics. The organization name is an advanced override. The token requires the displayed permission. The token is staged with the other Sources credentials and saved only when you choose **Apply**.
 
 ## Browser Sync Labs
 
-Browser Sync Labs is off by default. Only enabling it permits the widget to read
+Browser Sync Labs is off by default. Open **Settings → Sources → Browser sync** to configure it. Only enabling it permits the widget to read
 a selected local browser profile and call the relevant service directly with
 the existing session. Automatic Codex local-auth refresh does not require this
 setting and does not read browser storage.

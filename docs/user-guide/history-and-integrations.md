@@ -10,13 +10,19 @@ Runway calculations use the same local observations. Enabling forecast
 notifications also enables the local database for the minimum observation and
 transition evidence even when the general History switch is off.
 
-The popup provides:
+The monitor navigation provides:
 
 - a detail view for one provider or subscription tool
 - comparison charts across compatible sources
 - cost, token, request, and rate-limit metrics
 - 24-hour, 7-day, 30-day, and 90-day ranges
-- an Analyst view with activity, change, volatility, anomalies, and top drivers
+- an Insights view with activity, change, volatility, anomalies, and top drivers
+
+History keeps **Usage** and **Sessions** as the main modes. Usage filters identify
+source, metric, period, and comparison; the chart labels the selected context
+and coverage. Use the **Export** menu for CSV, JSON, or clipboard actions.
+Sessions keeps the tool selector available even when one tool is disabled and
+explains loading, error, and empty results separately.
 
 Sources with retained data remain selectable after they are disabled. A source
 that is no longer part of the current catalog is labeled **History only**.
@@ -28,7 +34,7 @@ values. Unknown values remain absent rather than becoming zero, and missing
 time buckets appear as chart gaps. Coverage text below the chart reports stored
 samples, plotted points, gaps, stale data, and history-only state.
 
-Analyst loads one background snapshot for its exact 30-day period. It starts
+Insights loads one background snapshot for its labeled **Last 30 days** period. It starts
 with coverage and then shows only sections supported by compatible history:
 spend, activity, top drivers, anomaly candidates, and a written summary.
 Insufficient history is explained as unavailable instead of appearing as
@@ -41,7 +47,7 @@ compatible snapshots and positive input tokens. It is a neutral relationship
 between two reported quantities, not a quality, productivity, prompt-clarity,
 or efficiency score.
 
-The 7-day and 30-day copy actions each build a report from their own period.
+The report menu offers 7-day and 30-day copy actions; each builds a report from its own period.
 Reports include coverage, currency status, actual and estimated sample counts,
 unavailable explanations, and the analysis method. Provider and installation
 diagnostics remain under **Settings → Diagnostics**.

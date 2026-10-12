@@ -8,8 +8,16 @@ ColumnLayout {
     id: sourceList
 
     required property var controller
+    property bool compact: false
+    signal sourceChosen()
 
     spacing: Kirigami.Units.smallSpacing
+
+    function focusSelectedSource() {
+        var selectedItem = providersList.currentItem;
+        if (selectedItem) selectedItem.forceActiveFocus();
+        else providersList.forceActiveFocus();
+    }
 
     Kirigami.SearchField {
         Layout.fillWidth: true
@@ -22,20 +30,24 @@ ColumnLayout {
         Layout.fillWidth: true
         textRole: "text"
         valueRole: "value"
-        Accessible.name: i18n("Filter by monitoring level")
+        Accessible.name: i18n("Filter sources")
         model: [
-            { text: i18n("All monitoring levels"), value: "all" },
-            { text: i18n("Usage & spend"), value: "usage" },
-            { text: i18n("Detected local tools"), value: "local" },
-            { text: i18n("Gateway"), value: "gateway" },
-            { text: i18n("Balance"), value: "balance" },
-            { text: i18n("Connectivity only"), value: "connectivity" }
+            { text: i18n("All sources"), value: "all" },
+            { text: i18n("Enabled"), value: "enabled" },
+            { text: i18n("Detected tools"), value: "detected" }
         ]
         onActivated: sourceList.controller.filterKey = currentValue
     }
 
+    QQC2.Label {
+        Layout.fillWidth: true
+        text: i18n("%1 sources", sourceList.controller.visibleSources.length)
+        color: Kirigami.Theme.disabledTextColor
+    }
+
     ListView {
         id: providersList
+        objectName: "providerSourceList"
         Accessible.name: i18n("Provider and detected local sources")
         activeFocusOnTab: true
         Layout.fillWidth: true
@@ -86,7 +98,10 @@ ColumnLayout {
                     Accessible.name: i18n("Enabled")
                 }
             }
-            onClicked: sourceList.controller.selectedSourceId = modelData.configKey
+            onClicked: {
+                sourceList.controller.selectedSourceId = modelData.configKey;
+                sourceList.sourceChosen();
+            }
         }
 
         Kirigami.PlaceholderMessage {

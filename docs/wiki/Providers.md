@@ -1,9 +1,9 @@
 <!-- Generated from docs/user-guide/providers.md by scripts/generate_wiki_docs.py; do not edit. -->
-# Configure providers
+# Configure sources
 
-Open **Settings → Providers**, search or filter the source list, and select one source to configure. Usage and spend sources appear before connection checks. The detail pane shows one source at a time.
+Open **Settings → Sources** to configure API services and AI tools in one searchable list. Use **All**, **Enabled**, or **Detected tools** to narrow it; active sources appear first within **AI tools** and **API services**. The detail pane shows one source at a time.
 
-Use the monitoring-level filter to find usage and spend, detected local tools, gateways, balances, or connectivity-only sources. Enable a source, enter its required fields, apply the changes, then choose **Verify**. Verification is disabled while Settings has pending changes.
+Select a source to see what it reports, the permission it needs, and its required fields. Enable it, enter credentials, and choose **Apply** before **Verify**. Verification stays disabled while configuration or credential changes are pending. Cancel discards those staged changes; failed Wallet writes remain available for another Apply attempt.
 
 ## Common fields
 
@@ -12,11 +12,13 @@ Use the monitoring-level filter to find usage and spend, detected local tools, g
 - **Custom base URL:** intended for a trusted proxy or gateway
 - **Refresh interval:** configured under General; catalog minimums still apply
 
-The default detail pane shows the monitoring level, required permission, scheduled read-only endpoint, and credential fields. Turn on **Advanced** only for model overrides, custom base URLs, or provider-specific fields.
+Each detail pane follows the same order: source name and status, enable control, connection and data source, plan or pricing tier, quota alerts, verification, and advanced overrides. Plan, billing mode, quota alerts, and Antigravity quota refresh are available without Advanced settings. **Advanced settings** is controlled from **Settings → General**; when enabled, each source has a local expandable section for provider-specific options. Antigravity quota refresh and source verification are explicit actions.
+
+Browser Sync has a separate **Browser sync** section on Sources. It remains off until enabled. Browser, profile, and refresh changes are staged with the other source settings; choose **Apply** before testing a Claude or ChatGPT session. Cancel restores the saved browser settings.
 
 Use HTTPS for remote endpoints. Plain HTTP is accepted only for loopback development addresses such as 127.0.0.1, localhost, and ::1.
 
-## Providers with account data
+## API services with account data
 
 ### OpenAI
 
@@ -95,4 +97,4 @@ The runtime-generated [capability matrix](https://github.com/loofiboss-bit/plasm
 - **429:** the provider rate-limited the request. The scheduler honors retry guidance and backs off.
 - **TLS or host error:** remove a custom base URL and retry the default endpoint.
 
-Open **Diagnostics** to confirm the frontend and plugin match, inspect the typed source-readiness error, and select the affected provider before changing unrelated settings.
+Open **Settings → Diagnostics** to confirm the frontend and plugin match, inspect the typed source-readiness error, and choose the affected source before changing unrelated settings.

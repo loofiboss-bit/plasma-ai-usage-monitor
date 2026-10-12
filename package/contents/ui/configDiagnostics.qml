@@ -200,6 +200,86 @@ KCM.SimpleKCM {
     }
 
     Components.SettingsFormLayout {
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: i18n("Source status and recovery")
+        }
+
+        ColumnLayout {
+            objectName: "diagnosticsSourceReadiness"
+            Kirigami.FormData.label: i18n("Sources:")
+            Layout.fillWidth: true
+            spacing: Kirigami.Units.smallSpacing
+
+            Repeater {
+                model: diagnosticsPage.actionableSources()
+                delegate: RowLayout {
+                    id: recoverySourceRow
+                    required property var modelData
+                    Layout.fillWidth: true
+                    spacing: Kirigami.Units.smallSpacing
+
+                    QQC2.Label {
+                        Layout.fillWidth: true
+                        text: diagnosticsPage.sourceSummary(recoverySourceRow.modelData)
+                        wrapMode: Text.WordWrap
+                    }
+
+                    QQC2.Button {
+                        text: i18n("Select in Sources")
+                        icon.name: "configure"
+                        visible: recoverySourceRow.modelData.nextActionKey !== "none"
+                        onClicked: {
+                            Plasmoid.configuration.settingsVerificationSourceId =
+                                recoverySourceRow.modelData.stableId;
+                            diagnosticsPage.recoverySelectionMessage = i18n(
+                                "%1 is selected. Open Sources to continue.",
+                                diagnosticsPage.sourceDisplayName(
+                                    recoverySourceRow.modelData.stableId));
+                        }
+                    }
+                }
+            }
+
+            QQC2.Label {
+                Layout.fillWidth: true
+                visible: diagnosticsPage.actionableSources().length === 0
+                text: i18n("No enabled source currently needs recovery.")
+                color: Kirigami.Theme.positiveTextColor
+                wrapMode: Text.WordWrap
+            }
+
+            QQC2.Label {
+                Layout.fillWidth: true
+                visible: diagnosticsPage.recoverySelectionMessage.length > 0
+                text: diagnosticsPage.recoverySelectionMessage
+                color: Kirigami.Theme.linkColor
+                wrapMode: Text.WordWrap
+            }
+        }
+
+        Kirigami.InlineMessage {
+            Kirigami.FormData.label: i18n("Monitor recovery:")
+            Layout.fillWidth: true
+            visible: diagnosticsPage.systemInfo.nativeStatus !== "ready"
+                     || diagnosticsPage.systemInfo.shadowing
+            text: diagnosticsPage.systemInfo.nextStep
+            type: Kirigami.MessageType.Warning
+            actions: [
+                Kirigami.Action {
+                    text: i18n("Copy repair command")
+                    icon.name: "edit-copy"
+                    visible: diagnosticsPage.systemInfo.repairCommand.length > 0
+                    onTriggered: clipboard.setText(diagnosticsPage.systemInfo.repairCommand)
+                }
+            ]
+        }
+
+        Kirigami.Separator {
+            Kirigami.FormData.isSection: true
+            Kirigami.FormData.label: i18n("Data trust")
+        }
+
         QQC2.Label {
             Kirigami.FormData.label: i18n("Subscription evidence:")
             Layout.fillWidth: true
@@ -580,77 +660,6 @@ KCM.SimpleKCM {
                    ? Kirigami.Theme.positiveTextColor : Kirigami.Theme.negativeTextColor
             wrapMode: Text.WordWrap
             Layout.fillWidth: true
-        }
-
-        Kirigami.InlineMessage {
-            Kirigami.FormData.label: i18n("Recovery:")
-            Layout.fillWidth: true
-            visible: diagnosticsPage.systemInfo.nativeStatus !== "ready"
-                     || diagnosticsPage.systemInfo.shadowing
-            text: diagnosticsPage.systemInfo.nextStep
-            type: Kirigami.MessageType.Warning
-            actions: [
-                Kirigami.Action {
-                    text: i18n("Copy repair command")
-                    icon.name: "edit-copy"
-                    visible: diagnosticsPage.systemInfo.repairCommand.length > 0
-                    onTriggered: clipboard.setText(diagnosticsPage.systemInfo.repairCommand)
-                }
-            ]
-        }
-
-        ColumnLayout {
-            Kirigami.FormData.label: i18n("Source readiness:")
-            Layout.fillWidth: true
-            spacing: Kirigami.Units.smallSpacing
-
-            Repeater {
-                model: diagnosticsPage.actionableSources()
-
-                delegate: RowLayout {
-                    id: sourceRow
-                    required property var modelData
-                    Layout.fillWidth: true
-                    spacing: Kirigami.Units.smallSpacing
-
-                    QQC2.Label {
-                        Layout.fillWidth: true
-                        text: diagnosticsPage.sourceSummary(sourceRow.modelData)
-                        wrapMode: Text.WordWrap
-                    }
-
-                    QQC2.Button {
-                        text: sourceRow.modelData.sourceKindKey === "local_tool"
-                              ? i18n("Open tool guide") : i18n("Select in Providers")
-                        icon.name: "configure"
-                        visible: sourceRow.modelData.nextActionKey !== "none"
-                        onClicked: {
-                            if (sourceRow.modelData.sourceKindKey === "local_tool") {
-                                Qt.openUrlExternally(diagnosticsPage.subscriptionGuideUrl);
-                                return;
-                            }
-                            Plasmoid.configuration.settingsVerificationSourceId = sourceRow.modelData.stableId;
-                            diagnosticsPage.recoverySelectionMessage = i18n("%1 is selected. Open Providers in the sidebar to continue.", diagnosticsPage.sourceDisplayName(sourceRow.modelData.stableId));
-                        }
-                    }
-                }
-            }
-
-            QQC2.Label {
-                Layout.fillWidth: true
-                visible: diagnosticsPage.actionableSources().length === 0
-                text: i18n("No enabled source currently needs recovery.")
-                color: Kirigami.Theme.positiveTextColor
-                wrapMode: Text.WordWrap
-            }
-
-            QQC2.Label {
-                Layout.fillWidth: true
-                visible: diagnosticsPage.recoverySelectionMessage.length > 0
-                text: diagnosticsPage.recoverySelectionMessage
-                color: Kirigami.Theme.linkColor
-                wrapMode: Text.WordWrap
-            }
         }
 
         RowLayout {

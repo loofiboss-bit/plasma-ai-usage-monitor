@@ -123,13 +123,14 @@ MouseArea {
             verticalAlignment: Text.AlignVCenter
             font.bold: true
             font.pointSize: Kirigami.Theme.smallFont.pointSize
-            minimumPointSize: Math.max(6, Kirigami.Theme.smallFont.pointSize - 2)
-            fontSizeMode: Text.Fit
-            wrapMode: compactRoot.displayMode === "attention" ? Text.WordWrap : Text.NoWrap
+            wrapMode: Text.NoWrap
             color: compactRoot.statusKey === "critical"
                 ? Kirigami.Theme.negativeTextColor
                 : compactRoot.statusKey === "warning"
                     ? Kirigami.Theme.neutralTextColor : Kirigami.Theme.textColor
+            PlasmaComponents.ToolTip {
+                text: compactRoot.accessibleText()
+            }
         }
     }
 

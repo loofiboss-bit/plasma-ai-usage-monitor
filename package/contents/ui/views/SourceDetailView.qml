@@ -721,7 +721,7 @@ QQC2.ScrollView {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
                 text: [(detail.sourceData.primaryMetricKind || "").replace(/_/g, " "),
-                       detail.sourceData.primaryMetricWindow || "", detail.statusText()]
+                       detail.sourceData.primaryMetricWindow || ""]
                     .filter(function(value) { return !!value; }).join(i18n(" · "))
                 color: Kirigami.Theme.disabledTextColor
                 wrapMode: Text.WordWrap

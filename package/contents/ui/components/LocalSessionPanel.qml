@@ -81,6 +81,8 @@ ColumnLayout {
     property var summary: ({})
     property bool loading: false
     property string statusText: ""
+    readonly property string queryErrorText: String(summary.errorText
+        || summary.error || "")
     property string summaryRequestId: ""
     property string sessionsRequestId: ""
     property string dailyRequestId: ""
@@ -401,11 +403,12 @@ ColumnLayout {
 
     SessionSection {
         Layout.fillWidth: true
-        visible: panel.selectedToolEnabled() && panel.presentationMode !== "summary"
+        visible: panel.presentationMode !== "summary"
         contentItem: GridLayout {
             columns: width < Kirigami.Units.gridUnit * 40 ? 1 : 2
 
             QQC2.ComboBox {
+                objectName: "sessionToolPicker"
                 Layout.fillWidth: true
                 visible: panel.fixedToolId === ""
                 model: panel.toolOptions()
@@ -530,6 +533,16 @@ ColumnLayout {
         }
     }
 
+    PlasmaComponents.Label {
+        objectName: "sessionQueryError"
+        Layout.fillWidth: true
+        visible: panel.selectedToolEnabled() && panel.queryErrorText !== ""
+        text: i18n("Session data could not be loaded: %1", panel.queryErrorText)
+        color: Kirigami.Theme.negativeTextColor
+        wrapMode: Text.WordWrap
+        Accessible.name: text
+    }
+
     QQC2.ComboBox {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled() && panel.presentationMode !== "summary"
@@ -566,6 +579,9 @@ ColumnLayout {
                 model: panel.dailyRows
                 spacing: Kirigami.Units.smallSpacing
                 Accessible.name: i18n("Daily session token usage")
+                QQC2.ScrollBar.vertical: QQC2.ScrollBar {
+                    policy: QQC2.ScrollBar.AsNeeded
+                }
 
                 delegate: ColumnLayout {
                     id: dailyRow
@@ -606,6 +622,17 @@ ColumnLayout {
     }
 
     PlasmaComponents.Label {
+        objectName: "sessionDailyEmptyState"
+        Layout.fillWidth: true
+        visible: panel.selectedToolEnabled() && panel.showDaily
+            && !panel.loading && panel.dailyRows.length === 0
+            && panel.queryErrorText === ""
+        text: i18n("No daily usage was recorded for this period.")
+        color: Kirigami.Theme.disabledTextColor
+        wrapMode: Text.WordWrap
+    }
+
+    PlasmaComponents.Label {
         Layout.fillWidth: true
         visible: panel.statusText !== ""
         text: panel.statusText
@@ -628,6 +655,7 @@ ColumnLayout {
             }
             ListView {
                 id: modelBreakdownList
+                objectName: "sessionModelBreakdownList"
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(
                     (panel.summary.modelBreakdown || []).length
@@ -637,6 +665,9 @@ ColumnLayout {
                 model: panel.summary.modelBreakdown || []
                 spacing: Kirigami.Units.smallSpacing
                 Accessible.name: i18n("Token usage by model")
+                QQC2.ScrollBar.vertical: QQC2.ScrollBar {
+                    policy: QQC2.ScrollBar.AsNeeded
+                }
 
                 delegate: ColumnLayout {
                     id: modelBreakdownRow
@@ -682,6 +713,7 @@ ColumnLayout {
             }
             ListView {
                 id: projectBreakdownList
+                objectName: "sessionProjectBreakdownList"
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(
                     (panel.summary.projectBreakdown || []).length
@@ -691,6 +723,9 @@ ColumnLayout {
                 model: panel.summary.projectBreakdown || []
                 spacing: Kirigami.Units.smallSpacing
                 Accessible.name: i18n("Token usage by project")
+                QQC2.ScrollBar.vertical: QQC2.ScrollBar {
+                    policy: QQC2.ScrollBar.AsNeeded
+                }
 
                 delegate: ColumnLayout {
                     id: projectBreakdownRow
@@ -724,6 +759,30 @@ ColumnLayout {
         }
     }
 
+    PlasmaComponents.Label {
+        objectName: "sessionModelEmptyState"
+        Layout.fillWidth: true
+        visible: panel.selectedToolEnabled()
+            && panel.presentationMode === "analysis" && panel.breakdownIndex === 1
+            && !panel.loading && (panel.summary.modelBreakdown || []).length === 0
+            && panel.queryErrorText === ""
+        text: i18n("No model usage was recorded for this period.")
+        color: Kirigami.Theme.disabledTextColor
+        wrapMode: Text.WordWrap
+    }
+
+    PlasmaComponents.Label {
+        objectName: "sessionProjectEmptyState"
+        Layout.fillWidth: true
+        visible: panel.selectedToolEnabled()
+            && panel.presentationMode === "analysis" && panel.breakdownIndex === 2
+            && !panel.loading && (panel.summary.projectBreakdown || []).length === 0
+            && panel.queryErrorText === ""
+        text: i18n("No project usage was recorded for this period.")
+        color: Kirigami.Theme.disabledTextColor
+        wrapMode: Text.WordWrap
+    }
+
     PlasmaComponents.BusyIndicator {
         Layout.alignment: Qt.AlignHCenter
         running: visible
@@ -742,6 +801,9 @@ ColumnLayout {
         model: panel.sessionRows
         spacing: Kirigami.Units.largeSpacing
         Accessible.name: i18n("Coding sessions")
+        QQC2.ScrollBar.vertical: QQC2.ScrollBar {
+            policy: QQC2.ScrollBar.AsNeeded
+        }
 
         delegate: QQC2.ItemDelegate {
             id: sessionDelegate
@@ -846,7 +908,9 @@ ColumnLayout {
         PlasmaComponents.Label {
             anchors.centerIn: parent
             visible: !panel.loading && panel.sessionRows.length === 0
-            text: i18n("No sessions matched this period and project filter.")
+            text: panel.queryErrorText !== ""
+                ? i18n("Session data could not be loaded: %1", panel.queryErrorText)
+                : i18n("No sessions matched this period and project filter.")
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
         }

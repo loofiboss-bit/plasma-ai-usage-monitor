@@ -49,7 +49,7 @@ def require_bindings(
 
 
 def validate_secret_pages() -> None:
-    for name in ("configProviders.qml", "configSubscriptions.qml", "configAlerts.qml"):
+    for name in ("configProviders.qml", "configAlerts.qml"):
         text = (UI / name).read_text(encoding="utf-8")
         destruction_hooks = re.findall(
             r"Component\.onDestruction\s*:\s*(.*?)(?=\n\s*(?:Component\.|[A-Z][A-Za-z]+\s*\{|$))",
@@ -63,6 +63,22 @@ def validate_secret_pages() -> None:
             fail(f"{name} does not expose SecretChangeSet dirtiness")
         if not re.search(r"\bfunction\s+saveConfig\s*\(", text):
             fail(f"{name} does not commit from Plasma's saveConfig hook")
+
+    providers = (UI / "configProviders.qml").read_text(encoding="utf-8")
+    tool_details = (UI / "ConfigSubscriptions.qml").read_text(encoding="utf-8")
+    for token in (
+        "ConfigApplyGuard",
+        "secretChanges.commit()",
+        "protectFailedApply()",
+        'stageSecret("copilot_github", value)',
+        'removeSecret("copilot_github")',
+    ):
+        source = tool_details if token.startswith(('stageSecret("copilot', 'removeSecret("copilot')) else providers
+        if token not in source:
+            fail(f"shared Sources Apply flow is missing {token}")
+    for token in ("required property var descriptor", "required property var controller", "required property var configPage"):
+        if token not in tool_details:
+            fail(f"tool detail component is missing its internal owner interface: {token}")
 
 
 def validate_catalog_notifications(providers: list[dict]) -> None:
@@ -141,9 +157,13 @@ def validate_source_choice_settings() -> None:
     details = (UI / "ProviderSourceDetails.qml").read_text(encoding="utf-8")
     general = (UI / "configGeneral.qml").read_text(encoding="utf-8")
     onboarding = (UI / "onboarding" / "SetupConfigureStep.qml").read_text(encoding="utf-8")
+    tool_details = (UI / "ConfigSubscriptions.qml").read_text(encoding="utf-8")
 
     if providers.count("ProviderSourceDetails {") != 1 or "ProviderSourceList {" not in providers:
         fail("Providers Settings must render one catalog-driven master/detail surface")
+    config_model = (ROOT / "package" / "contents" / "config" / "config.qml").read_text(encoding="utf-8")
+    if providers.count("ConfigSubscriptions {") != 1 or "configSubscriptions.qml" in config_model:
+        fail("Sources must render shared AI-tool details without a separate subscriptions page")
     if "ProviderSettingsController" not in providers or "detectedLocalSources" not in providers:
         fail("Providers Settings must include deterministic selection and detected local sources")
     for token in ("activeFocusOnTab: true", "Keys.onUpPressed", "Keys.onDownPressed"):
@@ -151,10 +171,18 @@ def validate_source_choice_settings() -> None:
             fail(f"Provider source list is missing its keyboard contract: {token}")
     if "CredentialEditor" not in details or "CredentialEditor" not in onboarding:
         fail("Settings and onboarding must share the credential editor")
+    if 'i18n("Live quota")' not in tool_details:
+        fail("AI-tool details must label actual_quota as Live quota")
+    if "Data source: %1" not in onboarding:
+        fail("onboarding must describe the selected source data directly")
     if "Local-First" in general or "presetCombo" in general:
         fail("General Settings still contains misleading presets")
     if "enabledProviders" not in general or "cfg_advancedSettingsMode ? generalPage.enabledProviders" not in general:
         fail("per-source intervals must be advanced-only and limited to enabled sources")
+
+    config_model = (ROOT / "package" / "contents" / "config" / "config.qml").read_text(encoding="utf-8")
+    if 'name: i18n("Subscriptions")' in config_model:
+        fail("Subscriptions must not remain a separate navigation category")
 
 
 def validate_budget_control() -> None:

@@ -240,7 +240,7 @@ capture_view() {
     media-source-detail) accessible_marker="Back to source list" ;;
     media-coding-sessions) accessible_marker="Back to source list" ;;
     onboarding-*) accessible_marker="Guided first success" ;;
-    settings) accessible_marker="Providers" ;;
+    settings) accessible_marker="Sources" ;;
     budget-settings) accessible_marker="Budget Control" ;;
     plugin-recovery)
       accessible_marker="The native plugin is older than the widget"
@@ -278,7 +278,7 @@ capture_view() {
 
   if [[ "$view" == "settings" || "$view" == "budget-settings" ]]; then
     match_query="AI Usage Monitor Settings"
-    local settings_target="Providers"
+    local settings_target="Sources"
     if [[ "$view" == "budget-settings" ]]; then
       settings_target="Budget Control"
     fi
@@ -560,6 +560,7 @@ capture_view media-analyst-sufficient analyst-sufficient.png 6
 capture_view media-analyst-insufficient analyst-insufficient.png 6
 capture_view media-analyst-sessions coding-sessions-analyst.png 8
 capture_view onboarding-source guided-first-success.png 6
+capture_view settings provider-settings.png 8
 capture_view budget-settings budget-control.png 8
 capture_view plugin-recovery plugin-recovery.png 6
 capture_panel
@@ -598,7 +599,7 @@ ASSETS_JSON="$(
   for filename in \
     overview-popup.png attention-state.png source-detail.png history-gap.png \
     analyst-sufficient.png analyst-insufficient.png guided-first-success.png \
-    budget-control.png plugin-recovery.png panel-lowest-quota.png \
+    provider-settings.png budget-control.png plugin-recovery.png panel-lowest-quota.png \
     coding-sessions-detail.png coding-sessions-history.png \
     coding-sessions-analyst.png; do
     sha256sum "${OUTPUT_DIR}/${filename}"
@@ -646,6 +647,7 @@ jq -n \
       "analyst-insufficient.png": "media-analyst-insufficient",
       "coding-sessions-analyst.png": "media-analyst-sessions",
       "guided-first-success.png": "onboarding-source",
+      "provider-settings.png": "settings",
       "budget-control.png": "budget-settings",
       "plugin-recovery.png": "plugin-recovery",
       "panel-lowest-quota.png": "media-panel"
