@@ -94,10 +94,16 @@ QQC2.ScrollView {
             stale: i18n("stale"),
             never: i18n("not observed yet")
         };
-        return (labels[sourceData.qualityClass]
+        var text = (labels[sourceData.qualityClass]
             || i18n("Data unavailable"))
             + i18n(" · %1", freshnessLabels[sourceData.freshnessState]
                                || i18n("freshness unknown"));
+        var avail = Number(detail.coverageData.availableMetricCount || 0);
+        var total = Number(detail.coverageData.totalMetricCount || 0);
+        if (total > 0 && avail < total) {
+            text += i18n(" · %1 of %2 metrics reported", avail, total);
+        }
+        return text;
     }
 
     function dateMilliseconds(value) {
@@ -107,14 +113,14 @@ QQC2.ScrollView {
     function localizedDate(value) {
         var milliseconds = dateMilliseconds(value);
         return milliseconds > 0
-            ? new Date(milliseconds).toLocaleString(Qt.locale())
+            ? Utils.formatWhen(milliseconds, "dateTime")
             : i18n("Not available");
     }
 
     function shortDate(value) {
         var milliseconds = dateMilliseconds(value);
         return milliseconds > 0
-            ? new Date(milliseconds).toLocaleString(Qt.locale(), Locale.ShortFormat)
+            ? Utils.formatWhen(milliseconds, "relative")
             : i18n("Not available");
     }
 
@@ -452,16 +458,16 @@ QQC2.ScrollView {
             Layout.fillWidth: true
             Layout.minimumWidth: 0
             Layout.margins: Kirigami.Units.smallSpacing
-            visible: detail.retryBlocked || detail.actionLabelData !== ""
-                || ["aging", "stale", "never"].indexOf(detail.sourceData.freshnessState) >= 0
+            visible: (detail.actionLabelData !== "" && detail.healthActionText() !== i18n("No action is required."))
+                || detail.retryBlocked
+                || ["stale", "never"].indexOf(detail.sourceData.freshnessState) >= 0
                 || detail.sourceData.readinessState === "waiting_for_activity"
-                || Number(detail.coverageData.availableMetricCount || 0)
-                   < Number(detail.coverageData.totalMetricCount || 0)
             PlasmaComponents.Label {
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
                 visible: Number(detail.coverageData.availableMetricCount || 0)
                     < Number(detail.coverageData.totalMetricCount || 0)
+                    && detail.healthActionText() !== i18n("No action is required.")
                 text: i18np("Partial data · %1 of %2 metric available",
                             "Partial data · %1 of %2 metrics available",
                             Number(detail.coverageData.availableMetricCount || 0),
@@ -667,7 +673,7 @@ QQC2.ScrollView {
                                    : quotaRow.modelData.sourceClass === "estimated"
                                        ? i18n("Estimated") : quotaRow.modelData.sourceClass || "",
                                detail.dateMilliseconds(quotaRow.modelData.resetAt) > 0
-                                   ? i18n("Resets %1", detail.shortDate(quotaRow.modelData.resetAt)) : ""]
+                                   ? Utils.formatResetCountdown(quotaRow.modelData.resetAt) : ""]
                             .filter(function(value) { return !!value; }).join(i18n(" · "))
                         visible: text !== ""
                         color: Kirigami.Theme.disabledTextColor
@@ -1289,16 +1295,14 @@ QQC2.ScrollView {
             }
         }
 
-        GridLayout {
-            columns: detail.availableWidth >= Kirigami.Units.gridUnit * 40 ? 3 : 1
+        RowLayout {
             Layout.fillWidth: true
             Layout.minimumWidth: 0
             Layout.margins: Kirigami.Units.smallSpacing
+            spacing: Kirigami.Units.smallSpacing
 
             PlasmaComponents.Button {
                 objectName: "sourceDetailSettings"
-                Layout.fillWidth: true
-                Layout.minimumWidth: 0
                 text: i18n("Open source settings")
                 icon.name: "configure"
                 activeFocusOnTab: true
@@ -1306,8 +1310,6 @@ QQC2.ScrollView {
             }
             PlasmaComponents.Button {
                 objectName: "sourceDetailHistory"
-                Layout.fillWidth: true
-                Layout.minimumWidth: 0
                 text: i18n("Open compatible history")
                 icon.name: "view-history"
                 activeFocusOnTab: true
