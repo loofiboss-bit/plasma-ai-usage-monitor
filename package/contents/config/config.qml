@@ -5,21 +5,17 @@ import org.kde.plasma.plasmoid
 ConfigModel {
     ConfigCategory {
         name: Plasmoid.configuration.budgetPolicySelectionRequest
-            ? i18n("Budget Control") : i18n("General")
+            ? i18n("Budget Control") : i18n("Sources")
         icon: Plasmoid.configuration.budgetPolicySelectionRequest
-            ? "security-high" : "configure"
+            ? "security-high" : "network-connect"
         source: Plasmoid.configuration.budgetPolicySelectionRequest
-            ? "configBudget.qml" : "configGeneral.qml"
+            ? "configBudget.qml" : "configProviders.qml"
     }
     ConfigCategory {
-        name: i18n("Providers")
-        icon: "network-connect"
-        source: "configProviders.qml"
-    }
-    ConfigCategory {
-        name: i18n("Alerts")
-        icon: "dialog-warning"
-        source: "configAlerts.qml"
+        name: i18n("General")
+        icon: "configure"
+        source: "configGeneral.qml"
+        visible: !Plasmoid.configuration.budgetPolicySelectionRequest
     }
     ConfigCategory {
         name: i18n("Budget Control")
@@ -28,15 +24,9 @@ ConfigModel {
         visible: !Plasmoid.configuration.budgetPolicySelectionRequest
     }
     ConfigCategory {
-        name: i18n("General")
-        icon: "configure"
-        source: "configGeneral.qml"
-        visible: !!Plasmoid.configuration.budgetPolicySelectionRequest
-    }
-    ConfigCategory {
-        name: i18n("Subscriptions")
-        icon: "view-task"
-        source: "configSubscriptions.qml"
+        name: i18n("Alerts")
+        icon: "dialog-warning"
+        source: "configAlerts.qml"
     }
     ConfigCategory {
         name: i18n("History")

@@ -27,6 +27,10 @@ Item {
     property string historySourceId: ""
     property string historyMetric: ""
     property int historyRangeDays: 7
+    property bool historyRequestPending: false
+    property var overviewViewState: ({})
+    property var historyViewState: ({})
+    property var insightsViewState: ({})
     property bool historySessionsMode: AppInfo.demoMode
         && (AppInfo.smokeView === "media-history-sessions"
             || AppInfo.smokeView === "media-analyst-sessions")
@@ -52,6 +56,20 @@ Item {
     function resumeGuidedSetup() {
         Plasmoid.configuration.setupWizardDismissed = false;
         Plasmoid.configuration.setupWizardInProgress = true;
+    }
+
+    function captureCurrentViewState() {
+        // Loader.item is a QObject in qmltypes; concrete destinations expose this transient interface.
+        // qmllint disable missing-property
+        if (sourceDetailVisible || destinationLoader.status !== Loader.Ready
+                || !destinationLoader.item
+                || typeof destinationLoader.item.captureViewState !== "function")
+            return;
+        var state = destinationLoader.item.captureViewState() || ({});
+        if (destination === 0) overviewViewState = state;
+        else if (destination === 1) historyViewState = state;
+        else if (destination === 2) insightsViewState = state;
+        // qmllint enable missing-property
     }
 
     readonly property bool hasConfiguration: {
@@ -84,17 +102,19 @@ Item {
                 columnSpacing: Kirigami.Units.largeSpacing
                 rowSpacing: 0
 
-                RowLayout {
+                QQC2.TabBar {
                     objectName: "monitorNavigation"
                     Layout.fillWidth: fullRoot.width < Kirigami.Units.gridUnit * 36
                     spacing: 0
+                    currentIndex: fullRoot.destination
                     Repeater {
                         model: [
                             { label: i18n("Overview"), icon: "view-dashboard" },
                             { label: i18n("History"), icon: "view-history" },
                             { label: i18n("Insights"), icon: "office-chart-line" }
                         ]
-                        PlasmaComponents.ToolButton {
+                        QQC2.TabButton {
+                            id: destinationTab
                             required property var modelData
                             required property int index
                             objectName: "monitorDestination-" + index
@@ -104,16 +124,17 @@ Item {
                             Layout.minimumWidth: 0
                             text: modelData.label
                             icon.name: modelData.icon
-                            display: QQC2.AbstractButton.TextBesideIcon
-                            checkable: true
-                            checked: !fullRoot.sourceDetailVisible
-                                && fullRoot.destination === index
+                            display: fullRoot.width >= Kirigami.Units.gridUnit * 24
+                                ? QQC2.AbstractButton.TextBesideIcon
+                                : QQC2.AbstractButton.IconOnly
                             activeFocusOnTab: true
                             Accessible.name: text
                             onClicked: {
+                                fullRoot.captureCurrentViewState();
                                 fullRoot.sourceDetailVisible = false;
                                 fullRoot.destination = index;
                             }
+                            PlasmaComponents.ToolTip { text: destinationTab.modelData.label }
                         }
                     }
                 }
@@ -222,24 +243,33 @@ Item {
                     item.sourceId = fullRoot.detailSourceId;
                     item.sessionState = fullRoot.localSessionViewState.sourceDetail;
                 } else if (fullRoot.destination === 1) {
-                    item.requestedSourceId = fullRoot.historySourceId;
-                    item.requestedMetric = fullRoot.historyMetric;
-                    item.requestedRangeDays = fullRoot.historyRangeDays;
+                    item.viewState = fullRoot.historyViewState;
                     item.sessionsMode = fullRoot.historySessionsMode;
                     item.sessionToolId = fullRoot.historySessionToolId;
                     item.sessionProjectId = fullRoot.historySessionProjectId;
                     item.sessionState = fullRoot.localSessionViewState.history;
+                    if (fullRoot.historyRequestPending) {
+                        item.requestedSourceId = fullRoot.historySourceId;
+                        item.requestedMetric = fullRoot.historyMetric;
+                        item.requestedRangeDays = fullRoot.historyRangeDays;
+                        fullRoot.historyRequestPending = false;
+                        fullRoot.historySourceId = "";
+                        fullRoot.historyMetric = "";
+                    }
                 } else if (fullRoot.destination === 2) {
+                    item.viewState = fullRoot.insightsViewState;
                     item.sessionState = fullRoot.localSessionViewState.analyst;
-                } else if (fullRoot.destination === 0
-                           && fullRoot.returnFocusSourceId !== "") {
-                    var sourceId = fullRoot.returnFocusSourceId;
-                    fullRoot.returnFocusSourceId = "";
-                    Qt.callLater(function() {
-                        // qmllint disable missing-property
-                        destinationLoader.item.restoreSourceFocus(sourceId);
-                        // qmllint enable missing-property
-                    });
+                } else if (fullRoot.destination === 0) {
+                    item.viewState = fullRoot.overviewViewState;
+                    if (fullRoot.returnFocusSourceId !== "") {
+                        var sourceId = fullRoot.returnFocusSourceId;
+                        fullRoot.returnFocusSourceId = "";
+                        Qt.callLater(function() {
+                            // qmllint disable missing-property
+                            destinationLoader.item.restoreSourceFocus(sourceId);
+                            // qmllint enable missing-property
+                        });
+                    }
                 }
             }
         }
@@ -250,6 +280,7 @@ Item {
             ignoreUnknownSignals: true
 
             function onSourceRequested(stableId) {
+                fullRoot.captureCurrentViewState();
                 fullRoot.detailSourceId = stableId;
                 fullRoot.returnFocusSourceId = stableId;
                 fullRoot.sourceDetailVisible = true;
@@ -259,6 +290,13 @@ Item {
                 fullRoot.destination = 0;
             }
             function onActionRequested(stableId, actionKey, sourceKind) {
+                if (actionKey === "review_quota" || actionKey === "review_runway") {
+                    fullRoot.captureCurrentViewState();
+                    fullRoot.detailSourceId = stableId;
+                    fullRoot.returnFocusSourceId = stableId;
+                    fullRoot.sourceDetailVisible = true;
+                    return;
+                }
                 fullRoot.monitor.fixOverviewSource(stableId, actionKey,
                                                    sourceKind);
             }
@@ -267,19 +305,24 @@ Item {
                     stableId, "open_source_settings", "");
             }
             function onHistoryRequested(historyId, metric, rangeDays) {
+                fullRoot.captureCurrentViewState();
+                fullRoot.historyViewState = ({});
                 fullRoot.historySessionsMode = false;
                 fullRoot.historySourceId = historyId;
                 fullRoot.historyMetric = metric;
                 fullRoot.historyRangeDays = rangeDays;
+                fullRoot.historyRequestPending = true;
                 fullRoot.sourceDetailVisible = false;
                 fullRoot.destination = 1;
             }
             function onSessionHistoryRequested(toolId, projectId, rangeDays,
                                                sessionId, pageOffset) {
+                fullRoot.historyViewState = ({});
                 fullRoot.historySessionsMode = true;
                 fullRoot.historySessionToolId = toolId;
                 fullRoot.historySessionProjectId = projectId;
                 fullRoot.historyRangeDays = rangeDays;
+                fullRoot.historyRequestPending = false;
                 var nextSessionState = Object.assign({},
                     fullRoot.localSessionViewState.history);
                 nextSessionState.toolId = toolId;

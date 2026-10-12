@@ -215,7 +215,10 @@ TestCase {
         compare(findChild(view, "historyController").seriesData.length, 1);
         compare(chart.seriesData.length, 1);
         verify(findChild(view, "historyExportButton").enabled);
-        verify(findChild(view, "historyCopyCsvButton").enabled);
+        verify(findChild(view, "historyCopyCsvMenuItem") !== null);
+        verify(findChild(view, "historyExportMenu") !== null);
+        compare(findChild(view, "historySelectionContext").text,
+                "Codex CLI · Tool usage · Last 7 days");
         var controller = findChild(view, "historyController");
         compare(controller.exportPayload("csv"), "history-export-csv");
         compare(controller.exportPayload("json"), "history-export-json");
@@ -239,7 +242,7 @@ TestCase {
         compare(controls.columns, 1);
 
         view.width = 1200;
-        tryCompare(controls, "columns", 5);
+        tryCompare(controls, "columns", 4);
         compare(scroll.contentWidth, scroll.availableWidth);
 
         content.height = scroll.availableHeight + 300;
@@ -253,5 +256,107 @@ TestCase {
         var sessionsPanel = findChild(view, "historySessionsPanel");
         verify(sessionsPanel !== null);
         compare(sessionsPanel.presentationMode, "history");
+    }
+
+    function test_viewStateCapturesAndRestoresUsageAndSessionFilters() {
+        var state = {
+            sessionsMode: false,
+            selectedSourceId: "tool:Codex CLI",
+            selectedMetric: "usageCount",
+            rangeIndex: 3,
+            compareMode: true,
+            contentY: 140,
+            sessionToolId: "claude-code",
+            sessionProjectId: "project-42",
+            session: {
+                toolId: "claude-code",
+                projectId: "project-42",
+                rangeIndex: 2,
+                pageOffset: 100,
+                sessionId: "session-42"
+            }
+        };
+        var view = createTemporaryObject(historyViewComponent, testCase);
+        verify(view !== null);
+        view.viewState = state;
+        verify(!view.applyViewState(state));
+        view.monitor = fakeMonitor;
+        tryCompare(fakeDb, "catalogRequestCount", 1);
+        verify(!view.applyViewState(state));
+        fakeDb.historyCatalogReady(fakeDb.catalogRequestId, storedSources());
+        tryVerify(function() { return fakeDb.seriesRequestCount > 0; });
+        var scrollArea = findChild(view, "historyContentScroll");
+        verify(scrollArea !== null);
+        var flickable = scrollArea.contentItem;
+        verify(view.restoreScrollPending);
+        var historyContent = findChild(view, "historyContent");
+        verify(historyContent !== null);
+        var spacer = Qt.createQmlObject(
+            "import QtQuick; Item { implicitWidth: 1; implicitHeight: 800 }",
+            historyContent);
+        verify(spacer !== null);
+        tryCompare(flickable, "contentY", 140);
+
+        compare(view.sessionsMode, false);
+        compare(findChild(view, "historyController").selectedSourceId,
+                "tool:Codex CLI");
+        compare(findChild(view, "historyController").selectedMetric,
+                "usageCount");
+        compare(findChild(view, "historyController").rangeIndex, 3);
+        compare(findChild(view, "historyController").compareMode, true);
+        compare(view.sessionToolId, "claude-code");
+        compare(view.sessionProjectId, "project-42");
+        compare(view.sessionState.rangeIndex, 2);
+        compare(view.sessionState.pageOffset, 100);
+        compare(view.sessionState.sessionId, "session-42");
+        flickable.contentY = 170;
+        compare(view.captureViewState().contentY, 170);
+        compare(findChild(view, "historySessionsPanel").selectedToolId,
+                "claude-code");
+        compare(findChild(view, "historySessionsPanel").selectedProjectId,
+                "project-42");
+        compare(findChild(view, "historySessionsPanel").pageOffset, 100);
+
+        view.sessionsMode = true;
+        var captured = view.captureViewState();
+        compare(captured.sessionsMode, true);
+        compare(captured.sessionToolId, "claude-code");
+        compare(captured.session.projectId, "project-42");
+        compare(captured.session.pageOffset, 100);
+        compare(captured.selectedMetric, "usageCount");
+        compare(captured.compareMode, true);
+    }
+
+    function test_emptyViewStateDoesNotResetSessionHistoryHandoff() {
+        var view = createTemporaryObject(historyViewComponent, testCase);
+        verify(view !== null);
+
+        view.sessionsMode = true;
+        view.sessionToolId = "claude-code";
+        view.sessionProjectId = "project-42";
+        view.sessionState = ({
+            toolId: "claude-code",
+            projectId: "project-42",
+            rangeIndex: 2,
+            pageOffset: 80,
+            sessionId: "session-42"
+        });
+        view.viewState = ({});
+
+        wait(0);
+        compare(view.sessionsMode, true);
+        compare(view.sessionToolId, "claude-code");
+        compare(view.sessionProjectId, "project-42");
+        compare(view.sessionState.rangeIndex, 2);
+        compare(view.sessionState.pageOffset, 80);
+        compare(view.sessionState.sessionId, "session-42");
+
+        var sessionsPanel = findChild(view, "historySessionsPanel");
+        verify(sessionsPanel !== null);
+        compare(sessionsPanel.selectedToolId, "claude-code");
+        compare(sessionsPanel.selectedProjectId, "project-42");
+        compare(sessionsPanel.selectedRangeIndex, 2);
+        compare(sessionsPanel.pageOffset, 80);
+        compare(sessionsPanel.selectedSessionId, "session-42");
     }
 }

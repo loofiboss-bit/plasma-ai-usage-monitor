@@ -12,6 +12,7 @@ Kirigami.ScrollablePage {
     id: analystPage
     required property var monitor
     property var sessionState: null
+    property var viewState: null
     property bool sessionsMode: false
     property bool coverageExpanded: false
     property bool driversExpanded: false
@@ -30,6 +31,35 @@ Kirigami.ScrollablePage {
         ? analystPage.monitor.usageDb
         : null
     readonly property var runwayRows: pacingAndRunwayRows()
+
+    function captureViewState() {
+        return {
+            sessionsMode: sessionsMode,
+            coverageExpanded: coverageExpanded,
+            driversExpanded: driversExpanded,
+            contentY: analystPage.flickable
+                ? Number(analystPage.flickable.contentY || 0) : 0
+        };
+    }
+
+    function applyViewState(state) {
+        if (!state || typeof state !== "object") return false;
+        sessionsMode = state.sessionsMode === true;
+        coverageExpanded = state.coverageExpanded === true;
+        driversExpanded = state.driversExpanded === true;
+        var savedContentY = Math.max(0, Number(state.contentY || 0));
+        Qt.callLater(function() {
+            var flickable = analystPage.flickable;
+            if (!flickable) return;
+            var maxY = Math.max(0, flickable.contentHeight - flickable.height);
+            flickable.contentY = Math.max(0, Math.min(savedContentY, maxY));
+        });
+        return true;
+    }
+
+    onViewStateChanged: {
+        if (viewState) applyViewState(viewState);
+    }
 
     function mediaSnapshot() {
         var sufficient = mediaSufficient;
@@ -160,6 +190,7 @@ Kirigami.ScrollablePage {
 
     onDbChanged: if (!mediaScenario && db !== null) analystState.refreshData()
     Component.onCompleted: {
+        if (viewState) applyViewState(viewState);
         if (mediaScenario) {
             analystState.snapshot = mediaSnapshot();
             analystState.loading = false;
@@ -181,20 +212,24 @@ Kirigami.ScrollablePage {
             }
         },
         Kirigami.Action {
+            objectName: "insightsReportAction"
             icon.name: "edit-copy"
-            text: i18n("Copy 7-day report")
+            text: i18n("Copy report")
             enabled: analystPage.db !== null
                 && !analystState.loading
                 && analystState.reportRequestId === ""
-            onTriggered: analystState.requestReport(7)
-        },
-        Kirigami.Action {
-            icon.name: "edit-copy"
-            text: i18n("Copy 30-day report")
-            enabled: analystPage.db !== null
-                && !analystState.loading
-                && analystState.reportRequestId === ""
-            onTriggered: analystState.requestReport(30)
+            children: [
+                Kirigami.Action {
+                    objectName: "copy7DayReportAction"
+                    text: i18n("Last 7 days")
+                    onTriggered: analystState.requestReport(7)
+                },
+                Kirigami.Action {
+                    objectName: "copy30DayReportAction"
+                    text: i18n("Last 30 days")
+                    onTriggered: analystState.requestReport(30)
+                }
+            ]
         }
     ]
 
@@ -235,7 +270,7 @@ Kirigami.ScrollablePage {
                     Controls.Label {
                         objectName: "insightsPeriod"
                         Layout.fillWidth: true
-                        text: i18n("%1 – %2 · %3 of %4 days recorded",
+                        text: i18n("Last 30 days · %1 – %2 · %3 of %4 days recorded",
                             analystState.formatDate(analystState.snapshot.from),
                             analystState.formatDate(new Date(new Date(analystState.snapshot.to).getTime() - 1)),
                             analystState.coverage.observedDayCount || 0,
@@ -263,6 +298,36 @@ Kirigami.ScrollablePage {
                     analystState.kpi("averageDailySpend").reasonKey,
                     analystState.kpi("averageDailySpend").sampleCount,
                     analystState.kpi("averageDailySpend").minimumSamples)
+            }
+
+            Kirigami.Heading {
+                Layout.fillWidth: true
+                visible: Plasmoid.configuration.forecastUiEnabled
+                    && analystPage.runwayRows.some(function(row) { return row.state !== "unavailable"; })
+                text: i18n("Pacing and runway")
+                level: 3
+            }
+
+            Controls.BusyIndicator {
+                Layout.alignment: Qt.AlignHCenter
+                visible: Plasmoid.configuration.forecastUiEnabled
+                    && analystPage.monitor
+                    && analystPage.monitor.guardrails
+                    && analystPage.monitor.guardrails.busy
+                    && analystPage.runwayRows.length === 0
+                running: visible
+            }
+
+            Repeater {
+                model: analystPage.runwayRows.filter(function(row) {
+                    return row.state !== "unavailable";
+                })
+
+                RunwayCard {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    forecast: modelData
+                }
             }
 
             Kirigami.Card {
@@ -324,6 +389,40 @@ Kirigami.ScrollablePage {
             Kirigami.Card {
                 Layout.fillWidth: true
                 visible: analystState.hasSnapshot
+                    && analystState.snapshot.anomaliesAvailable === true
+                    && (analystState.snapshot.anomalies || []).length > 0
+
+                header: Kirigami.Heading {
+                    text: i18n("Anomaly candidates")
+                    level: 3
+                }
+
+                contentItem: ColumnLayout {
+                    spacing: Kirigami.Units.smallSpacing
+
+
+                    Repeater {
+                        model: analystState.snapshot.anomalies || []
+
+                        Controls.Label {
+                            required property var modelData
+                            Layout.fillWidth: true
+                            text: i18n("%1: %2, compared with a %3 period baseline",
+                                       modelData.date,
+                                       analystState.formatMoney(modelData.value,
+                                                   modelData.currency),
+                                       analystState.formatMoney(modelData.baseline,
+                                                   modelData.currency))
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                }
+            }
+
+            Kirigami.Card {
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot
                     && analystState.snapshot.activityAvailable === true
 
                 header: Kirigami.Heading {
@@ -374,36 +473,6 @@ Kirigami.ScrollablePage {
                             analystState.kpi("outputInputRatio").value)
                     }
 
-                }
-            }
-
-            Kirigami.Heading {
-                Layout.fillWidth: true
-                visible: Plasmoid.configuration.forecastUiEnabled
-                    && analystPage.runwayRows.some(function(row) { return row.state !== "unavailable"; })
-                text: i18n("Pacing and runway")
-                level: 3
-            }
-
-            Controls.BusyIndicator {
-                Layout.alignment: Qt.AlignHCenter
-                visible: Plasmoid.configuration.forecastUiEnabled
-                    && analystPage.monitor
-                    && analystPage.monitor.guardrails
-                    && analystPage.monitor.guardrails.busy
-                    && analystPage.runwayRows.length === 0
-                running: visible
-            }
-
-            Repeater {
-                model: analystPage.runwayRows.filter(function(row) {
-                    return row.state !== "unavailable";
-                })
-
-                RunwayCard {
-                    required property var modelData
-                    Layout.fillWidth: true
-                    forecast: modelData
                 }
             }
 
@@ -473,40 +542,6 @@ Kirigami.ScrollablePage {
                             }
                         }
                     }
-                }
-            }
-
-            Kirigami.Card {
-                Layout.fillWidth: true
-                visible: analystState.hasSnapshot
-                    && analystState.snapshot.anomaliesAvailable === true
-                    && (analystState.snapshot.anomalies || []).length > 0
-
-                header: Kirigami.Heading {
-                    text: i18n("Anomaly candidates")
-                    level: 3
-                }
-
-                contentItem: ColumnLayout {
-                    spacing: Kirigami.Units.smallSpacing
-
-
-                    Repeater {
-                        model: analystState.snapshot.anomalies || []
-
-                        Controls.Label {
-                            required property var modelData
-                            Layout.fillWidth: true
-                            text: i18n("%1: %2, compared with a %3 period baseline",
-                                       modelData.date,
-                                       analystState.formatMoney(modelData.value,
-                                                   modelData.currency),
-                                       analystState.formatMoney(modelData.baseline,
-                                                   modelData.currency))
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-
                 }
             }
 

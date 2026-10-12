@@ -27,8 +27,13 @@ original tool logs.
 ## Project identities
 
 Projects are represented with anonymous local identities, not filesystem
-paths. Optional aliases can be assigned in Settings and are stored only on
-this computer. Clearing session history also clears aliases. Filters use the
+paths. In **Settings → History → Project aliases**, choose **Create project**,
+select the folder used by your coding tool, and enter your own name. Only saved
+aliases appear in this list; imported anonymous projects are not pre-created
+entries. The folder is used to match the anonymous identity and is not saved.
+You can create an alias before importing sessions, rename it, or remove its name
+without deleting session history. Aliases stay on this computer. Clearing
+session history also clears aliases. Filters use the
 same anonymous project identity in Source Detail and History. Explore sessions,
 daily totals, and projects in **History → Sessions**, using **Sessions**,
 **By Day**, and **By Project**. Source Detail provides a compact summary and

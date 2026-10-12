@@ -45,12 +45,18 @@ QQC2.ItemDelegate {
             Layout.preferredHeight: width
         }
 
-        RowLayout {
+        GridLayout {
+            id: metricsGrid
+            objectName: "sourceCardMetricsLayout"
             Layout.fillWidth: true
-            spacing: Kirigami.Units.largeSpacing
+            Layout.minimumWidth: 0
+            columns: card.width >= Kirigami.Units.gridUnit * 24 ? 2 : 1
+            columnSpacing: Kirigami.Units.largeSpacing
+            rowSpacing: 0
 
             ColumnLayout {
                 Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 spacing: 0
 
                 PlasmaComponents.Label {
@@ -76,32 +82,47 @@ QQC2.ItemDelegate {
                     text: card.sessionActivityText
                     color: Kirigami.Theme.disabledTextColor
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    elide: Text.ElideRight
+                    wrapMode: Text.WordWrap
                 }
             }
 
             ColumnLayout {
+                Layout.fillWidth: true
                 Layout.minimumWidth: 0
-                visible: card.row.primaryMetricAvailable === true
+                visible: true
                 spacing: 0
-                Layout.alignment: Qt.AlignRight
+                Layout.alignment: card.width >= Kirigami.Units.gridUnit * 24
+                    ? Qt.AlignRight : Qt.AlignLeft
+
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: card.metricLabel()
+                    color: Kirigami.Theme.disabledTextColor
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    horizontalAlignment: card.width >= Kirigami.Units.gridUnit * 24
+                        ? Text.AlignRight : Text.AlignLeft
+                    elide: Text.ElideRight
+                }
 
                 PlasmaComponents.Label {
                     objectName: "sourceMetricValue"
                     text: card.metricText()
                     font.bold: true
-                    horizontalAlignment: Text.AlignRight
-                    Layout.alignment: Qt.AlignRight
+                    Layout.fillWidth: true
+                    horizontalAlignment: card.width >= Kirigami.Units.gridUnit * 24
+                        ? Text.AlignRight : Text.AlignLeft
+                    elide: Text.ElideRight
                 }
                 PlasmaComponents.Label {
-                    wrapMode: Text.NoWrap
+                    Layout.fillWidth: true
                     text: card.metricStatusText()
                     color: card.row.freshnessState === "stale"
                         ? Kirigami.Theme.neutralTextColor
                         : Kirigami.Theme.disabledTextColor
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    horizontalAlignment: Text.AlignRight
-                    Layout.alignment: Qt.AlignRight
+                    horizontalAlignment: card.width >= Kirigami.Units.gridUnit * 24
+                        ? Text.AlignRight : Text.AlignLeft
+                    wrapMode: Text.WordWrap
                 }
             }
         }
@@ -153,6 +174,22 @@ QQC2.ItemDelegate {
         return labels[quality] || i18n("Data unavailable");
     }
 
+    function metricLabel() {
+        if (row.primaryMetricAvailable !== true) return i18n("Primary value");
+        if (row.primaryMetricUnit === "percent_remaining") return i18n("Live quota");
+        if (row.primaryMetricKind === "cost")
+            return row.primaryMetricQuality === "estimated"
+                ? i18n("Estimated spend") : i18n("Actual spend");
+        if (row.primaryMetricKind === "credit_balance"
+                || row.primaryMetricQuality === "balance")
+            return i18n("Account balance");
+        if (row.primaryMetricQuality === "estimated")
+            return i18n("Estimated usage");
+        if (row.primaryMetricQuality === "configured_limit")
+            return i18n("Configured limit");
+        return i18n("Reported usage");
+    }
+
     function attentionText() {
         if (row.attentionSeverity === "critical") return i18n("Critical · ");
         if (row.attentionSeverity === "warning") return i18n("Warning · ");
@@ -163,9 +200,9 @@ QQC2.ItemDelegate {
         if (row.primaryMetricAvailable !== true
                 || row.primaryMetricValue === undefined
                 || row.primaryMetricValue === null
-                || row.primaryMetricValue === "") return "\u2014";
+                || row.primaryMetricValue === "") return i18n("Unavailable");
         var value = Number(row.primaryMetricValue);
-        if (!Number.isFinite(value)) return "\u2014";
+        if (!Number.isFinite(value)) return i18n("Unavailable");
         if (row.primaryMetricUnit === "percent_remaining")
             return i18n("%1% left", Math.round(value));
         if (row.primaryMetricKind === "cost"
@@ -201,12 +238,22 @@ QQC2.ItemDelegate {
             || row.primaryMetricUnit === "count"
             ? value.toLocaleString(Qt.locale(), "f", 0)
             : value.toLocaleString(Qt.locale(), "f", 2);
-        return i18n("%1 %2 · %3", formatted,
-                    row.primaryMetricCurrency || row.primaryMetricUnit || "",
-                    metricStatusText());
+        return i18n("%1 · %2 · %3", metricLabel(), formatted,
+                    row.primaryMetricCurrency || row.primaryMetricUnit || "");
     }
 
     function metricStatusText() {
+        if (row.primaryMetricAvailable !== true) {
+            if (row.readinessState === "waiting_for_activity")
+                return i18n("Waiting for first session");
+            return i18n("No value reported");
+        }
+        if (row.primaryMetricUnit === "percent_remaining" && row.resetAt) {
+            var reset = Utils.formatResetCountdown(row.resetAt);
+            if (reset !== "")
+                return (row.primaryMetricWindow || i18n("Current window"))
+                    + i18n(" · %1", reset);
+        }
         var period = Utils.spendWindowText({
             window: row.primaryMetricWindow || "",
             periodStart: row.primaryMetricPeriodStart,

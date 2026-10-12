@@ -1,7 +1,7 @@
 # V24 Coding Sessions & Projects
 
-- **Target release:** `24.1.0` (V24.0.0 was the initial session feature release)
-- **Status:** the V24 session feature is published; the authorized 24.1.0 release improves readability and consolidates session exploration in History.
+- **Target release:** `24.2.0` (V24.0.0 was the initial session feature release)
+- **Status:** the V24 session feature is published; 24.2.0 structures source setup and usage views and adds explicit project-alias management.
 
 ## Goal
 

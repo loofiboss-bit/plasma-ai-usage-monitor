@@ -37,15 +37,27 @@ ColumnLayout {
             { key: "provider", title: i18n("A gateway or API provider"), detail: i18n("Connect LiteLLM or verify a provider endpoint with a safe read-only request.") }
         ]
 
-        PlasmaComponents.Button {
-            id: goalButton
+        ColumnLayout {
+            id: goalOption
             required property var modelData
             Layout.fillWidth: true
-            text: goalButton.modelData.title
-            Accessible.description: goalButton.modelData.detail
-            onClicked: step.controller.chooseGoal(goalButton.modelData.key)
+            spacing: 0
 
-            PlasmaComponents.ToolTip { text: goalButton.modelData.detail }
+            PlasmaComponents.Button {
+                Layout.fillWidth: true
+                text: goalOption.modelData.title
+                Accessible.description: goalOption.modelData.detail
+                onClicked: step.controller.chooseGoal(goalOption.modelData.key)
+            }
+            PlasmaComponents.Label {
+                objectName: "setupGoalDescription-" + goalOption.modelData.key
+                Layout.fillWidth: true
+                Layout.leftMargin: Kirigami.Units.largeSpacing
+                wrapMode: Text.WordWrap
+                text: goalOption.modelData.detail
+                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                color: Kirigami.Theme.disabledTextColor
+            }
         }
     }
 }

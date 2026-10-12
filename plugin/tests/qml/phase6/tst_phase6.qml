@@ -1,5 +1,6 @@
 import QtQuick
 import QtTest
+import "../../../../package/contents/ui" as Monitor
 import "../../../../package/contents/ui/components" as Components
 
 TestCase {
@@ -30,6 +31,8 @@ TestCase {
         id: fakeDb
 
         property string analystRequestId: ""
+        property var analystFrom: null
+        property var analystTo: null
         property string catalogRequestId: ""
         property string seriesRequestId: ""
         property var historySources: []
@@ -46,6 +49,8 @@ TestCase {
 
         function requestAnalyst(requestId, from, to, currency) {
             analystRequestId = requestId;
+            analystFrom = from;
+            analystTo = to;
         }
 
         function requestHistoryCatalog(requestId) {
@@ -80,6 +85,28 @@ TestCase {
         }
     }
 
+    QtObject {
+        id: fakeGuardrails
+        property var forecasts: []
+        property bool busy: false
+    }
+
+    QtObject {
+        id: fakeMonitor
+        property var usageDb: fakeDb
+        property var guardrails: fakeGuardrails
+        function refreshGuardrails() {}
+    }
+
+    Component {
+        id: insightsComponent
+        Monitor.AnalystTab {
+            monitor: fakeMonitor
+            width: 700
+            height: 500
+        }
+    }
+
     Components.MetricAvailabilityFormatter {
         id: formatter
     }
@@ -107,6 +134,8 @@ TestCase {
 
     function init() {
         fakeDb.analystRequestId = "";
+        fakeDb.analystFrom = null;
+        fakeDb.analystTo = null;
         fakeDb.catalogRequestId = "";
         fakeDb.seriesRequestId = "";
         fakeDb.historySources = [];
@@ -306,6 +335,68 @@ TestCase {
         verify(reportSpy.signalArguments[0][0].indexOf("Coverage: 7 of 7") >= 0);
         verify(reportSpy.signalArguments[0][0].indexOf("Average daily spend (actual):") >= 0);
         compare(analystState.reportRequestId, "");
+    }
+
+    function test_analystReportMenuPeriodsKeepTheirExactRange() {
+        analystState.requestReport(30);
+        var requestId = fakeDb.analystRequestId;
+        verify(requestId.indexOf("analyst-report-30-") === 0);
+        compare((fakeDb.analystTo.getTime() - fakeDb.analystFrom.getTime())
+                / 86400000, 30);
+
+        analystState.acceptResult(requestId, {
+            ok: true,
+            generatedAt: "2026-07-31T12:00:00Z",
+            from: "2026-07-02T00:00:00Z",
+            to: "2026-08-01T00:00:00Z",
+            coverage: { observedDayCount: 30, requestedDayCount: 30, percent: 100 },
+            currencyStatus: "single",
+            currency: "USD",
+            actualSampleCount: 30,
+            estimatedSampleCount: 0,
+            kpis: {},
+            topDrivers: [],
+            anomaliesAvailable: true,
+            anomalies: [],
+            spendSeries: []
+        });
+        compare(reportSpy.count, 1);
+        verify(reportSpy.signalArguments[0][0].indexOf("Insights Report (30 days)") >= 0);
+    }
+
+    function test_insightsViewStateRestoresSectionsSessionsAndScrollPosition() {
+        var page = createTemporaryObject(insightsComponent, testCase, {
+            viewState: {
+                sessionsMode: true,
+                coverageExpanded: true,
+                driversExpanded: true,
+                contentY: 120
+            }
+        });
+        verify(page !== null);
+        compare(page.sessionsMode, true);
+        compare(page.coverageExpanded, true);
+        compare(page.driversExpanded, true);
+        verify(page.flickable !== null);
+
+        page.flickable.height = 200;
+        page.flickable.contentHeight = 800;
+        page.applyViewState({
+            sessionsMode: false,
+            coverageExpanded: false,
+            driversExpanded: true,
+            contentY: 320
+        });
+        tryCompare(page.flickable, "contentY", 320);
+        compare(page.sessionsMode, false);
+        compare(page.coverageExpanded, false);
+        compare(page.driversExpanded, true);
+
+        var captured = page.captureViewState();
+        compare(captured.sessionsMode, false);
+        compare(captured.coverageExpanded, false);
+        compare(captured.driversExpanded, true);
+        compare(captured.contentY, 320);
     }
 
     function test_historyControllerIsFixtureDrivenAndMarksStaleSources() {

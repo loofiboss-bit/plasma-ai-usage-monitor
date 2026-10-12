@@ -109,6 +109,20 @@ TestCase {
         visible: false
     }
 
+    Onboarding.SetupGoalStep {
+        id: goalSelection
+        controller: controller
+        width: 460
+        visible: false
+    }
+
+    Onboarding.SetupConfigureStep {
+        id: sourceConfiguration
+        controller: controller
+        width: 460
+        visible: false
+    }
+
     function baseSources() {
         return {
             "codex-cli": {
@@ -194,6 +208,22 @@ TestCase {
         compare(sourceSelection.filteredCandidates.length, 0);
         sourceSelection.searchText = "";
         compare(sourceSelection.filteredCandidates[0].stableId, "openai");
+    }
+
+    function test_setupShowsGoalDetailsAndSelectedDataSource() {
+        var localDetail = findChild(goalSelection, "setupGoalDescription-local");
+        verify(localDetail !== null);
+        verify(localDetail.text.indexOf("detected Claude Code") >= 0);
+
+        controller.chooseGoal("local");
+        controller.selectSource("codex-cli", true);
+        var dataSource = findChild(sourceConfiguration, "setupDataSourceDescription");
+        verify(dataSource !== null);
+        verify(dataSource.text.indexOf("Local coding activity metadata") >= 0);
+
+        controller.chooseGoal("usage");
+        controller.selectSource("openai", true);
+        verify(dataSource.text.indexOf("provider usage or billing API") >= 0);
     }
 
     function test_localToolSuccess() {

@@ -1285,29 +1285,124 @@ void LocalSessionModel::requestExport(
   }));
 }
 
+QString LocalSessionModel::createProjectAlias(const QUrl &directory,
+                                              const QString &alias) {
+  const QString name = alias.trimmed();
+  if (!directory.isLocalFile() || name.isEmpty() || name.size() > 80 ||
+      alias.contains(QChar::Null))
+    return {};
+  const QFileInfo folder(directory.toLocalFile());
+  if (!folder.isAbsolute() || !folder.isDir())
+    return {};
+  const QByteArray key = sessionKey();
+  if (key.isEmpty())
+    return {};
+  const QString cleanPath = QDir::cleanPath(folder.absoluteFilePath());
+  QStringList paths{
+      directory.toLocalFile(), cleanPath, cleanPath + QStringLiteral("/"),
+      cleanPath + QStringLiteral("/."), cleanPath + QStringLiteral("/./")};
+  paths.removeDuplicates();
+  QStringList candidates;
+  for (const QString &path : paths)
+    candidates.append(QString::fromLatin1(
+        LocalSessionParser::identity(key, "project", path.toUtf8())));
+  QString projectId = QString::fromLatin1(
+      LocalSessionParser::identity(key, "project", cleanPath.toUtf8()));
+  const QString connection = QStringLiteral("local_sessions_alias_identity_%1")
+                                 .arg(QRandomGenerator::global()->generate());
+  bool queried = true;
+  {
+    auto db = openDb(connection);
+    queried = db.isOpen();
+    if (queried) {
+      QString existingAlias;
+      bool foundSessions = false;
+      QSqlQuery query(db);
+      query.prepare(QStringLiteral(
+          "SELECT EXISTS(SELECT 1 FROM local_sessions WHERE project_id=?),"
+          "EXISTS(SELECT 1 FROM local_project_aliases WHERE project_id=?)"));
+      // Imported cwd values retain their original spelling. Prefer an existing
+      // session identity, then a saved alias, without rewriting either table.
+      for (const QString &candidate : candidates) {
+        query.bindValue(0, candidate);
+        query.bindValue(1, candidate);
+        if (!query.exec() || !query.next()) {
+          queried = false;
+          break;
+        }
+        if (query.value(0).toBool()) {
+          projectId = candidate;
+          foundSessions = true;
+          break;
+        }
+        if (existingAlias.isEmpty() && query.value(1).toBool())
+          existingAlias = candidate;
+      }
+      if (queried && !foundSessions && !existingAlias.isEmpty())
+        projectId = existingAlias;
+    }
+  }
+  QSqlDatabase::removeDatabase(connection);
+  return queried && setProjectAlias(projectId, name) ? projectId : QString();
+}
+
+QVariantList LocalSessionModel::projectAliases() const {
+  const QString connection = QStringLiteral("local_sessions_aliases_%1")
+                                 .arg(QRandomGenerator::global()->generate());
+  QVariantList rows;
+  {
+    auto db = openDb(connection);
+    if (db.isOpen()) {
+      QSqlQuery query(db);
+      if (query.exec(QStringLiteral(
+              "SELECT a.project_id,a.alias,COUNT(DISTINCT s.tool_id || ':' || "
+              "s.session_id) FROM local_project_aliases a LEFT JOIN "
+              "local_sessions s ON s.project_id=a.project_id WHERE "
+              "TRIM(a.alias)<>'' GROUP BY a.project_id,a.alias ORDER BY "
+              "a.alias COLLATE NOCASE,a.alias,a.project_id"))) {
+        while (query.next())
+          rows.append(
+              QVariantMap{{QStringLiteral("projectId"), query.value(0)},
+                          {QStringLiteral("alias"), query.value(1)},
+                          {QStringLiteral("sessionCount"), query.value(2)}});
+      }
+    }
+  }
+  QSqlDatabase::removeDatabase(connection);
+  return rows;
+}
+
 bool LocalSessionModel::setProjectAlias(const QString &projectId,
                                         const QString &alias) {
+  const QString name = alias.trimmed();
   if (projectId.size() != 64 ||
       !QRegularExpression(QStringLiteral("^[0-9a-f]{64}$"))
            .match(projectId)
            .hasMatch() ||
-      alias.size() > 80 || alias.contains(QChar::Null))
+      name.size() > 80 || alias.contains(QChar::Null))
     return false;
-  const QString c = QStringLiteral("local_sessions_alias_%1")
-                        .arg(QRandomGenerator::global()->generate());
-  auto db = openDb(c);
-  if (!db.isOpen())
-    return false;
-  QSqlQuery q(db);
-  q.prepare(QStringLiteral(
-      "INSERT INTO local_project_aliases(project_id,alias) VALUES(?,?) ON "
-      "CONFLICT(project_id) DO UPDATE SET alias=excluded.alias"));
-  q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-  q.addBindValue(alias.trimmed());
-  const bool ok = q.exec();
-  db.close();
-  db = {};
-  QSqlDatabase::removeDatabase(c);
+  const QString connection = QStringLiteral("local_sessions_alias_%1")
+                                 .arg(QRandomGenerator::global()->generate());
+  bool ok = false;
+  {
+    auto db = openDb(connection);
+    if (db.isOpen()) {
+      QSqlQuery query(db);
+      query.prepare(
+          name.isEmpty()
+              ? QStringLiteral("DELETE FROM local_project_aliases "
+                               "WHERE project_id=?")
+              : QStringLiteral(
+                    "INSERT INTO local_project_aliases(project_id,alias) "
+                    "VALUES(?,?) ON CONFLICT(project_id) DO UPDATE SET "
+                    "alias=excluded.alias"));
+      query.addBindValue(projectId);
+      if (!name.isEmpty())
+        query.addBindValue(name);
+      ok = query.exec();
+    }
+  }
+  QSqlDatabase::removeDatabase(connection);
   return ok;
 }
 QString LocalSessionModel::projectAlias(const QString &projectId) const {

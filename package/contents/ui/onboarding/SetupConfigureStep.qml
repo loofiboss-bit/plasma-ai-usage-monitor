@@ -12,9 +12,33 @@ ColumnLayout {
     required property var controller
     spacing: Kirigami.Units.mediumSpacing
 
+    function dataSourceDescription() {
+        var source = step.controller.selectedSource || ({});
+        if (source.sourceKindKey === "local_tool") {
+            return source.monitoringLevel === "actual_quota"
+                ? i18n("The installed tool's authenticated quota endpoint reports current limits and reset windows.")
+                : i18n("Local coding activity metadata is summarized and shown as an estimate after activity is observed.");
+        }
+        var descriptions = {
+            actual_usage_spend: i18n("The provider usage or billing API reports actual usage and spend.") ,
+            actual_key_usage: i18n("The provider API reports usage attached to the configured API key.") ,
+            gateway_aggregate: i18n("The gateway reports aggregate usage or spend from its logs.") ,
+            balance_connectivity: i18n("The provider reports account balance and connection status; balance is not spend history.") ,
+            connectivity_only: i18n("A read-only model endpoint verifies access; it does not report usage or billing.")
+        };
+        return descriptions[source.monitoringLevel]
+            || i18n("The selected source reports the data shown after a successful read-only check.");
+    }
+
     PlasmaExtras.Heading {
         level: 4
         text: i18n("Set up %1", step.controller.selectedSource.displayName || i18n("source"))
+    }
+    PlasmaComponents.Label {
+        objectName: "setupDataSourceDescription"
+        Layout.fillWidth: true
+        wrapMode: Text.WordWrap
+        text: i18n("Data source: %1", step.dataSourceDescription())
     }
     PlasmaComponents.Label {
         Layout.fillWidth: true

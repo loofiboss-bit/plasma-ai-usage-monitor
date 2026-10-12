@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QObject>
 #include <QTimer>
+#include <QUrl>
 #include <QVariantMap>
 #include <QtQmlIntegration/qqmlintegration.h>
 #include <atomic>
@@ -52,6 +53,9 @@ public:
                 const QDateTime &fromUtc, const QDateTime &toUtc,
                 const QString &projectId, const QString &format,
                 const QString &destinationPath);
+  Q_INVOKABLE QString createProjectAlias(const QUrl &directory,
+                                         const QString &alias);
+  Q_INVOKABLE QVariantList projectAliases() const;
   Q_INVOKABLE bool setProjectAlias(const QString &projectId,
                                    const QString &alias);
   Q_INVOKABLE QString projectAlias(const QString &projectId) const;

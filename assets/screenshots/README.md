@@ -24,6 +24,7 @@ modifies the active desktop, widget installation, user history or panel.
 | `analyst-sufficient.png` | Compatible history satisfies documented sample requirements |
 | `analyst-insufficient.png` | Unavailable KPIs explain observed and required samples |
 | `guided-first-success.png` | Onboarding keeps the first successful source path explicit |
+| `provider-settings.png` | Sources presents API services and AI tools in one searchable configuration surface |
 | `budget-control.png` | Budget Control shows searchable staged policy editing and capability-driven fields |
 | `plugin-recovery.png` | Frontend-only install gives deterministic native-plugin recovery |
 | `panel-lowest-quota.png` | Real isolated Plasma panel in lowest-quota mode |

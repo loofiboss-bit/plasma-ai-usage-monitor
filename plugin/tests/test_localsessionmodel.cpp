@@ -88,6 +88,189 @@ public:
 class LocalSessionModelTest : public QObject {
   Q_OBJECT
 private Q_SLOTS:
+  void userCreatedAliasesMatchImportedProjectsAndKeepSessions() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    const QString folder =
+        fixture.directory.filePath(QStringLiteral("private-chosen-project"));
+    const QString secondFolder =
+        fixture.directory.filePath(QStringLiteral("untracked-project"));
+    QVERIFY(QDir().mkpath(folder));
+    QVERIFY(QDir().mkpath(secondFolder));
+    const QByteArray metadata =
+        QJsonDocument(
+            QJsonObject{{"type", "session_meta"},
+                        {"payload", QJsonObject{{"id", "chosen-session"},
+                                                {"cwd", folder}}}})
+            .toJson(QJsonDocument::Compact);
+    QVERIFY(fixture.write(metadata + '\n' + fixture.codexRecord(100)));
+    LocalSessionModel model;
+    QCOMPARE(model.projectAliases().size(), 0);
+    const QString projectId = model.createProjectAlias(
+        QUrl::fromLocalFile(folder + QStringLiteral("/./")),
+        QStringLiteral("  My project  "));
+    QCOMPARE(projectId.size(), 64);
+    QCOMPARE(model.projectAlias(projectId), QStringLiteral("My project"));
+    QCOMPARE(model.createProjectAlias(QUrl::fromLocalFile(folder),
+                                      QStringLiteral("Renamed project")),
+             projectId);
+    const QString secondId = model.createProjectAlias(
+        QUrl::fromLocalFile(secondFolder), QStringLiteral("Another project"));
+    QCOMPARE(secondId.size(), 64);
+    auto aliases = model.projectAliases();
+    QCOMPARE(aliases.size(), 2);
+    QCOMPARE(aliases.first().toMap().value("alias").toString(),
+             QStringLiteral("Another project"));
+    QCOMPARE(aliases.first().toMap().value("sessionCount").toInt(), 0);
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    QSignalSpy projects(&model, &LocalSessionModel::projectsReady);
+    model.setToolEnabled(QStringLiteral("codex"), true);
+    QTRY_COMPARE_WITH_TIMEOUT(imports.count(), 1, 5000);
+    QVERIFY(imports.first().at(3).toString().isEmpty());
+    model.requestProjects(QStringLiteral("aliases-imported"));
+    QTRY_COMPARE_WITH_TIMEOUT(projects.count(), 1, 5000);
+    QCOMPARE(projects.first()
+                 .at(1)
+                 .toList()
+                 .first()
+                 .toMap()
+                 .value("projectId")
+                 .toString(),
+             projectId);
+    aliases = model.projectAliases();
+    QCOMPARE(aliases.last().toMap().value("sessionCount").toInt(), 1);
+    QVERIFY(model.setProjectAlias(projectId, QStringLiteral("  ")));
+    QVERIFY(model.projectAlias(projectId).isEmpty());
+    QCOMPARE(model.projectAliases().size(), 1);
+    projects.clear();
+    model.requestProjects(QStringLiteral("aliases-removed"));
+    QTRY_COMPARE_WITH_TIMEOUT(projects.count(), 1, 5000);
+    QCOMPARE(projects.first().at(1).toList().size(), 1);
+    QVERIFY(projects.first()
+                .at(1)
+                .toList()
+                .first()
+                .toMap()
+                .value("alias")
+                .toString()
+                .isEmpty());
+    // The selected directory is an input to identity hashing, never stored
+    // data.
+    QFile database(fixture.database);
+    QVERIFY(database.open(QIODevice::ReadOnly));
+    QVERIFY(!database.readAll().contains(folder.toUtf8()));
+    QFile wal(fixture.database + QStringLiteral("-wal"));
+    if (wal.open(QIODevice::ReadOnly))
+      QVERIFY(!wal.readAll().contains(folder.toUtf8()));
+    QSignalSpy exported(&model, &LocalSessionModel::exportReady);
+    const QString destination =
+        fixture.directory.filePath(QStringLiteral("aliases-export.json"));
+    const auto now = QDateTime::currentDateTimeUtc();
+    model.requestExport(QStringLiteral("alias-privacy"),
+                        QStringLiteral("codex"), now.addDays(-1),
+                        now.addDays(1), {}, QStringLiteral("json"),
+                        destination);
+    QTRY_COMPARE_WITH_TIMEOUT(exported.count(), 1, 5000);
+    QVERIFY(exported.first().at(1).toString().isEmpty());
+    QFile output(destination);
+    QVERIFY(output.open(QIODevice::ReadOnly));
+    const QByteArray bytes = output.readAll();
+    QVERIFY(!bytes.contains(folder.toUtf8()));
+    QVERIFY(!bytes.contains("Another project"));
+  }
+
+  void aliasAttachesToOriginalImportedPathSpelling_data() {
+    QTest::addColumn<QString>("suffix");
+    QTest::newRow("trailing-slash") << QStringLiteral("/");
+    QTest::newRow("dot-suffix") << QStringLiteral("/.");
+    QTest::newRow("dot-slash-suffix") << QStringLiteral("/./");
+  }
+
+  void aliasAttachesToOriginalImportedPathSpelling() {
+    QFETCH(QString, suffix);
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    const QString folder =
+        fixture.directory.filePath(QStringLiteral("chosen-project"));
+    QVERIFY(QDir().mkpath(folder));
+    const QByteArray metadata =
+        QJsonDocument(
+            QJsonObject{{"type", "session_meta"},
+                        {"payload", QJsonObject{{"id", "spelled-session"},
+                                                {"cwd", folder + suffix}}}})
+            .toJson(QJsonDocument::Compact);
+    QVERIFY(fixture.write(metadata + '\n' + fixture.codexRecord(100)));
+    LocalSessionModel model;
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    QSignalSpy projects(&model, &LocalSessionModel::projectsReady);
+    model.setToolEnabled(QStringLiteral("codex"), true);
+    QTRY_COMPARE_WITH_TIMEOUT(imports.count(), 1, 5000);
+    QVERIFY(imports.first().at(3).toString().isEmpty());
+    model.requestProjects(QStringLiteral("path-spelling"));
+    QTRY_COMPARE_WITH_TIMEOUT(projects.count(), 1, 5000);
+    const QString importedId = projects.first()
+                                   .at(1)
+                                   .toList()
+                                   .first()
+                                   .toMap()
+                                   .value("projectId")
+                                   .toString();
+    QCOMPARE(model.createProjectAlias(QUrl::fromLocalFile(folder),
+                                      QStringLiteral("Selected project")),
+             importedId);
+    QCOMPARE(model.projectAliases().size(), 1);
+    QCOMPARE(
+        model.projectAliases().first().toMap().value("sessionCount").toInt(),
+        1);
+  }
+
+  void aliasCreationRejectsInvalidInput() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    LocalSessionModel model;
+    const QUrl directory = QUrl::fromLocalFile(fixture.directory.path());
+    QVERIFY(model
+                .createProjectAlias(
+                    QUrl(QStringLiteral("https://example.com/project")),
+                    QStringLiteral("Project"))
+                .isEmpty());
+    QVERIFY(
+        model
+            .createProjectAlias(QUrl::fromLocalFile(fixture.directory.filePath(
+                                    QStringLiteral("missing"))),
+                                QStringLiteral("Project"))
+            .isEmpty());
+    QVERIFY(model.createProjectAlias(directory, QStringLiteral(" ")).isEmpty());
+    QVERIFY(model.createProjectAlias(directory, QString(81, QLatin1Char('a')))
+                .isEmpty());
+    QVERIFY(
+        model.createProjectAlias(directory, QStringLiteral("a") + QChar::Null)
+            .isEmpty());
+    QVERIFY(fixture.write(QByteArray("test")));
+    QVERIFY(model
+                .createProjectAlias(
+                    QUrl::fromLocalFile(fixture.root +
+                                        QStringLiteral("/session.jsonl")),
+                    QStringLiteral("File"))
+                .isEmpty());
+    QCOMPARE(model.projectAliases().size(), 0);
+    // Old empty rows do not become artificial project entries.
+    const QString connection = QStringLiteral("empty_alias_seed");
+    {
+      auto db =
+          QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery query(db);
+      QVERIFY(query.exec(
+          QStringLiteral("INSERT INTO local_project_aliases(project_id,alias) "
+                         "VALUES('%1','')")
+              .arg(QString(64, QLatin1Char('a')))));
+    }
+    QSqlDatabase::removeDatabase(connection);
+    QCOMPARE(model.projectAliases().size(), 0);
+  }
+
   void failedWritesRollbackCountersAndCheckpoint_data() {
     QTest::addColumn<QString>("table");
     QTest::newRow("event") << QStringLiteral("local_usage_events");

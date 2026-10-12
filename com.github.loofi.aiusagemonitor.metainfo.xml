@@ -63,16 +63,16 @@
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-sufficient.png</image>
     </screenshot>
     <screenshot>
-      <caption>Coding-session token breakdowns by model and project</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/coding-sessions-analyst.png</image>
-    </screenshot>
-    <screenshot>
       <caption>Analyst explaining unavailable results for insufficient history</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-insufficient.png</image>
     </screenshot>
     <screenshot>
       <caption>Guided first success source selection</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/guided-first-success.png</image>
+    </screenshot>
+    <screenshot>
+      <caption>Unified API services and AI tools source settings</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/provider-settings.png</image>
     </screenshot>
     <screenshot>
       <caption>Searchable staged Budget Control policy editor</caption>
@@ -90,6 +90,7 @@
 
   <releases>
 
+    <release version="24.2.0" date="2026-10-12"/>
     <release version="24.1.0" date="2026-10-12"/>
     <release version="24.0.1" date="2026-10-12"/>
     <release version="24.0.0" date="2026-10-11"/>

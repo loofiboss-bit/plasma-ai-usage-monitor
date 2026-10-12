@@ -155,6 +155,49 @@ TestCase {
         tryCompare(panel, "technicalDetailsExpanded", false);
     }
 
+    function test_toolPickerRemainsAvailableWhenCodexIsDisabled() {
+        fakeModel.codexEnabled = false;
+        fakeModel.claudeCodeEnabled = true;
+        var panel = createTemporaryObject(panelComponent, tests);
+        verify(panel !== null);
+        panel.presentationMode = "history";
+        var picker = findChild(panel, "sessionToolPicker");
+        verify(picker !== null);
+        verify(picker.visible);
+        compare(panel.activeToolId, "codex-cli");
+        compare(findChild(panel, "sessionHistoryList").visible, false);
+
+        picker.currentIndex = 1;
+        picker.activated(1);
+        compare(panel.activeToolId, "claude-code");
+        compare(panel.selectedToolEnabled(), true);
+        verify(findChild(panel, "sessionHistoryList").visible);
+        fakeModel.codexEnabled = true;
+        fakeModel.claudeCodeEnabled = false;
+    }
+
+    function test_dailyModelAndProjectViewsHaveExplicitEmptyAndErrorStates() {
+        fakeModel.codexEnabled = true;
+        var panel = createTemporaryObject(panelComponent, tests);
+        verify(panel !== null);
+        panel.presentationMode = "analysis";
+        panel.breakdownIndex = 0;
+        panel.dailyRows = [];
+        panel.loading = false;
+        verify(findChild(panel, "sessionDailyEmptyState").visible);
+
+        panel.breakdownIndex = 1;
+        panel.summary = ({modelBreakdown: [], projectBreakdown: []});
+        verify(findChild(panel, "sessionModelEmptyState").visible);
+        verify(!findChild(panel, "sessionProjectEmptyState").visible);
+        panel.breakdownIndex = 2;
+        verify(findChild(panel, "sessionProjectEmptyState").visible);
+
+        panel.summary = ({errorText: "database unavailable"});
+        verify(findChild(panel, "sessionQueryError").visible);
+        verify(!findChild(panel, "sessionModelEmptyState").visible);
+    }
+
     function test_importRefreshesVisiblePanelAndRejectsOldListReply() {
         var panel = createTemporaryObject(panelComponent, tests);
         verify(panel !== null);

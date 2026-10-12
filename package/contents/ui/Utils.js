@@ -116,6 +116,18 @@ function filterOverviewSourceRows(rows, searchText, needsAttention) {
     });
 }
 
+function groupOverviewSourceRows(rows) {
+    var groups = [
+        { key: "local_tool", label: i18n("AI tools"), rows: [] },
+        { key: "provider", label: i18n("API services"), rows: [] }
+    ];
+    (rows || []).forEach(function(row) {
+        var group = row && row.sourceKind === "local_tool" ? groups[0] : groups[1];
+        group.rows.push(row);
+    });
+    return groups.filter(function(group) { return group.rows.length > 0; });
+}
+
 function availableMetric(backend, kind, window) {
     if (!backend) return null;
     var metrics = backend.metrics || [];

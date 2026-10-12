@@ -30,12 +30,12 @@ REQUIRED = (
     "analyst-sufficient.png",
     "analyst-insufficient.png",
     "guided-first-success.png",
+    "provider-settings.png",
     "budget-control.png",
     "plugin-recovery.png",
     "panel-lowest-quota.png",
     "coding-sessions-detail.png",
     "coding-sessions-history.png",
-    "coding-sessions-analyst.png",
 )
 SCENARIOS = {
     "overview-popup.png": "media-overview",
@@ -45,12 +45,12 @@ SCENARIOS = {
     "analyst-sufficient.png": "media-analyst-sufficient",
     "analyst-insufficient.png": "media-analyst-insufficient",
     "guided-first-success.png": "onboarding-source",
+    "provider-settings.png": "settings",
     "budget-control.png": "budget-settings",
     "plugin-recovery.png": "plugin-recovery",
     "panel-lowest-quota.png": "media-panel",
     "coding-sessions-detail.png": "media-coding-sessions",
     "coding-sessions-history.png": "media-history-sessions",
-    "coding-sessions-analyst.png": "media-analyst-sessions",
 }
 
 

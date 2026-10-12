@@ -1,7 +1,9 @@
 import QtQuick
 import QtTest
+import org.kde.kirigami as Kirigami
 import "../../../../package/contents/ui" as Monitor
 import "../../../../package/contents/ui/Utils.js" as Utils
+import "../../../../package/contents/ui/components" as Components
 
 TestCase {
     id: testCase
@@ -10,6 +12,13 @@ TestCase {
     Component {
         id: costCardComponent
         Monitor.CostSummaryCard { width: 800; summary: ({}) }
+    }
+
+    Component {
+        id: dailyOverviewStateComponent
+        Components.DailyOverviewState {
+            dailyState: ({ summary: ({}) })
+        }
     }
 
     Component {
@@ -23,10 +32,10 @@ TestCase {
                   primaryMetricAvailable: true, primaryMetricValue: null, primaryMetricUnit: "token"}
         });
         verify(card !== null);
-        compare(card.metricText(), "\u2014");
+        compare(card.metricText(), "Unavailable");
         compare(card.exactMetricText(), "Unavailable");
         card.row = Object.assign({}, card.row, {primaryMetricValue: ""});
-        compare(card.metricText(), "\u2014");
+        compare(card.metricText(), "Unavailable");
         compare(card.exactMetricText(), "Unavailable");
         card.row = Object.assign({}, card.row, {primaryMetricValue: 0});
         compare(card.metricText(), "0 tokens");
@@ -35,6 +44,25 @@ TestCase {
         card.row = Object.assign({}, card.row, {primaryMetricValue: 1200000000, primaryMetricUnit: "token"});
         verify(card.metricText().indexOf("B") > 0);
         verify(card.exactMetricText().indexOf((1200000000).toLocaleString(Qt.locale(), "f", 0)) >= 0);
+    }
+
+    function test_sourceCardMovesMetricsBelowDetailsAtNarrowWidths() {
+        var card = createTemporaryObject(dailySourceCardComponent, testCase, {
+            row: {displayName: "A long source name for narrow layouts",
+                stableId: "codex-cli", sourceKind: "local_tool",
+                primaryMetricAvailable: true, primaryMetricValue: 1250,
+                primaryMetricUnit: "request"}
+        });
+        verify(card !== null);
+        var metrics = findChild(card, "sourceCardMetricsLayout");
+        verify(metrics !== null);
+        var widths = [320, 375, 414, 420, 768, 1000];
+        for (var i = 0; i < widths.length; ++i) {
+            card.width = widths[i];
+            var shouldStack = widths[i] < Kirigami.Units.gridUnit * 24;
+            compare(metrics.columns, shouldStack ? 1 : 2,
+                    "source card width " + widths[i]);
+        }
     }
 
     QtObject {
@@ -121,6 +149,61 @@ TestCase {
         compare(attentionMatches[0].stableId, "anthropic");
         compare(allRows.length, 3);
         compare(allRows[0].stableId, "openai");
+    }
+
+    function test_overviewGroupsKeepPriorityAndHideEmptyGroups() {
+        var rows = [
+            {stableId: "codex-cli", sourceKind: "local_tool"},
+            {stableId: "anthropic", sourceKind: "provider"},
+            {stableId: "claude-code", sourceKind: "local_tool"}
+        ];
+        var groups = Utils.groupOverviewSourceRows(rows);
+        compare(groups.length, 2);
+        compare(groups[0].label, "AI tools");
+        compare(groups[0].rows.length, 2);
+        compare(groups[0].rows[0].stableId, "codex-cli");
+        compare(groups[0].rows[1].stableId, "claude-code");
+        compare(groups[1].label, "API services");
+        compare(groups[1].rows[0].stableId, "anthropic");
+        compare(Utils.groupOverviewSourceRows([rows[0]])[0].key, "local_tool");
+    }
+
+    function test_dailyFocusUsesQuotaResetFromThatQuotaAndActualSpendToday() {
+        var state = createTemporaryObject(dailyOverviewStateComponent, testCase);
+        verify(state);
+        state.dailyState = ({
+            summary: {
+                enabledSourceCount: 2,
+                reportingUsefulSourceCount: 2,
+                lowestActualRemainingQuota: {
+                    stableId: "codex-cli", displayName: "Codex",
+                    window: "five-hour", percentRemaining: 20,
+                    resetAt: new Date(Date.now() + 3600000)
+                },
+                nearestActualReset: {
+                    stableId: "claude-code", displayName: "Claude",
+                    window: "weekly", resetAt: new Date(Date.now() + 7200000)
+                },
+                spendGroups: [
+                    {quality: "actual", window: "day", value: 4.5,
+                        currency: "USD", sourceNames: ["OpenAI"]},
+                    {quality: "actual", window: "month", value: 20,
+                        currency: "USD", sourceNames: ["OpenAI"]},
+                    {quality: "estimated", window: "day", value: 1,
+                        currency: "USD", sourceNames: ["Cursor"]}
+                ],
+                fixedSubscriptionFees: {USD: 25}
+            }
+        });
+        var facts = state.focusFacts();
+        compare(facts.length, 2);
+        verify(facts[0].label.indexOf("Codex") >= 0);
+        verify(facts[0].label.indexOf("five-hour") >= 0);
+        verify(facts[0].value.indexOf("resets in") >= 0);
+        verify(facts[1].label.indexOf("today") >= 0);
+        verify(facts[1].value.indexOf("4.5") >= 0);
+        verify(facts[1].value.indexOf("20.00") < 0);
+        verify(facts[1].value.indexOf("1.00") < 0);
     }
 
     function test_compactNumbersUseLocaleAndNonBreakingSpacing() {

@@ -36,11 +36,11 @@ history.
 
 ## Add another source in Settings
 
-Open **Settings → Providers**. Search or filter the source list, then select one source to open its detail pane. The pane shows its monitoring level, required permission, scheduled endpoint, enable control, credential fields, and safe verification action.
+Open **Settings → Sources**. Search or filter **AI tools** and **API services**, then select a source to open its detail pane. The pane shows what it reports, its required permission, enable control, credentials, and explicit verification or refresh actions.
 
-Apply pending changes before choosing **Verify**. Cancelling Settings discards staged credential changes. Applying writes or removes the staged KWallet values.
+Apply pending changes before choosing **Verify**. Cancelling Settings discards staged configuration and credential changes. Applying writes or removes staged KWallet values; a failed write stays available for another Apply attempt.
 
-The **Advanced** switch shows model overrides, custom base URLs, and provider-specific fields. Leave it off for a first setup unless your provider needs a custom endpoint.
+The global **Advanced settings** switch is in **Settings → General**. When it is on, provider- and tool-specific options appear in expandable sections beside the selected source. Leave it off for a first setup unless a source needs a custom endpoint.
 
 ## Read Overview
 

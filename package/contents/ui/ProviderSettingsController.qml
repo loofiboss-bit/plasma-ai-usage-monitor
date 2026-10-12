@@ -18,27 +18,36 @@ QtObject {
     signal configurationEdited()
 
     function categoryKey(level) {
+        if (level === "actual_quota" || level === "local_activity_estimate") return "tools";
         if (level === "actual_usage_spend" || level === "actual_key_usage") return "usage";
-        if (level === "local_activity_estimate") return "local";
         if (level === "gateway_aggregate") return "gateway";
         if (level === "balance_connectivity") return "balance";
         return "connectivity";
     }
 
     function categoryLabel(level) {
+        if (level === "actual_quota" || level === "local_activity_estimate") return qsTr("AI tools");
         var labels = {
-            "usage": qsTr("Usage & spend"),
-            "local": qsTr("Detected local tools"),
-            "gateway": qsTr("Gateway"),
-            "balance": qsTr("Balance"),
-            "connectivity": qsTr("Connectivity only")
+            "usage": qsTr("API services"),
+            "local": qsTr("API services"),
+            "gateway": qsTr("API services"),
+            "balance": qsTr("API services"),
+            "connectivity": qsTr("API services")
         };
         return labels[categoryKey(level)];
     }
 
-    function categoryRank(level) {
-        var ranks = { "usage": 0, "local": 1, "gateway": 2, "balance": 3, "connectivity": 4 };
-        return ranks[categoryKey(level)];
+    function sourceGroupKey(source) {
+        return source.sourceKind === "ai_tool" || source.sourceKind === "local_tool"
+            ? "tools" : "api";
+    }
+
+    function sourceGroupLabel(source) {
+        return sourceGroupKey(source) === "tools" ? qsTr("AI tools") : qsTr("API services");
+    }
+
+    function sourceGroupRank(source) {
+        return sourceGroupKey(source) === "tools" ? 0 : 1;
     }
 
     function buildVisibleSources() {
@@ -50,16 +59,26 @@ QtObject {
             var haystack = (descriptor.name + " " + descriptor.configKey + " "
                             + categoryLabel(descriptor.monitoringLevel)).toLowerCase();
             if (needle.length > 0 && haystack.indexOf(needle) < 0) continue;
-            if (filterKey !== "all" && filterKey !== category) continue;
+            if (filterKey === "enabled" && !configuration[configProperty(descriptor.enabledConfigKey)]) continue;
+            if (filterKey === "detected"
+                    && (descriptor.sourceKind !== "ai_tool" || !descriptor.installed)) continue;
+            if (["usage", "tools", "local", "gateway", "balance", "connectivity"].indexOf(filterKey) >= 0
+                    && filterKey !== category) continue;
             rows.push(Object.assign({}, descriptor, {
                 categoryKey: category,
-                categoryLabel: categoryLabel(descriptor.monitoringLevel),
-                categoryRank: categoryRank(descriptor.monitoringLevel)
+                categoryLabel: sourceGroupLabel(descriptor),
+                sourceGroupRank: sourceGroupRank(descriptor)
             }));
         }
         rows.sort(function(left, right) {
-            if (left.categoryRank !== right.categoryRank)
-                return left.categoryRank - right.categoryRank;
+            if (left.sourceGroupRank !== right.sourceGroupRank)
+                return left.sourceGroupRank - right.sourceGroupRank;
+            var leftEnabled = !!configuration[configProperty(left.enabledConfigKey)];
+            var rightEnabled = !!configuration[configProperty(right.enabledConfigKey)];
+            if (leftEnabled !== rightEnabled) return leftEnabled ? -1 : 1;
+            var leftDetected = sourceGroupKey(left) === "tools" && !!left.installed;
+            var rightDetected = sourceGroupKey(right) === "tools" && !!right.installed;
+            if (leftDetected !== rightDetected) return leftDetected ? -1 : 1;
             return left.name.localeCompare(right.name);
         });
         return rows;
@@ -73,9 +92,18 @@ QtObject {
     }
 
     function ensureSelection() {
-        if (descriptorFor(selectedSourceId).configKey) return;
         var rows = buildVisibleSources();
+        for (var i = 0; i < rows.length; ++i) {
+            if (rows[i].configKey === selectedSourceId) return;
+        }
         selectedSourceId = rows.length > 0 ? rows[0].configKey : "";
+    }
+
+    onSearchTextChanged: ensureSelection()
+    onFilterKeyChanged: ensureSelection()
+    onDescriptorsChanged: {
+        extendBaselineForNewSources();
+        ensureSelection();
     }
 
     function configProperty(configKey) {
@@ -91,20 +119,29 @@ QtObject {
         if (configuration[propertyName] === newValue) return;
         configuration[propertyName] = newValue;
         updateDirty();
+        ensureSelection();
         configurationEdited();
     }
 
     function trackedKeys() {
-        var keys = ["advancedSettingsMode"];
+        var keys = [];
         for (var i = 0; i < descriptors.length; ++i) {
             var descriptor = descriptors[i];
             if (descriptor.enabledConfigKey) keys.push(descriptor.enabledConfigKey);
             if (descriptor.modelConfigKey) keys.push(descriptor.modelConfigKey);
+            if (descriptor.legacyPlanConfigKey) keys.push(descriptor.legacyPlanConfigKey);
             if (descriptor.customBaseUrlConfigKey) keys.push(descriptor.customBaseUrlConfigKey);
+            if (descriptor.customLimitConfigKey) keys.push(descriptor.customLimitConfigKey);
+            if (descriptor.notificationsConfigKey) keys.push(descriptor.notificationsConfigKey);
+            if (descriptor.billingModeConfigKey) keys.push(descriptor.billingModeConfigKey);
+            if (descriptor.refreshIntervalConfigKey) keys.push(descriptor.refreshIntervalConfigKey);
+            if (descriptor.resetDayConfigKey) keys.push(descriptor.resetDayConfigKey);
+            if (descriptor.orgNameConfigKey) keys.push(descriptor.orgNameConfigKey);
         }
         return keys.concat([
             "openaiProjectId", "azureDeploymentId", "bedrockRegion",
-            "googleTier", "googleveoTier"
+            "googleTier", "googleveoTier", "browserSyncEnabled",
+            "browserSyncBrowser", "browserSyncInterval", "browserSyncProfile"
         ]);
     }
 
@@ -155,5 +192,4 @@ QtObject {
         takeSnapshot();
     }
 
-    onDescriptorsChanged: extendBaselineForNewSources()
 }

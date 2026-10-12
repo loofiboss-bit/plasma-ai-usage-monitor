@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [24.2.0] — 2026-10-12
+
+### Added
+
+- Add named project aliases in History settings. Alias management selects a
+  folder and stores only the chosen name and anonymous project identity; paths
+  remain local and renaming or removing aliases preserves session history.
+
+### Changed
+
+- Put current status and actions first in Overview, group API services and AI
+  tools under Sources, and organize source setup around staged configuration,
+  verification, and advanced overrides.
+- Group History filters and exports, improve session loading/error/empty states,
+  and refine the hierarchy in Insights and settings.
+- Preserve session mode, tool, project, range, page, and selected session when
+  navigating into History from session summaries.
+
+## [24.1.0] — 2026-10-12
+
+### Changed
+
+- Improve usage-card readability, responsive navigation, source details,
+  Insights, panel labels, and the unified History views for local sessions.
+
 ## [24.0.1] — 2026-10-12
 
 ### Fixed
