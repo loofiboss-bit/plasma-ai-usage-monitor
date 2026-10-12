@@ -90,6 +90,7 @@
 
   <releases>
 
+    <release version="24.0.1" date="2026-10-12"/>
     <release version="24.0.0" date="2026-10-11"/>
     <release version="23.0.0" date="2026-10-05"/>
     <release version="22.0.0" date="2026-10-03"/>

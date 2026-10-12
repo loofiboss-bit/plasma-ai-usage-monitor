@@ -102,7 +102,7 @@ integrations. A user-requested session export is a separate JSON/CSV schema and
 uses export-local anonymous identifiers; it omits paths, aliases, credentials,
 and raw identities. Coverage is marked partial when a file is unreadable,
 truncated, or contains unsupported records. See [Coding sessions and
-projects](coding-sessions.md) for token and filter semantics.
+projects](Coding-Sessions) for token and filter semantics.
 
 ## Support reports
 

@@ -1,7 +1,7 @@
 # V24 Coding Sessions & Projects
 
-- **Target release:** `24.0.0`
-- **Status:** local implementation candidate based on published V23.0.0; public release is a separate task.
+- **Target release:** `24.0.1` (V24.0.0 was the initial session feature release)
+- **Status:** the V24 session feature is published; this authorized hotfix corrects Source Detail layout when local sessions are enabled.
 
 ## Goal
 
@@ -75,5 +75,6 @@ checks, QML lint, sanitizers, release checks, package-upgrade preservation, and
 100,000-event performance checks. Capture deterministic synthetic screenshots
 and document remaining physical display, keyboard, and screen-reader checks.
 
-No merge, tag, package publication, KDE Store update, or other public release
-is included in V24 candidate implementation work.
+The original V24 implementation task did not include public release. The
+V24.0.1 layout hotfix has separate publication authorization and is qualified
+by `docs/release/v24.0.1-checklist.md`.

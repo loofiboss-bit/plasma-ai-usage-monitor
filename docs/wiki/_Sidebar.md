@@ -7,6 +7,7 @@
 - [Understanding the data](Understanding-the-Data)
 - [Providers](Providers)
 - [Subscription tools](Subscription-Tools)
+- [Coding sessions and projects](Coding-Sessions)
 - [Budget Control and runway guardrails](Runway-Guardrails)
 - [History and integrations](History-and-Integrations)
 - [Troubleshooting](Troubleshooting)

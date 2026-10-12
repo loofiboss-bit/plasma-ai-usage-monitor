@@ -704,7 +704,6 @@ QQC2.ScrollView {
 
         Components.LocalSessionPanel {
             Layout.fillWidth: true
-            Layout.preferredHeight: Kirigami.Units.gridUnit * 20
             visible: detail.mediaMode
                 ? AppInfo.smokeView === "media-coding-sessions"
                 : detail.sourceId === "codex-cli" || detail.sourceId === "claude-code"

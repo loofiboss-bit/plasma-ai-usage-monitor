@@ -58,7 +58,7 @@ The standard card tracks local activity against the selected session and weekly 
 
 Session-token history is a separate opt-in in **Settings → History**. It reads
 local Claude Code JSONL usage records without saving prompts, replies, titles,
-or source paths. See [Coding sessions and projects](coding-sessions.md) for
+or source paths. See [Coding sessions and projects](Coding-Sessions) for
 filters, coverage and export behavior.
 
 ## GitHub Copilot
