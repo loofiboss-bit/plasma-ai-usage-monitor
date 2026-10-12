@@ -75,19 +75,6 @@ KCM.SimpleKCM {
 
     Connections {
         target: localSessions
-        function onProjectsReady(requestId, rows) {
-            if (requestId !== historyPage.projectRequestId) return;
-            historyPage.projectRows = rows || [];
-            if (historyPage.selectedProjectId.length > 0) {
-                var found = false;
-                for (var i = 0; i < historyPage.projectRows.length; ++i) {
-                    if (historyPage.projectRows[i].projectId
-                            === historyPage.selectedProjectId) found = true;
-                }
-                if (!found) historyPage.selectedProjectId = "";
-            }
-        }
-
         function onSummaryReady(requestId, summary) {
             summary = summary || {};
             var toolId = String(summary.toolId || "");
@@ -107,7 +94,7 @@ KCM.SimpleKCM {
                         "Import is partial: %1 session events were stored.", count)
                 : i18np("Imported %1 session event.",
                             "Imported %1 session events.", count);
-            historyPage.refreshProjectRows();
+            historyPage.refreshProjectAliases();
             historyPage.refreshSessionSummaries();
         }
 
@@ -117,14 +104,11 @@ KCM.SimpleKCM {
             historyPage.sessionStatusText = ok
                 ? i18n("Local session history was deleted.")
                 : i18n("Local session history could not be deleted.");
-            historyPage.refreshProjectRows();
+            historyPage.refreshProjectAliases();
             historyPage.refreshSessionSummaries();
         }
     }
 
-    property string projectRequestId: ""
-    property var projectRows: []
-    property string selectedProjectId: ""
     property string sessionStatusText: ""
     property var sessionSummaries: ({})
     property var sessionSummaryRequestIds: ({})
@@ -136,7 +120,7 @@ KCM.SimpleKCM {
             !!Plasmoid.configuration.codexSessionHistoryEnabled);
         localSessions.setToolEnabled("claude-code",
             !!Plasmoid.configuration.claudeCodeSessionHistoryEnabled);
-        refreshProjectRows();
+        refreshProjectAliases();
         refreshSessionSummaries();
     }
 
@@ -179,38 +163,8 @@ KCM.SimpleKCM {
         return i18n("Enabled; no completed scan status is available yet.");
     }
 
-    function refreshProjectRows() {
-        if (!localSessions || typeof localSessions.requestProjects !== "function")
-            return;
-        if (!Plasmoid.configuration.codexSessionHistoryEnabled
-                && !Plasmoid.configuration.claudeCodeSessionHistoryEnabled) {
-            projectRows = [];
-            return;
-        }
-        projectRequestId = "projects-" + Date.now().toString(36)
-            + "-" + Math.random().toString(36).slice(2);
-        localSessions.requestProjects(projectRequestId);
-    }
-
-    function projectOptions() {
-        var rows = [];
-        for (var i = 0; i < projectRows.length; ++i) {
-            var row = projectRows[i] || {};
-            var label = String(row.alias || "").trim();
-            if (!label) label = i18n("Unnamed project %1", i + 1);
-            rows.push({ label: (row.toolId === "codex-cli"
-                ? i18n("Codex") : i18n("Claude Code")) + " — " + label,
-                projectId: String(row.projectId || "") });
-        }
-        return rows;
-    }
-
-    function selectedProjectRow() {
-        for (var i = 0; i < projectRows.length; ++i) {
-            if (projectRows[i].projectId === selectedProjectId)
-                return projectRows[i];
-        }
-        return null;
+    function refreshProjectAliases() {
+        projectAliases.reload();
     }
 
     Connections {
@@ -309,50 +263,10 @@ KCM.SimpleKCM {
             }
         }
 
-        QQC2.ComboBox {
-            Kirigami.FormData.label: i18n("Project alias:")
-            enabled: historyPage.projectOptions().length > 0
-            Layout.fillWidth: true
-            model: historyPage.projectOptions()
-            textRole: "label"
-            valueRole: "projectId"
-            currentIndex: {
-                var rows = historyPage.projectOptions();
-                for (var i = 0; i < rows.length; ++i) {
-                    if (rows[i].projectId === historyPage.selectedProjectId)
-                        return i;
-                }
-                return rows.length > 0 ? 0 : -1;
-            }
-            onActivated: {
-                historyPage.selectedProjectId = currentValue || "";
-                var row = historyPage.selectedProjectRow();
-                projectAliasField.text = row ? String(row.alias || "") : "";
-            }
-        }
-
-        RowLayout {
-            enabled: historyPage.selectedProjectId.length > 0
-            QQC2.TextField {
-                id: projectAliasField
-                Layout.fillWidth: true
-                placeholderText: i18n("Optional local name")
-                maximumLength: 80
-                Accessible.name: i18n("Local project alias")
-            }
-            QQC2.Button {
-                text: i18n("Save alias")
-                enabled: historyPage.selectedProjectId.length > 0
-                onClicked: {
-                    var saved = localSessions.setProjectAlias(
-                        historyPage.selectedProjectId,
-                        projectAliasField.text.trim());
-                    historyPage.sessionStatusText = saved
-                        ? i18n("Project alias saved on this computer.")
-                        : i18n("Project alias could not be saved.");
-                    if (saved) historyPage.refreshProjectRows();
-                }
-            }
+        ProjectAliasEditor {
+            id: projectAliases
+            Kirigami.FormData.isSection: true
+            backend: localSessions
         }
 
         Kirigami.Separator {
