@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogVersion": "2026.10.05",
-  "release": "24.1.0",
+  "release": "24.2.0",
   "lastReviewed": "2026-10-05",
   "runtimeScraping": false,
   "notes": "Static local metadata reviewed against official sources on 2026-10-05 UTC (2026-10-06 in Europe/Stockholm). Live authenticated account data takes precedence. Unverified promotional allowances and account-specific prices remain unavailable. See docs/reviews/subscription-catalog-2026-10-06.md. No runtime scraping.",

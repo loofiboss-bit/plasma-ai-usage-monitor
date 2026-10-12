@@ -6,13 +6,14 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-The **24.1.0 release (Readable Usage Monitor)** brings clearer usage cards,
-responsive navigation, streamlined source metrics and Insights, and unified coding
-session exploration in History. Opt-in Codex and Claude Code history, anonymous
-project filters, local aliases, and redacted exports remain available.
+The **24.2.0 release (Structured Usage & Sources)** brings a clearer daily
+overview, a unified Sources area for API services and AI tools, and easier
+session history with named project aliases. Navigation preserves session
+filters and selection across views. Opt-in Codex and Claude Code history,
+anonymous project identities, and redacted exports remain available.
 See the [V24 user guide](docs/user-guide/coding-sessions.md),
-[qualification checklist](docs/release/v24.1.0-checklist.md), and
-[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v24.1.0).
+[qualification checklist](docs/release/v24.2.0-checklist.md), and
+[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v24.2.0).
 The screenshots below use deterministic synthetic fixtures.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)

@@ -1,10 +1,18 @@
 # Roadmap
 
-**Current release:** 24.1.0, Readable Usage Monitor
+**Current release:** 24.2.0, Structured Usage & Sources
 
 **Last updated:** 2026-10-12
 
 ## Current release
+
+### 24.2.0 Structured Usage & Sources
+
+Overview brings current status and actions forward, Sources unifies API
+services and AI tools, and History makes usage, sessions, filters, exports,
+and project aliases easier to navigate. Session context is preserved when
+opening History from a summary. See the
+[qualification checklist](docs/release/v24.2.0-checklist.md).
 
 ### 24.1.0 Readable Usage Monitor
 
