@@ -182,7 +182,7 @@ ColumnLayout {
 
     function dateText(value) {
         var time = Date.parse(value || "");
-        return Number.isFinite(time) ? new Date(time).toLocaleString(Qt.locale(), Locale.ShortFormat)
+        return Number.isFinite(time) ? Utils.formatWhen(time, "relative")
                                      : i18n("Unavailable");
     }
 
@@ -401,7 +401,7 @@ ColumnLayout {
 
     SessionSection {
         Layout.fillWidth: true
-        visible: panel.selectedToolEnabled()
+        visible: panel.selectedToolEnabled() && panel.presentationMode !== "summary"
         contentItem: GridLayout {
             columns: width < Kirigami.Units.gridUnit * 40 ? 1 : 2
 
@@ -487,7 +487,7 @@ ColumnLayout {
         contentItem: ColumnLayout {
             GridLayout {
                 Layout.fillWidth: true
-                columns: width < Kirigami.Units.gridUnit * 40 ? 1 : 2
+                columns: width < Kirigami.Units.gridUnit * 30 ? 1 : 3
                 MetricLabel { title: i18n("Sessions"); value: panel.summary.sessionCount; count: true; prominent: true }
                 MetricLabel { title: i18n("Input tokens"); value: panel.summary.inputTokens; prominent: true }
                 MetricLabel { title: i18n("Output tokens"); value: panel.summary.outputTokens; prominent: true }
@@ -580,8 +580,8 @@ ColumnLayout {
                             font.bold: true
                         }
                         PlasmaComponents.Label {
-                            text: i18n("%1 sessions",
-                                panel.countText(dailyRow.modelData.sessionCount))
+                            text: i18np("%1 session", "%1 sessions",
+                                Number(dailyRow.modelData.sessionCount || 0))
                         }
                     }
                     PlasmaComponents.Label {
@@ -774,9 +774,10 @@ ColumnLayout {
                     columns: width < Kirigami.Units.gridUnit * 40 ? 1 : 2
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
-                        text: i18n("%1 · %2 events",
+                        text: i18n("%1 · %2",
                             panel.dateText(sessionDelegate.modelData.lastSeenAtUtc),
-                            panel.countText(sessionDelegate.modelData.eventCount))
+                            i18np("%1 event", "%1 events",
+                                Number(sessionDelegate.modelData.eventCount || 0)))
                         font.bold: true
                         elide: Text.ElideRight
                     }
@@ -785,6 +786,7 @@ ColumnLayout {
                         wrapMode: Text.WordWrap
                         text: panel.coverageText(sessionDelegate.modelData.coverage)
                         color: sessionDelegate.modelData.coverage === "complete"
+                            || sessionDelegate.modelData.coverage === "reported"
                             ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.neutralTextColor
                     }
                 }
