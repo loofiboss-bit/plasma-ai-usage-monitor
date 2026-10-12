@@ -13,6 +13,7 @@ QtObject {
     property string selectedSourceId: ""
     property string selectedMetric: ""
 
+    property bool catalogLoading: false
     property bool loading: false
     property int requestGeneration: 0
     property string catalogRequestId: ""
@@ -163,9 +164,11 @@ QtObject {
 
     function refreshCatalog() {
         if (!usageDb || typeof usageDb.requestHistoryCatalog !== "function") {
+            catalogLoading = false;
             return;
         }
         catalogRequestId = "catalog-" + (++requestGeneration);
+        catalogLoading = true;
         usageDb.requestHistoryCatalog(catalogRequestId);
     }
 
@@ -208,6 +211,7 @@ QtObject {
 
     function acceptCatalog(requestId, sources) {
         if (requestId !== catalogRequestId) return;
+        catalogLoading = false;
         historyStateObject.storedCatalog = sources || [];
         normalizeSelection();
         catalogAccepted();

@@ -24,16 +24,54 @@ ColumnLayout {
     property string sessionToolId: "codex-cli"
     property string sessionProjectId: ""
     property var sessionState: null
+    property var catalogDatabase: null
     Accessible.name: historyController.loading
         ? i18n("History view loading")
         : i18n("History view ready")
 
     Components.HistoryController {
         id: historyController
-        usageDb: history.monitor.usageDb
-        dailyState: history.monitor.presentationDailyState
-        configuredProviders: history.monitor.allProviders || []
-        configuredTools: history.monitor.allSubscriptionTools || []
+        objectName: "historyController"
+        usageDb: history.monitor ? history.monitor.usageDb : null
+        dailyState: history.monitor ? history.monitor.presentationDailyState : null
+        configuredProviders: history.monitor ? history.monitor.allProviders || [] : []
+        configuredTools: history.monitor ? history.monitor.allSubscriptionTools || [] : []
+    }
+
+    function refreshHistoryCatalog(force) {
+        var database = history.monitor ? history.monitor.usageDb : null;
+        if (!database) return;
+        if (!force && history.catalogDatabase === database) return;
+        history.catalogDatabase = database;
+        historyController.refreshCatalog();
+    }
+
+    function scrollToTop() {
+        Qt.callLater(function() {
+            // Controls exposes a Flickable here at runtime, but its qmltypes only declare QQuickItem.
+            // qmllint disable missing-property
+            historyScroll.contentItem.contentY = 0;
+            // qmllint enable missing-property
+        });
+    }
+
+    function emptyStateTitle() {
+        if (historyController.errorKey !== "")
+            return i18n("This comparison is not compatible");
+        return historyController.metricRows().length === 0
+            ? i18n("No usage metrics have been retained")
+            : i18n("No observations in this period");
+    }
+
+    function emptyStateDetails() {
+        if (historyController.errorKey !== "")
+            return historyController.errorText();
+        if (historyController.metricRows().length === 0) {
+            if (!historyController.usageDb || !historyController.usageDb.enabled)
+                return i18n("Enable usage history in Settings → History. New metrics appear after the next saved observation.");
+            return i18n("This source has no saved usage snapshots yet. Refresh the source and return after its next snapshot is stored.");
+        }
+        return i18n("No observations for this metric in this period. Try a wider range or refresh the source.");
     }
 
     Timer {
@@ -66,6 +104,34 @@ ColumnLayout {
         }
     }
 
+    Timer {
+        id: catalogRefreshTimer
+        interval: 400
+        repeat: false
+        onTriggered: history.refreshHistoryCatalog(true)
+    }
+
+    Connections {
+        target: history.monitor ? history.monitor.usageDb : null
+        enabled: target !== null
+        ignoreUnknownSignals: true
+
+        function onObservationsChanged() {
+            if (!history.sessionsMode)
+                catalogRefreshTimer.restart();
+        }
+    }
+
+    Connections {
+        target: history.monitor
+        enabled: history.monitor !== null
+        ignoreUnknownSignals: true
+
+        function onUsageDbChanged() {
+            history.refreshHistoryCatalog(true);
+        }
+    }
+
     function openExport(format) {
         pendingExportFormat = format;
         exportDialog.nameFilters = format === "json"
@@ -87,6 +153,14 @@ ColumnLayout {
         }
     }
 
+    onMonitorChanged: Qt.callLater(function() {
+        history.refreshHistoryCatalog(false);
+    })
+    onSessionsModeChanged: {
+        scrollToTop();
+        if (!sessionsMode)
+            catalogRefreshTimer.restart();
+    }
     onRequestedSourceIdChanged: Qt.callLater(applyRequestedSelection)
     onRequestedMetricChanged: Qt.callLater(applyRequestedSelection)
     onRequestedRangeDaysChanged: Qt.callLater(applyRequestedSelection)
@@ -129,13 +203,13 @@ ColumnLayout {
         Layout.minimumHeight: 0
         clip: true
         contentWidth: availableWidth
-        contentHeight: historyContent.height
+        contentHeight: historyContent.implicitHeight
         QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
 
         ColumnLayout {
             id: historyContent
+            objectName: "historyContent"
             width: historyScroll.availableWidth
-            height: Math.max(implicitHeight, historyScroll.availableHeight)
             spacing: Kirigami.Units.smallSpacing
 
             RowLayout {
@@ -173,6 +247,7 @@ ColumnLayout {
 
             GridLayout {
                 id: historyControls
+                objectName: "historyControls"
                 Layout.fillWidth: true
                 visible: !history.sessionsMode
                 Layout.leftMargin: Kirigami.Units.smallSpacing
@@ -183,6 +258,7 @@ ColumnLayout {
 
                 QQC2.ComboBox {
                     id: rangeCombo
+                    objectName: "historyRangeCombo"
                     Layout.fillWidth: true
                     model: [i18n("24 hours"), i18n("7 days"), i18n("30 days"), i18n("90 days")]
                     currentIndex: historyController.rangeIndex
@@ -195,6 +271,7 @@ ColumnLayout {
                 }
                 QQC2.ComboBox {
                     id: sourceCombo
+                    objectName: "historySourceCombo"
                     visible: !historyController.compareMode
                     Layout.fillWidth: true
                     Layout.columnSpan: 1
@@ -212,12 +289,14 @@ ColumnLayout {
                 }
                 QQC2.ComboBox {
                     id: metricCombo
+                    objectName: "historyMetricCombo"
                     Layout.fillWidth: true
                     Layout.columnSpan: 1
                     model: historyController.metricRows()
                     textRole: "text"
                     valueRole: "value"
                     currentIndex: historyController.metricIndex()
+                    enabled: count > 0
                     activeFocusOnTab: true
                     Accessible.name: i18n("History metric")
                     onActivated: {
@@ -225,7 +304,15 @@ ColumnLayout {
                         historyController.refresh();
                     }
                 }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: historyController.metricRows().length === 0
+                    text: i18n("No metrics retained")
+                    color: Kirigami.Theme.disabledTextColor
+                    Accessible.name: text
+                }
                 PlasmaComponents.Button {
+                    objectName: "historyExportButton"
                     Layout.fillWidth: true
                     text: i18n("Export file")
                     icon.name: "document-export"
@@ -249,6 +336,7 @@ ColumnLayout {
                     }
                 }
                 PlasmaComponents.ToolButton {
+                    objectName: "historyCopyCsvButton"
                     Layout.fillWidth: true
                     text: i18n("Copy CSV")
                     display: QQC2.AbstractButton.TextBesideIcon
@@ -262,8 +350,10 @@ ColumnLayout {
             }
 
             PlasmaComponents.BusyIndicator {
+                objectName: "historyLoadingIndicator"
                 Layout.alignment: Qt.AlignHCenter
-                visible: !history.sessionsMode && historyController.loading
+                visible: !history.sessionsMode
+                    && (historyController.catalogLoading || historyController.loading)
                 running: visible
             }
 
@@ -279,17 +369,15 @@ ColumnLayout {
             }
 
             Components.EmptyState {
+                objectName: "historyEmptyState"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                visible: !history.sessionsMode && !historyController.loading
+                visible: !history.sessionsMode && !historyController.catalogLoading
+                    && !historyController.loading
                     && (historyController.errorKey !== ""
                         || historyController.seriesData.length === 0)
-                title: historyController.errorKey !== ""
-                    ? i18n("This comparison is not compatible")
-                    : i18n("No compatible history data")
-                details: historyController.errorKey !== ""
-                    ? historyController.errorText()
-                    : i18n("Choose a source, metric, and time range with retained compatible observations.")
+                title: history.emptyStateTitle()
+                details: history.emptyStateDetails()
             }
 
             ColumnLayout {
@@ -317,6 +405,7 @@ ColumnLayout {
             }
 
             Monitor.MultiSeriesChart {
+                objectName: "historyUsageChart"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.minimumHeight: Kirigami.Units.gridUnit * 12
@@ -328,6 +417,7 @@ ColumnLayout {
 
             Components.LocalSessionPanel {
                 id: sessionsPanel
+                objectName: "historySessionsPanel"
                 presentationMode: "history"
                 Layout.fillWidth: true
                 Layout.fillHeight: true
@@ -364,5 +454,7 @@ ColumnLayout {
         id: clipboard
     }
 
-    Component.onCompleted: historyController.refreshCatalog()
+    Component.onCompleted: Qt.callLater(function() {
+        history.refreshHistoryCatalog(false);
+    })
 }

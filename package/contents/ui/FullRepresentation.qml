@@ -260,6 +260,7 @@ Item {
                     stableId, "open_source_settings", "");
             }
             function onHistoryRequested(historyId, metric, rangeDays) {
+                fullRoot.historySessionsMode = false;
                 fullRoot.historySourceId = historyId;
                 fullRoot.historyMetric = metric;
                 fullRoot.historyRangeDays = rangeDays;
