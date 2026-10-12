@@ -16,11 +16,19 @@ TestCase {
         property bool codexEnabled: true
         property bool claudeCodeEnabled: false
         property int requests: 0
+        property int exportRequests: 0
+        property string lastExportFormat: ""
+        property string lastExportPath: ""
         signal importFinished(string toolId, int importedCount, bool partial, string errorKey)
         function requestProjects(requestId) { requests++; }
         function requestSummary(requestId, toolId, from, to, project) { requests++; }
         function requestSessions(requestId, toolId, from, to, project, offset, limit) { requests++; }
         function requestDaily(requestId, toolId, from, to, project, zone) { requests++; }
+        function requestExport(requestId, toolId, from, to, project, format, path) {
+            exportRequests++;
+            lastExportFormat = format;
+            lastExportPath = path;
+        }
     }
 
     SignalSpy { id: historySpy; signalName: "sessionHistoryRequested" }
@@ -54,6 +62,26 @@ TestCase {
                        "2026-10-12T00:00:00Z"];
         for (var i = 0; i < invalid.length; ++i)
             compare(panel.dayText(invalid[i]), "Date unavailable");
+    }
+
+    function test_sessionExportKeepsAbsoluteFileDialogPathForBothFormats() {
+        var panel = createTemporaryObject(panelComponent, tests);
+        verify(panel !== null);
+
+        for (var format of ["json", "csv"]) {
+            var expectedPath = "/tmp/AI Usage/coding-sessions." + format;
+            var selectedUrl = Qt.resolvedUrl("file:///tmp/AI%20Usage/coding-sessions." + format);
+
+            compare(panel.localPath(selectedUrl), expectedPath);
+            compare(panel.localPath(String(selectedUrl)), expectedPath);
+
+            panel.pendingExportFormat = format;
+            panel.beginExport(panel.localPath(selectedUrl));
+            compare(fakeModel.lastExportFormat, format);
+            compare(fakeModel.lastExportPath, expectedPath);
+        }
+
+        compare(fakeModel.exportRequests, 2);
     }
 
     function test_summaryHidesTechnicalDetailsAndPreservesHistoryFilter() {

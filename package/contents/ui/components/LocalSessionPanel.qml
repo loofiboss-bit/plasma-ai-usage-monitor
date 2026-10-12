@@ -300,9 +300,12 @@ ColumnLayout {
     }
 
     function localPath(url) {
+        if (url && typeof url.toLocalFile === "function")
+            return url.toLocalFile();
+
         var value = String(url || "");
         if (value.indexOf("file:") === 0) {
-            value = value.replace(/^file:\/\/\/?/, "");
+            value = value.replace(/^file:\/\//, "");
             try { return decodeURIComponent(value); }
             catch (error) { return ""; }
         }
