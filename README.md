@@ -119,7 +119,6 @@ handled as sensitive files.
 | Real history gap | ![History chart with an explicit missing-data gap](assets/screenshots/history-gap.png) |
 | Coding sessions in History | ![Daily coding-session tokens and a filtered session list](assets/screenshots/coding-sessions-history.png) |
 | Analyst with sufficient data | ![Analyst snapshot with documented coverage and compatible spend](assets/screenshots/analyst-sufficient.png) |
-| Coding sessions in Analyst | ![Coding-session model and project breakdowns](assets/screenshots/coding-sessions-analyst.png) |
 | Analyst with insufficient data | ![Analyst explaining unavailable results when samples are insufficient](assets/screenshots/analyst-insufficient.png) |
 | Guided setup | ![Guided first success source selection](assets/screenshots/guided-first-success.png) |
 | Sources settings | ![Unified API services and AI tools source settings](assets/screenshots/provider-settings.png) |

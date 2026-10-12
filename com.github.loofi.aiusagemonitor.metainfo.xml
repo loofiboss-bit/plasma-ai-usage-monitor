@@ -63,10 +63,6 @@
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-sufficient.png</image>
     </screenshot>
     <screenshot>
-      <caption>Coding-session token breakdowns by model and project</caption>
-      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/coding-sessions-analyst.png</image>
-    </screenshot>
-    <screenshot>
       <caption>Analyst explaining unavailable results for insufficient history</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-insufficient.png</image>
     </screenshot>

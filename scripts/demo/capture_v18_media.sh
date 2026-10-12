@@ -235,7 +235,6 @@ capture_view() {
   esac
   case "$view" in
     media-history-*) accessible_marker="History view ready" ;;
-    media-analyst-sessions) accessible_marker="History view ready" ;;
     media-analyst-*) accessible_marker="Insights view ready" ;;
     media-source-detail) accessible_marker="Back to source list" ;;
     media-coding-sessions) accessible_marker="Back to source list" ;;
@@ -558,7 +557,6 @@ capture_view media-history-gap history-gap.png 10
 capture_view media-history-sessions coding-sessions-history.png 8
 capture_view media-analyst-sufficient analyst-sufficient.png 6
 capture_view media-analyst-insufficient analyst-insufficient.png 6
-capture_view media-analyst-sessions coding-sessions-analyst.png 8
 capture_view onboarding-source guided-first-success.png 6
 capture_view settings provider-settings.png 8
 capture_view budget-settings budget-control.png 8
@@ -600,8 +598,7 @@ ASSETS_JSON="$(
     overview-popup.png attention-state.png source-detail.png history-gap.png \
     analyst-sufficient.png analyst-insufficient.png guided-first-success.png \
     provider-settings.png budget-control.png plugin-recovery.png panel-lowest-quota.png \
-    coding-sessions-detail.png coding-sessions-history.png \
-    coding-sessions-analyst.png; do
+    coding-sessions-detail.png coding-sessions-history.png; do
     sha256sum "${OUTPUT_DIR}/${filename}"
   done | jq -Rn '[inputs | split("  ") | {(.[1] | split("/") | last): .[0]}] | add'
 )"
@@ -645,7 +642,6 @@ jq -n \
       "coding-sessions-history.png": "media-history-sessions",
       "analyst-sufficient.png": "media-analyst-sufficient",
       "analyst-insufficient.png": "media-analyst-insufficient",
-      "coding-sessions-analyst.png": "media-analyst-sessions",
       "guided-first-success.png": "onboarding-source",
       "provider-settings.png": "settings",
       "budget-control.png": "budget-settings",
