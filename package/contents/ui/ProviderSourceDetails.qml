@@ -86,7 +86,7 @@ Kirigami.FormLayout {
     }
 
     QQC2.Label {
-        visible: details.hasSource
+        visible: details.hasSource && details.configPage.advancedMode
         Kirigami.FormData.label: i18n("Scheduled check:")
         text: details.endpointSummary(details.descriptor.safeRefresh || ({}))
         wrapMode: Text.WrapAnywhere
