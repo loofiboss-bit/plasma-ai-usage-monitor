@@ -85,7 +85,7 @@ Item {
 
                 RowLayout {
                     objectName: "monitorNavigation"
-                    Layout.fillWidth: true
+                    Layout.fillWidth: fullRoot.width < Kirigami.Units.gridUnit * 36
                     spacing: 0
                     Repeater {
                         model: [
@@ -97,7 +97,9 @@ Item {
                             required property var modelData
                             required property int index
                             objectName: "monitorDestination-" + index
-                            Layout.fillWidth: true
+                            Layout.fillWidth: fullRoot.width < Kirigami.Units.gridUnit * 36
+                            Layout.preferredWidth: fullRoot.width >= Kirigami.Units.gridUnit * 36
+                                ? Kirigami.Units.gridUnit * 7 : -1
                             Layout.minimumWidth: 0
                             text: modelData.label
                             icon.name: modelData.icon
@@ -122,7 +124,9 @@ Item {
                         activeFocusOnTab: true
                         icon.name: "view-refresh"
                         text: i18n("Refresh")
-                        display: QQC2.AbstractButton.TextBesideIcon
+                        display: fullRoot.width >= Kirigami.Units.gridUnit * 22
+                            ? QQC2.AbstractButton.TextBesideIcon
+                            : QQC2.AbstractButton.IconOnly
                         Accessible.name: i18n("Refresh all configured sources")
                         onClicked: fullRoot.monitor.refreshAll()
                         PlasmaComponents.ToolTip {
@@ -133,7 +137,9 @@ Item {
                         activeFocusOnTab: true
                         icon.name: "configure"
                         text: i18n("Settings")
-                        display: QQC2.AbstractButton.TextBesideIcon
+                        display: fullRoot.width >= Kirigami.Units.gridUnit * 22
+                            ? QQC2.AbstractButton.TextBesideIcon
+                            : QQC2.AbstractButton.IconOnly
                         Accessible.name: i18n("Configure AI Usage Monitor")
                         onClicked: Plasmoid.internalAction("configure").trigger()
                         PlasmaComponents.ToolTip { text: i18n("Configure") }
