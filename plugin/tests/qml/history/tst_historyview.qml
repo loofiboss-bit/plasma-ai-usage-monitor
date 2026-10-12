@@ -326,4 +326,37 @@ TestCase {
         compare(captured.selectedMetric, "usageCount");
         compare(captured.compareMode, true);
     }
+
+    function test_emptyViewStateDoesNotResetSessionHistoryHandoff() {
+        var view = createTemporaryObject(historyViewComponent, testCase);
+        verify(view !== null);
+
+        view.sessionsMode = true;
+        view.sessionToolId = "claude-code";
+        view.sessionProjectId = "project-42";
+        view.sessionState = ({
+            toolId: "claude-code",
+            projectId: "project-42",
+            rangeIndex: 2,
+            pageOffset: 80,
+            sessionId: "session-42"
+        });
+        view.viewState = ({});
+
+        wait(0);
+        compare(view.sessionsMode, true);
+        compare(view.sessionToolId, "claude-code");
+        compare(view.sessionProjectId, "project-42");
+        compare(view.sessionState.rangeIndex, 2);
+        compare(view.sessionState.pageOffset, 80);
+        compare(view.sessionState.sessionId, "session-42");
+
+        var sessionsPanel = findChild(view, "historySessionsPanel");
+        verify(sessionsPanel !== null);
+        compare(sessionsPanel.selectedToolId, "claude-code");
+        compare(sessionsPanel.selectedProjectId, "project-42");
+        compare(sessionsPanel.selectedRangeIndex, 2);
+        compare(sessionsPanel.pageOffset, 80);
+        compare(sessionsPanel.selectedSessionId, "session-42");
+    }
 }

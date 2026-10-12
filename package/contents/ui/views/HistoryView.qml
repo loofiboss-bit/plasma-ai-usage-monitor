@@ -152,7 +152,8 @@ ColumnLayout {
     }
 
     function applyViewState(state) {
-        if (!state || typeof state !== "object") return false;
+        if (!state || typeof state !== "object" || Object.keys(state).length === 0)
+            return false;
         pendingViewState = state;
         applyingViewState = true;
         sessionsMode = state.sessionsMode === true;
