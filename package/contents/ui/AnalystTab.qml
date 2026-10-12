@@ -13,6 +13,8 @@ Kirigami.ScrollablePage {
     required property var monitor
     property var sessionState: null
     property bool sessionsMode: false
+    property bool coverageExpanded: false
+    property bool driversExpanded: false
 
     title: i18n("Insights")
     Accessible.name: analystState.loading
@@ -146,7 +148,7 @@ Kirigami.ScrollablePage {
                 - Number(rank[right.state] === undefined
                          ? 4 : rank[right.state]);
         });
-        return rows.slice(0, 8);
+        return rows.filter(function(row) { return row.state !== "unavailable"; }).slice(0, 8);
     }
     Components.AnalystState {
         id: analystState
@@ -169,13 +171,6 @@ Kirigami.ScrollablePage {
         analystState.refreshData()
 
     actions: [
-        Kirigami.Action {
-            icon.name: "view-history"
-            text: i18n("Coding sessions")
-            checkable: true
-            checked: analystPage.sessionsMode
-            onTriggered: analystPage.sessionsMode = !analystPage.sessionsMode
-        },
         Kirigami.Action {
             icon.name: "view-refresh"
             text: i18n("Refresh")
@@ -208,404 +203,454 @@ Kirigami.ScrollablePage {
     }
 
     ColumnLayout {
-        visible: !analystPage.sessionsMode
+        width: Math.min(analystPage.availableWidth, Kirigami.Units.gridUnit * 64)
+        anchors.horizontalCenter: parent.horizontalCenter
         spacing: Kirigami.Units.largeSpacing
 
-        Controls.BusyIndicator {
-            Layout.alignment: Qt.AlignHCenter
-            visible: analystState.loading
-            running: visible
-        }
-
-        Kirigami.InlineMessage {
+        RowLayout {
             Layout.fillWidth: true
-            visible: !analystState.loading && !analystState.hasSnapshot
-            type: Kirigami.MessageType.Information
-            text: analystState.reasonText(analystState.snapshot.errorKey || "history_unavailable",
-                             0, 0)
+            Controls.ToolButton {
+                objectName: "insightsUsageMode"
+                text: i18n("Usage")
+                icon.name: "office-chart-line"
+                display: Controls.AbstractButton.TextBesideIcon
+                checkable: true
+                autoExclusive: true
+                checked: !analystPage.sessionsMode
+                onClicked: analystPage.sessionsMode = false
+            }
+            Controls.ToolButton {
+                objectName: "insightsSessionsMode"
+                text: i18n("Sessions")
+                icon.name: "view-history"
+                display: Controls.AbstractButton.TextBesideIcon
+                checkable: true
+                autoExclusive: true
+                checked: analystPage.sessionsMode
+                onClicked: analystPage.sessionsMode = true
+            }
+            Item { Layout.fillWidth: true }
         }
 
-        Kirigami.Heading {
+        ColumnLayout {
             Layout.fillWidth: true
-            visible: Plasmoid.configuration.forecastUiEnabled
-            text: i18n("Pacing and runway")
-            level: 3
-        }
+            visible: !analystPage.sessionsMode
+            spacing: Kirigami.Units.largeSpacing
 
-        Kirigami.InlineMessage {
-            Layout.fillWidth: true
-            visible: Plasmoid.configuration.forecastUiEnabled
-                && analystPage.runwayRows.length === 0
-                && !(analystPage.monitor
-                     && analystPage.monitor.guardrails
-                     && analystPage.monitor.guardrails.busy)
-            type: Kirigami.MessageType.Information
-            text: i18n("No compatible runway forecast is available for the current local history and guardrail settings.")
-            Accessible.name: text
-        }
+            Controls.BusyIndicator {
+                Layout.alignment: Qt.AlignHCenter
+                visible: analystState.loading
+                running: visible
+            }
 
-        Controls.BusyIndicator {
-            Layout.alignment: Qt.AlignHCenter
-            visible: Plasmoid.configuration.forecastUiEnabled
-                && analystPage.monitor
-                && analystPage.monitor.guardrails
-                && analystPage.monitor.guardrails.busy
-                && analystPage.runwayRows.length === 0
-            running: visible
-        }
-
-        Repeater {
-            model: analystPage.runwayRows
-
-            RunwayCard {
-                required property var modelData
+            Kirigami.InlineMessage {
                 Layout.fillWidth: true
-                forecast: modelData
-            }
-        }
-
-        Kirigami.Card {
-            Layout.fillWidth: true
-            visible: analystState.hasSnapshot
-
-            header: Kirigami.Heading {
-                text: i18n("Data coverage")
-                level: 3
+                visible: !analystState.loading && !analystState.hasSnapshot
+                type: Kirigami.MessageType.Information
+                text: analystState.reasonText(analystState.snapshot.errorKey || "history_unavailable",
+                                 0, 0)
             }
 
-            contentItem: ColumnLayout {
-                spacing: Kirigami.Units.smallSpacing
+            Kirigami.Card {
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot
 
-                Controls.Label {
-                    text: i18n("Period: %1 – %2",
-                               analystState.formatDate(analystState.snapshot.from),
-                               analystState.formatDate(new Date(
-                                   new Date(analystState.snapshot.to).getTime()
-                                   - 1)))
-                    color: Kirigami.Theme.disabledTextColor
+                header: Kirigami.Heading {
+                    text: i18n("Period summary")
+                    level: 3
                 }
 
-                Controls.Label {
-                    objectName: "coverageLabel"
-                    text: i18n("%1 of %2 days contain compatible observations (%3%)",
-                               analystState.coverage.observedDayCount || 0,
-                               analystState.coverage.requestedDayCount || 30,
-                               Number(analystState.coverage.percent || 0).toFixed(0))
-                    wrapMode: Text.WordWrap
-                }
-
-                Controls.Label {
-                    text: i18n("%1 actual and %2 estimated compatible cost samples",
-                               analystState.snapshot.actualSampleCount || 0,
-                               analystState.snapshot.estimatedSampleCount || 0)
-                    color: Kirigami.Theme.disabledTextColor
-                }
-            }
-        }
-
-        Kirigami.InlineMessage {
-            Layout.fillWidth: true
-            visible: analystState.hasSnapshot
-                && !analystState.kpi("averageDailySpend").available
-            type: analystState.snapshot.mixedCurrencies
-                ? Kirigami.MessageType.Warning
-                : Kirigami.MessageType.Information
-            text: analystState.reasonText(
-                analystState.kpi("averageDailySpend").reasonKey,
-                analystState.kpi("averageDailySpend").sampleCount,
-                analystState.kpi("averageDailySpend").minimumSamples)
-        }
-
-        Kirigami.Card {
-            Layout.fillWidth: true
-            visible: analystState.hasSnapshot
-                && analystState.kpi("averageDailySpend").available
-
-            header: Kirigami.Heading {
-                text: i18n("Spend trend")
-                level: 3
-            }
-
-            contentItem: ColumnLayout {
-                spacing: Kirigami.Units.mediumSpacing
-
-                Kirigami.CardsLayout {
-                    id: kpiCards
-                    Layout.fillWidth: true
-                    maximumColumns: 3
-                    minimumColumnWidth: Kirigami.Units.gridUnit * 11
-                    maximumColumnWidth: Kirigami.Units.gridUnit * 18
-
-                    Kirigami.AbstractCard {
-                        contentItem: ColumnLayout {
-                            Controls.Label {
-                                Layout.fillWidth: true
-                                text: analystState.averageSpendLabel(
-                                    analystState.snapshot)
-                                color: Kirigami.Theme.disabledTextColor
-                                wrapMode: Text.WordWrap
-                            }
-                            Controls.Label {
-                                objectName: "averageSpendValue"
-                                text: analystState.formatMoney(
-                                    analystState.kpi("averageDailySpend").value,
-                                    analystState.snapshot.currency)
-                                font.pointSize: 20
-                                font.weight: Font.Bold
-                            }
-                        }
-                    }
-
-                    Kirigami.AbstractCard {
-                        contentItem: ColumnLayout {
-                            Controls.Label {
-                                text: i18n("Week over week")
-                                color: Kirigami.Theme.disabledTextColor
-                            }
-                            Controls.Label {
-                                text: analystState.kpi("weekOverWeekChange").available
-                                    ? analystState.formatPercent(analystState.kpi("weekOverWeekChange").value)
-                                    : i18n("Unavailable")
-                                font.pointSize: 20
-                                font.weight: Font.Bold
-                            }
-                            Controls.Label {
-                                Layout.fillWidth: true
-                                visible: !analystState.kpi("weekOverWeekChange").available
-                                text: analystState.reasonText(
-                                    analystState.kpi("weekOverWeekChange").reasonKey,
-                                    analystState.kpi("weekOverWeekChange").sampleCount,
-                                    analystState.kpi("weekOverWeekChange").minimumSamples)
-                                wrapMode: Text.WordWrap
-                                color: Kirigami.Theme.disabledTextColor
-                            }
-                        }
-                    }
-
-                    Kirigami.AbstractCard {
-                        contentItem: ColumnLayout {
-                            Controls.Label {
-                                text: i18n("Volatility")
-                                color: Kirigami.Theme.disabledTextColor
-                            }
-                            Controls.Label {
-                                text: analystState.kpi("volatility").available
-                                    ? analystState.formatPercent(analystState.kpi("volatility").value)
-                                    : i18n("Unavailable")
-                                font.pointSize: 20
-                                font.weight: Font.Bold
-                            }
-                            Controls.Label {
-                                Layout.fillWidth: true
-                                visible: !analystState.kpi("volatility").available
-                                text: analystState.reasonText(
-                                    analystState.kpi("volatility").reasonKey,
-                                    analystState.kpi("volatility").sampleCount,
-                                    analystState.kpi("volatility").minimumSamples)
-                                wrapMode: Text.WordWrap
-                                color: Kirigami.Theme.disabledTextColor
-                            }
-                        }
-                    }
-                }
-
-                MultiSeriesChart {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Kirigami.Units.gridUnit * 12
-                    metric: "cost"
-                    seriesData: analystState.spendChartSeries()
-                }
-            }
-        }
-
-        Kirigami.Card {
-            Layout.fillWidth: true
-            visible: analystState.hasSnapshot
-                && analystState.snapshot.activityAvailable === true
-
-            header: Kirigami.Heading {
-                text: i18n("Activity trend")
-                level: 3
-            }
-
-            contentItem: ColumnLayout {
-                spacing: Kirigami.Units.mediumSpacing
-
-                MultiSeriesChart {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Kirigami.Units.gridUnit * 11
-                    visible: analystState.seriesHasValues("tokens")
-                    metric: "tokens"
-                    seriesData: analystState.activityChartSeries("tokens")
-                }
-
-                MultiSeriesChart {
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Kirigami.Units.gridUnit * 11
-                    visible: analystState.seriesHasValues("requests")
-                    metric: "requests"
-                    seriesData: analystState.activityChartSeries("requests")
-                }
-
-                ColumnLayout {
-                    visible: analystState.seriesHasValues("toolUsage")
+                contentItem: ColumnLayout {
                     spacing: Kirigami.Units.smallSpacing
+                    Controls.Label {
+                        objectName: "insightsPeriod"
+                        Layout.fillWidth: true
+                        text: i18n("%1 – %2 · %3 of %4 days recorded",
+                            analystState.formatDate(analystState.snapshot.from),
+                            analystState.formatDate(new Date(new Date(analystState.snapshot.to).getTime() - 1)),
+                            analystState.coverage.observedDayCount || 0,
+                            analystState.coverage.requestedDayCount || 30)
+                        wrapMode: Text.WordWrap
+                        color: Kirigami.Theme.disabledTextColor
+                    }
+                    Controls.Label {
+                        objectName: "writtenSummary"
+                        Layout.fillWidth: true
+                        text: analystState.writtenSummary()
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+            Kirigami.InlineMessage {
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot
+                    && analystState.snapshot.mixedCurrencies === true
+                    && !analystState.kpi("averageDailySpend").available
+                type: analystState.snapshot.mixedCurrencies
+                    ? Kirigami.MessageType.Warning
+                    : Kirigami.MessageType.Information
+                text: analystState.reasonText(
+                    analystState.kpi("averageDailySpend").reasonKey,
+                    analystState.kpi("averageDailySpend").sampleCount,
+                    analystState.kpi("averageDailySpend").minimumSamples)
+            }
 
-                    Kirigami.Heading {
-                        text: i18n("Local tool activity")
-                        level: 4
+            Kirigami.Card {
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot
+                    && analystState.kpi("averageDailySpend").available
+
+                header: Kirigami.Heading {
+                    text: i18n("Spend trend")
+                    level: 3
+                }
+
+                contentItem: ColumnLayout {
+                    spacing: Kirigami.Units.mediumSpacing
+
+                    Kirigami.CardsLayout {
+                        id: kpiCards
+                        Layout.fillWidth: true
+                        maximumColumns: analystPage.width >= Kirigami.Units.gridUnit * 40 ? 2 : 1
+                        minimumColumnWidth: Kirigami.Units.gridUnit * 11
+                        maximumColumnWidth: Kirigami.Units.gridUnit * 18
+
+                        Kirigami.AbstractCard {
+                            contentItem: ColumnLayout {
+                                Controls.Label {
+                                    Layout.fillWidth: true
+                                    text: analystState.averageSpendLabel(
+                                        analystState.snapshot)
+                                    color: Kirigami.Theme.disabledTextColor
+                                    wrapMode: Text.WordWrap
+                                }
+                                Controls.Label {
+                                    objectName: "averageSpendValue"
+                                    text: analystState.formatMoney(
+                                        analystState.kpi("averageDailySpend").value,
+                                        analystState.snapshot.currency)
+                                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.5
+                                    font.weight: Font.Bold
+                                }
+                            }
+                        }
+
+                        Kirigami.AbstractCard {
+                            visible: analystState.kpi("weekOverWeekChange").available
+                            contentItem: ColumnLayout {
+                                Controls.Label {
+                                    text: i18n("Week over week")
+                                    color: Kirigami.Theme.disabledTextColor
+                                }
+                                Controls.Label {
+                                    text: analystState.formatPercent(analystState.kpi("weekOverWeekChange").value)
+                                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.5
+                                    font.weight: Font.Bold
+                                }
+                            }
+                        }
+
+                        Kirigami.AbstractCard {
+                            visible: analystState.kpi("volatility").available
+                            contentItem: ColumnLayout {
+                                Controls.Label {
+                                    text: i18n("Volatility")
+                                    color: Kirigami.Theme.disabledTextColor
+                                }
+                                Controls.Label {
+                                    text: analystState.formatPercent(analystState.kpi("volatility").value)
+                                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.5
+                                    font.weight: Font.Bold
+                                }
+                            }
+                        }
+                    }
+
+                    MultiSeriesChart {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Kirigami.Units.gridUnit * 12
+                        metric: "cost"
+                        seriesData: analystState.spendChartSeries()
+                    }
+                }
+            }
+
+            Kirigami.Card {
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot
+                    && analystState.snapshot.activityAvailable === true
+
+                header: Kirigami.Heading {
+                    text: i18n("Activity trend")
+                    level: 3
+                }
+
+                contentItem: ColumnLayout {
+                    spacing: Kirigami.Units.mediumSpacing
+
+                    MultiSeriesChart {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Kirigami.Units.gridUnit * 11
+                        visible: analystState.seriesHasValues("tokens")
+                        metric: "tokens"
+                        seriesData: analystState.activityChartSeries("tokens")
                     }
 
                     MultiSeriesChart {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Kirigami.Units.gridUnit * 11
+                        visible: analystState.seriesHasValues("requests")
                         metric: "requests"
-                        seriesData: analystState.activityChartSeries("toolUsage")
+                        seriesData: analystState.activityChartSeries("requests")
                     }
-                }
 
-                OutputInputRatioCard {
-                    Layout.fillWidth: true
-                    visible: analystState.kpi("outputInputRatio").available
-                    outputInputRatio: Number(
-                        analystState.kpi("outputInputRatio").value)
-                }
-
-                Controls.Label {
-                    visible: !analystState.kpi("outputInputRatio").available
-                    text: analystState.reasonText(
-                        analystState.kpi("outputInputRatio").reasonKey,
-                        analystState.kpi("outputInputRatio").sampleCount,
-                        analystState.kpi("outputInputRatio").minimumSamples)
-                    wrapMode: Text.WordWrap
-                    color: Kirigami.Theme.disabledTextColor
-                }
-            }
-        }
-
-        Kirigami.Card {
-            Layout.fillWidth: true
-            visible: analystState.hasSnapshot
-                && (analystState.snapshot.topDrivers || []).length > 0
-
-            header: Kirigami.Heading {
-                text: i18n("Top compatible spend drivers")
-                level: 3
-            }
-
-            contentItem: ColumnLayout {
-                spacing: Kirigami.Units.smallSpacing
-
-                Repeater {
-                    model: analystState.snapshot.topDrivers || []
-
-                    RowLayout {
-                        id: driverRow
-                        required property int index
-                        required property var modelData
-                        Layout.fillWidth: true
+                    ColumnLayout {
+                        visible: analystState.seriesHasValues("toolUsage")
                         spacing: Kirigami.Units.smallSpacing
 
-                        Controls.Label {
-                            text: (driverRow.index + 1) + "."
-                            color: Kirigami.Theme.disabledTextColor
+                        Kirigami.Heading {
+                            text: i18n("Local tool activity")
+                            level: 4
                         }
 
-                        ColumnLayout {
+                        MultiSeriesChart {
                             Layout.fillWidth: true
-                            spacing: 0
+                            Layout.preferredHeight: Kirigami.Units.gridUnit * 11
+                            metric: "requests"
+                            seriesData: analystState.activityChartSeries("toolUsage")
+                        }
+                    }
+
+                    OutputInputRatioCard {
+                        Layout.fillWidth: true
+                        visible: analystState.kpi("outputInputRatio").available
+                        outputInputRatio: Number(
+                            analystState.kpi("outputInputRatio").value)
+                    }
+
+                }
+            }
+
+            Kirigami.Heading {
+                Layout.fillWidth: true
+                visible: Plasmoid.configuration.forecastUiEnabled
+                    && analystPage.runwayRows.some(function(row) { return row.state !== "unavailable"; })
+                text: i18n("Pacing and runway")
+                level: 3
+            }
+
+            Controls.BusyIndicator {
+                Layout.alignment: Qt.AlignHCenter
+                visible: Plasmoid.configuration.forecastUiEnabled
+                    && analystPage.monitor
+                    && analystPage.monitor.guardrails
+                    && analystPage.monitor.guardrails.busy
+                    && analystPage.runwayRows.length === 0
+                running: visible
+            }
+
+            Repeater {
+                model: analystPage.runwayRows.filter(function(row) {
+                    return row.state !== "unavailable";
+                })
+
+                RunwayCard {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    forecast: modelData
+                }
+            }
+
+            Controls.ToolButton {
+                objectName: "insightsDriversToggle"
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot && (analystState.snapshot.topDrivers || []).length > 0
+                text: i18n("Spend by source and model")
+                icon.name: checked ? "arrow-down" : "arrow-right"
+                display: Controls.AbstractButton.TextBesideIcon
+                checkable: true
+                checked: analystPage.driversExpanded
+                onClicked: analystPage.driversExpanded = !analystPage.driversExpanded
+            }
+
+            Kirigami.Card {
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot && analystPage.driversExpanded
+                    && (analystState.snapshot.topDrivers || []).length > 0
+
+                header: Kirigami.Heading {
+                    text: i18n("Top compatible spend drivers")
+                    level: 3
+                }
+
+                contentItem: ColumnLayout {
+                    spacing: Kirigami.Units.smallSpacing
+
+                    Repeater {
+                        model: analystState.snapshot.topDrivers || []
+
+                        RowLayout {
+                            id: driverRow
+                            required property int index
+                            required property var modelData
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
 
                             Controls.Label {
-                                Layout.fillWidth: true
-                                text: driverRow.modelData.provider + "  ["
-                                      + driverRow.modelData.model + "]"
-                                elide: Text.ElideRight
-                            }
-                            Controls.Label {
-                                text: driverRow.modelData.quality === "estimated"
-                                    ? i18n("Estimated")
-                                    : i18n("Actual")
+                                text: (driverRow.index + 1) + "."
                                 color: Kirigami.Theme.disabledTextColor
                             }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 0
+
+                                Controls.Label {
+                                    Layout.fillWidth: true
+                                    text: driverRow.modelData.provider + "  ["
+                                          + driverRow.modelData.model + "]"
+                                    elide: Text.ElideRight
+                                }
+                                Controls.Label {
+                                    text: driverRow.modelData.quality === "estimated"
+                                        ? i18n("Estimated")
+                                        : i18n("Actual")
+                                    color: Kirigami.Theme.disabledTextColor
+                                }
+                            }
+
+                            Controls.Label {
+                                text: analystState.formatMoney(
+                                    driverRow.modelData.value,
+                                    driverRow.modelData.currency)
+                                font.weight: Font.DemiBold
+                            }
                         }
+                    }
+                }
+            }
+
+            Kirigami.Card {
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot
+                    && analystState.snapshot.anomaliesAvailable === true
+                    && (analystState.snapshot.anomalies || []).length > 0
+
+                header: Kirigami.Heading {
+                    text: i18n("Anomaly candidates")
+                    level: 3
+                }
+
+                contentItem: ColumnLayout {
+                    spacing: Kirigami.Units.smallSpacing
+
+
+                    Repeater {
+                        model: analystState.snapshot.anomalies || []
 
                         Controls.Label {
-                            text: analystState.formatMoney(
-                                driverRow.modelData.value,
-                                driverRow.modelData.currency)
-                            font.weight: Font.DemiBold
+                            required property var modelData
+                            Layout.fillWidth: true
+                            text: i18n("%1: %2, compared with a %3 period baseline",
+                                       modelData.date,
+                                       analystState.formatMoney(modelData.value,
+                                                   modelData.currency),
+                                       analystState.formatMoney(modelData.baseline,
+                                                   modelData.currency))
+                            wrapMode: Text.WordWrap
                         }
                     }
+
                 }
             }
-        }
 
-        Kirigami.Card {
-            Layout.fillWidth: true
-            visible: analystState.hasSnapshot
-                && analystState.snapshot.anomaliesAvailable === true
-
-            header: Kirigami.Heading {
-                text: i18n("Anomaly candidates")
-                level: 3
+            Controls.ToolButton {
+                objectName: "insightsCoverageToggle"
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot
+                text: i18n("Data coverage and method")
+                icon.name: checked ? "arrow-down" : "arrow-right"
+                display: Controls.AbstractButton.TextBesideIcon
+                checkable: true
+                checked: analystPage.coverageExpanded
+                onClicked: analystPage.coverageExpanded = !analystPage.coverageExpanded
             }
 
-            contentItem: ColumnLayout {
-                spacing: Kirigami.Units.smallSpacing
+            Kirigami.Card {
+                Layout.fillWidth: true
+                visible: analystState.hasSnapshot && analystPage.coverageExpanded
 
-                Controls.Label {
-                    visible: (analystState.snapshot.anomalies || []).length === 0
-                    text: i18n("No day crossed the documented threshold.")
-                    color: Kirigami.Theme.disabledTextColor
+                header: Kirigami.Heading {
+                    text: i18n("Data coverage")
+                    level: 3
                 }
 
-                Repeater {
-                    model: analystState.snapshot.anomalies || []
+                contentItem: ColumnLayout {
+                    spacing: Kirigami.Units.smallSpacing
 
                     Controls.Label {
-                        required property var modelData
                         Layout.fillWidth: true
-                        text: i18n("%1: %2, compared with a %3 period baseline",
-                                   modelData.date,
-                                   analystState.formatMoney(modelData.value,
-                                               modelData.currency),
-                                   analystState.formatMoney(modelData.baseline,
-                                               modelData.currency))
+                        wrapMode: Text.WordWrap
+                        text: i18n("Period: %1 – %2",
+                                   analystState.formatDate(analystState.snapshot.from),
+                                   analystState.formatDate(new Date(
+                                       new Date(analystState.snapshot.to).getTime()
+                                       - 1)))
+                        color: Kirigami.Theme.disabledTextColor
+                    }
+
+                    Controls.Label {
+                        objectName: "coverageLabel"
+                        Layout.fillWidth: true
+                        text: i18n("%1 of %2 days contain compatible observations (%3%)",
+                                   analystState.coverage.observedDayCount || 0,
+                                   analystState.coverage.requestedDayCount || 30,
+                                   Number(analystState.coverage.percent || 0).toFixed(0))
                         wrapMode: Text.WordWrap
                     }
-                }
 
-                Controls.Label {
-                    text: i18n("Candidates require at least seven recorded days, two standard deviations above the period mean, and a material absolute increase.")
-                    wrapMode: Text.WordWrap
-                    color: Kirigami.Theme.disabledTextColor
+                    Controls.Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        text: i18n("%1 actual and %2 estimated compatible cost samples",
+                                   analystState.snapshot.actualSampleCount || 0,
+                                   analystState.snapshot.estimatedSampleCount || 0)
+                        color: Kirigami.Theme.disabledTextColor
+                    }
+                    Controls.Label {
+                        Layout.fillWidth: true
+                        text: i18n("Volatility requires seven recorded days. Anomaly candidates require two standard deviations above the period mean and a material absolute increase. Output / input ratio describes activity and does not measure quality or productivity.")
+                        wrapMode: Text.WordWrap
+                        color: Kirigami.Theme.disabledTextColor
+                    }
+                    Repeater {
+                        model: ["weekOverWeekChange", "volatility", "outputInputRatio"]
+                        Controls.Label {
+                            required property string modelData
+                            Layout.fillWidth: true
+                            visible: !analystState.kpi(modelData).available
+                            text: analystState.reasonText(analystState.kpi(modelData).reasonKey,
+                                analystState.kpi(modelData).sampleCount,
+                                analystState.kpi(modelData).minimumSamples)
+                            wrapMode: Text.WordWrap
+                            color: Kirigami.Theme.disabledTextColor
+                        }
+                    }
+
                 }
             }
+
         }
 
-        Kirigami.Card {
+        Components.LocalSessionPanel {
+            presentationMode: "analysis"
+            visible: analystPage.sessionsMode
             Layout.fillWidth: true
-            visible: analystState.hasSnapshot
-
-            header: Kirigami.Heading {
-                text: i18n("Period summary")
-                level: 3
-            }
-
-            contentItem: Controls.Label {
-                objectName: "writtenSummary"
-                text: analystState.writtenSummary()
-                wrapMode: Text.WordWrap
-            }
+            Layout.fillHeight: true
+            sessionModel: analystPage.monitor ? analystPage.monitor.localSessions : null
+            sessionState: analystPage.sessionState
         }
-    }
 
-    Components.LocalSessionPanel {
-        visible: analystPage.sessionsMode
-        Layout.fillWidth: true
-        Layout.fillHeight: true
-        sessionModel: analystPage.monitor ? analystPage.monitor.localSessions : null
-        sessionState: analystPage.sessionState
     }
 
     onSessionStateChanged: {

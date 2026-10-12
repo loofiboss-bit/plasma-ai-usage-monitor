@@ -21,6 +21,9 @@ QQC2.ItemDelegate {
     Accessible.name: row.displayName + ". " + attentionText() + stateText()
         + ". " + metricText() + ". " + sessionActivityText
         + ". " + i18n("Open source details")
+    Accessible.description: exactMetricText()
+    QQC2.ToolTip.visible: hovered || activeFocus
+    QQC2.ToolTip.text: exactMetricText()
     onClicked: sourceRequested(row.stableId)
 
     background: Rectangle {
@@ -42,55 +45,65 @@ QQC2.ItemDelegate {
             Layout.preferredHeight: width
         }
 
-        ColumnLayout {
+        GridLayout {
             Layout.fillWidth: true
-            spacing: 0
+            columns: card.width >= Kirigami.Units.gridUnit * 40 ? 2 : 1
+            columnSpacing: Kirigami.Units.largeSpacing
 
-            PlasmaComponents.Label {
+            ColumnLayout {
                 Layout.fillWidth: true
-                text: card.row.displayName || card.row.stableId
-                font.bold: true
-                elide: Text.ElideRight
-            }
-            PlasmaComponents.Label {
-                Layout.fillWidth: true
-                text: card.attentionText() + card.stateText()
-                color: card.row.attentionSeverity === "critical"
-                    ? Kirigami.Theme.negativeTextColor
-                    : card.row.attentionSeverity === "warning"
-                      ? Kirigami.Theme.neutralTextColor
-                      : Kirigami.Theme.disabledTextColor
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                elide: Text.ElideRight
-            }
-            PlasmaComponents.Label {
-                Layout.fillWidth: true
-                visible: card.sessionActivityText !== ""
-                text: card.sessionActivityText
-                color: Kirigami.Theme.disabledTextColor
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                elide: Text.ElideRight
-            }
-        }
+                spacing: 0
 
-        ColumnLayout {
-            visible: card.row.primaryMetricAvailable === true
-            spacing: 0
-            PlasmaComponents.Label {
-                objectName: "sourceMetricValue"
-                text: card.metricText()
-                font.bold: true
-                horizontalAlignment: Text.AlignRight
-                Layout.alignment: Qt.AlignRight
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: card.row.displayName || card.row.stableId
+                    font.bold: true
+                    elide: Text.ElideRight
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    text: card.attentionText() + card.stateText()
+                    color: card.row.attentionSeverity === "critical"
+                        ? Kirigami.Theme.negativeTextColor
+                        : card.row.attentionSeverity === "warning"
+                          ? Kirigami.Theme.neutralTextColor
+                          : Kirigami.Theme.disabledTextColor
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    wrapMode: Text.WordWrap
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    visible: card.sessionActivityText !== ""
+                    text: card.sessionActivityText
+                    color: Kirigami.Theme.disabledTextColor
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    elide: Text.ElideRight
+                }
             }
-            PlasmaComponents.Label {
-                text: card.metricStatusText()
-                color: card.row.freshnessState === "stale"
-                    ? Kirigami.Theme.neutralTextColor
-                    : Kirigami.Theme.disabledTextColor
-                font.pointSize: Kirigami.Theme.smallFont.pointSize
-                Layout.alignment: Qt.AlignRight
+
+            ColumnLayout {
+                Layout.fillWidth: true
+                visible: card.row.primaryMetricAvailable === true
+                spacing: 0
+                PlasmaComponents.Label {
+                    objectName: "sourceMetricValue"
+                    text: card.metricText()
+                    font.bold: true
+                    horizontalAlignment: Text.AlignRight
+                    Layout.alignment: Qt.AlignRight
+                }
+                PlasmaComponents.Label {
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                    text: card.metricStatusText()
+                    color: card.row.freshnessState === "stale"
+                        ? Kirigami.Theme.neutralTextColor
+                        : Kirigami.Theme.disabledTextColor
+                    font.pointSize: Kirigami.Theme.smallFont.pointSize
+                    Layout.alignment: Qt.AlignRight
+                }
             }
+
         }
 
         Kirigami.Icon {
@@ -147,7 +160,10 @@ QQC2.ItemDelegate {
     }
 
     function metricText() {
-        if (row.primaryMetricAvailable !== true) return "\u2014";
+        if (row.primaryMetricAvailable !== true
+                || row.primaryMetricValue === undefined
+                || row.primaryMetricValue === null
+                || row.primaryMetricValue === "") return "\u2014";
         var value = Number(row.primaryMetricValue);
         if (!Number.isFinite(value)) return "\u2014";
         if (row.primaryMetricUnit === "percent_remaining")
@@ -162,14 +178,32 @@ QQC2.ItemDelegate {
                 : value.toLocaleString(Qt.locale(), "f", 2);
         }
         if (row.primaryMetricUnit === "token")
-            return i18np("%1 token", "%1 tokens", Math.round(value));
+            return i18n("%1 tokens", Utils.formatNumber(value));
         if (row.primaryMetricUnit === "request")
-            return i18np("%1 request", "%1 requests", Math.round(value));
+            return i18n("%1 requests", value.toLocaleString(Qt.locale(), "f", 0));
         if (row.primaryMetricUnit === "credits")
             return i18np("%1 credit", "%1 credits", Math.round(value));
         if (row.primaryMetricUnit === "count")
-            return i18np("%1 event", "%1 events", Math.round(value));
+            return i18n("%1 events", value.toLocaleString(Qt.locale(), "f", 0));
         return value.toLocaleString(Qt.locale());
+    }
+
+    function exactMetricText() {
+        if (row.primaryMetricAvailable !== true
+                || row.primaryMetricValue === null
+                || row.primaryMetricValue === undefined
+                || row.primaryMetricValue === "")
+            return i18n("Unavailable");
+        var value = Number(row.primaryMetricValue);
+        if (!Number.isFinite(value)) return i18n("Unavailable");
+        var formatted = row.primaryMetricUnit === "token"
+            || row.primaryMetricUnit === "request"
+            || row.primaryMetricUnit === "count"
+            ? value.toLocaleString(Qt.locale(), "f", 0)
+            : value.toLocaleString(Qt.locale(), "f", 2);
+        return i18n("%1 %2 · %3", formatted,
+                    row.primaryMetricCurrency || row.primaryMetricUnit || "",
+                    metricStatusText());
     }
 
     function metricStatusText() {

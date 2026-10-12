@@ -96,7 +96,7 @@ QQC2.ScrollView {
         var count = Math.max(0, Number(summary.sessionCount || 0));
         var lastActivity = Date.parse(summary.lastActivityAtUtc || "");
         var activityText = Number.isFinite(lastActivity)
-            ? new Date(lastActivity).toLocaleString(Qt.locale())
+            ? new Date(lastActivity).toLocaleString(Qt.locale(), Locale.ShortFormat)
             : i18n("not observed");
         var partial = String(summary.coverage || "").indexOf("partial") === 0
             || summary.importStatus === "error";
@@ -192,10 +192,11 @@ QQC2.ScrollView {
             color: Kirigami.Theme.disabledTextColor
         }
 
-        RowLayout {
+        GridLayout {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
+            columns: overview.width >= Kirigami.Units.gridUnit * 30 ? 2 : 1
             visible: overviewState.sourceRows.length > 0
 
             Kirigami.SearchField {
@@ -207,7 +208,8 @@ QQC2.ScrollView {
             }
 
             QQC2.ComboBox {
-                Layout.minimumWidth: Kirigami.Units.gridUnit * 8
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 model: [i18n("All"), i18n("Needs attention")]
                 currentIndex: overview.sourceFilterIndex
                 Accessible.name: i18n("Filter sources")

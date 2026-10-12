@@ -47,10 +47,10 @@ def main() -> None:
         'property: "popupExpanded"',
         "value: root.expanded",
     )
-    tab_start = representation.index("Kirigami.NavigationTabBar")
-    tab_end = representation.index("QQC2.ToolBar", tab_start)
+    tab_start = representation.index('objectName: "monitorNavigation"')
+    tab_end = representation.index('objectName: "monitorDestination-"', tab_start)
     tab_block = representation[tab_start:tab_end]
-    labels = re.findall(r'text:\s*i18n\("([^"]+)"\)', tab_block)
+    labels = re.findall(r'label:\s*i18n\("([^"]+)"\)', tab_block)
     if labels != ["Overview", "History", "Insights"]:
         fail(f"popup tabs must be exactly Overview, History, Insights; got {labels}")
     if representation.count("Loader {") != 2:

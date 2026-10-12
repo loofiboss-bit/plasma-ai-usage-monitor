@@ -3,20 +3,30 @@
  */
 
 /**
- * Format a large number with K/M suffix.
+ * Format a large number with localized K/M/B suffixes.
  * @param {number} n - The number to format
  * @returns {string} Formatted string (e.g., "1.2M", "5.3K", "42")
  */
 function formatNumber(n, locale) {
+    if (n === undefined || n === null || n === "") return "";
     var value = Number(n);
     if (!Number.isFinite(value)) return "";
     var activeLocale = locale || Qt.locale();
     var magnitude = Math.abs(value);
+    if (magnitude >= 1000000000)
+        return (value / 1000000000).toLocaleString(activeLocale, "f", 1) + "\u202fB";
     if (magnitude >= 1000000)
         return (value / 1000000).toLocaleString(activeLocale, "f", 1) + "\u202fM";
     if (magnitude >= 1000)
         return (value / 1000).toLocaleString(activeLocale, "f", 1) + "\u202fK";
     return Math.round(value).toLocaleString(activeLocale, "f", 0);
+}
+
+/** Format discrete counts and exact token values without decimal places. */
+function formatCount(value, locale) {
+    if (value === undefined || value === null || value === ""
+            || !Number.isFinite(Number(value))) return "";
+    return Math.round(Number(value)).toLocaleString(locale || Qt.locale(), "f", 0);
 }
 
 function formatMoney(value, currency, locale) {

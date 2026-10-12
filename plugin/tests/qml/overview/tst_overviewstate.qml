@@ -12,6 +12,31 @@ TestCase {
         Monitor.CostSummaryCard { width: 800; summary: ({}) }
     }
 
+    Component {
+        id: dailySourceCardComponent
+        Monitor.DailySourceCard { width: 420; row: ({}) }
+    }
+
+    function test_sourceHeadlineKeepsMissingSeparateFromZeroAndCountsIntegral() {
+        var card = createTemporaryObject(dailySourceCardComponent, testCase, {
+            row: {displayName: "Codex", stableId: "codex-cli", sourceKind: "local_tool",
+                  primaryMetricAvailable: true, primaryMetricValue: null, primaryMetricUnit: "token"}
+        });
+        verify(card !== null);
+        compare(card.metricText(), "\u2014");
+        compare(card.exactMetricText(), "Unavailable");
+        card.row = Object.assign({}, card.row, {primaryMetricValue: ""});
+        compare(card.metricText(), "\u2014");
+        compare(card.exactMetricText(), "Unavailable");
+        card.row = Object.assign({}, card.row, {primaryMetricValue: 0});
+        compare(card.metricText(), "0 tokens");
+        card.row = Object.assign({}, card.row, {primaryMetricValue: 45, primaryMetricUnit: "count"});
+        compare(card.metricText(), "45 events");
+        card.row = Object.assign({}, card.row, {primaryMetricValue: 1200000000, primaryMetricUnit: "token"});
+        verify(card.metricText().indexOf("B") > 0);
+        verify(card.exactMetricText().indexOf((1200000000).toLocaleString(Qt.locale(), "f", 0)) >= 0);
+    }
+
     QtObject {
         id: fakeAntigravity
         property bool installed: true

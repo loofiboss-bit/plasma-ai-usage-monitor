@@ -50,9 +50,11 @@ Rectangle {
         anchors.margins: Kirigami.Units.largeSpacing
         spacing: Kirigami.Units.mediumSpacing
 
-        RowLayout {
+        GridLayout {
             Layout.fillWidth: true
-            spacing: Kirigami.Units.mediumSpacing
+            columns: focus.width >= Kirigami.Units.gridUnit * 40 ? 2 : 1
+            columnSpacing: Kirigami.Units.mediumSpacing
+            rowSpacing: Kirigami.Units.mediumSpacing
 
             ColumnLayout {
                 Layout.fillWidth: true
@@ -62,7 +64,6 @@ Rectangle {
                     text: i18n("Daily focus")
                     color: Kirigami.Theme.disabledTextColor
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    font.capitalization: Font.AllUppercase
                 }
                 PlasmaExtras.Heading {
                     objectName: "dailyFocusHeadline"
@@ -102,7 +103,7 @@ Rectangle {
 
         GridLayout {
             Layout.fillWidth: true
-            columns: focus.width < Kirigami.Units.gridUnit * 22 ? 1 : 3
+            columns: focus.width < Kirigami.Units.gridUnit * 40 ? 1 : 2
             columnSpacing: Kirigami.Units.largeSpacing
             rowSpacing: Kirigami.Units.smallSpacing
             visible: focus.facts.length > 0
