@@ -207,41 +207,11 @@ Kirigami.ScrollablePage {
         anchors.horizontalCenter: parent.horizontalCenter
         spacing: Kirigami.Units.largeSpacing
 
-        RowLayout {
-            Layout.fillWidth: true
-            Controls.ToolButton {
-                objectName: "insightsUsageMode"
-                text: i18n("Usage")
-                icon.name: "office-chart-line"
-                display: Controls.AbstractButton.TextBesideIcon
-                checkable: true
-                autoExclusive: true
-                checked: !analystPage.sessionsMode
-                onClicked: analystPage.sessionsMode = false
-            }
-            Controls.ToolButton {
-                objectName: "insightsSessionsMode"
-                text: i18n("Sessions")
-                icon.name: "view-history"
-                display: Controls.AbstractButton.TextBesideIcon
-                checkable: true
-                autoExclusive: true
-                checked: analystPage.sessionsMode
-                onClicked: analystPage.sessionsMode = true
-            }
-            Item { Layout.fillWidth: true }
+        Controls.BusyIndicator {
+            Layout.alignment: Qt.AlignHCenter
+            visible: analystState.loading
+            running: visible
         }
-
-        ColumnLayout {
-            Layout.fillWidth: true
-            visible: !analystPage.sessionsMode
-            spacing: Kirigami.Units.largeSpacing
-
-            Controls.BusyIndicator {
-                Layout.alignment: Qt.AlignHCenter
-                visible: analystState.loading
-                running: visible
-            }
 
             Kirigami.InlineMessage {
                 Layout.fillWidth: true
@@ -308,61 +278,37 @@ Kirigami.ScrollablePage {
                 contentItem: ColumnLayout {
                     spacing: Kirigami.Units.mediumSpacing
 
-                    Kirigami.CardsLayout {
+                    GridLayout {
                         id: kpiCards
                         Layout.fillWidth: true
-                        maximumColumns: analystPage.width >= Kirigami.Units.gridUnit * 40 ? 2 : 1
-                        minimumColumnWidth: Kirigami.Units.gridUnit * 11
-                        maximumColumnWidth: Kirigami.Units.gridUnit * 18
+                        columns: analystPage.width >= Kirigami.Units.gridUnit * 32 ? 3 : 1
+                        rowSpacing: Kirigami.Units.smallSpacing
+                        columnSpacing: Kirigami.Units.smallSpacing
 
-                        Kirigami.AbstractCard {
-                            contentItem: ColumnLayout {
-                                Controls.Label {
-                                    Layout.fillWidth: true
-                                    text: analystState.averageSpendLabel(
-                                        analystState.snapshot)
-                                    color: Kirigami.Theme.disabledTextColor
-                                    wrapMode: Text.WordWrap
-                                }
-                                Controls.Label {
-                                    objectName: "averageSpendValue"
-                                    text: analystState.formatMoney(
-                                        analystState.kpi("averageDailySpend").value,
-                                        analystState.snapshot.currency)
-                                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.5
-                                    font.weight: Font.Bold
-                                }
-                            }
+                        Components.MetricTile {
+                            objectName: "averageSpendValue"
+                            Layout.fillWidth: true
+                            title: analystState.averageSpendLabel(analystState.snapshot)
+                            formattedValue: analystState.formatMoney(
+                                analystState.kpi("averageDailySpend").value,
+                                analystState.snapshot.currency)
+                            prominent: true
                         }
 
-                        Kirigami.AbstractCard {
+                        Components.MetricTile {
+                            Layout.fillWidth: true
                             visible: analystState.kpi("weekOverWeekChange").available
-                            contentItem: ColumnLayout {
-                                Controls.Label {
-                                    text: i18n("Week over week")
-                                    color: Kirigami.Theme.disabledTextColor
-                                }
-                                Controls.Label {
-                                    text: analystState.formatPercent(analystState.kpi("weekOverWeekChange").value)
-                                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.5
-                                    font.weight: Font.Bold
-                                }
-                            }
+                            title: i18n("Week over week")
+                            formattedValue: analystState.formatPercent(analystState.kpi("weekOverWeekChange").value)
+                            prominent: true
                         }
 
-                        Kirigami.AbstractCard {
+                        Components.MetricTile {
+                            Layout.fillWidth: true
                             visible: analystState.kpi("volatility").available
-                            contentItem: ColumnLayout {
-                                Controls.Label {
-                                    text: i18n("Volatility")
-                                    color: Kirigami.Theme.disabledTextColor
-                                }
-                                Controls.Label {
-                                    text: analystState.formatPercent(analystState.kpi("volatility").value)
-                                    font.pointSize: Kirigami.Theme.defaultFont.pointSize * 1.5
-                                    font.weight: Font.Bold
-                                }
-                            }
+                            title: i18n("Volatility")
+                            formattedValue: analystState.formatPercent(analystState.kpi("volatility").value)
+                            prominent: true
                         }
                     }
 
@@ -641,17 +587,6 @@ Kirigami.ScrollablePage {
             }
 
         }
-
-        Components.LocalSessionPanel {
-            presentationMode: "analysis"
-            visible: analystPage.sessionsMode
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            sessionModel: analystPage.monitor ? analystPage.monitor.localSessions : null
-            sessionState: analystPage.sessionState
-        }
-
-    }
 
     onSessionStateChanged: {
         if (sessionState) sessionsMode = !!sessionState.analystMode;

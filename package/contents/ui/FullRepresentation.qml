@@ -13,7 +13,8 @@ Item {
 
     required property var monitor
     property int destination: AppInfo.smokeView === "history"
-                              || AppInfo.smokeView.indexOf("media-history") === 0 ? 1
+                              || AppInfo.smokeView.indexOf("media-history") === 0
+                              || AppInfo.smokeView === "media-analyst-sessions" ? 1
                             : AppInfo.smokeView === "analyst"
                               || AppInfo.smokeView.indexOf("media-analyst") === 0 ? 2 : 0
     property bool sourceDetailVisible: AppInfo.smokeView === "source-detail"
@@ -27,15 +28,15 @@ Item {
     property string historyMetric: ""
     property int historyRangeDays: 7
     property bool historySessionsMode: AppInfo.demoMode
-        && AppInfo.smokeView === "media-history-sessions"
+        && (AppInfo.smokeView === "media-history-sessions"
+            || AppInfo.smokeView === "media-analyst-sessions")
     property string historySessionToolId: "codex-cli"
     property string historySessionProjectId: ""
     property var localSessionViewState: ({
         sourceDetail: ({ toolId: "codex-cli", rangeIndex: 1 }),
         history: ({ toolId: "codex-cli", rangeIndex: 1 }),
         analyst: ({
-            analystMode: AppInfo.demoMode
-                && AppInfo.smokeView === "media-analyst-sessions",
+            analystMode: false,
             toolId: "codex-cli", rangeIndex: 1
         })
     })
