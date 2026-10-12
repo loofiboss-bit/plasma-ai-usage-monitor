@@ -7,6 +7,7 @@ import QtQuick.Dialogs as Dialogs
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.kirigami as Kirigami
 import com.github.loofi.aiusagemonitor 1.0
+import "../Utils.js" as Utils
 
 ColumnLayout {
     id: panel
@@ -22,12 +23,53 @@ ColumnLayout {
         }
     }
 
+    component MetricLabel: ColumnLayout {
+        id: metricLabel
+        required property string title
+        required property var value
+        property bool count: false
+        property bool prominent: false
+        Layout.fillWidth: true
+        spacing: 0
+        QQC2.Label {
+            visible: metricLabel.prominent
+            Layout.fillWidth: true
+            text: metricLabel.title
+            color: Kirigami.Theme.disabledTextColor
+            wrapMode: Text.WordWrap
+        }
+        QQC2.Label {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            activeFocusOnTab: true
+            text: metricLabel.prominent
+                ? (metricLabel.count ? panel.countText(metricLabel.value) : panel.tokenText(metricLabel.value))
+                : i18n("%1: %2", metricLabel.title,
+                       metricLabel.count ? panel.countText(metricLabel.value) : panel.tokenText(metricLabel.value))
+            font.bold: metricLabel.prominent
+            font.pointSize: Kirigami.Theme.defaultFont.pointSize * (metricLabel.prominent ? 1.4 : 1)
+            Accessible.name: i18n("%1: %2", metricLabel.title, panel.countText(metricLabel.value))
+            QQC2.ToolTip.visible: metricHover.hovered || activeFocus
+            QQC2.ToolTip.text: Accessible.name
+            HoverHandler { id: metricHover }
+        }
+    }
+
+    // Presentation only; shared filters and requests remain unchanged.
+    property string presentationMode: "summary"
+    property bool technicalDetailsExpanded: false
+    property int breakdownIndex: 0
+    property int historyDisplayIndex: 0
+    readonly property bool showDaily: presentationMode === "analysis"
+        ? breakdownIndex === 0 : presentationMode === "history" && historyDisplayIndex === 1
+
     required property var sessionModel
     property string fixedToolId: ""
     property string initialToolId: "codex-cli"
     property string initialProjectId: ""
     property int initialRangeDays: 7
     property var sessionState: null
+    property bool restoringState: false
     property string selectedToolId: "codex-cli"
     property string selectedProjectId: ""
     property int selectedRangeIndex: 1
@@ -78,7 +120,7 @@ ColumnLayout {
     }
 
     function persistState() {
-        if (!sessionState) return;
+        if (!sessionState || restoringState) return;
         sessionState.toolId = selectedToolId;
         sessionState.projectId = selectedProjectId;
         sessionState.rangeIndex = selectedRangeIndex;
@@ -88,6 +130,7 @@ ColumnLayout {
 
     function restoreState() {
         if (!sessionState) return;
+        restoringState = true;
         selectedToolId = String(sessionState.toolId || initialToolId || selectedToolId);
         selectedProjectId = String(sessionState.projectId || initialProjectId || "");
         selectedRangeIndex = Math.max(0, Math.min(2,
@@ -97,6 +140,7 @@ ColumnLayout {
                 : sessionState.rangeIndex)));
         pageOffset = Math.max(0, Number(sessionState.pageOffset || 0));
         selectedSessionId = String(sessionState.sessionId || "");
+        restoringState = false;
     }
 
     function toolOptions() {
@@ -138,14 +182,41 @@ ColumnLayout {
 
     function dateText(value) {
         var time = Date.parse(value || "");
+        return Number.isFinite(time) ? Utils.formatWhen(time, "relative")
+                                     : i18n("Unavailable");
+    }
+
+    function fullDateText(value) {
+        var time = Date.parse(value || "");
         return Number.isFinite(time) ? new Date(time).toLocaleString(Qt.locale())
                                      : i18n("Unavailable");
     }
 
+    function dayText(value) {
+        // Daily rows already contain a local calendar date, not a UTC timestamp.
+        var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+        if (!parts) return i18n("Date unavailable");
+        var year = Number(parts[1]);
+        var month = Number(parts[2]);
+        var day = Number(parts[3]);
+        var date = new Date(year, month - 1, day);
+        if (year < 100) date.setFullYear(year);
+        if (date.getFullYear() !== year || date.getMonth() !== month - 1
+                || date.getDate() !== day) return i18n("Date unavailable");
+        return date.toLocaleDateString(Qt.locale(), Locale.ShortFormat);
+    }
+
     function tokenText(value) {
-        if (value === undefined || value === null || !Number.isFinite(Number(value)))
-            return i18n("Unavailable");
-        return Math.round(Number(value)).toLocaleString(Qt.locale());
+        return Utils.formatNumber(value) || i18n("Unavailable");
+    }
+
+    function countText(value) {
+        return Utils.formatCount(value) || i18n("Unavailable");
+    }
+
+    function openSessionHistory() {
+        sessionHistoryRequested(activeToolId, selectedProjectId, rangeDays,
+                                selectedSessionId, pageOffset);
     }
 
     function coverageText(value) {
@@ -229,9 +300,12 @@ ColumnLayout {
     }
 
     function localPath(url) {
+        if (url && typeof url.toLocalFile === "function")
+            return url.toLocalFile();
+
         var value = String(url || "");
         if (value.indexOf("file:") === 0) {
-            value = value.replace(/^file:\/\/\/?/, "");
+            value = value.replace(/^file:\/\//, "");
             try { return decodeURIComponent(value); }
             catch (error) { return ""; }
         }
@@ -327,62 +401,9 @@ ColumnLayout {
 
     SessionSection {
         Layout.fillWidth: true
-        visible: panel.selectedToolEnabled() && panel.dailyRows.length > 0
-        contentItem: ColumnLayout {
-            Kirigami.Heading {
-                Layout.fillWidth: true
-                level: 5
-                text: i18n("Daily usage")
-            }
-            ListView {
-                id: dailyList
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(
-                    panel.dailyRows.length * Kirigami.Units.gridUnit * 3,
-                    Kirigami.Units.gridUnit * 7)
-                Layout.minimumHeight: Kirigami.Units.gridUnit * 3
-                clip: true
-                model: panel.dailyRows
-                spacing: Kirigami.Units.smallSpacing
-                Accessible.name: i18n("Daily session token usage")
-
-                delegate: ColumnLayout {
-                    id: dailyRow
-                    required property var modelData
-                    width: dailyList.width
-                    spacing: 0
-                    RowLayout {
-                        Layout.fillWidth: true
-                        PlasmaComponents.Label {
-                            Layout.fillWidth: true
-                            text: dailyRow.modelData.localDate || i18n("Date unavailable")
-                            font.bold: true
-                        }
-                        PlasmaComponents.Label {
-                            text: i18n("%1 sessions",
-                                panel.tokenText(dailyRow.modelData.sessionCount))
-                        }
-                    }
-                    PlasmaComponents.Label {
-                        Layout.fillWidth: true
-                        text: i18n("Input %1 · output %2 · cache read %3 · cache write %4",
-                            panel.tokenText(dailyRow.modelData.inputTokens),
-                            panel.tokenText(dailyRow.modelData.outputTokens),
-                            panel.tokenText(dailyRow.modelData.cacheReadTokens),
-                            panel.tokenText(dailyRow.modelData.cacheWriteTokens))
-                        color: Kirigami.Theme.disabledTextColor
-                        wrapMode: Text.WordWrap
-                    }
-                }
-            }
-        }
-    }
-
-    SessionSection {
-        Layout.fillWidth: true
-        visible: panel.selectedToolEnabled()
+        visible: panel.selectedToolEnabled() && panel.presentationMode !== "summary"
         contentItem: GridLayout {
-            columns: width < Kirigami.Units.gridUnit * 28 ? 2 : 4
+            columns: width < Kirigami.Units.gridUnit * 40 ? 1 : 2
 
             QQC2.ComboBox {
                 Layout.fillWidth: true
@@ -463,22 +484,123 @@ ColumnLayout {
     SessionSection {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled()
-        contentItem: GridLayout {
-            columns: width < Kirigami.Units.gridUnit * 28 ? 2 : 4
-            PlasmaComponents.Label { text: i18n("Sessions: %1", panel.tokenText(panel.summary.sessionCount)) }
-            PlasmaComponents.Label { text: i18n("Events: %1", panel.tokenText(panel.summary.eventCount)) }
-            PlasmaComponents.Label { text: i18n("Input: %1", panel.tokenText(panel.summary.inputTokens)) }
-            PlasmaComponents.Label { text: i18n("Output: %1", panel.tokenText(panel.summary.outputTokens)) }
-            PlasmaComponents.Label { text: i18n("Cache read: %1", panel.tokenText(panel.summary.cacheReadTokens)) }
-            PlasmaComponents.Label { text: i18n("Cache write: %1", panel.tokenText(panel.summary.cacheWriteTokens)) }
+        contentItem: ColumnLayout {
+            GridLayout {
+                Layout.fillWidth: true
+                columns: width < Kirigami.Units.gridUnit * 30 ? 1 : 3
+                MetricLabel { title: i18n("Sessions"); value: panel.summary.sessionCount; count: true; prominent: true }
+                MetricLabel { title: i18n("Input tokens"); value: panel.summary.inputTokens; prominent: true }
+                MetricLabel { title: i18n("Output tokens"); value: panel.summary.outputTokens; prominent: true }
+            }
             PlasmaComponents.Label {
                 Layout.fillWidth: true
-                Layout.columnSpan: parent.columns
-                visible: !!panel.summary.coverage
                 text: panel.coverageText(panel.summary.coverage)
+                wrapMode: Text.WordWrap
                 color: panel.summary.coverage === "complete"
                     ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.neutralTextColor
                 Accessible.name: text
+            }
+            QQC2.Button {
+                objectName: "sessionTechnicalDetailsButton"
+                text: i18n("Technical details")
+                checkable: true
+                checked: panel.technicalDetailsExpanded
+                onToggled: panel.technicalDetailsExpanded = checked
+                Accessible.description: checked ? i18n("Expanded") : i18n("Collapsed")
+            }
+            GridLayout {
+                objectName: "sessionTechnicalDetails"
+                Layout.fillWidth: true
+                visible: panel.technicalDetailsExpanded
+                columns: width < Kirigami.Units.gridUnit * 40 ? 1 : 2
+                MetricLabel { title: i18n("Sessions"); value: panel.summary.sessionCount; count: true }
+                MetricLabel { title: i18n("Events"); value: panel.summary.eventCount; count: true }
+                MetricLabel { title: i18n("Input tokens"); value: panel.summary.inputTokens; count: true }
+                MetricLabel { title: i18n("Output tokens"); value: panel.summary.outputTokens; count: true }
+                MetricLabel { title: i18n("Cache read tokens"); value: panel.summary.cacheReadTokens; count: true }
+                MetricLabel { title: i18n("Cache write tokens"); value: panel.summary.cacheWriteTokens; count: true }
+            }
+            PlasmaComponents.Button {
+                objectName: "viewSessionHistoryButton"
+                visible: panel.presentationMode === "summary"
+                text: i18n("View session history")
+                icon.name: "view-history"
+                onClicked: panel.openSessionHistory()
+            }
+        }
+    }
+
+    QQC2.ComboBox {
+        Layout.fillWidth: true
+        visible: panel.selectedToolEnabled() && panel.presentationMode !== "summary"
+        model: panel.presentationMode === "analysis"
+            ? [i18n("By day"), i18n("By model"), i18n("By project")]
+            : [i18n("Sessions"), i18n("Daily usage")]
+        currentIndex: panel.presentationMode === "analysis"
+            ? panel.breakdownIndex : panel.historyDisplayIndex
+        Accessible.name: i18n("Session breakdown")
+        onActivated: {
+            if (panel.presentationMode === "analysis") panel.breakdownIndex = currentIndex;
+            else panel.historyDisplayIndex = currentIndex;
+        }
+    }
+
+    SessionSection {
+        Layout.fillWidth: true
+        visible: panel.selectedToolEnabled() && panel.showDaily && panel.dailyRows.length > 0
+        contentItem: ColumnLayout {
+            Kirigami.Heading {
+                Layout.fillWidth: true
+                level: 5
+                text: i18n("Daily usage")
+            }
+            ListView {
+                id: dailyList
+                objectName: "sessionDailyList"
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(
+                    panel.dailyRows.length * Kirigami.Units.gridUnit * 3,
+                    Kirigami.Units.gridUnit * 7)
+                Layout.minimumHeight: Kirigami.Units.gridUnit * 3
+                clip: true
+                model: panel.dailyRows
+                spacing: Kirigami.Units.smallSpacing
+                Accessible.name: i18n("Daily session token usage")
+
+                delegate: ColumnLayout {
+                    id: dailyRow
+                    required property var modelData
+                    width: dailyList.width
+                    spacing: 0
+                    RowLayout {
+                        Layout.fillWidth: true
+                        PlasmaComponents.Label {
+                            Layout.fillWidth: true
+                            text: panel.dayText(dailyRow.modelData.localDate)
+                            font.bold: true
+                        }
+                        PlasmaComponents.Label {
+                            text: i18np("%1 session", "%1 sessions",
+                                Number(dailyRow.modelData.sessionCount || 0))
+                        }
+                    }
+                    PlasmaComponents.Label {
+                        id: dailyUsageValue
+                        activeFocusOnTab: true
+                        Accessible.name: i18n("Input tokens: %1 · Output tokens: %2",
+                            panel.countText(dailyRow.modelData.inputTokens),
+                            panel.countText(dailyRow.modelData.outputTokens))
+                        QQC2.ToolTip.visible: dailyUsageValueHover.hovered || activeFocus
+                        QQC2.ToolTip.text: Accessible.name
+                        HoverHandler { id: dailyUsageValueHover }
+                        Layout.fillWidth: true
+                        text: i18n("Input %1 · output %2",
+                            panel.tokenText(dailyRow.modelData.inputTokens),
+                            panel.tokenText(dailyRow.modelData.outputTokens))
+                        color: Kirigami.Theme.disabledTextColor
+                        wrapMode: Text.WordWrap
+                    }
+                }
             }
         }
     }
@@ -496,6 +618,7 @@ ColumnLayout {
     SessionSection {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled()
+            && panel.presentationMode === "analysis" && panel.breakdownIndex === 1
             && (panel.summary.modelBreakdown || []).length > 0
         contentItem: ColumnLayout {
             Kirigami.Heading {
@@ -508,14 +631,14 @@ ColumnLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(
                     (panel.summary.modelBreakdown || []).length
-                        * Kirigami.Units.gridUnit * 2,
-                    Kirigami.Units.gridUnit * 5)
+                        * Kirigami.Units.gridUnit * 3,
+                    Kirigami.Units.gridUnit * 7)
                 clip: true
                 model: panel.summary.modelBreakdown || []
                 spacing: Kirigami.Units.smallSpacing
                 Accessible.name: i18n("Token usage by model")
 
-                delegate: RowLayout {
+                delegate: ColumnLayout {
                     id: modelBreakdownRow
                     required property var modelData
                     width: modelBreakdownList.width
@@ -525,8 +648,18 @@ ColumnLayout {
                         elide: Text.ElideRight
                     }
                     PlasmaComponents.Label {
+                        id: modelUsageValue
+                        activeFocusOnTab: true
+                        Accessible.name: i18n("Input tokens: %1 · Output tokens: %2",
+                            panel.countText(modelBreakdownRow.modelData.inputTokens),
+                            panel.countText(modelBreakdownRow.modelData.outputTokens))
+                        QQC2.ToolTip.visible: modelUsageValueHover.hovered || activeFocus
+                        QQC2.ToolTip.text: Accessible.name
+                        HoverHandler { id: modelUsageValueHover }
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
                         text: i18n("%1 events · input %2 · output %3",
-                            panel.tokenText(modelBreakdownRow.modelData.eventCount),
+                            panel.countText(modelBreakdownRow.modelData.eventCount),
                             panel.tokenText(modelBreakdownRow.modelData.inputTokens),
                             panel.tokenText(modelBreakdownRow.modelData.outputTokens))
                         color: Kirigami.Theme.disabledTextColor
@@ -539,7 +672,7 @@ ColumnLayout {
     SessionSection {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled()
-            && !panel.selectedProjectId
+            && panel.presentationMode === "analysis" && panel.breakdownIndex === 2
             && (panel.summary.projectBreakdown || []).length > 0
         contentItem: ColumnLayout {
             Kirigami.Heading {
@@ -552,14 +685,14 @@ ColumnLayout {
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(
                     (panel.summary.projectBreakdown || []).length
-                        * Kirigami.Units.gridUnit * 2,
-                    Kirigami.Units.gridUnit * 5)
+                        * Kirigami.Units.gridUnit * 3,
+                    Kirigami.Units.gridUnit * 7)
                 clip: true
                 model: panel.summary.projectBreakdown || []
                 spacing: Kirigami.Units.smallSpacing
                 Accessible.name: i18n("Token usage by project")
 
-                delegate: RowLayout {
+                delegate: ColumnLayout {
                     id: projectBreakdownRow
                     required property var modelData
                     width: projectBreakdownList.width
@@ -570,8 +703,18 @@ ColumnLayout {
                         elide: Text.ElideRight
                     }
                     PlasmaComponents.Label {
+                        id: projectUsageValue
+                        activeFocusOnTab: true
+                        Accessible.name: i18n("Input tokens: %1 · Output tokens: %2",
+                            panel.countText(projectBreakdownRow.modelData.inputTokens),
+                            panel.countText(projectBreakdownRow.modelData.outputTokens))
+                        QQC2.ToolTip.visible: projectUsageValueHover.hovered || activeFocus
+                        QQC2.ToolTip.text: Accessible.name
+                        HoverHandler { id: projectUsageValueHover }
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
                         text: i18n("%1 sessions · input %2 · output %3",
-                            panel.tokenText(projectBreakdownRow.modelData.sessionCount),
+                            panel.countText(projectBreakdownRow.modelData.sessionCount),
                             panel.tokenText(projectBreakdownRow.modelData.inputTokens),
                             panel.tokenText(projectBreakdownRow.modelData.outputTokens))
                         color: Kirigami.Theme.disabledTextColor
@@ -589,11 +732,13 @@ ColumnLayout {
 
     ListView {
         id: sessionList
+        objectName: "sessionHistoryList"
         Layout.fillWidth: true
         Layout.fillHeight: true
         Layout.minimumHeight: Kirigami.Units.gridUnit * 10
         clip: true
-        visible: panel.selectedToolEnabled()
+        visible: panel.selectedToolEnabled() && panel.presentationMode === "history"
+            && panel.historyDisplayIndex === 0
         model: panel.sessionRows
         spacing: Kirigami.Units.largeSpacing
         Accessible.name: i18n("Coding sessions")
@@ -614,7 +759,7 @@ ColumnLayout {
                     ? Kirigami.Theme.highlightColor : Qt.alpha(Kirigami.Theme.textColor, 0.18)
             }
             Accessible.name: i18n("Session ending %1, %2 events",
-                panel.dateText(modelData.lastSeenAtUtc), panel.tokenText(modelData.eventCount))
+                panel.dateText(modelData.lastSeenAtUtc), panel.countText(modelData.eventCount))
             Accessible.description: panel.coverageText(modelData.coverage)
             onClicked: {
                 panel.selectedSessionId = panel.selectedSessionId === modelData.sessionId
@@ -624,29 +769,32 @@ ColumnLayout {
 
             contentItem: ColumnLayout {
                 spacing: Kirigami.Units.smallSpacing
-                RowLayout {
+                GridLayout {
                     Layout.fillWidth: true
+                    columns: width < Kirigami.Units.gridUnit * 40 ? 1 : 2
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
-                        text: i18n("%1 · %2 events",
+                        text: i18n("%1 · %2",
                             panel.dateText(sessionDelegate.modelData.lastSeenAtUtc),
-                            panel.tokenText(sessionDelegate.modelData.eventCount))
+                            i18np("%1 event", "%1 events",
+                                Number(sessionDelegate.modelData.eventCount || 0)))
                         font.bold: true
                         elide: Text.ElideRight
                     }
                     PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
                         text: panel.coverageText(sessionDelegate.modelData.coverage)
                         color: sessionDelegate.modelData.coverage === "complete"
+                            || sessionDelegate.modelData.coverage === "reported"
                             ? Kirigami.Theme.disabledTextColor : Kirigami.Theme.neutralTextColor
                     }
                 }
                 PlasmaComponents.Label {
                     Layout.fillWidth: true
-                    text: i18n("Input %1 · Output %2 · Cache read %3 · Cache write %4",
+                    text: i18n("Input %1 · Output %2",
                         panel.tokenText(sessionDelegate.modelData.inputTokens),
-                        panel.tokenText(sessionDelegate.modelData.outputTokens),
-                        panel.tokenText(sessionDelegate.modelData.cacheReadTokens),
-                        panel.tokenText(sessionDelegate.modelData.cacheWriteTokens))
+                        panel.tokenText(sessionDelegate.modelData.outputTokens))
                     wrapMode: Text.WordWrap
                     color: Kirigami.Theme.disabledTextColor
                 }
@@ -662,9 +810,17 @@ ColumnLayout {
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
                         text: i18n("Started: %1 · Last activity: %2",
-                            panel.dateText(sessionDelegate.modelData.startedAtUtc),
-                            panel.dateText(sessionDelegate.modelData.lastSeenAtUtc))
+                            panel.fullDateText(sessionDelegate.modelData.startedAtUtc),
+                            panel.fullDateText(sessionDelegate.modelData.lastSeenAtUtc))
                         wrapMode: Text.WordWrap
+                    }
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: width < Kirigami.Units.gridUnit * 40 ? 1 : 2
+                        MetricLabel { title: i18n("Input tokens"); value: sessionDelegate.modelData.inputTokens; count: true }
+                        MetricLabel { title: i18n("Output tokens"); value: sessionDelegate.modelData.outputTokens; count: true }
+                        MetricLabel { title: i18n("Cache read tokens"); value: sessionDelegate.modelData.cacheReadTokens; count: true }
+                        MetricLabel { title: i18n("Cache write tokens"); value: sessionDelegate.modelData.cacheWriteTokens; count: true }
                     }
                     PlasmaComponents.Label {
                         Layout.fillWidth: true
@@ -698,7 +854,8 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true
-        visible: panel.selectedToolEnabled()
+        visible: panel.selectedToolEnabled() && panel.presentationMode === "history"
+            && panel.historyDisplayIndex === 0
         PlasmaComponents.Button {
             text: i18n("Previous")
             enabled: panel.pageOffset > 0 && !panel.loading

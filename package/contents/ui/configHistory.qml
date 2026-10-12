@@ -234,8 +234,7 @@ KCM.SimpleKCM {
         historyPage.syncSessionConsent();
     }
 
-    Kirigami.FormLayout {
-        anchors.fill: parent
+    Components.SettingsFormLayout {
 
         // Master toggle
         QQC2.Switch {

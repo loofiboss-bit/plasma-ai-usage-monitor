@@ -189,11 +189,15 @@ Item {
                     // X labels
                     ctx.textAlign = "center";
                     var xTicks = 4;
+                    var lastLabel = "";
                     for (var t = 0; t <= xTicks; t++) {
                         var tr = t / xTicks;
                         var tx = chartRoot.marginLeft + tr * chartW;
                         var tm = bounds.minTime + tr * (bounds.maxTime - bounds.minTime);
-                        ctx.fillText(chartRoot.formatAxisTime(tm), tx, h - 5);
+                        var label = chartRoot.formatAxisTime(tm);
+                        if (label === "" || label === lastLabel) continue;
+                        lastLabel = label;
+                        ctx.fillText(label, tx, h - 5);
                     }
 
                     // Draw series
@@ -642,8 +646,8 @@ Item {
 
         var bounds = chartRoot.computeBounds(chartRoot.parseSeries());
         var span = bounds.valid ? bounds.maxTime - bounds.minTime : 0;
-        if (span <= 2 * 86400000) return Qt.formatDateTime(d, "MMM d hh:mm");
-        if (span <= 14 * 86400000) return Qt.formatDateTime(d, "ddd MMM d");
-        return Qt.formatDate(d, "MMM d");
+        if (span <= 2 * 86400000) return Qt.formatDateTime(d, "d MMM hh:mm");
+        if (span <= 14 * 86400000) return Qt.formatDateTime(d, "ddd d MMM");
+        return Qt.formatDate(d, "d MMM");
     }
 }

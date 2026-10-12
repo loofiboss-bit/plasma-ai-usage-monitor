@@ -1,10 +1,16 @@
 # Roadmap
 
-**Current release:** 24.0.1, Coding Sessions & Projects
+**Current release:** 24.1.0, Readable Usage Monitor
 
 **Last updated:** 2026-10-12
 
 ## Current release
+
+### 24.1.0 Readable Usage Monitor
+
+Clearer usage cards, responsive navigation, unified session exploration in History,
+and streamlined source details, Insights, panel labels, and advanced diagnostics.
+See the [qualification checklist](docs/release/v24.1.0-checklist.md).
 
 ### 24.0.1 Coding Sessions Layout Hotfix
 

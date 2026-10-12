@@ -29,8 +29,10 @@ original tool logs.
 Projects are represented with anonymous local identities, not filesystem
 paths. Optional aliases can be assigned in Settings and are stored only on
 this computer. Clearing session history also clears aliases. Filters use the
-same anonymous project identity across Overview, Source Detail, History and
-Insights.
+same anonymous project identity in Source Detail and History. Explore sessions,
+daily totals, and projects in **History → Sessions**, using **Sessions**,
+**By Day**, and **By Project**. Source Detail provides a compact summary and
+a direct link to History.
 
 ## Read the token values
 

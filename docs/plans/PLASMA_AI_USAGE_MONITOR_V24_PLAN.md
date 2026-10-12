@@ -1,7 +1,7 @@
 # V24 Coding Sessions & Projects
 
-- **Target release:** `24.0.1` (V24.0.0 was the initial session feature release)
-- **Status:** the V24 session feature is published; this authorized hotfix corrects Source Detail layout when local sessions are enabled.
+- **Target release:** `24.1.0` (V24.0.0 was the initial session feature release)
+- **Status:** the V24 session feature is published; the authorized 24.1.0 release improves readability and consolidates session exploration in History.
 
 ## Goal
 

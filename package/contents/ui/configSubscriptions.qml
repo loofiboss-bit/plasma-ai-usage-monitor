@@ -5,6 +5,7 @@ import QtQuick.Controls as QQC2
 import org.kde.kirigami as Kirigami
 import org.kde.kcmutils as KCM
 import com.github.loofi.aiusagemonitor 1.0
+import "components" as Components
 
 KCM.SimpleKCM {
     id: subscriptionsPage
@@ -253,8 +254,7 @@ KCM.SimpleKCM {
         subscriptionsPage.reloadBrowserProfiles();
     }
 
-    Kirigami.FormLayout {
-        anchors.fill: parent
+    Components.SettingsFormLayout {
 
         Kirigami.InlineMessage {
             visible: subscriptionsPage.secretStatusMessage.length > 0

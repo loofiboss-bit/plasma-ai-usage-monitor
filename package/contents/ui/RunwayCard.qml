@@ -10,6 +10,8 @@ Kirigami.Card {
 
     required property var forecast
     property bool showHistoryAction: false
+    property bool compact: false
+    property bool detailsExpanded: false
     readonly property bool budgetForecast: forecast.kind === "budget_overrun"
     signal historyRequested(string metric)
 
@@ -62,7 +64,8 @@ Kirigami.Card {
             columns: card.width < Kirigami.Units.gridUnit * 17 ? 1 : 3
             rowSpacing: Kirigami.Units.smallSpacing
             columnSpacing: Kirigami.Units.largeSpacing
-            visible: card.forecast.state !== "unavailable"
+            visible: (!card.compact || card.detailsExpanded)
+                && card.forecast.state !== "unavailable"
 
             Repeater {
                 model: [
@@ -115,7 +118,8 @@ Kirigami.Card {
             Layout.fillWidth: true
             text: i18n("Period ends %1", card.formatDate(
                            card.forecast.periodEnd))
-            visible: card.forecast.periodEnd !== undefined
+            visible: (!card.compact || card.detailsExpanded)
+                && card.forecast.periodEnd !== undefined
                 && card.forecast.periodEnd !== null
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
@@ -123,7 +127,7 @@ Kirigami.Card {
 
         QQC2.Label {
             Layout.fillWidth: true
-            visible: card.budgetForecast
+            visible: (!card.compact || card.detailsExpanded) && card.budgetForecast
                 && card.forecast.previousPeriodSpentMinor !== undefined
                 && card.forecast.previousPeriodSpentMinor !== null
             text: card.previousPeriodText()
@@ -133,6 +137,7 @@ Kirigami.Card {
 
         QQC2.Label {
             Layout.fillWidth: true
+            visible: !card.compact || card.detailsExpanded
             text: i18n("Evidence: %1 · %2 samples · %3% coverage",
                        card.evidenceLabel(),
                        Number(card.forecast.sampleCount || 0),
@@ -145,12 +150,23 @@ Kirigami.Card {
 
         QQC2.Label {
             Layout.fillWidth: true
+            visible: !card.compact || card.detailsExpanded
             text: i18n("Method: %1", card.forecast.methodId || "—")
             color: Kirigami.Theme.disabledTextColor
             font.pointSize: Kirigami.Theme.smallFont.pointSize
             wrapMode: Text.WrapAnywhere
             Accessible.name: i18n("Deterministic calculation method: %1",
                                   card.forecast.methodId || i18n("Unavailable"))
+        }
+
+        QQC2.Button {
+            visible: card.compact
+            text: i18n("Forecast details")
+            checkable: true
+            checked: card.detailsExpanded
+            activeFocusOnTab: true
+            Accessible.description: checked ? i18n("Expanded") : i18n("Collapsed")
+            onToggled: card.detailsExpanded = checked
         }
 
         QQC2.Button {
@@ -226,7 +242,9 @@ Kirigami.Card {
         if (value === undefined || value === null) return "—";
         var date = new Date(value);
         return isNaN(date.getTime()) ? "—"
-                                    : date.toLocaleString(Qt.locale());
+                                    : date.toLocaleString(Qt.locale(),
+                                        card.compact && !card.detailsExpanded
+                                            ? Locale.ShortFormat : Locale.LongFormat);
     }
 
     function formatMinor(minor) {

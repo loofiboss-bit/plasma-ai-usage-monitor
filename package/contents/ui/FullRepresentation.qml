@@ -13,7 +13,8 @@ Item {
 
     required property var monitor
     property int destination: AppInfo.smokeView === "history"
-                              || AppInfo.smokeView.indexOf("media-history") === 0 ? 1
+                              || AppInfo.smokeView.indexOf("media-history") === 0
+                              || AppInfo.smokeView === "media-analyst-sessions" ? 1
                             : AppInfo.smokeView === "analyst"
                               || AppInfo.smokeView.indexOf("media-analyst") === 0 ? 2 : 0
     property bool sourceDetailVisible: AppInfo.smokeView === "source-detail"
@@ -27,15 +28,15 @@ Item {
     property string historyMetric: ""
     property int historyRangeDays: 7
     property bool historySessionsMode: AppInfo.demoMode
-        && AppInfo.smokeView === "media-history-sessions"
+        && (AppInfo.smokeView === "media-history-sessions"
+            || AppInfo.smokeView === "media-analyst-sessions")
     property string historySessionToolId: "codex-cli"
     property string historySessionProjectId: ""
     property var localSessionViewState: ({
         sourceDetail: ({ toolId: "codex-cli", rangeIndex: 1 }),
         history: ({ toolId: "codex-cli", rangeIndex: 1 }),
         analyst: ({
-            analystMode: AppInfo.demoMode
-                && AppInfo.smokeView === "media-analyst-sessions",
+            analystMode: false,
             toolId: "codex-cli", rangeIndex: 1
         })
     })
@@ -73,83 +74,95 @@ Item {
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
-        Kirigami.NavigationTabBar {
-            id: navigationTabs
-            Layout.fillWidth: true
-            visible: !fullRoot.showGuidedSetup
-            actions: [
-                Kirigami.Action {
-                    text: i18n("Overview")
-                    icon.name: "view-dashboard"
-                    checkable: true
-                    checked: !fullRoot.sourceDetailVisible
-                        && fullRoot.destination === 0
-                    onTriggered: {
-                        fullRoot.sourceDetailVisible = false;
-                        fullRoot.destination = 0;
-                    }
-                },
-                Kirigami.Action {
-                    text: i18n("History")
-                    icon.name: "view-history"
-                    checkable: true
-                    checked: !fullRoot.sourceDetailVisible
-                        && fullRoot.destination === 1
-                    onTriggered: {
-                        fullRoot.sourceDetailVisible = false;
-                        fullRoot.destination = 1;
-                    }
-                },
-                Kirigami.Action {
-                    text: i18n("Insights")
-                    icon.name: "office-chart-line"
-                    checkable: true
-                    checked: !fullRoot.sourceDetailVisible
-                        && fullRoot.destination === 2
-                    onTriggered: {
-                        fullRoot.sourceDetailVisible = false;
-                        fullRoot.destination = 2;
-                    }
-                }
-            ]
-        }
-
         QQC2.ToolBar {
             Layout.fillWidth: true
             visible: !fullRoot.showGuidedSetup
-            Accessible.name: i18n("Monitor actions")
+            Accessible.name: i18n("Monitor navigation and actions")
 
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: Kirigami.Units.smallSpacing
-                anchors.rightMargin: Kirigami.Units.smallSpacing
-                Item { Layout.fillWidth: true }
-                PlasmaComponents.ToolButton {
-                    activeFocusOnTab: true
-                    icon.name: "view-refresh"
-                    text: i18n("Refresh")
-                    display: QQC2.AbstractButton.TextBesideIcon
-                    Accessible.name: i18n("Refresh all configured sources")
-                    onClicked: fullRoot.monitor.refreshAll()
-                    PlasmaComponents.ToolTip {
-                        text: i18n("Refresh all configured sources")
+            contentItem: GridLayout {
+                columns: fullRoot.width >= Kirigami.Units.gridUnit * 36 ? 2 : 1
+                columnSpacing: Kirigami.Units.largeSpacing
+                rowSpacing: 0
+
+                RowLayout {
+                    objectName: "monitorNavigation"
+                    Layout.fillWidth: fullRoot.width < Kirigami.Units.gridUnit * 36
+                    spacing: 0
+                    Repeater {
+                        model: [
+                            { label: i18n("Overview"), icon: "view-dashboard" },
+                            { label: i18n("History"), icon: "view-history" },
+                            { label: i18n("Insights"), icon: "office-chart-line" }
+                        ]
+                        PlasmaComponents.ToolButton {
+                            required property var modelData
+                            required property int index
+                            objectName: "monitorDestination-" + index
+                            Layout.fillWidth: fullRoot.width < Kirigami.Units.gridUnit * 36
+                            Layout.preferredWidth: fullRoot.width >= Kirigami.Units.gridUnit * 36
+                                ? Kirigami.Units.gridUnit * 7 : -1
+                            Layout.minimumWidth: 0
+                            text: modelData.label
+                            icon.name: modelData.icon
+                            display: QQC2.AbstractButton.TextBesideIcon
+                            checkable: true
+                            checked: !fullRoot.sourceDetailVisible
+                                && fullRoot.destination === index
+                            activeFocusOnTab: true
+                            Accessible.name: text
+                            onClicked: {
+                                fullRoot.sourceDetailVisible = false;
+                                fullRoot.destination = index;
+                            }
+                        }
                     }
                 }
-                PlasmaComponents.ToolButton {
-                    activeFocusOnTab: true
-                    icon.name: "tools-wizard"
-                    Accessible.name: i18n("Run guided setup again")
-                    onClicked: fullRoot.startGuidedSetupAgain()
-                    PlasmaComponents.ToolTip {
-                        text: i18n("Run guided setup again")
+
+                RowLayout {
+                    Layout.alignment: Qt.AlignRight
+                    spacing: Kirigami.Units.smallSpacing
+                    PlasmaComponents.ToolButton {
+                        activeFocusOnTab: true
+                        icon.name: "view-refresh"
+                        text: i18n("Refresh")
+                        display: fullRoot.width >= Kirigami.Units.gridUnit * 22
+                            ? QQC2.AbstractButton.TextBesideIcon
+                            : QQC2.AbstractButton.IconOnly
+                        Accessible.name: i18n("Refresh all configured sources")
+                        onClicked: fullRoot.monitor.refreshAll()
+                        PlasmaComponents.ToolTip {
+                            text: i18n("Refresh all configured sources")
+                        }
                     }
-                }
-                PlasmaComponents.ToolButton {
-                    activeFocusOnTab: true
-                    icon.name: "configure"
-                    Accessible.name: i18n("Configure AI Usage Monitor")
-                    onClicked: Plasmoid.internalAction("configure").trigger()
-                    PlasmaComponents.ToolTip { text: i18n("Configure") }
+                    PlasmaComponents.ToolButton {
+                        activeFocusOnTab: true
+                        icon.name: "configure"
+                        text: i18n("Settings")
+                        display: fullRoot.width >= Kirigami.Units.gridUnit * 22
+                            ? QQC2.AbstractButton.TextBesideIcon
+                            : QQC2.AbstractButton.IconOnly
+                        Accessible.name: i18n("Configure AI Usage Monitor")
+                        onClicked: Plasmoid.internalAction("configure").trigger()
+                        PlasmaComponents.ToolTip { text: i18n("Configure") }
+                    }
+                    PlasmaComponents.ToolButton {
+                        id: moreButton
+                        activeFocusOnTab: true
+                        icon.name: "application-menu"
+                        Accessible.name: i18n("More monitor actions")
+                        onClicked: moreMenu.open()
+                        QQC2.Menu {
+                            id: moreMenu
+                            y: moreButton.height
+                            QQC2.MenuItem {
+                                text: i18n("Run guided setup again")
+                                Accessible.name: text
+                                icon.name: "tools-wizard"
+                                onTriggered: fullRoot.startGuidedSetupAgain()
+                            }
+                        }
+                        PlasmaComponents.ToolTip { text: i18n("More actions") }
+                    }
                 }
             }
         }
@@ -192,6 +205,9 @@ Item {
         Loader {
             id: destinationLoader
             Layout.fillWidth: true
+            Layout.maximumWidth: Kirigami.Units.gridUnit * 64
+            Layout.minimumWidth: 0
+            Layout.alignment: Qt.AlignHCenter
             Layout.fillHeight: true
             active: !fullRoot.showGuidedSetup
             asynchronous: true
@@ -251,6 +267,7 @@ Item {
                     stableId, "open_source_settings", "");
             }
             function onHistoryRequested(historyId, metric, rangeDays) {
+                fullRoot.historySessionsMode = false;
                 fullRoot.historySourceId = historyId;
                 fullRoot.historyMetric = metric;
                 fullRoot.historyRangeDays = rangeDays;

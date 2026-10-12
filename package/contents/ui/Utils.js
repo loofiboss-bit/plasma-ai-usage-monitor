@@ -3,20 +3,30 @@
  */
 
 /**
- * Format a large number with K/M suffix.
+ * Format a large number with localized K/M/B suffixes.
  * @param {number} n - The number to format
  * @returns {string} Formatted string (e.g., "1.2M", "5.3K", "42")
  */
 function formatNumber(n, locale) {
+    if (n === undefined || n === null || n === "") return "";
     var value = Number(n);
     if (!Number.isFinite(value)) return "";
     var activeLocale = locale || Qt.locale();
     var magnitude = Math.abs(value);
+    if (magnitude >= 1000000000)
+        return (value / 1000000000).toLocaleString(activeLocale, "f", 1) + "\u202fB";
     if (magnitude >= 1000000)
         return (value / 1000000).toLocaleString(activeLocale, "f", 1) + "\u202fM";
     if (magnitude >= 1000)
         return (value / 1000).toLocaleString(activeLocale, "f", 1) + "\u202fK";
     return Math.round(value).toLocaleString(activeLocale, "f", 0);
+}
+
+/** Format discrete counts and exact token values without decimal places. */
+function formatCount(value, locale) {
+    if (value === undefined || value === null || value === ""
+            || !Number.isFinite(Number(value))) return "";
+    return Math.round(Number(value)).toLocaleString(locale || Qt.locale(), "f", 0);
 }
 
 function formatMoney(value, currency, locale) {
@@ -223,4 +233,69 @@ function budgetColor(spent, budget, theme, warningThreshold) {
     if (ratio < 0.5) return theme.positiveTextColor;
     if (ratio < warning) return theme.neutralTextColor;
     return theme.negativeTextColor;
+}
+
+function parseTimestamp(value) {
+    if (value === undefined || value === null || value === "") return NaN;
+    if (value instanceof Date) return value.getTime();
+    if (typeof value === "number") return Number.isFinite(value) ? value : NaN;
+    var parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : NaN;
+}
+
+function startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/**
+ * Format a timestamp with unambiguous, localized presentation.
+ * style: "relative" | "dateTime" | "date" | "time"
+ */
+function formatWhen(value, style, locale, nowMs) {
+    var ms = parseTimestamp(value);
+    if (!Number.isFinite(ms)) return "";
+    var d = new Date(ms);
+    var now = new Date(nowMs !== undefined && nowMs !== null ? nowMs : Date.now());
+    var time = Qt.formatTime(d, "hh:mm");
+    if (style === "time") return time;
+    var sameYear = d.getFullYear() === now.getFullYear();
+    var date = Qt.formatDate(d, sameYear ? "d MMM" : "d MMM yyyy");
+    if (style === "date") return date;
+    if (style === "relative") {
+        var dayDiff = Math.round((startOfDay(d) - startOfDay(now)) / 86400000);
+        if (dayDiff === 0) return i18n("today %1", time);
+        if (dayDiff === -1) return i18n("yesterday %1", time);
+        if (dayDiff === 1) return i18n("tomorrow %1", time);
+    }
+    return i18nc("date, time", "%1, %2", date, time);
+}
+
+function formatDuration(ms) {
+    var totalSeconds = Math.max(0, Math.round(Number(ms || 0) / 1000));
+    var days = Math.floor(totalSeconds / 86400);
+    var hours = Math.floor((totalSeconds % 86400) / 3600);
+    var minutes = Math.floor((totalSeconds % 3600) / 60);
+    if (days > 0) {
+        return hours > 0
+            ? i18n("%1 d %2 h", days, hours)
+            : i18np("%1 day", "%1 days", days);
+    }
+    if (hours > 0) {
+        return minutes > 0
+            ? i18n("%1 h %2 min", hours, minutes)
+            : i18np("%1 hour", "%1 hours", hours);
+    }
+    if (minutes > 0) {
+        return i18np("%1 minute", "%1 minutes", minutes);
+    }
+    return i18n("< 1 min");
+}
+
+function formatResetCountdown(resetAt, nowMs) {
+    var ms = parseTimestamp(resetAt);
+    if (!Number.isFinite(ms)) return "";
+    var now = nowMs !== undefined && nowMs !== null ? nowMs : Date.now();
+    var diff = ms - now;
+    if (diff <= 0) return i18n("Resetting soon");
+    return i18n("Resets in %1 (%2)", formatDuration(diff), formatWhen(ms, "relative", null, now));
 }

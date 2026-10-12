@@ -96,11 +96,12 @@ QQC2.ScrollView {
         var count = Math.max(0, Number(summary.sessionCount || 0));
         var lastActivity = Date.parse(summary.lastActivityAtUtc || "");
         var activityText = Number.isFinite(lastActivity)
-            ? new Date(lastActivity).toLocaleString(Qt.locale())
+            ? Utils.formatWhen(lastActivity, "relative")
             : i18n("not observed");
         var partial = String(summary.coverage || "").indexOf("partial") === 0
             || summary.importStatus === "error";
-        return i18n("%1 sessions today · last activity %2", count, activityText)
+        return i18np("%1 session today", "%1 sessions today", count)
+            + i18n(" · last activity %1", activityText)
             + (partial
                 ? i18n(" · partial import") : "");
     }
@@ -171,6 +172,17 @@ QQC2.ScrollView {
                 text: i18n("Sources")
                 Layout.fillWidth: true
             }
+
+            PlasmaComponents.ToolButton {
+                visible: overviewState.attentionRows.length > 0
+                checkable: true
+                checked: overview.sourceFilterIndex === 1
+                icon.name: "dialog-warning"
+                text: i18n("Needs attention (%1)", overviewState.attentionRows.length)
+                display: QQC2.AbstractButton.TextBesideIcon
+                onToggled: overview.sourceFilterIndex = checked ? 1 : 0
+            }
+
             PlasmaComponents.Label {
                 text: overview.visibleSourceRows.length === overviewState.sourceRows.length
                     ? overviewState.sourceRows.length
@@ -192,11 +204,12 @@ QQC2.ScrollView {
             color: Kirigami.Theme.disabledTextColor
         }
 
-        RowLayout {
+        GridLayout {
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.smallSpacing
             Layout.rightMargin: Kirigami.Units.smallSpacing
-            visible: overviewState.sourceRows.length > 0
+            columns: overview.width >= Kirigami.Units.gridUnit * 30 ? 2 : 1
+            visible: overviewState.sourceRows.length > 6
 
             Kirigami.SearchField {
                 Layout.fillWidth: true
@@ -207,7 +220,8 @@ QQC2.ScrollView {
             }
 
             QQC2.ComboBox {
-                Layout.minimumWidth: Kirigami.Units.gridUnit * 8
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
                 model: [i18n("All"), i18n("Needs attention")]
                 currentIndex: overview.sourceFilterIndex
                 Accessible.name: i18n("Filter sources")

@@ -5,6 +5,7 @@ import QtQuick.Layouts
 import org.kde.plasma.components as PlasmaComponents
 import org.kde.plasma.extras as PlasmaExtras
 import org.kde.kirigami as Kirigami
+import "../Utils.js" as Utils
 
 Rectangle {
     id: focus
@@ -50,9 +51,11 @@ Rectangle {
         anchors.margins: Kirigami.Units.largeSpacing
         spacing: Kirigami.Units.mediumSpacing
 
-        RowLayout {
+        GridLayout {
             Layout.fillWidth: true
-            spacing: Kirigami.Units.mediumSpacing
+            columns: focus.width >= Kirigami.Units.gridUnit * 40 ? 2 : 1
+            columnSpacing: Kirigami.Units.mediumSpacing
+            rowSpacing: Kirigami.Units.mediumSpacing
 
             ColumnLayout {
                 Layout.fillWidth: true
@@ -62,7 +65,6 @@ Rectangle {
                     text: i18n("Daily focus")
                     color: Kirigami.Theme.disabledTextColor
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
-                    font.capitalization: Font.AllUppercase
                 }
                 PlasmaExtras.Heading {
                     objectName: "dailyFocusHeadline"
@@ -102,7 +104,7 @@ Rectangle {
 
         GridLayout {
             Layout.fillWidth: true
-            columns: focus.width < Kirigami.Units.gridUnit * 22 ? 1 : 3
+            columns: focus.width < Kirigami.Units.gridUnit * 40 ? 1 : 2
             columnSpacing: Kirigami.Units.largeSpacing
             rowSpacing: Kirigami.Units.smallSpacing
             visible: focus.facts.length > 0
@@ -121,22 +123,17 @@ Rectangle {
                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
                         Layout.preferredHeight: width
                     }
-                    ColumnLayout {
+                    PlasmaComponents.Label {
+                        text: fact.modelData.label
+                        color: Kirigami.Theme.disabledTextColor
+                        font.pointSize: Kirigami.Theme.smallFont.pointSize
+                        elide: Text.ElideRight
                         Layout.fillWidth: true
-                        spacing: 0
-                        PlasmaComponents.Label {
-                            text: fact.modelData.value
-                            font.bold: true
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
-                        PlasmaComponents.Label {
-                            text: fact.modelData.label
-                            color: Kirigami.Theme.disabledTextColor
-                            font.pointSize: Kirigami.Theme.smallFont.pointSize
-                            elide: Text.ElideRight
-                            Layout.fillWidth: true
-                        }
+                    }
+                    PlasmaComponents.Label {
+                        text: fact.modelData.value
+                        font.bold: true
+                        horizontalAlignment: Text.AlignRight
                     }
                 }
             }
@@ -180,10 +177,10 @@ Rectangle {
         if (runwayRisk.kind === "budget_overrun")
             return i18n("%1 is projected to exceed its configured budget on %2.",
                         runwayRisk.sourceId,
-                        predicted.toLocaleString(Qt.locale()));
+                        Utils.formatWhen(predicted, "dateTime"));
         return i18n("%1 is projected to exhaust quota before reset on %2.",
                     runwayRisk.sourceId,
-                    predicted.toLocaleString(Qt.locale()));
+                    Utils.formatWhen(predicted, "dateTime"));
     }
 
     function effectiveActionLabel() {
@@ -225,8 +222,7 @@ Rectangle {
                 ? i18n("Budget pacing") : i18n("Quota runway")
         }, {
             icon: "chronometer",
-            value: new Date(runwayRisk.predictedAt)
-                .toLocaleString(Qt.locale()),
+            value: Utils.formatWhen(runwayRisk.predictedAt, "dateTime"),
             label: i18n("Predicted event")
         }, {
             icon: "documentinfo",
@@ -292,8 +288,6 @@ Rectangle {
     }
 
     function formatShortDate(value) {
-        var date = new Date(value);
-        return isNaN(date.getTime()) ? i18n("unknown")
-                                    : date.toLocaleDateString(Qt.locale());
+        return Utils.formatWhen(value, "date") || i18n("unknown");
     }
 }
