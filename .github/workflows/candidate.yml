@@ -31,14 +31,14 @@ jobs:
         shell: bash
         run: bash scripts/demo/capture_v18_media.sh "$PWD/build/ci" 2>&1 | tee build/ci/plasma-capture.log
       - name: Upload captured Plasma evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: plasma-media-${{ github.sha }}
           path: assets/screenshots/
           if-no-files-found: error
       - name: Upload QML diagnostics
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: candidate-diagnostics-${{ github.sha }}
           path: |
