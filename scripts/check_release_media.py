@@ -15,9 +15,15 @@ from pathlib import Path
 from release_media_evidence import EvidenceError, validate_capture_evidence
 
 ROOT = Path(__file__).resolve().parents[1]
+default_mode = (
+    "development"
+    if os.environ.get("AIUSAGE_MONITOR_DEVELOPMENT") == "1"
+    or os.environ.get("AI_USAGE_MONITOR_DEVELOPMENT") == "1"
+    else "candidate"
+)
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--screenshots", type=Path, default=ROOT / "assets" / "screenshots")
-parser.add_argument("--mode", choices=("candidate", "development"), default="candidate",
+parser.add_argument("--mode", choices=("candidate", "development"), default=default_mode,
                     help="Candidate mode binds evidence to current source; development checks saved evidence integrity.")
 args = parser.parse_args()
 SCREENSHOTS = args.screenshots
