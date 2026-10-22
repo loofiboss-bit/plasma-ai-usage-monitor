@@ -41,7 +41,7 @@ run_lifecycle() {
       source /etc/os-release
       test "$ID" = fedora && test "$VERSION_ID" = "$EXPECTED_FEDORA"
       # Only local candidate RPMs in this disposable container may bypass signatures.
-      local_rpm_options=()
+      local_rpm_options=(--setopt=localpkg_gpgcheck=True)
       if [[ "$ALLOW_UNSIGNED_LOCAL_TEST_RPMS" == 1 ]]; then
         local_rpm_options=(--setopt=localpkg_gpgcheck=False)
       fi
@@ -180,7 +180,7 @@ run_clean_install() {
       source /etc/os-release
       test "$ID" = fedora && test "$VERSION_ID" = "$EXPECTED_FEDORA"
       # Only local candidate RPMs in this disposable container may bypass signatures.
-      local_rpm_options=()
+      local_rpm_options=(--setopt=localpkg_gpgcheck=True)
       if [[ "$ALLOW_UNSIGNED_LOCAL_TEST_RPMS" == 1 ]]; then
         local_rpm_options=(--setopt=localpkg_gpgcheck=False)
       fi
