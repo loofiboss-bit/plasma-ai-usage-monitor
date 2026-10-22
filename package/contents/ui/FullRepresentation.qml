@@ -334,6 +334,9 @@ Item {
                 nextSessionState.sessionId = sessionId;
                 nextSessionState.pageOffset = pageOffset;
                 nextSessionState.modelFilter = modelFilter || ({});
+                nextSessionState.historyDisplayIndex = 0;
+                nextSessionState.projectSearch = "";
+                nextSessionState.modelSearch = "";
                 fullRoot.localSessionViewState = Object.assign({},
                     fullRoot.localSessionViewState, { history: nextSessionState });
                 fullRoot.sourceDetailVisible = false;

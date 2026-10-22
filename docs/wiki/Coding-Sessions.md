@@ -48,22 +48,37 @@ searches the complete project list, including projects beyond the first 100
 analysis rows. A search with no matches does not remove stored history. Renaming
 an alias changes its displayed name without changing the anonymous identity.
 
+Search the model chooser without case sensitivity across every reported model
+for the selected tool, project and period, including choices beyond the first
+100 analysis rows. Typing only narrows the chooser; the active data filter
+changes when you choose a model. A chooser search with no matches has its own
+message and does not mean that session history is empty.
+
 Choose **All models**, an exact reported model ID, or **Unknown model**. Model
 choices reflect the selected tool, project and period before model filtering.
+The selected model stays visible when the chooser search hides other choices
+or when a different project or period has no matching model.
 For a session that used several models, only usage events matching the selected
 model contribute to its token values. Session counts count each matching
 session once. Summary, daily totals, sessions, details and manual export use the
 same active filters. Unavailable token categories remain unavailable.
 
-Changing a filter resets the page and selected session. **Next** is available
-only when the matching summary reports more sessions. The active filter and
-reset action make it possible to return to the complete selection. Project and
-model analysis rows open History sessions with that filter while retaining
-other filters; returning preserves the saved filter context and keyboard focus.
+Changing a filter resets the page and selected session. Changing the tool also
+clears the project, model and chooser searches. Changing the project or period
+keeps the model filter. If no sessions match, the active filters remain visible
+with an explanation and a reset action.
+
+**Next** is available only when the matching summary reports more sessions.
+If an import or retention changes the number of pages, a completed query moves
+to the last valid page, or the first page for an empty result. Project and model
+analysis rows open History sessions with that filter while retaining other
+filters. Returning restores the Sessions or Daily usage view, chooser searches,
+filters, page and selected session, including its keyboard focus and scroll
+position when its row is outside the currently rendered list.
 
 Model and project analysis displays at most 100 rows and reports **Showing 100
 of N** when truncated. Overall totals still include every matching event; equal
-values use stable ordering. These limits do not restrict project search.
+values use stable ordering. These limits do not restrict project or model chooser search.
 
 ## Coverage and query errors
 
@@ -100,12 +115,19 @@ their existing provider-reported meaning.
 
 ## Export
 
-The session export action writes the selected tool, period, project, and model filters
-as JSON or CSV using a dedicated schema version 1. Each export assigns its own
-anonymous IDs. It excludes aliases, project search text, local paths, credentials, and raw tool or
-session identities. Export is manual and asynchronous; the widget shows the
-result or an error after the write finishes. Session data is excluded from
-configuration backups and scheduled provider-history exports.
+The session export action writes JSON or CSV using a dedicated schema version 1.
+Opening the export dialog fixes the tool, project, model, period boundaries and
+format for that export; background history refreshes do not change that selection.
+Only one export can run at a time in a session panel. Writing, success and
+localized failure feedback remain separate from history loading and survive
+automatic refreshes.
+
+Each export assigns its own anonymous IDs. It excludes aliases, project and
+model search text, local paths, credentials, and raw tool or session identities.
+Rows stream directly from the database to a private, atomically saved file, so
+large exports do not collect all events in memory and a failed write preserves
+an existing destination. Unavailable JSON token categories remain null. Session
+data is excluded from configuration backups and scheduled provider-history exports.
 
 ## Data handling
 
@@ -121,3 +143,4 @@ V25 uses the same SQLite schema v9, configuration schema v3 and session-export
 schema v1. Existing history, local aliases, independent import opt-ins and
 settings are retained; no new database migration or reimport is required.
 Older saved view state without a model choice opens with **All models**.
+Missing view-mode and model-search fields default to Sessions and an empty search.

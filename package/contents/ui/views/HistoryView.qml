@@ -136,6 +136,8 @@ ColumnLayout {
             projectId: sessionsPanel ? sessionsPanel.selectedProjectId : sessionProjectId,
             modelFilter: sessionsPanel ? sessionsPanel.selectedModelFilter : ({}),
             projectSearch: sessionsPanel ? sessionsPanel.projectSearch : "",
+            modelSearch: sessionsPanel ? sessionsPanel.modelSearch : "",
+            historyDisplayIndex: sessionsPanel ? sessionsPanel.historyDisplayIndex : 0,
             rangeIndex: sessionsPanel ? sessionsPanel.selectedRangeIndex : 1,
             pageOffset: sessionsPanel ? sessionsPanel.pageOffset : 0,
             sessionId: sessionsPanel ? sessionsPanel.selectedSessionId : ""
@@ -172,6 +174,8 @@ ColumnLayout {
         sessionState.projectId = String(session.projectId || sessionProjectId);
         sessionState.modelFilter = session.modelFilter || ({});
         sessionState.projectSearch = String(session.projectSearch || "");
+        sessionState.modelSearch = String(session.modelSearch || "");
+        sessionState.historyDisplayIndex = Number(session.historyDisplayIndex) === 1 ? 1 : 0;
         sessionState.rangeIndex = Math.max(0, Math.min(2,
             Number(session.rangeIndex === undefined ? 1 : session.rangeIndex)));
         sessionState.pageOffset = Math.max(0, Number(session.pageOffset || 0));

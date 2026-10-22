@@ -15,6 +15,8 @@
 #include <QTemporaryDir>
 #include <QTest>
 #include <QTimer>
+#include <signal.h>
+#include <sys/resource.h>
 
 class SessionFixture {
 public:
@@ -261,6 +263,268 @@ private Q_SLOTS:
     QCOMPARE(summaries.first()[0].toString(), QStringLiteral("retry"));
     for (const auto &name : QSqlDatabase::connectionNames())
       QVERIFY(!name.startsWith("local_sessions_"));
+  }
+
+  void failedDatabaseOpensDoNotLeakConnections() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    LocalSessionModel model;
+    const QString projectId(64, QLatin1Char('a'));
+    QVERIFY(
+        !model
+             .createProjectAlias(QUrl::fromLocalFile(fixture.directory.path()),
+                                 QStringLiteral("Private alias"))
+             .isEmpty());
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    QSignalSpy clears(&model, &LocalSessionModel::clearFinished);
+    QSignalSpy failures(&model, &LocalSessionModel::queryFailed);
+    QSignalSpy exports(&model, &LocalSessionModel::exportReady);
+    const auto from = QDateTime::currentDateTimeUtc().addDays(-1);
+    const auto to = from.addDays(2);
+    QVERIFY(QFile::rename(fixture.database, fixture.database + ".saved"));
+    QVERIFY(QDir().mkdir(fixture.database));
+    for (int attempt = 0; attempt < 4; ++attempt) {
+      QVERIFY(model.projectAliases().isEmpty());
+      QVERIFY(model.projectAlias(projectId).isEmpty());
+      QVERIFY(!model.setProjectAlias(projectId, QStringLiteral("Alias")));
+      QVERIFY(
+          model
+              .createProjectAlias(QUrl::fromLocalFile(fixture.directory.path()),
+                                  QStringLiteral("Alias"))
+              .isEmpty());
+      if (attempt == 0)
+        model.setToolEnabled(QStringLiteral("codex"), true);
+      else
+        model.requestImport();
+      QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+      QCOMPARE(imports.takeFirst()[3].toString(),
+               QStringLiteral("session-database-unavailable"));
+      model.clearSessions(QStringLiteral("failed-clear"));
+      QTRY_COMPARE_WITH_TIMEOUT(clears.size(), 1, 5000);
+      const auto cleared = clears.takeFirst();
+      QVERIFY(!cleared[1].toBool());
+      QCOMPARE(cleared[2].toString(),
+               QStringLiteral("session-database-unavailable"));
+      model.requestSessions("failed-sessions", "codex", from, to);
+      model.requestSummary("failed-summary", "codex", from, to);
+      model.requestDaily("failed-daily", "codex", from, to);
+      model.requestProjects("failed-projects");
+      model.requestExport("failed-export", "codex", from, to, {}, "json",
+                          fixture.directory.filePath("export.json"));
+      QTRY_COMPARE_WITH_TIMEOUT(failures.size(), 4, 5000);
+      QTRY_COMPARE_WITH_TIMEOUT(exports.size(), 1, 5000);
+      for (const auto &failure : failures)
+        QCOMPARE(failure[1].toString(),
+                 QStringLiteral("session-database-unavailable"));
+      QCOMPARE(exports.takeFirst()[1].toString(),
+               QStringLiteral("session-database-unavailable"));
+      failures.clear();
+      for (const auto &name : QSqlDatabase::connectionNames())
+        QVERIFY2(!name.startsWith("local_sessions_"), qPrintable(name));
+    }
+    model.setToolEnabled(QStringLiteral("codex"), false);
+    QVERIFY(QDir().rmdir(fixture.database));
+    QVERIFY(QFile::rename(fixture.database + ".saved", fixture.database));
+    QVERIFY(model.setProjectAlias(projectId, QStringLiteral("Recovered")));
+    QCOMPARE(model.projectAlias(projectId), QStringLiteral("Recovered"));
+  }
+
+  void streamsOneHundredThousandExportEventsAtomically() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    const QString modelId = QString::fromUtf8("model,\"quoted\",å\nline");
+    {
+      auto db = QSqlDatabase::addDatabase("QSQLITE", "export-stream-seed");
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery query(db);
+      QVERIFY(query.exec(
+          "INSERT INTO "
+          "local_sessions(session_id,tool_id,project_id,started_at_utc,"
+          "last_seen_at_utc) VALUES('private-session','codex',"
+          "'private-project','2026-10-10T12:00:00.000Z',"
+          "'2026-10-10T12:00:00.000Z')"));
+      QVERIFY(query.exec("INSERT INTO local_project_aliases(project_id,alias) "
+                         "VALUES('private-project','Private alias')"));
+      query.prepare(
+          "WITH RECURSIVE seq(i) AS (SELECT 0 UNION ALL SELECT i+1 "
+          "FROM seq WHERE i<99999) INSERT INTO local_usage_events("
+          "event_id,session_id,observed_at_utc,model_id,input_tokens,"
+          "output_tokens,cache_read_tokens,cache_write_tokens,parser_revision) "
+          "SELECT 'event-'||i,'private-session','2026-10-10T12:00:00.000Z',"
+          "?,i,CASE WHEN i%2=0 THEN NULL ELSE 0 END,7,0,1 FROM seq");
+      query.addBindValue(modelId);
+      QVERIFY(query.exec());
+      // A small separate tool result exceeds the export file cap without
+      // requiring SQLite to spill its ORDER BY sorting into a temporary file.
+      QVERIFY(query.exec(
+          "INSERT INTO local_sessions(session_id,tool_id,project_id,"
+          "started_at_utc,last_seen_at_utc) VALUES('failure-session',"
+          "'claude-code','private-project','2026-10-10T12:00:00.000Z',"
+          "'2026-10-10T12:00:00.000Z')"));
+      QVERIFY(query.exec(
+          "WITH RECURSIVE seq(i) AS (SELECT 0 UNION ALL SELECT i+1 "
+          "FROM seq WHERE i<99) INSERT INTO local_usage_events("
+          "event_id,session_id,observed_at_utc,model_id,input_tokens,parser_"
+          "revision) "
+          "SELECT 'failure-'||i,'failure-session','2026-10-10T12:00:00.000Z',"
+          "'test-model',i,1 FROM seq"));
+    }
+    QSqlDatabase::removeDatabase("export-stream-seed");
+    LocalSessionModel model;
+    QSignalSpy exports(&model, &LocalSessionModel::exportReady);
+    const auto from =
+        QDateTime::fromString("2026-10-10T00:00:00.000Z", Qt::ISODateWithMs);
+    const auto to = from.addDays(1);
+    QJsonArray jsonRows;
+    QString jsonSessionId, jsonProjectId;
+    const auto exportFile = [&](const QString &format) {
+      return fixture.directory.filePath("events." + format);
+    };
+    for (const auto &format : {QStringLiteral("json"), QStringLiteral("csv")}) {
+      const auto path = exportFile(format);
+      model.requestExport("stream-" + format, "codex", from, to, {}, format,
+                          path);
+      QTRY_COMPARE_WITH_TIMEOUT(exports.size(), 1, 30000);
+      QVERIFY2(exports.first()[1].toString().isEmpty(),
+               qPrintable(exports.first()[1].toString()));
+      exports.clear();
+      QFile file(path);
+      QVERIFY(file.open(QIODevice::ReadOnly));
+      const auto bytes = file.readAll();
+      QVERIFY(!bytes.contains("private-session"));
+      QVERIFY(!bytes.contains("private-project"));
+      QVERIFY(!bytes.contains("Private alias"));
+      QVERIFY(!bytes.contains(fixture.directory.path().toUtf8()));
+      QCOMPARE(file.permissions() &
+                   (QFileDevice::ReadGroup | QFileDevice::WriteGroup |
+                    QFileDevice::ExeGroup | QFileDevice::ReadOther |
+                    QFileDevice::WriteOther | QFileDevice::ExeOther),
+               QFileDevice::Permissions());
+      if (format == QLatin1String("json")) {
+        QJsonParseError error;
+        const auto object = QJsonDocument::fromJson(bytes, &error).object();
+        QCOMPARE(error.error, QJsonParseError::NoError);
+        QCOMPARE(object.value("schemaVersion").toInt(), 1);
+        jsonRows = object.value("sessions").toArray();
+        QCOMPARE(jsonRows.size(), 100000);
+        jsonSessionId =
+            jsonRows.first().toObject().value("sessionId").toString();
+        jsonProjectId =
+            jsonRows.first().toObject().value("projectId").toString();
+        QCOMPARE(jsonSessionId.size(), 64);
+        QCOMPARE(jsonProjectId.size(), 64);
+      } else {
+        // Parse quoted fields including escaped quotes, commas, Unicode and
+        // embedded newlines, comparing each record with the JSON export.
+        QList<QByteArray> fields;
+        QByteArray field;
+        bool quoted = false;
+        int record = -1;
+        QByteArray csvSessionId, csvProjectId;
+        for (qsizetype i = 0; i < bytes.size(); ++i) {
+          const char ch = bytes[i];
+          if (ch == '"') {
+            if (quoted && i + 1 < bytes.size() && bytes[i + 1] == '"') {
+              field += '"';
+              ++i;
+            } else {
+              quoted = !quoted;
+            }
+          } else if (!quoted && (ch == ',' || ch == '\n')) {
+            fields.append(field);
+            field.clear();
+            if (ch != '\n')
+              continue;
+            QCOMPARE(fields.size(), 8);
+            if (record >= 0) {
+              const auto row = jsonRows[record].toObject();
+              if (record == 0) {
+                csvSessionId = fields[0];
+                csvProjectId = fields[1];
+                QCOMPARE(csvSessionId.size(), 64);
+                QCOMPARE(csvProjectId.size(), 64);
+                QVERIFY(csvSessionId != jsonSessionId.toUtf8());
+                QVERIFY(csvProjectId != jsonProjectId.toUtf8());
+              }
+              QCOMPARE(fields[0], csvSessionId);
+              QCOMPARE(fields[1], csvProjectId);
+              QCOMPARE(fields[2],
+                       row.value("timestampUtc").toString().toUtf8());
+              QCOMPARE(QString::fromUtf8(fields[3]), modelId);
+              QCOMPARE(fields[4].toLongLong(),
+                       row.value("inputTokens").toInteger());
+              QCOMPARE(fields[4].toLongLong(), record);
+              if (record % 2 == 0) {
+                QVERIFY(row.value("outputTokens").isNull());
+                QVERIFY(fields[5].isEmpty());
+              } else {
+                QCOMPARE(row.value("outputTokens").toInt(), 0);
+                QCOMPARE(fields[5], QByteArray("0"));
+              }
+              QCOMPARE(fields[6], QByteArray("7"));
+              QCOMPARE(fields[7], QByteArray("0"));
+              QCOMPARE(row.value("cacheReadTokens").toInt(), 7);
+              QCOMPARE(row.value("cacheWriteTokens").toInt(), 0);
+              QCOMPARE(row.value("sessionId").toString(), jsonSessionId);
+              QCOMPARE(row.value("projectId").toString(), jsonProjectId);
+              QCOMPARE(row.value("modelId").toString(), modelId);
+            }
+            ++record;
+            fields.clear();
+          } else {
+            field += ch;
+          }
+        }
+        QVERIFY(!quoted);
+        QVERIFY(fields.isEmpty());
+        QVERIFY(field.isEmpty());
+        QCOMPARE(record, 100000);
+      }
+    }
+
+    const auto target = fixture.directory.filePath("preserved.json");
+    QFile existing(target);
+    QVERIFY(existing.open(QIODevice::WriteOnly));
+    QCOMPARE(existing.write("original export"), qint64(15));
+    existing.close();
+    const auto originalPermissions = existing.permissions();
+    {
+      // Limit the temporary export's size to force a real mid-stream write
+      // failure, rather than merely rejecting an invalid destination.
+      struct FileSizeLimit {
+        rlimit original{};
+        struct sigaction originalSignal{};
+        bool limited = false;
+        ~FileSizeLimit() {
+          if (limited) {
+            setrlimit(RLIMIT_FSIZE, &original);
+            sigaction(SIGXFSZ, &originalSignal, nullptr);
+          }
+        }
+      } limit;
+      QCOMPARE(getrlimit(RLIMIT_FSIZE, &limit.original), 0);
+      struct sigaction ignored{};
+      ignored.sa_handler = SIG_IGN;
+      sigemptyset(&ignored.sa_mask);
+      QCOMPARE(sigaction(SIGXFSZ, &ignored, &limit.originalSignal), 0);
+      limit.limited = true;
+      rlimit restricted = limit.original;
+      restricted.rlim_cur = qMin<rlim_t>(4096, restricted.rlim_max);
+      QCOMPARE(setrlimit(RLIMIT_FSIZE, &restricted), 0);
+      model.requestExport("write-failure", "claude-code", from, to, {}, "json",
+                          target);
+      QTRY_COMPARE_WITH_TIMEOUT(exports.size(), 1, 30000);
+      QCOMPARE(exports.first()[1].toString(),
+               QStringLiteral("session-export-write-failed"));
+    }
+    QVERIFY(existing.open(QIODevice::ReadOnly));
+    QCOMPARE(existing.readAll(), QByteArray("original export"));
+    QCOMPARE(existing.permissions(), originalPermissions);
+    const auto leftoverFiles =
+        QDir(fixture.directory.path()).entryList(QDir::Files);
+    QCOMPARE(leftoverFiles,
+             QStringList({"events.csv", "events.json", "preserved.json"}));
   }
 
   void sessionModelBreakdownIsBoundedAndCounted() {

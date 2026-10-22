@@ -74,6 +74,7 @@ ColumnLayout {
     property string selectedProjectId: ""
     property var selectedModelFilter: ({})
     property string projectSearch: ""
+    property string modelSearch: ""
     property string queryErrorKey: ""
     property string projectErrorKey: ""
     property var pendingQueryIds: []
@@ -88,7 +89,15 @@ ColumnLayout {
     property var dailyRows: []
     property var summary: ({})
     property bool loading: false
-    property string statusText: ""
+    property string exportState: "idle"
+    property string exportErrorKey: ""
+    property bool exportDialogOpen: false
+    property var pendingExportSelection: null
+    readonly property bool exportBusy: exportDialogOpen || exportState === "writing"
+    readonly property string statusText: exportState === "writing"
+        ? i18n("Writing redacted export…")
+        : exportState === "saved" ? i18n("Redacted session export saved.")
+        : exportState === "error" ? exportErrorText(exportErrorKey) : ""
     readonly property string queryErrorText: (queryErrorKey || projectErrorKey) === "session-database-unavailable"
         ? i18n("The local session database is unavailable. Try again.")
         : (queryErrorKey || projectErrorKey) !== "" ? i18n("Session data could not be loaded. Try again.") : ""
@@ -136,6 +145,8 @@ ColumnLayout {
         sessionState.projectId = selectedProjectId;
         sessionState.modelFilter = selectedModelFilter;
         sessionState.projectSearch = projectSearch;
+        sessionState.modelSearch = modelSearch;
+        sessionState.historyDisplayIndex = historyDisplayIndex;
         sessionState.breakdownIndex = breakdownIndex;
         sessionState.rangeIndex = selectedRangeIndex;
         sessionState.pageOffset = pageOffset;
@@ -149,6 +160,8 @@ ColumnLayout {
         selectedProjectId = String(sessionState.projectId || initialProjectId || "");
         selectedModelFilter = sessionState.modelFilter || ({});
         projectSearch = String(sessionState.projectSearch || "");
+        modelSearch = String(sessionState.modelSearch || "");
+        historyDisplayIndex = Number(sessionState.historyDisplayIndex) === 1 ? 1 : 0;
         breakdownIndex = Math.max(0, Math.min(2, Number(sessionState.breakdownIndex || 0)));
         selectedRangeIndex = Math.max(0, Math.min(2,
             Number(sessionState.rangeIndex === undefined
@@ -190,14 +203,45 @@ ColumnLayout {
         return rows;
     }
 
+    function modelMatchesSearch(name) {
+        var search = modelSearch.trim().toLocaleLowerCase();
+        return !search || (name || i18n("Unknown model")).toLocaleLowerCase().indexOf(search) >= 0;
+    }
+
+    function matchingModelCount() {
+        return (summary.modelOptions || []).filter(function(row) {
+            return panel.modelMatchesSearch(String(row.modelId || ""));
+        }).length;
+    }
+
     function modelOptions() {
         var rows = [{ label: i18n("All models"), filter: ({}) }];
         var options = summary.modelOptions || [];
+        var selected = selectedModelFilter.modelId;
+        var selectedIncluded = selected === undefined;
         for (var i = 0; i < options.length; ++i) {
             var name = String(options[i].modelId || "");
+            if (!modelMatchesSearch(name) && name !== selected) continue;
             rows.push({ label: name || i18n("Unknown model"), filter: {modelId: name} });
+            if (name === selected) selectedIncluded = true;
         }
+        if (!selectedIncluded)
+            rows.push({ label: selected || i18n("Unknown model"), filter: {modelId: selected} });
         return rows;
+    }
+
+    function clearFilters() {
+        selectedProjectId = "";
+        selectedModelFilter = ({});
+        projectSearch = "";
+        modelSearch = "";
+        filtersUpdated();
+    }
+
+    function emptyHistoryText() {
+        return selectedProjectId !== "" || selectedModelFilter.modelId !== undefined
+            ? i18n("No sessions match the active filters. Clear filters or choose a different period.")
+            : i18n("No sessions were recorded for this period.");
     }
 
     function modelIndex() {
@@ -219,6 +263,15 @@ ColumnLayout {
     function completeQuery(requestId) {
         pendingQueryIds = pendingQueryIds.filter(function(id) { return id !== requestId; });
         loading = pendingQueryIds.length > 0;
+        if (!loading && summaryCurrent && queryErrorText === "") {
+            var lastOffset = Math.max(0, Math.floor((Number(summary.sessionCount || 0) - 1) / 100) * 100);
+            if (pageOffset > lastOffset) {
+                pageOffset = lastOffset;
+                selectedSessionId = "";
+                persistState();
+                refresh();
+            }
+        }
     }
 
     function drillDown(projectId, modelFilter) {
@@ -349,6 +402,7 @@ ColumnLayout {
             dailyRequestId = "";
             queryErrorKey = "";
             sessionRows = [];
+            dailyRows = [];
             summary = ({});
             return;
         }
@@ -364,7 +418,6 @@ ColumnLayout {
         sessionRows = [];
         dailyRows = [];
         summary = ({});
-        statusText = "";
         activeSessionModel.requestSummary(summaryRequestId, activeToolId,
             range.from, range.to, selectedProjectId, selectedModelFilter);
         activeSessionModel.requestSessions(sessionsRequestId, activeToolId,
@@ -373,8 +426,30 @@ ColumnLayout {
             range.from, range.to, selectedProjectId, "", selectedModelFilter);
     }
 
-    function openExport(format) {
+    function exportErrorText(key) {
+        if (key === "session-database-unavailable")
+            return i18n("The local session database is unavailable. Try exporting again.");
+        if (key === "session-export-destination-invalid" || key === "session-export-write-failed")
+            return i18n("The export could not be saved. Choose a writable file and try again.");
+        return i18n("Session export could not be completed. Try again.");
+    }
+
+    function prepareExport(format) {
+        if (exportBusy || !selectedToolEnabled()) return false;
+        var range = localRange();
+        pendingExportSelection = {
+            toolId: activeToolId, projectId: selectedProjectId,
+            modelFilter: selectedModelFilter.modelId === undefined
+                ? ({}) : ({modelId: selectedModelFilter.modelId}),
+            from: range.from, to: range.to, format: format
+        };
         pendingExportFormat = format;
+        exportDialogOpen = true;
+        return true;
+    }
+
+    function openExport(format) {
+        if (!prepareExport(format)) return;
         exportDialog.nameFilters = format === "csv"
             ? [i18n("CSV files (*.csv)")] : [i18n("JSON files (*.json)")];
         exportDialog.currentFile = "coding-sessions." + format;
@@ -382,12 +457,25 @@ ColumnLayout {
     }
 
     function beginExport(path) {
-        var range = localRange();
+        if (exportState === "writing") return false;
+        if (!pendingExportSelection && !prepareExport(pendingExportFormat)) return false;
+        var selection = pendingExportSelection;
+        pendingExportSelection = null;
+        exportDialogOpen = false;
+        if (!activeSessionModel || !(selection.toolId === "codex-cli"
+                ? activeSessionModel.codexEnabled : activeSessionModel.claudeCodeEnabled)) {
+            exportState = "error";
+            exportErrorKey = "session-invalid-query";
+            return false;
+        }
         exportRequestId = "session-export-" + requestPrefix
             + "-" + (++requestGeneration);
-        statusText = i18n("Writing redacted export…");
-        activeSessionModel.requestExport(exportRequestId, activeToolId,
-            range.from, range.to, selectedProjectId, pendingExportFormat, path, selectedModelFilter);
+        exportErrorKey = "";
+        exportState = "writing";
+        activeSessionModel.requestExport(exportRequestId, selection.toolId,
+            selection.from, selection.to, selection.projectId,
+            selection.format, path, selection.modelFilter);
+        return true;
     }
 
     function localPath(url) {
@@ -406,7 +494,6 @@ ColumnLayout {
     function acceptSessionRows(requestId, rows) {
         if (requestId !== sessionsRequestId) return;
         sessionRows = rows || [];
-        completeQuery(requestId);
         var found = false;
         var selectedIndex = -1;
         for (var i = 0; i < sessionRows.length; ++i) {
@@ -419,10 +506,18 @@ ColumnLayout {
         persistState();
         if (found) {
             Qt.callLater(function() {
-                var delegate = sessionList.itemAtIndex(selectedIndex);
-                if (delegate) delegate.forceActiveFocus(Qt.TabFocusReason);
+                if (requestId !== panel.sessionsRequestId || panel.selectedSessionId === ""
+                        || !sessionList.visible) return;
+                sessionList.positionViewAtIndex(selectedIndex, ListView.Contain);
+                sessionList.forceLayout();
+                Qt.callLater(function() {
+                    if (requestId !== panel.sessionsRequestId) return;
+                    var delegate = sessionList.itemAtIndex(selectedIndex);
+                    if (delegate) delegate.forceActiveFocus(Qt.TabFocusReason);
+                });
             });
         }
+        completeQuery(requestId);
     }
 
     Connections {
@@ -477,9 +572,8 @@ ColumnLayout {
 
         function onExportReady(requestId, errorKey) {
             if (requestId !== panel.exportRequestId) return;
-            panel.statusText = errorKey === ""
-                ? i18n("Redacted session export saved.")
-                : i18n("Session export failed: %1", errorKey);
+            panel.exportErrorKey = errorKey;
+            panel.exportState = errorKey === "" ? "saved" : "error";
         }
 
         function onEnabledChanged() {
@@ -520,8 +614,6 @@ ColumnLayout {
                 Accessible.name: i18n("Session tool")
                 onActivated: {
                     panel.selectedToolId = currentValue;
-                    panel.selectedProjectId = "";
-                    panel.filtersUpdated();
                 }
             }
 
@@ -566,6 +658,23 @@ ColumnLayout {
                 color: Kirigami.Theme.disabledTextColor
             }
 
+            QQC2.TextField {
+                objectName: "sessionModelSearch"
+                Layout.fillWidth: true
+                placeholderText: i18n("Search models")
+                Accessible.name: placeholderText
+                text: panel.modelSearch
+                onTextEdited: { panel.modelSearch = text; panel.persistState(); }
+            }
+            PlasmaComponents.Label {
+                objectName: "sessionModelSearchEmpty"
+                Layout.fillWidth: true
+                visible: panel.modelSearch.trim() !== "" && panel.summaryCurrent
+                    && panel.queryErrorText === "" && panel.matchingModelCount() === 0
+                text: i18n("No models match this search. The active model filter is unchanged.")
+                wrapMode: Text.WordWrap
+                color: Kirigami.Theme.disabledTextColor
+            }
             QQC2.ComboBox {
                 objectName: "sessionModelPicker"
                 Layout.fillWidth: true
@@ -580,6 +689,7 @@ ColumnLayout {
             }
             PlasmaComponents.Label {
                 Layout.fillWidth: true
+                objectName: "sessionActiveFilters"
                 visible: panel.selectedProjectId !== "" || panel.selectedModelFilter.modelId !== undefined
                 text: i18n("Active filter: %1 · %2", panel.selectedProjectId ? panel.projectLabel(panel.selectedProjectId) : i18n("All projects"),
                     panel.selectedModelFilter.modelId === undefined ? i18n("All models") : panel.selectedModelFilter.modelId || i18n("Unknown model"))
@@ -587,13 +697,10 @@ ColumnLayout {
             }
             PlasmaComponents.Button {
                 text: i18n("Clear filters")
-                visible: panel.selectedProjectId !== "" || panel.selectedModelFilter.modelId !== undefined || panel.projectSearch !== ""
-                onClicked: {
-                    panel.selectedProjectId = "";
-                    panel.selectedModelFilter = ({});
-                    panel.projectSearch = "";
-                    panel.filtersUpdated();
-                }
+                objectName: "sessionClearFilters"
+                visible: panel.selectedProjectId !== "" || panel.selectedModelFilter.modelId !== undefined
+                    || panel.projectSearch !== "" || panel.modelSearch !== ""
+                onClicked: panel.clearFilters()
             }
 
             PlasmaComponents.Button {
@@ -601,7 +708,7 @@ ColumnLayout {
                 text: i18n("Export")
                 icon.name: "document-export"
                 activeFocusOnTab: true
-                enabled: !panel.loading && panel.selectedToolEnabled()
+                enabled: !panel.loading && panel.selectedToolEnabled() && !panel.exportBusy && panel.queryErrorText === ""
                 Accessible.name: i18n("Export filtered session history")
                 onClicked: exportMenu.open()
 
@@ -698,7 +805,7 @@ ColumnLayout {
         Accessible.name: i18n("Session breakdown")
         onActivated: {
             if (panel.presentationMode === "analysis") { panel.breakdownIndex = currentIndex; panel.persistState(); }
-            else panel.historyDisplayIndex = currentIndex;
+            else { panel.historyDisplayIndex = currentIndex; panel.persistState(); }
         }
     }
 
@@ -771,7 +878,9 @@ ColumnLayout {
         visible: panel.selectedToolEnabled() && panel.showDaily
             && !panel.loading && panel.dailyRows.length === 0
             && panel.queryErrorText === ""
-        text: i18n("No daily usage was recorded for this period.")
+        text: panel.selectedProjectId !== "" || panel.selectedModelFilter.modelId !== undefined
+            ? i18n("No daily usage matches the active filters. Clear filters or choose a different period.")
+            : i18n("No daily usage was recorded for this period.")
         color: Kirigami.Theme.disabledTextColor
         wrapMode: Text.WordWrap
     }
@@ -781,7 +890,8 @@ ColumnLayout {
         visible: panel.statusText !== ""
         text: panel.statusText
         wrapMode: Text.WordWrap
-        color: panel.statusText.indexOf("failed") >= 0
+        objectName: "sessionExportStatus"
+        color: panel.exportState === "error"
             ? Kirigami.Theme.negativeTextColor : Kirigami.Theme.neutralTextColor
         Accessible.name: text
     }
@@ -1091,7 +1201,7 @@ ColumnLayout {
             visible: !panel.loading && panel.sessionRows.length === 0
             text: panel.queryErrorText !== ""
                 ? i18n("Session data could not be loaded: %1", panel.queryErrorText)
-                : i18n("No sessions matched this period and project filter.")
+                : panel.emptyHistoryText()
             color: Kirigami.Theme.disabledTextColor
             wrapMode: Text.WordWrap
         }
@@ -1135,6 +1245,10 @@ ColumnLayout {
         title: i18n("Export coding sessions")
         fileMode: Dialogs.FileDialog.SaveFile
         onAccepted: panel.beginExport(panel.localPath(selectedFile))
+        onRejected: {
+            panel.exportDialogOpen = false;
+            panel.pendingExportSelection = null;
+        }
     }
 
     onVisibleChanged: {
@@ -1145,9 +1259,13 @@ ColumnLayout {
     }
 
     onSelectedToolIdChanged: {
-        if (fixedToolId === "") {
+        if (fixedToolId === "" && !restoringState) {
+            selectedProjectId = "";
+            selectedModelFilter = ({});
+            projectSearch = "";
+            modelSearch = "";
             loadProjects();
-            refresh();
+            filtersUpdated();
         }
     }
     onSelectedProjectIdChanged: persistState()

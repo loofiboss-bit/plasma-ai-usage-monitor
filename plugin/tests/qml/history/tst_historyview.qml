@@ -273,7 +273,9 @@ TestCase {
                 projectId: "project-42",
                 rangeIndex: 2,
                 pageOffset: 100,
-                sessionId: "session-42"
+                sessionId: "session-42",
+                modelSearch: "sonnet",
+                historyDisplayIndex: 1
             }
         };
         var view = createTemporaryObject(historyViewComponent, testCase);
@@ -309,6 +311,8 @@ TestCase {
         compare(view.sessionState.rangeIndex, 2);
         compare(view.sessionState.pageOffset, 100);
         compare(view.sessionState.sessionId, "session-42");
+        compare(view.sessionState.modelSearch, "sonnet");
+        compare(view.sessionState.historyDisplayIndex, 1);
         flickable.contentY = 170;
         compare(view.captureViewState().contentY, 170);
         compare(findChild(view, "historySessionsPanel").selectedToolId,
@@ -323,6 +327,8 @@ TestCase {
         compare(captured.sessionToolId, "claude-code");
         compare(captured.session.projectId, "project-42");
         compare(captured.session.pageOffset, 100);
+        compare(captured.session.modelSearch, "sonnet");
+        compare(captured.session.historyDisplayIndex, 1);
         compare(captured.selectedMetric, "usageCount");
         compare(captured.compareMode, true);
     }

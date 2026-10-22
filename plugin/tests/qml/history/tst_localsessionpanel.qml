@@ -21,11 +21,19 @@ TestCase {
         signal dailyReady(string requestId, var rows)
         signal projectsReady(string requestId, var rows)
         signal queryFailed(string requestId, string errorKey)
+        signal exportReady(string requestId, string errorKey)
+        signal importFinished(string toolId, int count, bool partial, string errorKey)
+        property int exportCount: 0
+        property var exportedSelection: ({})
         function requestProjects(id) { requests.projects = id; }
         function requestSummary(id, tool, from, to, project, filter) { requests.summary = id; filters.summary = filter; }
         function requestSessions(id, tool, from, to, project, offset, limit, filter) { requests.sessions = id; filters.sessions = filter; }
         function requestDaily(id, tool, from, to, project, zone, filter) { requests.daily = id; filters.daily = filter; }
-        function requestExport(id, tool, from, to, project, format, path, filter) { filters.export = filter; }
+        function requestExport(id, tool, from, to, project, format, path, filter) {
+            filters.export = filter;
+            ++exportCount;
+            exportedSelection = {tool: tool, from: from, to: to, project: project, format: format, path: path, filter: filter};
+        }
     }
     Component {
         id: panelComponent
@@ -38,6 +46,7 @@ TestCase {
     }
     property var panel: null
     function init() {
+        database.exportCount = 0;
         panel = createTemporaryObject(panelComponent, testCase);
         verify(panel !== null);
         panel.refresh();
@@ -190,6 +199,159 @@ TestCase {
             return restoredRow !== null && restoredRow.children[0].activeFocus;
         });
         verify(restoredList.contentY > 0);
+    }
+    function test_model_search_complete_choices_and_pinned_selection() {
+        var models = [{modelId: ""}];
+        for (var i = 0; i < 150; ++i) models.push({modelId: "Model-" + i});
+        database.summaryReady(panel.summaryRequestId, {sessionCount: 0, modelOptions: models});
+        compare(panel.modelOptions().length, 152);
+        panel.modelSearch = "MODEL-149";
+        compare(panel.modelOptions().length, 2);
+        compare(panel.modelOptions()[1].filter.modelId, "Model-149");
+        compare(panel.selectedModelFilter.modelId, undefined);
+        panel.selectedModelFilter = {modelId: "Model-42"};
+        compare(panel.modelOptions().length, 3);
+        compare(panel.modelOptions()[panel.modelIndex()].filter.modelId, "Model-42");
+        panel.modelSearch = "no-such-model";
+        compare(panel.matchingModelCount(), 0);
+        verify(findChild(panel, "sessionModelSearchEmpty").visible);
+        compare(panel.modelOptions()[panel.modelIndex()].filter.modelId, "Model-42");
+        panel.selectedModelFilter = {modelId: ""};
+        compare(panel.modelOptions()[panel.modelIndex()].label, panel.modelNames([{modelId: ""}])[0]);
+    }
+    function test_tool_switch_resets_selection_and_ignores_old_replies() {
+        panel.selectedProjectId = "old-project";
+        panel.selectedModelFilter = {modelId: "old-model"};
+        panel.projectSearch = "old project";
+        panel.modelSearch = "old model";
+        panel.pageOffset = 100;
+        panel.selectedSessionId = "old-session";
+        var oldSummary = panel.summaryRequestId;
+        var oldSessions = panel.sessionsRequestId;
+        var oldProjects = panel.projectsRequestId;
+        panel.selectedToolId = "claude-code";
+        compare(panel.selectedProjectId, "");
+        compare(panel.selectedModelFilter.modelId, undefined);
+        compare(panel.projectSearch, "");
+        compare(panel.modelSearch, "");
+        compare(panel.pageOffset, 0);
+        compare(panel.selectedSessionId, "");
+        database.summaryReady(oldSummary, {sessionCount: 999});
+        database.sessionsReady(oldSessions, [{sessionId: "old-session"}]);
+        database.projectsReady(oldProjects, [{toolId: "codex-cli", projectId: "old-project"}]);
+        compare(panel.summaryCurrent, false);
+        compare(panel.sessionRows.length, 0);
+    }
+    function test_missing_selected_model_remains_explicit_until_reset() {
+        panel.selectedModelFilter = {modelId: "missing-model"};
+        panel.selectedRangeIndex = 0;
+        panel.filtersUpdated();
+        finish(0);
+        compare(panel.selectedModelFilter.modelId, "missing-model");
+        compare(panel.modelOptions()[panel.modelIndex()].label, "missing-model");
+        verify(findChild(panel, "sessionActiveFilters").visible);
+        verify(panel.emptyHistoryText().indexOf("active filters") >= 0);
+        panel.historyDisplayIndex = 1;
+        verify(findChild(panel, "sessionDailyEmptyState").visible);
+        verify(findChild(panel, "sessionDailyEmptyState").text.indexOf("active filters") >= 0);
+        findChild(panel, "sessionClearFilters").clicked();
+        compare(panel.selectedModelFilter.modelId, undefined);
+    }
+    function test_restored_daily_view_and_model_search_with_old_state_default() {
+        panel.sessionState = {toolId: "codex-cli", historyDisplayIndex: 1,
+                              modelSearch: "Model", modelFilter: {modelId: "model-a"}};
+        compare(panel.historyDisplayIndex, 1);
+        compare(panel.modelSearch, "Model");
+        verify(panel.showDaily);
+        panel.persistState();
+        compare(panel.sessionState.historyDisplayIndex, 1);
+        panel.sessionState = {toolId: "codex-cli"};
+        compare(panel.historyDisplayIndex, 0);
+        compare(panel.modelSearch, "");
+    }
+    function test_retention_clamps_page_after_complete_generation_data() {
+        return [{tag: "last-page", total: 101, offset: 100}, {tag: "empty", total: 0, offset: 0}];
+    }
+    function test_retention_clamps_page_after_complete_generation(data) {
+        panel.pageOffset = 300;
+        panel.refresh();
+        var oldSummary = panel.summaryRequestId;
+        var oldSessions = panel.sessionsRequestId;
+        database.sessionsReady(oldSessions, []);
+        database.summaryReady(oldSummary, {sessionCount: data.total});
+        compare(panel.pageOffset, 300);
+        database.dailyReady(panel.dailyRequestId, []);
+        compare(panel.pageOffset, data.offset);
+        verify(panel.summaryRequestId !== oldSummary);
+        database.summaryReady(oldSummary, {sessionCount: 999});
+        database.sessionsReady(oldSessions, [{sessionId: "stale"}]);
+        verify(!panel.summaryCurrent);
+        compare(panel.sessionRows.length, 0);
+        finish(data.total, data.total ? [{sessionId: "retained"}] : []);
+        compare(panel.pageOffset, data.offset);
+        verify(!panel.loading);
+        verify(!panel.hasNextPage);
+    }
+    function test_virtualized_session_focus_and_scroll_restored() {
+        panel.selectedSessionId = "session-75";
+        var rows = [];
+        for (var i = 0; i < 100; ++i) rows.push({sessionId: "session-" + i, eventCount: 1});
+        finish(100, rows);
+        var list = findChild(panel, "sessionHistoryList");
+        tryVerify(function() {
+            var row = list.itemAtIndex(75);
+            return row !== null && row.activeFocus;
+        });
+        verify(list.contentY > 0);
+        compare(panel.selectedSessionId, "session-75");
+    }
+    function test_export_freezes_selection_and_keeps_independent_status() {
+        panel.selectedProjectId = "chosen-project";
+        panel.selectedModelFilter = {modelId: "chosen-model"};
+        verify(panel.prepareExport("csv"));
+        var frozen = panel.pendingExportSelection;
+        verify(panel.exportBusy);
+        verify(!panel.prepareExport("json"));
+        panel.selectedToolId = "claude-code";
+        panel.selectedRangeIndex = 2;
+        database.importFinished("claude-code", 1, false, "");
+        verify(panel.beginExport("/unused"));
+        compare(database.exportCount, 1);
+        compare(database.exportedSelection.tool, "codex-cli");
+        compare(database.exportedSelection.project, "chosen-project");
+        compare(database.exportedSelection.filter.modelId, "chosen-model");
+        compare(database.exportedSelection.from, frozen.from);
+        compare(database.exportedSelection.to, frozen.to);
+        compare(database.exportedSelection.format, "csv");
+        verify(!panel.beginExport("/other"));
+        compare(database.exportCount, 1);
+        var request = panel.exportRequestId;
+        panel.refresh();
+        compare(panel.exportState, "writing");
+        database.exportReady("old-request", "session-export-write-failed");
+        compare(panel.exportState, "writing");
+        database.exportReady(request, "");
+        compare(panel.exportState, "saved");
+        verify(!panel.exportBusy);
+        var message = panel.statusText;
+        panel.refresh();
+        compare(panel.statusText, message);
+    }
+    function test_export_errors_are_localized_and_not_cleared_by_refresh_data() {
+        return ["session-export-format-invalid", "session-invalid-query", "session-database-unavailable",
+                "session-export-destination-invalid", "session-export-write-failed", "session-query-failed", "future-code"]
+            .map(function(key) { return {tag: key, key: key}; });
+    }
+    function test_export_errors_are_localized_and_not_cleared_by_refresh(data) {
+        verify(panel.beginExport("/unused"));
+        database.exportReady(panel.exportRequestId, data.key);
+        compare(panel.exportState, "error");
+        verify(panel.statusText.length > 0);
+        verify(panel.statusText.indexOf(data.key) < 0);
+        var message = panel.statusText;
+        panel.refresh();
+        compare(panel.statusText, message);
+        verify(!panel.exportBusy);
     }
     SignalSpy { id: navigation; signalName: "sessionHistoryRequested" }
     function test_drilldown_preserves_source_filters() {

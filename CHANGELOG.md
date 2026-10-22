@@ -15,6 +15,8 @@ Local release candidate; publication and manual desktop qualification pending.
 
 - Add case-insensitive project search across local aliases and anonymous project
   labels, with complete project choices independent of bounded analysis lists.
+- Add case-insensitive search over complete model choices while keeping the
+  active selection visible and leaving data filters unchanged until selection.
 - Add exact reported-model and unknown-model filtering to session summaries,
   daily totals, session lists/details, and manual JSON/CSV exports.
 - Open filtered History sessions from project and model analysis rows while
@@ -30,6 +32,13 @@ Local release candidate; publication and manual desktop qualification pending.
 - Use the matching summary's session count for pagination and reset session
   selection and page after filter changes.
 - Preserve unavailable token categories as JSON null in manual session exports.
+- Restore session/day mode, model search, selected-session focus and scroll
+  through navigation, including virtualized session rows.
+- Clamp pages after completed queries when refreshed or retained history shrinks.
+- Freeze export filters and format when opening the dialog; prevent overlapping
+  exports and retain localized, typed export status across history refreshes.
+- Stream JSON/CSV exports to private atomic files without buffering all events.
+- Clean up registered database connections on failed opens and early returns.
 
 ### Changed
 

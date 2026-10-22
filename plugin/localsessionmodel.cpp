@@ -9,7 +9,6 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFutureWatcher>
-#include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLockFile>
@@ -80,14 +79,16 @@ QSqlDatabase openDb(const QString &connection) {
   return db;
 }
 // Own the connection until all local queries have been destroyed, including
-// early returns after failed open or SQL execution.
+// early returns after failed open or SQL execution. Writers disable the read
+// snapshot and manage their own commit/rollback boundaries.
 struct SessionConnection {
   QString name;
   QSqlDatabase db;
   bool snapshotStarted = false;
-  explicit SessionConnection(const QString &prefix)
+  explicit SessionConnection(const QString &prefix, bool readSnapshot = true)
       : name(prefix + QString::number(QRandomGenerator::global()->generate())),
-        db(openDb(name)), snapshotStarted(db.isOpen() && db.transaction()) {}
+        db(openDb(name)),
+        snapshotStarted(readSnapshot && db.isOpen() && db.transaction()) {}
   ~SessionConnection() {
     if (snapshotStarted)
       db.rollback();
@@ -284,7 +285,8 @@ void LocalSessionModel::requestImport() {
       const QString cleanupConnection =
           QStringLiteral("local_sessions_retention_%1")
               .arg(QRandomGenerator::global()->generate());
-      auto cleanupDb = openDb(cleanupConnection);
+      SessionConnection connectionOwner(cleanupConnection, false);
+      auto &cleanupDb = connectionOwner.db;
       if (!cleanupDb.isOpen()) {
         result.insert(QStringLiteral("errorKey"),
                       QStringLiteral("session-database-unavailable"));
@@ -314,9 +316,6 @@ void LocalSessionModel::requestImport() {
         retentionCleanupFailed = true;
         result.insert(QStringLiteral("partial"), true);
       }
-      cleanupDb.close();
-      cleanupDb = {};
-      QSqlDatabase::removeDatabase(cleanupConnection);
     }
     for (const QString &tool :
          {QStringLiteral("codex"), QStringLiteral("claude-code")}) {
@@ -331,7 +330,8 @@ void LocalSessionModel::requestImport() {
         const QString checkpointConnection =
             QStringLiteral("local_sessions_checkpoint_%1")
                 .arg(QRandomGenerator::global()->generate());
-        auto checkpointDb = openDb(checkpointConnection);
+        SessionConnection connectionOwner(checkpointConnection, false);
+        auto &checkpointDb = connectionOwner.db;
         if (!checkpointDb.isOpen()) {
           result.insert(QStringLiteral("errorKey"),
                         QStringLiteral("session-database-unavailable"));
@@ -347,9 +347,6 @@ void LocalSessionModel::requestImport() {
           rebaselinePending = checkpoint.value(1).toBool();
           persistedCoverage = checkpoint.value(2).toString();
         }
-        checkpointDb.close();
-        checkpointDb = {};
-        QSqlDatabase::removeDatabase(checkpointConnection);
       }
       bool toolPartial = retentionCleanupFailed ||
                          persistedCoverage == QLatin1String("partial");
@@ -363,12 +360,10 @@ void LocalSessionModel::requestImport() {
         const QString statusConnection =
             QStringLiteral("local_sessions_status_%1")
                 .arg(QRandomGenerator::global()->generate());
-        auto statusDb = openDb(statusConnection);
+        SessionConnection connectionOwner(statusConnection, false);
+        auto &statusDb = connectionOwner.db;
         if (statusDb.isOpen()) {
           recordToolCoverage(statusDb, tool, true);
-          statusDb.close();
-          statusDb = {};
-          QSqlDatabase::removeDatabase(statusConnection);
         }
         markPartial();
         continue;
@@ -378,12 +373,10 @@ void LocalSessionModel::requestImport() {
         const QString statusConnection =
             QStringLiteral("local_sessions_status_%1")
                 .arg(QRandomGenerator::global()->generate());
-        auto statusDb = openDb(statusConnection);
+        SessionConnection connectionOwner(statusConnection, false);
+        auto &statusDb = connectionOwner.db;
         if (statusDb.isOpen()) {
           recordToolCoverage(statusDb, tool, true);
-          statusDb.close();
-          statusDb = {};
-          QSqlDatabase::removeDatabase(statusConnection);
         }
         continue;
       }
@@ -448,7 +441,8 @@ void LocalSessionModel::requestImport() {
             QStringLiteral("local_sessions_import_%1_%2")
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()))
                 .arg(QRandomGenerator::global()->generate());
-        QSqlDatabase db = openDb(conn);
+        SessionConnection connectionOwner(conn, false);
+        auto &db = connectionOwner.db;
         if (!db.isOpen()) {
           result.insert(QStringLiteral("errorKey"),
                         QStringLiteral("session-database-unavailable"));
@@ -474,9 +468,6 @@ void LocalSessionModel::requestImport() {
         }
         if (currentSize == previousSize && modifiedUtc == previousModified &&
             startOffset == currentSize) {
-          db.close();
-          db = {};
-          QSqlDatabase::removeDatabase(conn);
           continue;
         }
         if (currentSize < previousSize ||
@@ -506,9 +497,6 @@ void LocalSessionModel::requestImport() {
             LocalSessionParser::updateCodexContext(line, &codexContext);
           }
           if (bytesRead > 256ll * 1024 * 1024) {
-            db.close();
-            db = {};
-            QSqlDatabase::removeDatabase(conn);
             break;
           }
           if (codexContext.isEmpty()) {
@@ -552,9 +540,6 @@ void LocalSessionModel::requestImport() {
         while (!file.atEnd()) {
           if (generationState->load(std::memory_order_acquire) != generation) {
             db.rollback();
-            db.close();
-            db = {};
-            QSqlDatabase::removeDatabase(conn);
             return result;
           }
           const QByteArray line = file.readLine(1024 * 1024 + 1);
@@ -885,9 +870,6 @@ void LocalSessionModel::requestImport() {
         writesOk = writesOk && recordToolCoverage(db, tool, toolPartial);
         if (generationState->load(std::memory_order_acquire) != generation) {
           db.rollback();
-          db.close();
-          db = {};
-          QSqlDatabase::removeDatabase(conn);
           return result;
         }
         if (!writesOk || file.error() != QFileDevice::NoError || !db.commit()) {
@@ -900,14 +882,12 @@ void LocalSessionModel::requestImport() {
                         result.value(QStringLiteral("count")).toInt() +
                             fileImportedCount);
         }
-        db.close();
-        db = {};
-        QSqlDatabase::removeDatabase(conn);
       }
       const QString statusConnection =
           QStringLiteral("local_sessions_status_%1")
               .arg(QRandomGenerator::global()->generate());
-      auto statusDb = openDb(statusConnection);
+      SessionConnection connectionOwner(statusConnection, false);
+      auto &statusDb = connectionOwner.db;
       if (statusDb.isOpen()) {
         recordToolCoverage(statusDb, tool, toolPartial);
         if (!toolPartial) {
@@ -918,9 +898,6 @@ void LocalSessionModel::requestImport() {
           complete.addBindValue(tool);
           complete.exec();
         }
-        statusDb.close();
-        statusDb = {};
-        QSqlDatabase::removeDatabase(statusConnection);
       }
     }
     return result;
@@ -1276,7 +1253,6 @@ void LocalSessionModel::requestExport(
     if (destinationPath.isEmpty() || destinationInfo.isDir() ||
         destinationInfo.isSymLink())
       return QStringLiteral("session-export-destination-invalid");
-    QVariantList rows;
     QByteArray exportKey(32, Qt::Uninitialized);
     for (qsizetype index = 0; index < exportKey.size(); index += 4) {
       const quint32 random = QRandomGenerator::system()->generate();
@@ -1290,6 +1266,7 @@ void LocalSessionModel::requestExport(
     if (!connection.snapshotStarted)
       return QStringLiteral("session-query-failed");
     QSqlQuery q(db);
+    q.setForwardOnly(true);
     q.prepare(QStringLiteral(
         "SELECT "
         "s.session_id,s.project_id,e.observed_at_utc,e.model_id,e.input_"
@@ -1308,54 +1285,60 @@ void LocalSessionModel::requestExport(
     q.addBindValue(modelFilter.value("modelId", QStringLiteral("")).toString());
     if (!q.exec())
       return QStringLiteral("session-query-failed");
+    QSaveFile file(destinationPath);
+    file.setDirectWriteFallback(false);
+    if (!file.open(QIODevice::WriteOnly) ||
+        !file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner))
+      return QStringLiteral("session-export-write-failed");
+    const auto write = [&file](const QByteArray &bytes) {
+      return file.write(bytes) == bytes.size();
+    };
+    const bool json = format == QLatin1String("json");
+    if (!write(json ? QByteArray("{\"schemaVersion\":1,\"sessions\":[\n")
+                    : QByteArray("sessionId,projectId,timestampUtc,modelId,"
+                                 "inputTokens,outputTokens,cacheReadTokens,"
+                                 "cacheWriteTokens\n")))
+      return QStringLiteral("session-export-write-failed");
+    bool firstRow = true;
     while (q.next()) {
-      QVariantMap r;
-      r.insert("sessionId",
-               QString::fromLatin1(LocalSessionParser::identity(
-                   exportKey, "export-session", q.value(0).toByteArray())));
-      r.insert("projectId",
-               QString::fromLatin1(LocalSessionParser::identity(
-                   exportKey, "export-project", q.value(1).toByteArray())));
-      r.insert("timestampUtc", q.value(2));
-      r.insert("modelId", q.value(3));
-      r.insert("inputTokens", q.value(4).isNull() ? QVariant() : q.value(4));
-      r.insert("outputTokens", q.value(5).isNull() ? QVariant() : q.value(5));
-      r.insert("cacheReadTokens",
-               q.value(6).isNull() ? QVariant() : q.value(6));
-      r.insert("cacheWriteTokens",
-               q.value(7).isNull() ? QVariant() : q.value(7));
-      rows.append(r);
+      QVariantMap row;
+      row.insert("sessionId",
+                 QString::fromLatin1(LocalSessionParser::identity(
+                     exportKey, "export-session", q.value(0).toByteArray())));
+      row.insert("projectId",
+                 QString::fromLatin1(LocalSessionParser::identity(
+                     exportKey, "export-project", q.value(1).toByteArray())));
+      row.insert("timestampUtc", q.value(2));
+      row.insert("modelId", q.value(3));
+      const QStringList tokenKeys{"inputTokens", "outputTokens",
+                                  "cacheReadTokens", "cacheWriteTokens"};
+      for (int i = 0; i < tokenKeys.size(); ++i)
+        row.insert(tokenKeys[i],
+                   q.value(i + 4).isNull() ? QVariant() : q.value(i + 4));
+      QByteArray bytes;
+      if (json) {
+        if (!firstRow)
+          bytes = ",\n";
+        bytes += QJsonDocument(QJsonObject::fromVariantMap(row))
+                     .toJson(QJsonDocument::Compact);
+      } else {
+        QStringList fields;
+        for (const auto &key : {"sessionId", "projectId", "timestampUtc",
+                                "modelId", "inputTokens", "outputTokens",
+                                "cacheReadTokens", "cacheWriteTokens"}) {
+          QString value = row.value(QLatin1String(key)).toString();
+          value.replace('"', "\"\"");
+          fields << ('"' + value + '"');
+        }
+        bytes = fields.join(',').toUtf8() + "\n";
+      }
+      if (!write(bytes))
+        return QStringLiteral("session-export-write-failed");
+      firstRow = false;
     }
     if (q.lastError().isValid())
       return QStringLiteral("session-query-failed");
-    QSaveFile file(destinationPath);
-    file.setDirectWriteFallback(false);
-    if (!file.open(QIODevice::WriteOnly))
-      return QStringLiteral("session-export-write-failed");
-    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-    QByteArray bytes;
-    if (format == QLatin1String("json"))
-      bytes = QJsonDocument(
-                  QJsonObject{{"schemaVersion", 1},
-                              {"sessions", QJsonArray::fromVariantList(rows)}})
-                  .toJson(QJsonDocument::Indented);
-    else {
-      bytes = "sessionId,projectId,timestampUtc,modelId,inputTokens,"
-              "outputTokens,cacheReadTokens,cacheWriteTokens\n";
-      for (const auto &v : rows) {
-        const auto r = v.toMap();
-        QStringList fields;
-        for (const auto &k : {"sessionId", "projectId", "timestampUtc",
-                              "modelId", "inputTokens", "outputTokens",
-                              "cacheReadTokens", "cacheWriteTokens"}) {
-          QString s = r.value(QLatin1String(k)).toString();
-          s.replace('"', "\"\"");
-          fields << ('"' + s + '"');
-        }
-        bytes += fields.join(',').toUtf8() + "\n";
-      }
-    }
-    if (file.write(bytes) != bytes.size() || !file.commit())
+    if ((json && !write("\n]}\n")) || !file.commit())
       return QStringLiteral("session-export-write-failed");
     return QString();
   }));
@@ -1388,7 +1371,8 @@ QString LocalSessionModel::createProjectAlias(const QUrl &directory,
                                  .arg(QRandomGenerator::global()->generate());
   bool queried = true;
   {
-    auto db = openDb(connection);
+    SessionConnection connectionOwner(connection, false);
+    auto &db = connectionOwner.db;
     queried = db.isOpen();
     if (queried) {
       QString existingAlias;
@@ -1418,7 +1402,6 @@ QString LocalSessionModel::createProjectAlias(const QUrl &directory,
         projectId = existingAlias;
     }
   }
-  QSqlDatabase::removeDatabase(connection);
   return queried && setProjectAlias(projectId, name) ? projectId : QString();
 }
 
@@ -1427,7 +1410,8 @@ QVariantList LocalSessionModel::projectAliases() const {
                                  .arg(QRandomGenerator::global()->generate());
   QVariantList rows;
   {
-    auto db = openDb(connection);
+    SessionConnection connectionOwner(connection, false);
+    auto &db = connectionOwner.db;
     if (db.isOpen()) {
       QSqlQuery query(db);
       if (query.exec(QStringLiteral(
@@ -1444,7 +1428,6 @@ QVariantList LocalSessionModel::projectAliases() const {
       }
     }
   }
-  QSqlDatabase::removeDatabase(connection);
   return rows;
 }
 
@@ -1461,7 +1444,8 @@ bool LocalSessionModel::setProjectAlias(const QString &projectId,
                                  .arg(QRandomGenerator::global()->generate());
   bool ok = false;
   {
-    auto db = openDb(connection);
+    SessionConnection connectionOwner(connection, false);
+    auto &db = connectionOwner.db;
     if (db.isOpen()) {
       QSqlQuery query(db);
       query.prepare(
@@ -1478,13 +1462,13 @@ bool LocalSessionModel::setProjectAlias(const QString &projectId,
       ok = query.exec();
     }
   }
-  QSqlDatabase::removeDatabase(connection);
   return ok;
 }
 QString LocalSessionModel::projectAlias(const QString &projectId) const {
   const QString c = QStringLiteral("local_sessions_alias_read_%1")
                         .arg(QRandomGenerator::global()->generate());
-  auto db = openDb(c);
+  SessionConnection connectionOwner(c, false);
+  auto &db = connectionOwner.db;
   if (!db.isOpen())
     return {};
   QSqlQuery q(db);
@@ -1494,9 +1478,6 @@ QString LocalSessionModel::projectAlias(const QString &projectId) const {
   QString result;
   if (q.exec() && q.next())
     result = q.value(0).toString();
-  db.close();
-  db = {};
-  QSqlDatabase::removeDatabase(c);
   return result;
 }
 void LocalSessionModel::clearSessions() { clearSessions(QString()); }
@@ -1523,7 +1504,8 @@ void LocalSessionModel::clearSessions(const QString &requestId) {
     }
     const QString c = QStringLiteral("local_sessions_clear_%1")
                           .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
+    SessionConnection connectionOwner(c, false);
+    auto &db = connectionOwner.db;
     if (!db.isOpen()) {
       result.insert("errorKey", QStringLiteral("session-database-unavailable"));
       return result;
@@ -1557,9 +1539,6 @@ void LocalSessionModel::clearSessions(const QString &requestId) {
       result.insert("errorKey", QStringLiteral("session-clear-failed"));
     } else
       result.insert("ok", true);
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
     return result;
   }));
 }
