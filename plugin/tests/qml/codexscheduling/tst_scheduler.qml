@@ -160,7 +160,7 @@ TestCase {
     }
 
     function createScheduler() {
-        return createTemporaryObject(schedulerComponent, testCase, {
+        var scheduler = createTemporaryObject(schedulerComponent, testCase, {
             configuration: configuration,
             registry: registry,
             browserSyncService: browserService,
@@ -171,6 +171,10 @@ TestCase {
             usageDatabase: database,
             popupOpen: false
         });
+        if (scheduler && scheduler.networkPolicy) {
+            scheduler.networkPolicy.observeReachability(true);
+        }
+        return scheduler;
     }
 
     function scheduledTimer(owner) {

@@ -33,11 +33,21 @@ if(DISCOVERY STREQUAL "CONFIG")
   endif()
 else()
   find_package(Protobuf MODULE REQUIRED)
+  # FindProtobuf supplies the compiler/library target, while modern Protobuf
+  # also exposes transitive Abseil and utf8_range dependencies via pkg-config.
+  # Keep older module-only installations working when no .pc file is shipped.
+  find_package(PkgConfig QUIET)
+  if(PkgConfig_FOUND)
+    pkg_check_modules(PROTOBUF_DEPS QUIET IMPORTED_TARGET protobuf)
+  endif()
 endif()
 protobuf_generate_cpp(PROTO_SRCS PROTO_HDRS smoke.proto)
 add_executable(smoke main.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 target_include_directories(smoke PRIVATE ${CMAKE_CURRENT_BINARY_DIR})
 target_link_libraries(smoke PRIVATE protobuf::libprotobuf)
+if(TARGET PkgConfig::PROTOBUF_DEPS)
+  target_link_libraries(smoke PRIVATE PkgConfig::PROTOBUF_DEPS)
+endif()
 ''')
     fixture = root / "config-fixture"
     fixture.mkdir()
