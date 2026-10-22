@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [25.0.0] — 2026-10-22
+
+Local release candidate; publication and manual desktop qualification pending.
+
+### Added
+
+- Add case-insensitive project search across local aliases and anonymous project
+  labels, with complete project choices independent of bounded analysis lists.
+- Add exact reported-model and unknown-model filtering to session summaries,
+  daily totals, session lists/details, and manual JSON/CSV exports.
+- Open filtered History sessions from project and model analysis rows while
+  preserving navigation context.
+
+### Fixed
+
+- Distinguish failed database queries from valid empty history, offer retry,
+  finish loading after errors, and ignore superseded query responses.
+- Explain importer coverage in localized language without exposing status codes.
+- Report total matching project/model counts alongside bounded 100-row analysis
+  lists, with deterministic ties and complete aggregate totals.
+- Use the matching summary's session count for pagination and reset session
+  selection and page after filter changes.
+- Preserve unavailable token categories as JSON null in manual session exports.
+
+### Changed
+
+- Prepare 25.0.0 metadata and session guidance while preserving SQLite schema v9,
+  configuration schema v3, session-export schema v1, and existing export formats.
+
 ## [24.2.0] — 2026-10-12
 
 ### Added

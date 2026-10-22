@@ -13,7 +13,7 @@ candidate_rpm="$(realpath "$2")"
 
 expected_base="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$base_rpm")"
 expected_candidate="$(rpm -qp --qf '%{VERSION}-%{RELEASE}' "$candidate_rpm")"
-base_version="${BASE_VERSION:-23.0.0}"
+base_version="${BASE_VERSION:-24.2.0}"
 [[ "$expected_base" == "$base_version-"* ]] || {
   echo "Expected the v${base_version} base RPM, got $expected_base" >&2
   exit 1
@@ -38,7 +38,7 @@ run_lifecycle() {
       install -d /root/.local/share/plasma-ai-usage-monitor /root/.local/share/kwalletd /root/.config
       history_db=/root/.local/share/plasma-ai-usage-monitor/usage_history.db
       sqlite3 "$history_db" <<SQL
-PRAGMA user_version = 8;
+PRAGMA user_version = 9;
 CREATE TABLE observations (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   provider TEXT NOT NULL,
@@ -76,12 +76,35 @@ INSERT INTO budget_policies VALUES (
   '\''aggregate'\'','\'''\'','\'''\'','\'''\'', '\''actual'\'',2500,'\''USD'\'','\''calendar_month'\'',NULL,'\''UTC'\'',80,90,
   1,1,'\''2026-10-01T00:00:00.000Z'\'','\''2026-10-01T00:00:00.000Z'\'',NULL
 );
+CREATE TABLE local_sessions (
+  session_id TEXT PRIMARY KEY, tool_id TEXT NOT NULL, project_id TEXT NOT NULL,
+  started_at_utc TEXT NOT NULL, last_seen_at_utc TEXT NOT NULL,
+  coverage TEXT NOT NULL DEFAULT '\''reported'\'', source_id TEXT NOT NULL DEFAULT '\'''\''
+);
+CREATE TABLE local_usage_events (
+  event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, observed_at_utc TEXT NOT NULL,
+  model_id TEXT NOT NULL DEFAULT '\'''\'', input_tokens INTEGER, output_tokens INTEGER,
+  cache_read_tokens INTEGER, cache_write_tokens INTEGER, parser_revision INTEGER NOT NULL,
+  provenance TEXT NOT NULL DEFAULT '\'''\''
+);
+CREATE TABLE local_project_aliases (project_id TEXT PRIMARY KEY, alias TEXT NOT NULL);
+INSERT INTO local_sessions VALUES (
+  '\''fixture-session'\'','\''codex'\'','\''fixture-project'\'',
+  '\''2026-10-12T12:00:00.000Z'\'','\''2026-10-12T12:00:00.000Z'\'','\''reported'\'','\'''\''
+);
+INSERT INTO local_usage_events VALUES (
+  '\''fixture-event'\'','\''fixture-session'\'','\''2026-10-12T12:00:00.000Z'\'',
+  '\''fixture-model'\'',120,30,NULL,0,1,'\'''\''
+);
+INSERT INTO local_project_aliases VALUES ('\''fixture-project'\'','\''Preserved project'\'');
 SQL
       cat > /root/.config/plasma-org.kde.plasma.desktop-appletsrc <<CONFIG
 [Containments][1][Applets][1][Configuration][General]
 historyEnabled=true
 openaiEnabled=true
 compactMode=lowestQuota
+codexSessionHistoryEnabled=true
+claudeCodeSessionHistoryEnabled=false
 CONFIG
       printf "base-wallet-fixture\n" > /root/.local/share/kwalletd/kdewallet.kwl
       fixture_hashes="$(sha256sum \
@@ -94,13 +117,17 @@ CONFIG
           "$history_db" \
           /root/.config/plasma-org.kde.plasma.desktop-appletsrc \
           /root/.local/share/kwalletd/kdewallet.kwl)"
-        test "$(sqlite3 "$history_db" "PRAGMA user_version")" = 8
+        test "$(sqlite3 "$history_db" "PRAGMA user_version")" = 9
         test "$(sqlite3 "$history_db" \
           "SELECT value IS NULL FROM observations WHERE id = 1")" = 1
         test "$(sqlite3 "$history_db" \
           "SELECT value = 0 FROM observations WHERE id = 2")" = 1
         test "$(sqlite3 "$history_db" \
           "SELECT limit_minor FROM budget_policies WHERE policy_id = '\''00000000-0000-4000-8000-000000000024'\''")" = 2500
+        test "$(sqlite3 "$history_db" \
+          "SELECT alias FROM local_project_aliases WHERE project_id = '\''fixture-project'\''")" = "Preserved project"
+        test "$(sqlite3 "$history_db" \
+          "SELECT input_tokens || '\'':'\'' || output_tokens || '\'':'\'' || (cache_read_tokens IS NULL) FROM local_usage_events WHERE event_id = '\''fixture-event'\''")" = "120:30:1"
         grep -Fq "historyEnabled=true" /root/.config/plasma-org.kde.plasma.desktop-appletsrc
         grep -Fxq "base-wallet-fixture" /root/.local/share/kwalletd/kdewallet.kwl
       }

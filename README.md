@@ -6,14 +6,18 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-The **24.2.0 release (Structured Usage & Sources)** brings a clearer daily
-overview, a unified Sources area for API services and AI tools, and easier
-session history with named project aliases. Navigation preserves session
-filters and selection across views. Opt-in Codex and Claude Code history,
-anonymous project identities, and redacted exports remain available.
-See the [V24 user guide](docs/user-guide/coding-sessions.md),
-[qualification checklist](docs/release/v24.2.0-checklist.md), and
-[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v24.2.0).
+The **25.0.0 release (Searchable Session History)** is a local release candidate.
+It adds searchable project choices, exact model filters, and consistent filtered
+session summaries, details, and manual exports. Database errors offer retry,
+coverage explains incomplete imports, and bounded analysis lists show their
+full match count. Publication and physical desktop qualification remain pending.
+See the [session user guide](docs/user-guide/coding-sessions.md),
+[implementation plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V25_PLAN.md), and
+[qualification checklist](docs/release/v25.0.0-checklist.md).
+The reserved candidate release URL is
+[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v25.0.0);
+it is not publication evidence. Find existing published builds under
+[latest published release](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/latest).
 The screenshots below use deterministic synthetic fixtures.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
@@ -73,7 +77,7 @@ Hosted-provider support includes:
 
 The generated [provider capability matrix](docs/provider-capabilities.md) lists the scheduled endpoint and monitoring level for every provider.
 
-The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI. Antigravity 2.x can report the signed-in plan, live per-model quota, and shared five-hour and weekly windows from its read-only localhost daemon; local activity and configured plan limits for other tools remain estimates unless a supported authenticated source provides a live quota window. In V24, Codex and Claude Code can separately opt in to local session-token history; these reported tokens are not subscription percentages or billed cost.
+The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI. Antigravity 2.x can report the signed-in plan, live per-model quota, and shared five-hour and weekly windows from its read-only localhost daemon; local activity and configured plan limits for other tools remain estimates unless a supported authenticated source provides a live quota window. Codex and Claude Code can separately opt in to local session-token history; these reported tokens are not subscription percentages or billed cost.
 
 ## Main features
 
@@ -82,7 +86,7 @@ The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilo
 - Action-first Overview for attention, lowest live quota, next reset, spend categories, and source quality
 - Provider usage, spend, balances, limits, and connection state where the provider exposes them
 - Retained local history for enabled, disabled, and history-only sources, with explicit chart gaps
-- Optional Codex and Claude Code session history with project filtering and manual redacted JSON/CSV export
+- Optional Codex and Claude Code session history with searchable projects, model filters, and manual redacted JSON/CSV export
 - Analyst snapshots with documented sample requirements, coverage, spend trends, activity, anomalies, and compatible drivers
 - Typed Budget Control policies for day, ISO week, month, anchored month and reviewed provider reset periods
 - Deterministic safe-today, remaining allowance, period projection and previous-period comparison

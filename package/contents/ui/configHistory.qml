@@ -21,6 +21,8 @@ KCM.SimpleKCM {
     property alias cfg_autoExportEnabled: autoExportSwitch.checked
     property alias cfg_autoExportDirectory: autoExportDirectoryField.text
     property alias cfg_autoExportIntervalMinutes: autoExportIntervalSpin.value
+    property var sessionBackend: localSessions
+    property var historyDatabase: historyDb
     property string cfg_autoExportFormat: Plasmoid.configuration.autoExportFormat
 
     function readRuntimeSnapshot(value) {
@@ -65,7 +67,7 @@ KCM.SimpleKCM {
 
     Components.HistoryMaintenanceController {
         id: maintenance
-        database: historyDb
+        database: historyPage.historyDatabase
     }
 
     LocalSessionModel {
@@ -74,15 +76,12 @@ KCM.SimpleKCM {
     }
 
     Connections {
-        target: localSessions
+        target: historyPage.sessionBackend
         function onSummaryReady(requestId, summary) {
-            summary = summary || {};
-            var toolId = String(summary.toolId || "");
-            if (!toolId || historyPage.sessionSummaryRequestIds[toolId] !== requestId)
-                return;
-            var summaries = Object.assign({}, historyPage.sessionSummaries);
-            summaries[toolId] = summary;
-            historyPage.sessionSummaries = summaries;
+            historyPage.acceptSessionSummary(requestId, summary, false);
+        }
+        function onQueryFailed(requestId, errorKey) {
+            historyPage.acceptSessionSummary(requestId, {}, true);
         }
 
         function onImportFinished(toolId, importedCount, partial, errorKey) {
@@ -116,16 +115,16 @@ KCM.SimpleKCM {
     property bool sessionOperationBusy: false
 
     function syncSessionConsent() {
-        localSessions.setToolEnabled("codex-cli",
+        sessionBackend.setToolEnabled("codex-cli",
             !!Plasmoid.configuration.codexSessionHistoryEnabled);
-        localSessions.setToolEnabled("claude-code",
+        sessionBackend.setToolEnabled("claude-code",
             !!Plasmoid.configuration.claudeCodeSessionHistoryEnabled);
         refreshProjectAliases();
         refreshSessionSummaries();
     }
 
     function refreshSessionSummaries() {
-        if (!localSessions || typeof localSessions.requestSummary !== "function")
+        if (!sessionBackend || typeof sessionBackend.requestSummary !== "function")
             return;
         var today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -133,15 +132,34 @@ KCM.SimpleKCM {
         from.setDate(from.getDate() - 29);
         var to = new Date(today.getTime());
         to.setDate(to.getDate() + 1);
-        var ids = Object.assign({}, sessionSummaryRequestIds);
+        var ids = ({});
+        var pending = [];
         ["codex-cli", "claude-code"].forEach(function(toolId) {
             var requestId = "session-status-" + toolId + "-"
                 + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
             ids[toolId] = requestId;
-            localSessions.requestSummary(requestId, toolId,
-                from.toISOString(), to.toISOString(), "");
+            pending.push({requestId: requestId, toolId: toolId});
         });
         sessionSummaryRequestIds = ids;
+        pending.forEach(function(request) {
+            sessionBackend.requestSummary(request.requestId, request.toolId,
+                from.toISOString(), to.toISOString(), "");
+        });
+    }
+
+    function acceptSessionSummary(requestId, summary, failed) {
+        var tools = Object.keys(sessionSummaryRequestIds);
+        for (var i = 0; i < tools.length; ++i) {
+            var toolId = tools[i];
+            if (sessionSummaryRequestIds[toolId] !== requestId) continue;
+            var ids = Object.assign({}, sessionSummaryRequestIds);
+            delete ids[toolId];
+            sessionSummaryRequestIds = ids;
+            var summaries = Object.assign({}, sessionSummaries);
+            summaries[toolId] = failed ? {queryFailed: true} : summary || {};
+            sessionSummaries = summaries;
+            return;
+        }
     }
 
     function sessionImportStatus(toolId) {
@@ -150,6 +168,7 @@ KCM.SimpleKCM {
             : !!Plasmoid.configuration.claudeCodeSessionHistoryEnabled;
         if (!enabled) return i18n("Disabled");
         var summary = sessionSummaries[toolId] || {};
+        if (summary.queryFailed) return i18n("Session status could not be loaded. Try again.");
         var coverage = String(summary.toolCoverage || "unknown");
         var status = String(summary.importStatus || "unknown");
         if (coverage === "partial" || status.indexOf("partial") >= 0)
@@ -184,7 +203,7 @@ KCM.SimpleKCM {
     }
 
     Component.onCompleted: {
-        historyDb.init();
+        historyDatabase.init();
         historyPage.syncSessionConsent();
     }
 
@@ -252,7 +271,7 @@ KCM.SimpleKCM {
                     && !historyPage.sessionOperationBusy
                 onClicked: {
                     historyPage.sessionStatusText = i18n("Scanning local sessions…");
-                    localSessions.requestImport();
+                    historyPage.sessionBackend.requestImport();
                 }
             }
 
@@ -266,7 +285,7 @@ KCM.SimpleKCM {
         ProjectAliasEditor {
             id: projectAliases
             Kirigami.FormData.isSection: true
-            backend: localSessions
+            backend: historyPage.sessionBackend
         }
 
         Kirigami.Separator {
@@ -514,7 +533,7 @@ KCM.SimpleKCM {
             historyPage.sessionOperationBusy = true;
             historyPage.clearRequestId = "clear-sessions-"
                 + Date.now().toString(36);
-            localSessions.clearSessions(historyPage.clearRequestId);
+            historyPage.sessionBackend.clearSessions(historyPage.clearRequestId);
         }
     }
 

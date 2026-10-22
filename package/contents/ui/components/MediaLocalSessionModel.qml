@@ -14,6 +14,7 @@ QtObject {
         "project-localization": "Localization"
     })
 
+    signal queryFailed(string requestId, string errorKey)
     signal sessionsReady(string requestId, var rows)
     signal summaryReady(string requestId, var summary)
     signal dailyReady(string requestId, var rows)
@@ -102,7 +103,7 @@ QtObject {
         ];
     }
 
-    function filteredRows(requestedTool, fromUtc, toUtc, projectId) {
+    function filteredRows(requestedTool, fromUtc, toUtc, projectId, modelFilter) {
         var from = Date.parse(fromUtc || "") || 0;
         var to = Date.parse(toUtc || "") || Number.MAX_SAFE_INTEGER;
         var rows = fixtureRows(requestedTool);
@@ -111,7 +112,18 @@ QtObject {
             var timestamp = Date.parse(rows[i].lastSeenAtUtc);
             if (timestamp < from || timestamp > to) continue;
             if (projectId && rows[i].projectId !== projectId) continue;
-            filtered.push(rows[i]);
+            var row = rows[i];
+            if (modelFilter && modelFilter.modelId !== undefined) {
+                row = Object.assign({}, row);
+                row.modelBreakdown = row.modelBreakdown.filter(function(model) {
+                    return String(model.modelId || "") === modelFilter.modelId;
+                });
+                if (!row.modelBreakdown.length) continue;
+                ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "eventCount"].forEach(function(key) {
+                    row[key] = row.modelBreakdown.reduce(function(total, model) { return total + Number(model[key] || 0); }, 0);
+                });
+            }
+            filtered.push(row);
         }
         return filtered;
     }
@@ -242,8 +254,8 @@ QtObject {
     }
     function projectAlias(projectId) { return aliases[projectId] || ""; }
     function requestSessions(requestId, requestedTool, fromUtc, toUtc,
-                             projectId, offset, limit) {
-        var rows = filteredRows(requestedTool, fromUtc, toUtc, projectId);
+                             projectId, offset, limit, modelFilter) {
+        var rows = filteredRows(requestedTool, fromUtc, toUtc, projectId, modelFilter);
         rows.sort(function(a, b) { return b.lastSeenAtUtc.localeCompare(a.lastSeenAtUtc); });
         var start = Math.max(0, Number(offset) || 0);
         var count = Math.max(1, Number(limit) || 100);
@@ -251,17 +263,20 @@ QtObject {
             mediaModel.sessionsReady(requestId, rows.slice(start, start + count));
         });
     }
-    function requestSummary(requestId, requestedTool, fromUtc, toUtc, projectId) {
+    function requestSummary(requestId, requestedTool, fromUtc, toUtc, projectId, modelFilter) {
         var result = summaryFor(
-            filteredRows(requestedTool, fromUtc, toUtc, projectId), requestedTool, projectId);
+            filteredRows(requestedTool, fromUtc, toUtc, projectId, modelFilter), requestedTool, projectId);
+        result.modelOptions = modelSummary(filteredRows(requestedTool, fromUtc, toUtc, projectId), requestedTool).map(function(row) { return {modelId: row.modelId}; });
+        result.modelBreakdownTotalCount = result.modelBreakdown.length;
+        result.projectBreakdownTotalCount = result.projectBreakdown.length;
         Qt.callLater(function() { mediaModel.summaryReady(requestId, result); });
     }
-    function requestDaily(requestId, requestedTool, fromUtc, toUtc, projectId) {
-        var result = dailyFor(filteredRows(requestedTool, fromUtc, toUtc, projectId));
+    function requestDaily(requestId, requestedTool, fromUtc, toUtc, projectId, timeZoneId, modelFilter) {
+        var result = dailyFor(filteredRows(requestedTool, fromUtc, toUtc, projectId, modelFilter));
         Qt.callLater(function() { mediaModel.dailyReady(requestId, result); });
     }
     function requestExport(requestId, requestedTool, fromUtc, toUtc,
-                           projectId, format, destinationPath) {
+                           projectId, format, destinationPath, modelFilter) {
         Qt.callLater(function() {
             mediaModel.exportReady(requestId, "demo_export_not_written");
         });

@@ -32,27 +32,27 @@ public:
   void setRetentionDays(int days);
   Q_INVOKABLE void setToolEnabled(const QString &toolId, bool enabled);
   Q_INVOKABLE void requestImport();
-  Q_INVOKABLE void requestSessions(const QString &requestId,
-                                   const QString &toolId,
-                                   const QDateTime &fromUtc,
-                                   const QDateTime &toUtc,
-                                   const QString &projectId = {},
-                                   int offset = 0, int limit = 100);
+  Q_INVOKABLE void
+  requestSessions(const QString &requestId, const QString &toolId,
+                  const QDateTime &fromUtc, const QDateTime &toUtc,
+                  const QString &projectId = {}, int offset = 0,
+                  int limit = 100, const QVariantMap &modelFilter = {});
   Q_INVOKABLE void requestSummary(const QString &requestId,
                                   const QString &toolId,
                                   const QDateTime &fromUtc,
                                   const QDateTime &toUtc,
-                                  const QString &projectId = {});
+                                  const QString &projectId = {},
+                                  const QVariantMap &modelFilter = {});
   Q_INVOKABLE void
   requestDaily(const QString &requestId, const QString &toolId,
                const QDateTime &fromUtc, const QDateTime &toUtc,
                const QString &projectId = {},
-               const QString &timeZoneId = QStringLiteral("UTC"));
-  Q_INVOKABLE void
-  requestExport(const QString &requestId, const QString &toolId,
-                const QDateTime &fromUtc, const QDateTime &toUtc,
-                const QString &projectId, const QString &format,
-                const QString &destinationPath);
+               const QString &timeZoneId = QStringLiteral("UTC"),
+               const QVariantMap &modelFilter = {});
+  Q_INVOKABLE void requestExport(
+      const QString &requestId, const QString &toolId, const QDateTime &fromUtc,
+      const QDateTime &toUtc, const QString &projectId, const QString &format,
+      const QString &destinationPath, const QVariantMap &modelFilter = {});
   Q_INVOKABLE QString createProjectAlias(const QUrl &directory,
                                          const QString &alias);
   Q_INVOKABLE QVariantList projectAliases() const;
@@ -66,6 +66,7 @@ signals:
   void enabledChanged();
   void statusChanged();
   void retentionDaysChanged();
+  void queryFailed(const QString &requestId, const QString &errorKey);
   void sessionsReady(const QString &requestId, const QVariantList &rows);
   void summaryReady(const QString &requestId, const QVariantMap &summary);
   void dailyReady(const QString &requestId, const QVariantList &rows);

@@ -23,7 +23,11 @@ History keeps **Usage** and **Sessions** as the main modes. Usage filters identi
 source, metric, period, and comparison; the chart labels the selected context
 and coverage. Use the **Export** menu for CSV, JSON, or clipboard actions.
 Sessions keeps the tool selector available even when one tool is disabled and
-explains loading, error, and empty results separately.
+explains loading, retryable query errors, and empty results separately.
+Project search and exact-model filters apply consistently to session summaries,
+daily views, details and manual exports. Analysis rows open filtered sessions;
+limited project/model lists show their full match counts. See
+[Coding sessions and projects](Coding-Sessions) for filter and coverage rules.
 
 Sources with retained data remain selectable after they are disabled. A source
 that is no longer part of the current catalog is labeled **History only**.
@@ -89,7 +93,7 @@ clicks cannot overlap an active export. **Last scheduled export** shows the last
 completed scheduled result. Each file is written atomically; a partially
 successful batch reports the files actually written.
 
-Full-history JSON uses export schema v7, independently of SQLite schema v8.
+Full-history JSON uses export schema v7, independently of SQLite schema v9.
 It includes observations, metadata, legacy guardrail transitions, policy
 transitions, and per-channel delivery status. CSV writes policy/channel evidence
 in a separate `ai-usage-policy-events-*.csv` alongside the other history files.

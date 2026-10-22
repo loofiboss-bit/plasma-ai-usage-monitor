@@ -134,6 +134,8 @@ ColumnLayout {
         var session = ({
             toolId: sessionsPanel ? sessionsPanel.selectedToolId : sessionToolId,
             projectId: sessionsPanel ? sessionsPanel.selectedProjectId : sessionProjectId,
+            modelFilter: sessionsPanel ? sessionsPanel.selectedModelFilter : ({}),
+            projectSearch: sessionsPanel ? sessionsPanel.projectSearch : "",
             rangeIndex: sessionsPanel ? sessionsPanel.selectedRangeIndex : 1,
             pageOffset: sessionsPanel ? sessionsPanel.pageOffset : 0,
             sessionId: sessionsPanel ? sessionsPanel.selectedSessionId : ""
@@ -168,6 +170,8 @@ ColumnLayout {
             sessionState = ({});
         sessionState.toolId = String(session.toolId || sessionToolId);
         sessionState.projectId = String(session.projectId || sessionProjectId);
+        sessionState.modelFilter = session.modelFilter || ({});
+        sessionState.projectSearch = String(session.projectSearch || "");
         sessionState.rangeIndex = Math.max(0, Math.min(2,
             Number(session.rangeIndex === undefined ? 1 : session.rangeIndex)));
         sessionState.pageOffset = Math.max(0, Number(session.pageOffset || 0));

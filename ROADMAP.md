@@ -1,10 +1,20 @@
 # Roadmap
 
-**Current release:** 24.2.0, Structured Usage & Sources
+**Current release:** 25.0.0, Searchable Session History (local candidate)
 
-**Last updated:** 2026-10-12
+**Last updated:** 2026-10-22
 
 ## Current release
+
+### 25.0.0 Searchable Session History
+
+Local candidate: searchable project choices and exact model filters across
+sessions, daily totals, details, analysis and manual exports. Retryable query
+errors, understandable coverage, complete breakdown counts and correct paging
+make retained local history easier to trust. SQLite schema v9 and existing
+privacy boundaries remain unchanged. Publication and physical desktop checks
+are pending; see the [implementation plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V25_PLAN.md)
+and [qualification checklist](docs/release/v25.0.0-checklist.md).
 
 ### 24.2.0 Structured Usage & Sources
 

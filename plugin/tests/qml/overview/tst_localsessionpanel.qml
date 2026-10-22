@@ -193,7 +193,7 @@ TestCase {
         panel.breakdownIndex = 2;
         verify(findChild(panel, "sessionProjectEmptyState").visible);
 
-        panel.summary = ({errorText: "database unavailable"});
+        panel.queryErrorKey = "session-database-unavailable";
         verify(findChild(panel, "sessionQueryError").visible);
         verify(!findChild(panel, "sessionModelEmptyState").visible);
     }

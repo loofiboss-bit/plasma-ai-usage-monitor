@@ -1,6 +1,6 @@
 # Coding sessions and projects
 
-V24 can keep a local history of reported token usage from Codex and Claude
+V25 can keep a local history of reported token usage from Codex and Claude
 Code. This is separate from the tools' quota cards: session tokens describe
 what the local tool recorded, and are not a subscription percentage, bill, or
 productivity measure.
@@ -39,6 +39,45 @@ daily totals, and projects in **History → Sessions**, using **Sessions**,
 **By Day**, and **By Project**. Source Detail provides a compact summary and
 a direct link to History.
 
+## Search and filter sessions
+
+In History or Insights session mode, search the project chooser by your local
+alias or the displayed anonymous project name. Matching ignores case and
+searches the complete project list, including projects beyond the first 100
+analysis rows. A search with no matches does not remove stored history. Renaming
+an alias changes its displayed name without changing the anonymous identity.
+
+Choose **All models**, an exact reported model ID, or **Unknown model**. Model
+choices reflect the selected tool, project and period before model filtering.
+For a session that used several models, only usage events matching the selected
+model contribute to its token values. Session counts count each matching
+session once. Summary, daily totals, sessions, details and manual export use the
+same active filters. Unavailable token categories remain unavailable.
+
+Changing a filter resets the page and selected session. **Next** is available
+only when the matching summary reports more sessions. The active filter and
+reset action make it possible to return to the complete selection. Project and
+model analysis rows open History sessions with that filter while retaining
+other filters; returning preserves the saved filter context and keyboard focus.
+
+Model and project analysis displays at most 100 rows and reports **Showing 100
+of N** when truncated. Overall totals still include every matching event; equal
+values use stable ordering. These limits do not restrict project search.
+
+## Coverage and query errors
+
+Coverage explains when history is incomplete because records were retained for
+only part of the period, a cumulative counter reset, lineage could not be
+verified, or records were unsupported, conflicting, truncated or unreadable.
+Unknown future coverage states receive a general incomplete-coverage message
+instead of an internal code. Coverage describes imported evidence, not missing
+usage inferred from account quotas.
+
+A database query error displays a localized explanation and **Try again**.
+A successful query with no matching sessions displays an empty result instead.
+Loading finishes on either outcome. Retry requests the current selection;
+results from superseded selections cannot overwrite it.
+
 ## Read the token values
 
 Input, output, cache-read and cache-write are separate categories. A value can
@@ -60,9 +99,9 @@ their existing provider-reported meaning.
 
 ## Export
 
-The session export action writes the selected tool, period, and project filter
+The session export action writes the selected tool, period, project, and model filters
 as JSON or CSV using a dedicated schema version 1. Each export assigns its own
-anonymous IDs. It excludes aliases, local paths, credentials, and raw tool or
+anonymous IDs. It excludes aliases, project search text, local paths, credentials, and raw tool or
 session identities. Export is manual and asynchronous; the widget shows the
 result or an error after the write finishes. Session data is excluded from
 configuration backups and scheduled provider-history exports.
@@ -74,3 +113,10 @@ assistant replies, conversation titles, and full project paths are never
 stored or written to diagnostics. Imported session records, aliases, and
 private identity material stay in local application storage. See [Privacy and
 security](privacy-and-security.md) for the wider data boundary.
+
+## Upgrade from 24.2.0
+
+V25 uses the same SQLite schema v9, configuration schema v3 and session-export
+schema v1. Existing history, local aliases, independent import opt-ins and
+settings are retained; no new database migration or reimport is required.
+Older saved view state without a model choice opens with **All models**.

@@ -38,7 +38,9 @@ Item {
     property string historySessionProjectId: ""
     property var localSessionViewState: ({
         sourceDetail: ({ toolId: "codex-cli", rangeIndex: 1 }),
-        history: ({ toolId: "codex-cli", rangeIndex: 1 }),
+        history: ({ toolId: "codex-cli", rangeIndex: 1,
+            modelFilter: AppInfo.demoMode && AppInfo.smokeView === "media-history-sessions"
+                ? {modelId: "gpt-5-codex"} : ({}) }),
         analyst: ({
             analystMode: false,
             toolId: "codex-cli", rangeIndex: 1
@@ -316,7 +318,8 @@ Item {
                 fullRoot.destination = 1;
             }
             function onSessionHistoryRequested(toolId, projectId, rangeDays,
-                                               sessionId, pageOffset) {
+                                               sessionId, pageOffset, modelFilter) {
+                fullRoot.captureCurrentViewState();
                 fullRoot.historyViewState = ({});
                 fullRoot.historySessionsMode = true;
                 fullRoot.historySessionToolId = toolId;
@@ -330,6 +333,7 @@ Item {
                 nextSessionState.rangeIndex = [1, 7, 30].indexOf(rangeDays);
                 nextSessionState.sessionId = sessionId;
                 nextSessionState.pageOffset = pageOffset;
+                nextSessionState.modelFilter = modelFilter || ({});
                 fullRoot.localSessionViewState = Object.assign({},
                     fullRoot.localSessionViewState, { history: nextSessionState });
                 fullRoot.sourceDetailVisible = false;

@@ -79,6 +79,52 @@ QSqlDatabase openDb(const QString &connection) {
   p.exec(QStringLiteral("PRAGMA busy_timeout=5000"));
   return db;
 }
+// Own the connection until all local queries have been destroyed, including
+// early returns after failed open or SQL execution.
+struct SessionConnection {
+  QString name;
+  QSqlDatabase db;
+  bool snapshotStarted = false;
+  explicit SessionConnection(const QString &prefix)
+      : name(prefix + QString::number(QRandomGenerator::global()->generate())),
+        db(openDb(name)), snapshotStarted(db.isOpen() && db.transaction()) {}
+  ~SessionConnection() {
+    if (snapshotStarted)
+      db.rollback();
+    db.close();
+    db = {};
+    QSqlDatabase::removeDatabase(name);
+  }
+};
+struct SessionQueryResult {
+  QVariantList rows;
+  QVariantMap summary;
+  QString error;
+};
+bool validSessionQuery(const QString &tool, const QDateTime &from,
+                       const QDateTime &to, const QVariantMap &filter) {
+  return (tool == QLatin1String("codex") ||
+          tool == QLatin1String("claude-code")) &&
+         from.isValid() && to.isValid() && from < to &&
+         (!filter.contains("modelId") ||
+          filter.value("modelId").metaType().id() == QMetaType::QString);
+}
+QString eventWhere() {
+  return QStringLiteral(" s.tool_id=? AND e.observed_at_utc>=? AND "
+                        "e.observed_at_utc<? AND (?='' OR s.project_id=?) "
+                        "AND (?=0 OR e.model_id=?) ");
+}
+void bindEventFilter(QSqlQuery &query, const QString &tool,
+                     const QDateTime &from, const QDateTime &to,
+                     const QString &project, const QVariantMap &filter) {
+  query.addBindValue(tool);
+  query.addBindValue(from.toUTC().toString(Qt::ISODateWithMs));
+  query.addBindValue(to.toUTC().toString(Qt::ISODateWithMs));
+  query.addBindValue(project.isEmpty() ? QStringLiteral("") : project);
+  query.addBindValue(project.isEmpty() ? QStringLiteral("") : project);
+  query.addBindValue(filter.contains("modelId") ? 1 : 0);
+  query.addBindValue(filter.value("modelId", QStringLiteral("")).toString());
+}
 bool recordToolCoverage(QSqlDatabase &db, const QString &tool, bool partial) {
   QSqlQuery query(db);
   query.prepare(QStringLiteral(
@@ -883,82 +929,97 @@ void LocalSessionModel::requestImport() {
 
 void LocalSessionModel::requestSessions(
     const QString &requestId, const QString &toolId, const QDateTime &fromUtc,
-    const QDateTime &toUtc, const QString &projectId, int offset, int limit) {
+    const QDateTime &toUtc, const QString &projectId, int offset, int limit,
+    const QVariantMap &modelFilter) {
   const QString storedTool = canonicalTool(toolId);
   offset = qMax(0, offset);
   limit = qBound(1, limit, 100);
-  auto *w = new QFutureWatcher<QVariantList>(this);
-  connect(w, &QFutureWatcher<QVariantList>::finished, this,
-          [this, w, requestId]() {
-            emit sessionsReady(requestId, w->result());
-            w->deleteLater();
+  auto *watcher = new QFutureWatcher<SessionQueryResult>(this);
+  connect(watcher, &QFutureWatcher<SessionQueryResult>::finished, this,
+          [this, watcher, requestId]() {
+            const auto result = watcher->result();
+            watcher->deleteLater();
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit sessionsReady(requestId, result.rows);
           });
-  w->setFuture(QtConcurrent::run([=]() {
-    QVariantList rows;
-    const QString c = QStringLiteral("local_sessions_query_%1")
-                          .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
-    if (!db.isOpen())
-      return rows;
-    QSqlQuery q(db);
-    q.prepare(QStringLiteral(
-        "SELECT "
-        "s.session_id,s.project_id,s.started_at_utc,s.last_seen_at_utc,s."
-        "coverage,COUNT(e.event_id),SUM(e.input_tokens),SUM(e.output_tokens),"
-        "SUM(e.cache_read_tokens),SUM(e.cache_write_tokens) FROM "
-        "local_sessions s JOIN local_usage_events e ON "
-        "e.session_id=s.session_id AND e.observed_at_utc>=? AND "
-        "e.observed_at_utc<? WHERE s.tool_id=? AND (?='' OR s.project_id=?) "
-        "GROUP BY "
-        "s.session_id ORDER BY MAX(e.observed_at_utc) DESC,s.session_id LIMIT "
-        "? OFFSET ?"));
-    q.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    q.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    q.addBindValue(storedTool);
-    q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    q.addBindValue(limit);
-    q.addBindValue(offset);
-    if (q.exec())
-      while (q.next()) {
-        QVariantMap r;
-        r.insert("sessionId", q.value(0));
-        r.insert("projectId", q.value(1));
-        r.insert("startedAtUtc", q.value(2));
-        r.insert("lastSeenAtUtc", q.value(3));
-        r.insert("coverage", q.value(4));
-        r.insert("eventCount", q.value(5));
-        r.insert("inputTokens", q.value(6));
-        r.insert("outputTokens", q.value(7));
-        r.insert("cacheReadTokens", q.value(8));
-        r.insert("cacheWriteTokens", q.value(9));
-        QSqlQuery models(db);
-        models.prepare(QStringLiteral(
-            "SELECT model_id,COUNT(*),SUM(input_tokens),SUM(output_tokens) "
-            "FROM local_usage_events WHERE session_id=? AND observed_at_utc>=? "
-            "AND observed_at_utc<? GROUP BY model_id ORDER BY COUNT(*) DESC "
-            "LIMIT 100"));
-        models.addBindValue(q.value(0));
-        models.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-        models.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-        QVariantList modelRows;
-        if (models.exec())
-          while (models.next()) {
-            QVariantMap m;
-            m.insert("modelId", models.value(0));
-            m.insert("eventCount", models.value(1));
-            m.insert("inputTokens", models.value(2));
-            m.insert("outputTokens", models.value(3));
-            modelRows.append(m);
-          }
-        r.insert("modelBreakdown", modelRows);
-        rows.append(r);
+  watcher->setFuture(QtConcurrent::run([=]() {
+    SessionQueryResult result;
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter)) {
+      result.error = QStringLiteral("session-invalid-query");
+      return result;
+    }
+    SessionConnection connection(QStringLiteral("local_sessions_query_"));
+    auto &db = connection.db;
+    if (!db.isOpen()) {
+      result.error = QStringLiteral("session-database-unavailable");
+      return result;
+    }
+    result.error = QStringLiteral("session-query-failed");
+    if (!connection.snapshotStarted)
+      return result;
+    QSqlQuery query(db);
+    query.prepare(
+        QStringLiteral(
+            "SELECT "
+            "s.session_id,s.project_id,s.started_at_utc,s.last_seen_at_utc,"
+            "s.coverage,COUNT(e.event_id),SUM(e.input_tokens),SUM(e.output_"
+            "tokens),"
+            "SUM(e.cache_read_tokens),SUM(e.cache_write_tokens) FROM "
+            "local_sessions s "
+            "JOIN local_usage_events e ON e.session_id=s.session_id WHERE ") +
+        eventWhere() +
+        QStringLiteral(
+            " GROUP BY s.session_id ORDER BY "
+            "MAX(e.observed_at_utc) DESC,s.session_id LIMIT ? OFFSET ?"));
+    bindEventFilter(query, storedTool, fromUtc, toUtc, projectId, modelFilter);
+    query.addBindValue(limit);
+    query.addBindValue(offset);
+    if (!query.exec())
+      return result;
+    while (query.next()) {
+      QVariantMap row;
+      const QStringList keys{
+          "sessionId",       "projectId",       "startedAtUtc", "lastSeenAtUtc",
+          "coverage",        "eventCount",      "inputTokens",  "outputTokens",
+          "cacheReadTokens", "cacheWriteTokens"};
+      for (int i = 0; i < keys.size(); ++i)
+        row.insert(keys[i], query.value(i));
+      QSqlQuery models(db);
+      models.prepare(
+          QStringLiteral("SELECT e.model_id,COUNT(*),SUM(e.input_tokens),"
+                         "SUM(e.output_tokens) FROM local_usage_events e JOIN "
+                         "local_sessions s ON "
+                         "s.session_id=e.session_id WHERE ") +
+          eventWhere() +
+          QStringLiteral(" AND s.session_id=? GROUP BY e.model_id ORDER BY "
+                         "COUNT(*) DESC,e.model_id"));
+      bindEventFilter(models, storedTool, fromUtc, toUtc, projectId,
+                      modelFilter);
+      models.addBindValue(query.value(0));
+      if (!models.exec())
+        return result;
+      QVariantList breakdown;
+      int count = 0;
+      while (models.next()) {
+        ++count;
+        if (count <= 100)
+          breakdown.append(QVariantMap{{"modelId", models.value(0)},
+                                       {"eventCount", models.value(1)},
+                                       {"inputTokens", models.value(2)},
+                                       {"outputTokens", models.value(3)}});
       }
-    else
-      db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
-    return rows;
+      if (models.lastError().isValid())
+        return result;
+      row.insert("modelBreakdown", breakdown);
+      row.insert("modelBreakdownTotalCount", count);
+      result.rows.append(row);
+    }
+    if (query.lastError().isValid())
+      return result;
+    result.error.clear();
+    return result;
   }));
 }
 
@@ -966,233 +1027,240 @@ void LocalSessionModel::requestSummary(const QString &requestId,
                                        const QString &toolId,
                                        const QDateTime &fromUtc,
                                        const QDateTime &toUtc,
-                                       const QString &projectId) {
+                                       const QString &projectId,
+                                       const QVariantMap &modelFilter) {
   const QString storedTool = canonicalTool(toolId);
-  const bool toolEnabled =
+  const bool enabled =
       storedTool == QLatin1String("codex") ? m_codexEnabled : m_claudeEnabled;
-  auto *w = new QFutureWatcher<QVariantMap>(this);
-  connect(w, &QFutureWatcher<QVariantMap>::finished, this,
-          [this, w, requestId]() {
-            emit summaryReady(requestId, w->result());
-            w->deleteLater();
+  auto *watcher = new QFutureWatcher<SessionQueryResult>(this);
+  connect(watcher, &QFutureWatcher<SessionQueryResult>::finished, this,
+          [this, watcher, requestId]() {
+            const auto result = watcher->result();
+            watcher->deleteLater();
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit summaryReady(requestId, result.summary);
           });
-  w->setFuture(QtConcurrent::run([=]() {
-    QVariantMap result;
-    const QString c = QStringLiteral("local_sessions_summary_%1")
-                          .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
-    if (!db.isOpen())
+  watcher->setFuture(QtConcurrent::run([=]() {
+    SessionQueryResult result;
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter)) {
+      result.error = QStringLiteral("session-invalid-query");
       return result;
-    QSqlQuery q(db);
-    q.prepare(QStringLiteral(
-        "SELECT COUNT(DISTINCT "
-        "s.session_id),COUNT(e.event_id),SUM(e.input_tokens),SUM(e.output_"
-        "tokens),SUM(e.cache_read_tokens),SUM(e.cache_write_tokens),COUNT("
-        "DISTINCT s.project_id),MAX(e.observed_at_utc),CASE WHEN SUM(CASE "
-        "WHEN s.coverage!='reported' THEN 1 ELSE 0 END)>0 THEN 'partial' "
-        "ELSE 'reported' END FROM local_sessions s "
-        "JOIN "
-        "local_usage_events e ON e.session_id=s.session_id AND "
-        "e.observed_at_utc>=? AND e.observed_at_utc<? WHERE s.tool_id=? AND "
-        "(?='' OR s.project_id=?)"));
-    q.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    q.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    q.addBindValue(storedTool);
-    q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    if (q.exec() && q.next()) {
-      result.insert("sessionCount", q.value(0));
-      result.insert("eventCount", q.value(1));
-      result.insert("inputTokens", q.value(2));
-      result.insert("outputTokens", q.value(3));
-      result.insert("cacheReadTokens", q.value(4));
-      result.insert("cacheWriteTokens", q.value(5));
-      result.insert("projectCount", q.value(6));
-      result.insert("lastActivityAtUtc", q.value(7));
-      result.insert("coverage", q.value(0).toInt() == 0
-                                    ? QStringLiteral("unavailable")
-                                    : q.value(8).toString());
     }
-    QString toolCoverage;
+    SessionConnection connection(QStringLiteral("local_sessions_summary_"));
+    auto &db = connection.db;
+    if (!db.isOpen()) {
+      result.error = QStringLiteral("session-database-unavailable");
+      return result;
+    }
+    result.error = QStringLiteral("session-query-failed");
+    if (!connection.snapshotStarted)
+      return result;
+    auto &summary = result.summary;
+    const QString from =
+        QStringLiteral(" FROM local_sessions s JOIN local_usage_events e ON "
+                       "e.session_id=s.session_id WHERE ");
+    QSqlQuery query(db);
+    query.prepare(
+        QStringLiteral(
+            "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),"
+            "SUM(e.input_tokens),SUM(e.output_tokens),SUM(e.cache_read_tokens),"
+            "SUM(e.cache_write_tokens),"
+            "COUNT(DISTINCT s.project_id),MAX(e.observed_at_utc),CASE WHEN "
+            "SUM(CASE WHEN "
+            "s.coverage!='reported' THEN 1 ELSE 0 END)>0 THEN 'partial' ELSE "
+            "'reported' END") +
+        from + eventWhere());
+    bindEventFilter(query, storedTool, fromUtc, toUtc, projectId, modelFilter);
+    if (!query.exec() || !query.next())
+      return result;
+    const QStringList keys{
+        "sessionCount", "eventCount",        "inputTokens",
+        "outputTokens", "cacheReadTokens",   "cacheWriteTokens",
+        "projectCount", "lastActivityAtUtc", "coverage"};
+    for (int i = 0; i < keys.size(); ++i)
+      summary.insert(keys[i], query.value(i));
+    if (!query.value(0).toInt())
+      summary.insert("coverage", QStringLiteral("unavailable"));
     QSqlQuery checkpoint(db);
     checkpoint.prepare(QStringLiteral(
         "SELECT coverage FROM local_import_checkpoints WHERE tool_id=?"));
     checkpoint.addBindValue(storedTool);
-    if (checkpoint.exec() && checkpoint.next())
-      toolCoverage = checkpoint.value(0).toString();
-    QString persistedStatus = QStringLiteral("unknown");
-    if (!toolEnabled) {
-      persistedStatus = QStringLiteral("disabled");
-    } else if (toolCoverage == QLatin1String("partial")) {
-      persistedStatus = QStringLiteral("partial");
-      result.insert("coverage", QStringLiteral("partial"));
-    } else if (toolCoverage == QLatin1String("reported")) {
-      persistedStatus = QStringLiteral("reported");
-    }
-    result.insert("toolCoverage", toolCoverage.isEmpty()
-                                      ? QStringLiteral("unknown")
-                                      : toolCoverage);
-    result.insert("toolEnabled", toolEnabled);
-    result.insert("importStatus", persistedStatus);
-    QVariantList modelBreakdown;
+    if (!checkpoint.exec())
+      return result;
+    const QString coverage = checkpoint.next() ? checkpoint.value(0).toString()
+                                               : QStringLiteral("unknown");
+    summary.insert("toolCoverage", coverage);
+    summary.insert("toolEnabled", enabled);
+    summary.insert("importStatus",
+                   !enabled ? QStringLiteral("disabled") : coverage);
+    if (enabled && coverage == QLatin1String("partial"))
+      summary.insert("coverage", coverage);
     QSqlQuery models(db);
-    models.prepare(QStringLiteral(
-        "SELECT e.model_id,COUNT(*),SUM(e.input_tokens),SUM(e.output_tokens) "
-        "FROM local_usage_events e JOIN local_sessions s ON "
-        "s.session_id=e.session_id WHERE s.tool_id=? AND e.observed_at_utc>=? "
-        "AND e.observed_at_utc<? AND (?='' OR s.project_id=?) GROUP BY "
-        "e.model_id ORDER BY COUNT(*) DESC LIMIT 100"));
-    models.addBindValue(storedTool);
-    models.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    models.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    models.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    models.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    if (models.exec())
-      while (models.next()) {
-        QVariantMap row;
-        row.insert("modelId", models.value(0));
-        row.insert("eventCount", models.value(1));
-        row.insert("inputTokens", models.value(2));
-        row.insert("outputTokens", models.value(3));
-        modelBreakdown.append(row);
-      }
-    result.insert("modelBreakdown", modelBreakdown);
-    QVariantList projectBreakdown;
-    QSqlQuery groupedProjects(db);
-    groupedProjects.prepare(QStringLiteral(
-        "SELECT s.project_id,COUNT(DISTINCT "
-        "s.session_id),SUM(e.input_tokens),SUM(e.output_tokens) FROM "
-        "local_sessions s JOIN local_usage_events e ON "
-        "e.session_id=s.session_id AND e.observed_at_utc>=? AND "
-        "e.observed_at_utc<? WHERE s.tool_id=? AND (?='' OR s.project_id=?) "
-        "GROUP BY "
-        "s.project_id ORDER BY COUNT(DISTINCT s.session_id) DESC LIMIT 100"));
-    groupedProjects.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    groupedProjects.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    groupedProjects.addBindValue(storedTool);
-    groupedProjects.addBindValue(projectId.isEmpty() ? QStringLiteral("")
-                                                     : projectId);
-    groupedProjects.addBindValue(projectId.isEmpty() ? QStringLiteral("")
-                                                     : projectId);
-    if (groupedProjects.exec())
-      while (groupedProjects.next()) {
-        QVariantMap row;
-        row.insert("projectId", groupedProjects.value(0));
-        row.insert("sessionCount", groupedProjects.value(1));
-        row.insert("inputTokens", groupedProjects.value(2));
-        row.insert("outputTokens", groupedProjects.value(3));
-        QSqlQuery a(db);
-        a.prepare(QStringLiteral(
-            "SELECT alias FROM local_project_aliases WHERE project_id=?"));
-        a.addBindValue(groupedProjects.value(0));
-        if (a.exec() && a.next())
-          row.insert("alias", a.value(0));
-        projectBreakdown.append(row);
-      }
-    result.insert("projectBreakdown", projectBreakdown);
-    QSqlQuery p(db);
-    p.prepare(QStringLiteral("SELECT DISTINCT s.project_id FROM local_sessions "
-                             "s JOIN local_usage_events e "
-                             "ON e.session_id=s.session_id WHERE s.tool_id=? "
-                             "AND e.observed_at_utc>=? "
-                             "AND e.observed_at_utc<? ORDER BY s.project_id"));
-    p.addBindValue(storedTool);
-    p.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    p.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    QVariantList projects;
-    if (p.exec())
-      while (p.next()) {
-        QVariantMap x;
-        x.insert("projectId", p.value(0));
-        QSqlQuery a(db);
-        a.prepare(QStringLiteral(
-            "SELECT alias FROM local_project_aliases WHERE project_id=?"));
-        a.addBindValue(p.value(0));
-        if (a.exec() && a.next())
-          x.insert("alias", a.value(0));
-        projects.append(x);
-      }
-    result.insert("projectOptions", projects);
-    result.insert("toolId", toolId);
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
+    models.prepare(
+        QStringLiteral(
+            "SELECT "
+            "e.model_id,COUNT(*),SUM(e.input_tokens),SUM(e.output_tokens)") +
+        from + eventWhere() +
+        QStringLiteral(
+            " GROUP BY e.model_id ORDER BY COUNT(*) DESC,e.model_id"));
+    bindEventFilter(models, storedTool, fromUtc, toUtc, projectId, modelFilter);
+    if (!models.exec())
+      return result;
+    QVariantList modelRows;
+    int modelCount = 0;
+    while (models.next()) {
+      ++modelCount;
+      if (modelCount <= 100)
+        modelRows.append(QVariantMap{{"modelId", models.value(0)},
+                                     {"eventCount", models.value(1)},
+                                     {"inputTokens", models.value(2)},
+                                     {"outputTokens", models.value(3)}});
+    }
+    if (models.lastError().isValid())
+      return result;
+    summary.insert("modelBreakdown", modelRows);
+    summary.insert("modelBreakdownTotalCount", modelCount);
+    QSqlQuery projects(db);
+    projects.prepare(
+        QStringLiteral("SELECT s.project_id,COUNT(DISTINCT s.session_id),"
+                       "SUM(e.input_tokens),SUM(e.output_tokens),COALESCE(a."
+                       "alias,'') FROM local_sessions s "
+                       "JOIN local_usage_events e ON e.session_id=s.session_id "
+                       "LEFT JOIN local_project_aliases a "
+                       "ON a.project_id=s.project_id WHERE ") +
+        eventWhere() +
+        QStringLiteral(" GROUP BY s.project_id ORDER BY COUNT(DISTINCT "
+                       "s.session_id) DESC,s.project_id"));
+    bindEventFilter(projects, storedTool, fromUtc, toUtc, projectId,
+                    modelFilter);
+    if (!projects.exec())
+      return result;
+    QVariantList projectRows;
+    int projectCount = 0;
+    while (projects.next()) {
+      ++projectCount;
+      if (projectCount <= 100)
+        projectRows.append(QVariantMap{{"projectId", projects.value(0)},
+                                       {"sessionCount", projects.value(1)},
+                                       {"inputTokens", projects.value(2)},
+                                       {"outputTokens", projects.value(3)},
+                                       {"alias", projects.value(4)}});
+    }
+    if (projects.lastError().isValid())
+      return result;
+    summary.insert("projectBreakdown", projectRows);
+    summary.insert("projectBreakdownTotalCount", projectCount);
+    // Project choices remain available independently of the current
+    // project/model.
+    QSqlQuery choices(db);
+    choices.prepare(
+        QStringLiteral("SELECT DISTINCT s.project_id,COALESCE(a.alias,'') "
+                       "FROM local_sessions s JOIN local_usage_events e ON "
+                       "e.session_id=s.session_id "
+                       "LEFT JOIN local_project_aliases a ON "
+                       "a.project_id=s.project_id WHERE ") +
+        eventWhere() + QStringLiteral(" ORDER BY s.project_id"));
+    bindEventFilter(choices, storedTool, fromUtc, toUtc, {}, {});
+    if (!choices.exec())
+      return result;
+    QVariantList options;
+    while (choices.next())
+      options.append(QVariantMap{{"projectId", choices.value(0)},
+                                 {"alias", choices.value(1)}});
+    if (choices.lastError().isValid())
+      return result;
+    summary.insert("projectOptions", options);
+    QSqlQuery modelOptions(db);
+    modelOptions.prepare(QStringLiteral("SELECT DISTINCT e.model_id") + from +
+                         eventWhere() + QStringLiteral(" ORDER BY e.model_id"));
+    bindEventFilter(modelOptions, storedTool, fromUtc, toUtc, projectId, {});
+    if (!modelOptions.exec())
+      return result;
+    options.clear();
+    while (modelOptions.next())
+      options.append(QVariantMap{{"modelId", modelOptions.value(0)}});
+    if (modelOptions.lastError().isValid())
+      return result;
+    summary.insert("modelOptions", options);
+    summary.insert("toolId", toolId);
+    result.error.clear();
     return result;
   }));
 }
 
-void LocalSessionModel::requestDaily(const QString &requestId,
-                                     const QString &toolId,
-                                     const QDateTime &fromUtc,
-                                     const QDateTime &toUtc,
-                                     const QString &projectId,
-                                     const QString &timeZoneId) {
+void LocalSessionModel::requestDaily(
+    const QString &requestId, const QString &toolId, const QDateTime &fromUtc,
+    const QDateTime &toUtc, const QString &projectId, const QString &timeZoneId,
+    const QVariantMap &modelFilter) {
   const QString storedTool = canonicalTool(toolId);
   const QTimeZone zone = timeZoneId.isEmpty() ? QTimeZone::systemTimeZone()
                                               : QTimeZone(timeZoneId.toUtf8());
-  auto *watcher = new QFutureWatcher<QVariantList>(this);
-  connect(watcher, &QFutureWatcher<QVariantList>::finished, this,
+  auto *watcher = new QFutureWatcher<SessionQueryResult>(this);
+  connect(watcher, &QFutureWatcher<SessionQueryResult>::finished, this,
           [this, watcher, requestId]() {
-            emit dailyReady(requestId, watcher->result());
+            const auto result = watcher->result();
             watcher->deleteLater();
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit dailyReady(requestId, result.rows);
           });
   watcher->setFuture(QtConcurrent::run([=]() {
-    QVariantList rows;
-    if (!zone.isValid() || !fromUtc.isValid() || !toUtc.isValid() ||
-        toUtc <= fromUtc)
-      return rows;
+    SessionQueryResult result;
     const QDate first = fromUtc.toTimeZone(zone).date();
     const QDate last = toUtc.addMSecs(-1).toTimeZone(zone).date();
-    if (!first.isValid() || !last.isValid() || first.daysTo(last) > 30)
-      return rows;
-    const QString connection = QStringLiteral("local_sessions_daily_%1")
-                                   .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(connection);
-    if (!db.isOpen())
-      return rows;
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter) ||
+        !zone.isValid() || !first.isValid() || !last.isValid() ||
+        first.daysTo(last) > 30) {
+      result.error = QStringLiteral("session-invalid-query");
+      return result;
+    }
+    SessionConnection connection(QStringLiteral("local_sessions_daily_"));
+    auto &db = connection.db;
+    if (!db.isOpen()) {
+      result.error = QStringLiteral("session-database-unavailable");
+      return result;
+    }
+    result.error = QStringLiteral("session-query-failed");
+    if (!connection.snapshotStarted)
+      return result;
     for (QDate date = first; date <= last; date = date.addDays(1)) {
-      const QDateTime dayStart(date, QTime(0, 0), zone);
-      const QDateTime dayEnd(date.addDays(1), QTime(0, 0), zone);
-      const QDateTime lower = qMax(fromUtc.toUTC(), dayStart.toUTC());
-      const QDateTime upper = qMin(toUtc.toUTC(), dayEnd.toUTC());
+      const auto lower =
+          qMax(fromUtc.toUTC(), QDateTime(date, QTime(0, 0), zone).toUTC());
+      const auto upper = qMin(
+          toUtc.toUTC(), QDateTime(date.addDays(1), QTime(0, 0), zone).toUTC());
       if (upper <= lower)
         continue;
       QSqlQuery query(db);
       query.prepare(QStringLiteral(
-          "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),SUM(e.input_"
-          "tokens),SUM(e.output_tokens),SUM(e.cache_read_tokens),SUM(e.cache_"
-          "write_tokens) FROM local_usage_events e JOIN local_sessions s ON "
-          "s.session_id=e.session_id WHERE s.tool_id=? AND "
-          "e.observed_at_utc>=? "
-          "AND e.observed_at_utc<? AND (?='' OR s.project_id=?)"));
-      query.addBindValue(storedTool);
-      query.addBindValue(lower.toString(Qt::ISODateWithMs));
-      query.addBindValue(upper.toString(Qt::ISODateWithMs));
-      query.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-      query.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-      if (query.exec() && query.next()) {
-        QVariantMap row;
-        row.insert("localDate", date.toString(Qt::ISODate));
-        row.insert("sessionCount", query.value(0));
-        row.insert("eventCount", query.value(1));
-        row.insert("inputTokens", query.value(2));
-        row.insert("outputTokens", query.value(3));
-        row.insert("cacheReadTokens", query.value(4));
-        row.insert("cacheWriteTokens", query.value(5));
-        rows.append(row);
-      }
+                        "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),"
+                        "SUM(e.input_tokens),SUM(e.output_tokens),SUM(e.cache_"
+                        "read_tokens),SUM(e.cache_write_tokens) "
+                        "FROM local_sessions s JOIN local_usage_events e ON "
+                        "e.session_id=s.session_id WHERE ") +
+                    eventWhere());
+      bindEventFilter(query, storedTool, lower, upper, projectId, modelFilter);
+      if (!query.exec() || !query.next())
+        return result;
+      QVariantMap row{{"localDate", date.toString(Qt::ISODate)}};
+      const QStringList keys{"sessionCount",    "eventCount",
+                             "inputTokens",     "outputTokens",
+                             "cacheReadTokens", "cacheWriteTokens"};
+      for (int i = 0; i < keys.size(); ++i)
+        row.insert(keys[i], query.value(i));
+      result.rows.append(row);
     }
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(connection);
-    return rows;
+    result.error.clear();
+    return result;
   }));
 }
 
 void LocalSessionModel::requestExport(
     const QString &requestId, const QString &toolId, const QDateTime &fromUtc,
     const QDateTime &toUtc, const QString &projectId, const QString &format,
-    const QString &destinationPath) {
+    const QString &destinationPath, const QVariantMap &modelFilter) {
   const QString storedTool = canonicalTool(toolId);
   auto *w = new QFutureWatcher<QString>(this);
   connect(w, &QFutureWatcher<QString>::finished, this, [this, w, requestId]() {
@@ -1202,6 +1270,8 @@ void LocalSessionModel::requestExport(
   w->setFuture(QtConcurrent::run([=]() {
     if (format != QLatin1String("json") && format != QLatin1String("csv"))
       return QStringLiteral("session-export-format-invalid");
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter))
+      return QStringLiteral("session-invalid-query");
     QFileInfo destinationInfo(destinationPath);
     if (destinationPath.isEmpty() || destinationInfo.isDir() ||
         destinationInfo.isSymLink())
@@ -1213,11 +1283,12 @@ void LocalSessionModel::requestExport(
       qToLittleEndian(random,
                       reinterpret_cast<uchar *>(exportKey.data() + index));
     }
-    const QString c = QStringLiteral("local_sessions_export_%1")
-                          .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
+    SessionConnection connection(QStringLiteral("local_sessions_export_"));
+    auto &db = connection.db;
     if (!db.isOpen())
       return QStringLiteral("session-database-unavailable");
+    if (!connection.snapshotStarted)
+      return QStringLiteral("session-query-failed");
     QSqlQuery q(db);
     q.prepare(QStringLiteral(
         "SELECT "
@@ -1225,33 +1296,38 @@ void LocalSessionModel::requestExport(
         "tokens,e.output_tokens,e.cache_read_tokens,e.cache_write_tokens FROM "
         "local_sessions s JOIN local_usage_events e ON "
         "e.session_id=s.session_id WHERE s.tool_id=? AND e.observed_at_utc>=? "
-        "AND e.observed_at_utc<? AND (?='' OR s.project_id=?) ORDER BY "
+        "AND e.observed_at_utc<? AND (?='' OR s.project_id=?) AND (?=0 OR "
+        "e.model_id=?) ORDER BY "
         "e.observed_at_utc"));
     q.addBindValue(storedTool);
     q.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
     q.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
     q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
     q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    if (q.exec())
-      while (q.next()) {
-        QVariantMap r;
-        r.insert("sessionId",
-                 QString::fromLatin1(LocalSessionParser::identity(
-                     exportKey, "export-session", q.value(0).toByteArray())));
-        r.insert("projectId",
-                 QString::fromLatin1(LocalSessionParser::identity(
-                     exportKey, "export-project", q.value(1).toByteArray())));
-        r.insert("timestampUtc", q.value(2));
-        r.insert("modelId", q.value(3));
-        r.insert("inputTokens", q.value(4));
-        r.insert("outputTokens", q.value(5));
-        r.insert("cacheReadTokens", q.value(6));
-        r.insert("cacheWriteTokens", q.value(7));
-        rows.append(r);
-      }
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
+    q.addBindValue(modelFilter.contains("modelId") ? 1 : 0);
+    q.addBindValue(modelFilter.value("modelId", QStringLiteral("")).toString());
+    if (!q.exec())
+      return QStringLiteral("session-query-failed");
+    while (q.next()) {
+      QVariantMap r;
+      r.insert("sessionId",
+               QString::fromLatin1(LocalSessionParser::identity(
+                   exportKey, "export-session", q.value(0).toByteArray())));
+      r.insert("projectId",
+               QString::fromLatin1(LocalSessionParser::identity(
+                   exportKey, "export-project", q.value(1).toByteArray())));
+      r.insert("timestampUtc", q.value(2));
+      r.insert("modelId", q.value(3));
+      r.insert("inputTokens", q.value(4).isNull() ? QVariant() : q.value(4));
+      r.insert("outputTokens", q.value(5).isNull() ? QVariant() : q.value(5));
+      r.insert("cacheReadTokens",
+               q.value(6).isNull() ? QVariant() : q.value(6));
+      r.insert("cacheWriteTokens",
+               q.value(7).isNull() ? QVariant() : q.value(7));
+      rows.append(r);
+    }
+    if (q.lastError().isValid())
+      return QStringLiteral("session-query-failed");
     QSaveFile file(destinationPath);
     file.setDirectWriteFallback(false);
     if (!file.open(QIODevice::WriteOnly))
@@ -1488,19 +1564,29 @@ void LocalSessionModel::clearSessions(const QString &requestId) {
   }));
 }
 void LocalSessionModel::requestProjects(const QString &requestId) {
-  auto *w = new QFutureWatcher<QVariantList>(this);
-  connect(w, &QFutureWatcher<QVariantList>::finished, this,
+  auto *w = new QFutureWatcher<SessionQueryResult>(this);
+  connect(w, &QFutureWatcher<SessionQueryResult>::finished, this,
           [this, w, requestId]() {
-            emit projectsReady(requestId, w->result());
+            const auto result = w->result();
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit projectsReady(requestId, result.rows);
             w->deleteLater();
           });
   w->setFuture(QtConcurrent::run([]() {
-    QVariantList rows;
-    const QString c = QStringLiteral("local_sessions_projects_%1")
-                          .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
-    if (!db.isOpen())
-      return rows;
+    SessionQueryResult result;
+    auto &rows = result.rows;
+    SessionConnection connection(QStringLiteral("local_sessions_projects_"));
+    auto &db = connection.db;
+    if (!db.isOpen()) {
+      result.error = QStringLiteral("session-database-unavailable");
+      return result;
+    }
+    if (!connection.snapshotStarted) {
+      result.error = QStringLiteral("session-query-failed");
+      return result;
+    }
     QSqlQuery q(db);
     if (q.exec(QStringLiteral(
             "SELECT s.tool_id,s.project_id,COALESCE(a.alias,''),COUNT(DISTINCT "
@@ -1517,9 +1603,10 @@ void LocalSessionModel::requestProjects(const QString &requestId) {
         r.insert("sessionCount", q.value(3));
         rows.append(r);
       }
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
-    return rows;
+    else
+      result.error = QStringLiteral("session-query-failed");
+    if (q.lastError().isValid())
+      result.error = QStringLiteral("session-query-failed");
+    return result;
   }));
 }

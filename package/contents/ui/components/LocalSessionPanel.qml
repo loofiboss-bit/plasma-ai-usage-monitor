@@ -72,6 +72,14 @@ ColumnLayout {
     property bool restoringState: false
     property string selectedToolId: "codex-cli"
     property string selectedProjectId: ""
+    property var selectedModelFilter: ({})
+    property string projectSearch: ""
+    property string queryErrorKey: ""
+    property string projectErrorKey: ""
+    property var pendingQueryIds: []
+    property bool summaryCurrent: false
+    readonly property bool hasNextPage: summaryCurrent && !loading && queryErrorText === ""
+        && pageOffset + sessionRows.length < Number(summary.sessionCount || 0)
     property int selectedRangeIndex: 1
     property int pageOffset: 0
     property string selectedSessionId: ""
@@ -81,8 +89,9 @@ ColumnLayout {
     property var summary: ({})
     property bool loading: false
     property string statusText: ""
-    readonly property string queryErrorText: String(summary.errorText
-        || summary.error || "")
+    readonly property string queryErrorText: (queryErrorKey || projectErrorKey) === "session-database-unavailable"
+        ? i18n("The local session database is unavailable. Try again.")
+        : (queryErrorKey || projectErrorKey) !== "" ? i18n("Session data could not be loaded. Try again.") : ""
     property string summaryRequestId: ""
     property string sessionsRequestId: ""
     property string dailyRequestId: ""
@@ -99,7 +108,7 @@ ColumnLayout {
         ? mediaSessionModel : sessionModel
 
     signal sessionHistoryRequested(string toolId, string projectId, int rangeDays,
-                                   string sessionId, int pageOffset)
+                                   string sessionId, int pageOffset, var modelFilter)
     signal filtersChanged(string toolId, string projectId, int rangeDays)
     Accessible.role: Accessible.Pane
     Accessible.name: i18n("Local coding session history")
@@ -125,6 +134,9 @@ ColumnLayout {
         if (!sessionState || restoringState) return;
         sessionState.toolId = selectedToolId;
         sessionState.projectId = selectedProjectId;
+        sessionState.modelFilter = selectedModelFilter;
+        sessionState.projectSearch = projectSearch;
+        sessionState.breakdownIndex = breakdownIndex;
         sessionState.rangeIndex = selectedRangeIndex;
         sessionState.pageOffset = pageOffset;
         sessionState.sessionId = selectedSessionId;
@@ -135,6 +147,9 @@ ColumnLayout {
         restoringState = true;
         selectedToolId = String(sessionState.toolId || initialToolId || selectedToolId);
         selectedProjectId = String(sessionState.projectId || initialProjectId || "");
+        selectedModelFilter = sessionState.modelFilter || ({});
+        projectSearch = String(sessionState.projectSearch || "");
+        breakdownIndex = Math.max(0, Math.min(2, Number(sessionState.breakdownIndex || 0)));
         selectedRangeIndex = Math.max(0, Math.min(2,
             Number(sessionState.rangeIndex === undefined
                 ? ([1, 7, 30].indexOf(Number(initialRangeDays)) < 0 ? 1
@@ -162,16 +177,68 @@ ColumnLayout {
 
     function displayedProjects() {
         var rows = [{ label: i18n("All projects"), projectId: "" }];
+        var ordinal = 0;
+        var search = projectSearch.trim().toLocaleLowerCase();
         for (var i = 0; i < projectRows.length; ++i) {
             var row = projectRows[i] || {};
             if (row.toolId !== activeToolId) continue;
+            var anonymous = i18n("Unnamed project %1", ++ordinal);
             var alias = String(row.alias || "").trim();
-            rows.push({
-                label: alias || i18n("Unnamed project %1", rows.length),
-                projectId: String(row.projectId || "")
-            });
+            if (search && (alias + " " + anonymous).toLocaleLowerCase().indexOf(search) < 0) continue;
+            rows.push({ label: alias || anonymous, projectId: String(row.projectId || "") });
         }
         return rows;
+    }
+
+    function modelOptions() {
+        var rows = [{ label: i18n("All models"), filter: ({}) }];
+        var options = summary.modelOptions || [];
+        for (var i = 0; i < options.length; ++i) {
+            var name = String(options[i].modelId || "");
+            rows.push({ label: name || i18n("Unknown model"), filter: {modelId: name} });
+        }
+        return rows;
+    }
+
+    function modelIndex() {
+        if (selectedModelFilter.modelId === undefined) return 0;
+        var rows = modelOptions();
+        for (var i = 1; i < rows.length; ++i)
+            if (rows[i].filter.modelId === selectedModelFilter.modelId) return i;
+        return -1;
+    }
+
+    function filtersUpdated() {
+        pageOffset = 0;
+        selectedSessionId = "";
+        persistState();
+        refresh();
+        filtersChanged(activeToolId, selectedProjectId, rangeDays);
+    }
+
+    function completeQuery(requestId) {
+        pendingQueryIds = pendingQueryIds.filter(function(id) { return id !== requestId; });
+        loading = pendingQueryIds.length > 0;
+    }
+
+    function drillDown(projectId, modelFilter) {
+        persistState();
+        sessionHistoryRequested(activeToolId, projectId, rangeDays, "", 0, modelFilter);
+    }
+
+    function restoreBreakdownFocus() {
+        if (!sessionState || presentationMode !== "analysis") return;
+        var key = String(sessionState.focusKey || "");
+        var list = breakdownIndex === 1 && key.indexOf("model:") === 0 ? modelBreakdownList
+            : breakdownIndex === 2 && key.indexOf("project:") === 0 ? projectBreakdownList : null;
+        if (!list || list.count === 0) return;
+        var index = Math.max(0, Math.min(list.count - 1, Number(sessionState.focusIndex || 0)));
+        list.positionViewAtIndex(index, ListView.Contain);
+        list.forceLayout();
+        Qt.callLater(function() {
+            var row = list.itemAtIndex(index);
+            if (row) row.focusAction();
+        });
     }
 
     function projectIndex() {
@@ -179,7 +246,7 @@ ColumnLayout {
         for (var i = 0; i < rows.length; ++i) {
             if (rows[i].projectId === selectedProjectId) return i;
         }
-        return 0;
+        return selectedProjectId === "" ? 0 : -1;
     }
 
     function dateText(value) {
@@ -218,7 +285,7 @@ ColumnLayout {
 
     function openSessionHistory() {
         sessionHistoryRequested(activeToolId, selectedProjectId, rangeDays,
-                                selectedSessionId, pageOffset);
+                                selectedSessionId, pageOffset, selectedModelFilter);
     }
 
     function coverageText(value) {
@@ -228,14 +295,23 @@ ColumnLayout {
         if (value === "partial-counter-reset") return i18n("Partial after a counter reset");
         if (value === "conflict") return i18n("Conflicting records");
         if (value === "unverified_lineage") return i18n("Unverified fork or agent history");
-        return value ? String(value) : i18n("Coverage unavailable");
+        if (value === "partial-retention") return i18n("Partial history after retention cleanup");
+        if (value === "partial-clear-rebaseline") return i18n("Partial history after clearing and rebuilding usage counters");
+        if (value === "partial-identity") return i18n("Partial history because session identity is uncertain");
+        if (value === "partial-lineage") return i18n("Partial history because fork or agent history is uncertain");
+        if (value === "partial-usage") return i18n("Partial history because some usage records are unavailable");
+        if (value === "partial-conflict") return i18n("Partial history because records conflict");
+        return i18n("Coverage unavailable");
     }
 
     function projectLabel(projectId) {
+        var ordinal = 0;
         for (var i = 0; i < projectRows.length; ++i) {
+            if (projectRows[i].toolId !== activeToolId) continue;
+            ++ordinal;
             if (projectRows[i].projectId === projectId) {
                 var alias = String(projectRows[i].alias || "").trim();
-                return alias || i18n("Unnamed project");
+                return alias || i18n("Unnamed project %1", ordinal);
             }
         }
         return i18n("Project unavailable");
@@ -245,8 +321,8 @@ ColumnLayout {
         var names = [];
         rows = rows || [];
         for (var i = 0; i < rows.length; ++i) {
-            if (rows[i].modelId && names.indexOf(rows[i].modelId) < 0)
-                names.push(rows[i].modelId);
+            var name = String(rows[i].modelId || "") || i18n("Unknown model");
+            if (names.indexOf(name) < 0) names.push(name);
         }
         return names;
     }
@@ -257,6 +333,7 @@ ColumnLayout {
             projectRows = [];
             return;
         }
+        projectErrorKey = "";
         projectsRequestId = "session-projects-" + requestPrefix
             + "-" + (++requestGeneration);
         activeSessionModel.requestProjects(projectsRequestId);
@@ -265,6 +342,12 @@ ColumnLayout {
     function refresh() {
         if (!sessionModel || !selectedToolEnabled()) {
             loading = false;
+            pendingQueryIds = [];
+            summaryCurrent = false;
+            summaryRequestId = "";
+            sessionsRequestId = "";
+            dailyRequestId = "";
+            queryErrorKey = "";
             sessionRows = [];
             summary = ({});
             return;
@@ -273,15 +356,21 @@ ColumnLayout {
         var generation = ++requestGeneration;
         summaryRequestId = "session-summary-" + requestPrefix + "-" + generation;
         sessionsRequestId = "session-list-" + requestPrefix + "-" + generation;
+        dailyRequestId = "session-daily-" + requestPrefix + "-" + generation;
+        pendingQueryIds = [summaryRequestId, sessionsRequestId, dailyRequestId];
         loading = true;
+        summaryCurrent = false;
+        queryErrorKey = "";
+        sessionRows = [];
+        dailyRows = [];
+        summary = ({});
         statusText = "";
         activeSessionModel.requestSummary(summaryRequestId, activeToolId,
-            range.from, range.to, selectedProjectId);
+            range.from, range.to, selectedProjectId, selectedModelFilter);
         activeSessionModel.requestSessions(sessionsRequestId, activeToolId,
-            range.from, range.to, selectedProjectId, pageOffset, 100);
-        dailyRequestId = "session-daily-" + requestPrefix + "-" + generation;
+            range.from, range.to, selectedProjectId, pageOffset, 100, selectedModelFilter);
         activeSessionModel.requestDaily(dailyRequestId, activeToolId,
-            range.from, range.to, selectedProjectId, "");
+            range.from, range.to, selectedProjectId, "", selectedModelFilter);
     }
 
     function openExport(format) {
@@ -298,7 +387,7 @@ ColumnLayout {
             + "-" + (++requestGeneration);
         statusText = i18n("Writing redacted export…");
         activeSessionModel.requestExport(exportRequestId, activeToolId,
-            range.from, range.to, selectedProjectId, pendingExportFormat, path);
+            range.from, range.to, selectedProjectId, pendingExportFormat, path, selectedModelFilter);
     }
 
     function localPath(url) {
@@ -317,7 +406,7 @@ ColumnLayout {
     function acceptSessionRows(requestId, rows) {
         if (requestId !== sessionsRequestId) return;
         sessionRows = rows || [];
-        loading = false;
+        completeQuery(requestId);
         var found = false;
         var selectedIndex = -1;
         for (var i = 0; i < sessionRows.length; ++i) {
@@ -351,17 +440,19 @@ ColumnLayout {
         function onProjectsReady(requestId, rows) {
             if (requestId !== panel.projectsRequestId) return;
             panel.projectRows = rows || [];
+            panel.projectErrorKey = "";
             if (panel.selectedProjectId !== ""
-                    && panel.projectIndex() === 0) {
+                    && !panel.projectRows.some(function(row) { return row.projectId === panel.selectedProjectId && row.toolId === panel.activeToolId; })) {
                 panel.selectedProjectId = "";
-                panel.persistState();
-                panel.refresh();
+                panel.filtersUpdated();
             }
         }
 
         function onSummaryReady(requestId, payload) {
             if (requestId !== panel.summaryRequestId) return;
             panel.summary = payload || {};
+            panel.summaryCurrent = true;
+            panel.completeQuery(requestId);
         }
 
         function onSessionsReady(requestId, rows) {
@@ -371,6 +462,17 @@ ColumnLayout {
         function onDailyReady(requestId, rows) {
             if (requestId !== panel.dailyRequestId) return;
             panel.dailyRows = rows || [];
+            panel.completeQuery(requestId);
+        }
+
+        function onQueryFailed(requestId, errorKey) {
+            if (requestId === panel.projectsRequestId) {
+                panel.projectErrorKey = errorKey || "session-query-failed";
+                return;
+            }
+            if (panel.pendingQueryIds.indexOf(requestId) < 0) return;
+            panel.queryErrorKey = errorKey || "session-query-failed";
+            panel.completeQuery(requestId);
         }
 
         function onExportReady(requestId, errorKey) {
@@ -419,11 +521,7 @@ ColumnLayout {
                 onActivated: {
                     panel.selectedToolId = currentValue;
                     panel.selectedProjectId = "";
-                    panel.pageOffset = 0;
-                    panel.persistState();
-                    panel.refresh();
-                    panel.filtersChanged(panel.activeToolId, panel.selectedProjectId,
-                                         panel.rangeDays);
+                    panel.filtersUpdated();
                 }
             }
 
@@ -434,12 +532,17 @@ ColumnLayout {
                 Accessible.name: i18n("Session period")
                 onActivated: {
                     panel.selectedRangeIndex = currentIndex;
-                    panel.pageOffset = 0;
-                    panel.persistState();
-                    panel.refresh();
-                    panel.filtersChanged(panel.activeToolId, panel.selectedProjectId,
-                                         panel.rangeDays);
+                    panel.filtersUpdated();
                 }
+            }
+
+            QQC2.TextField {
+                objectName: "sessionProjectSearch"
+                Layout.fillWidth: true
+                placeholderText: i18n("Search projects")
+                Accessible.name: placeholderText
+                text: panel.projectSearch
+                onTextEdited: { panel.projectSearch = text; panel.persistState(); }
             }
 
             QQC2.ComboBox {
@@ -451,11 +554,45 @@ ColumnLayout {
                 Accessible.name: i18n("Session project")
                 onActivated: {
                     panel.selectedProjectId = currentValue || "";
-                    panel.pageOffset = 0;
-                    panel.persistState();
-                    panel.refresh();
-                    panel.filtersChanged(panel.activeToolId, panel.selectedProjectId,
-                                         panel.rangeDays);
+                    panel.filtersUpdated();
+                }
+            }
+
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                visible: panel.projectSearch.trim() !== "" && panel.displayedProjects().length === 1
+                text: i18n("No projects match this search.")
+                wrapMode: Text.WordWrap
+                color: Kirigami.Theme.disabledTextColor
+            }
+
+            QQC2.ComboBox {
+                objectName: "sessionModelPicker"
+                Layout.fillWidth: true
+                model: panel.modelOptions()
+                textRole: "label"
+                currentIndex: panel.modelIndex()
+                Accessible.name: i18n("Session model")
+                onActivated: {
+                    panel.selectedModelFilter = model[currentIndex].filter;
+                    panel.filtersUpdated();
+                }
+            }
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                visible: panel.selectedProjectId !== "" || panel.selectedModelFilter.modelId !== undefined
+                text: i18n("Active filter: %1 · %2", panel.selectedProjectId ? panel.projectLabel(panel.selectedProjectId) : i18n("All projects"),
+                    panel.selectedModelFilter.modelId === undefined ? i18n("All models") : panel.selectedModelFilter.modelId || i18n("Unknown model"))
+                wrapMode: Text.WordWrap
+            }
+            PlasmaComponents.Button {
+                text: i18n("Clear filters")
+                visible: panel.selectedProjectId !== "" || panel.selectedModelFilter.modelId !== undefined || panel.projectSearch !== ""
+                onClicked: {
+                    panel.selectedProjectId = "";
+                    panel.selectedModelFilter = ({});
+                    panel.projectSearch = "";
+                    panel.filtersUpdated();
                 }
             }
 
@@ -543,6 +680,13 @@ ColumnLayout {
         Accessible.name: text
     }
 
+    PlasmaComponents.Button {
+        objectName: "sessionQueryRetry"
+        visible: panel.queryErrorText !== ""
+        text: i18n("Try again")
+        onClicked: { panel.loadProjects(); panel.refresh(); }
+    }
+
     QQC2.ComboBox {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled() && panel.presentationMode !== "summary"
@@ -553,7 +697,7 @@ ColumnLayout {
             ? panel.breakdownIndex : panel.historyDisplayIndex
         Accessible.name: i18n("Session breakdown")
         onActivated: {
-            if (panel.presentationMode === "analysis") panel.breakdownIndex = currentIndex;
+            if (panel.presentationMode === "analysis") { panel.breakdownIndex = currentIndex; panel.persistState(); }
             else panel.historyDisplayIndex = currentIndex;
         }
     }
@@ -653,8 +797,15 @@ ColumnLayout {
                 level: 5
                 text: i18n("By model")
             }
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                visible: Number(panel.summary.modelBreakdownTotalCount || 0) > (panel.summary.modelBreakdown || []).length
+                text: i18n("Showing %1 of %2", (panel.summary.modelBreakdown || []).length, panel.summary.modelBreakdownTotalCount || 0)
+            }
             ListView {
                 id: modelBreakdownList
+                onCountChanged: Qt.callLater(panel.restoreBreakdownFocus)
+                onVisibleChanged: if (visible) Qt.callLater(panel.restoreBreakdownFocus)
                 objectName: "sessionModelBreakdownList"
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(
@@ -671,12 +822,21 @@ ColumnLayout {
 
                 delegate: ColumnLayout {
                     id: modelBreakdownRow
+                    required property int index
                     required property var modelData
+                    function focusAction() { modelBreakdownButton.forceActiveFocus(Qt.TabFocusReason); }
                     width: modelBreakdownList.width
-                    PlasmaComponents.Label {
+                    QQC2.Button {
+                        id: modelBreakdownButton
                         Layout.fillWidth: true
-                        text: modelBreakdownRow.modelData.modelId || i18n("Model unavailable")
-                        elide: Text.ElideRight
+                        text: modelBreakdownRow.modelData.modelId || i18n("Unknown model")
+                        onClicked: {
+                            if (panel.sessionState) {
+                                panel.sessionState.focusKey = "model:" + String(modelBreakdownRow.modelData.modelId || "");
+                                panel.sessionState.focusIndex = modelBreakdownRow.index;
+                            }
+                            panel.drillDown(panel.selectedProjectId, {modelId: String(modelBreakdownRow.modelData.modelId || "")});
+                        }
                     }
                     PlasmaComponents.Label {
                         id: modelUsageValue
@@ -711,8 +871,15 @@ ColumnLayout {
                 level: 5
                 text: i18n("By project")
             }
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                visible: Number(panel.summary.projectBreakdownTotalCount || 0) > (panel.summary.projectBreakdown || []).length
+                text: i18n("Showing %1 of %2", (panel.summary.projectBreakdown || []).length, panel.summary.projectBreakdownTotalCount || 0)
+            }
             ListView {
                 id: projectBreakdownList
+                onCountChanged: Qt.callLater(panel.restoreBreakdownFocus)
+                onVisibleChanged: if (visible) Qt.callLater(panel.restoreBreakdownFocus)
                 objectName: "sessionProjectBreakdownList"
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(
@@ -729,13 +896,21 @@ ColumnLayout {
 
                 delegate: ColumnLayout {
                     id: projectBreakdownRow
+                    required property int index
                     required property var modelData
+                    function focusAction() { projectBreakdownButton.forceActiveFocus(Qt.TabFocusReason); }
                     width: projectBreakdownList.width
-                    PlasmaComponents.Label {
+                    QQC2.Button {
+                        id: projectBreakdownButton
                         Layout.fillWidth: true
-                        text: String(projectBreakdownRow.modelData.alias || "").trim()
-                            || i18n("Unnamed project")
-                        elide: Text.ElideRight
+                        text: panel.projectLabel(projectBreakdownRow.modelData.projectId)
+                        onClicked: {
+                            if (panel.sessionState) {
+                                panel.sessionState.focusKey = "project:" + String(projectBreakdownRow.modelData.projectId || "");
+                                panel.sessionState.focusIndex = projectBreakdownRow.index;
+                            }
+                            panel.drillDown(String(projectBreakdownRow.modelData.projectId || ""), panel.selectedModelFilter);
+                        }
                     }
                     PlasmaComponents.Label {
                         id: projectUsageValue
@@ -892,6 +1067,12 @@ ColumnLayout {
                             sessionDelegate.modelData.modelBreakdown).join(", "))
                         wrapMode: Text.WordWrap
                     }
+                    PlasmaComponents.Label {
+                        Layout.fillWidth: true
+                        visible: Number(sessionDelegate.modelData.modelBreakdownTotalCount || 0) > (sessionDelegate.modelData.modelBreakdown || []).length
+                        text: i18n("Showing %1 of %2 models", (sessionDelegate.modelData.modelBreakdown || []).length, sessionDelegate.modelData.modelBreakdownTotalCount || 0)
+                        wrapMode: Text.WordWrap
+                    }
                     PlasmaComponents.Button {
                         text: i18n("Open this filter in History")
                         visible: panel.fixedToolId !== ""
@@ -899,7 +1080,7 @@ ColumnLayout {
                         Accessible.name: text
                         onClicked: panel.sessionHistoryRequested(
                             panel.activeToolId, panel.selectedProjectId, panel.rangeDays,
-                            panel.selectedSessionId, panel.pageOffset)
+                            panel.selectedSessionId, panel.pageOffset, panel.selectedModelFilter)
                     }
                 }
             }
@@ -939,7 +1120,8 @@ ColumnLayout {
         }
         PlasmaComponents.Button {
             text: i18n("Next")
-            enabled: panel.sessionRows.length === 100 && !panel.loading
+            objectName: "sessionNextPage"
+            enabled: panel.hasNextPage
             onClicked: {
                 panel.pageOffset += 100;
                 panel.persistState();

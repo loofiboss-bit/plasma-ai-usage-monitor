@@ -13,6 +13,7 @@ Kirigami.ScrollablePage {
     required property var monitor
     property var sessionState: null
     property var viewState: null
+    signal sessionHistoryRequested(string toolId, string projectId, int rangeDays, string sessionId, int pageOffset, var modelFilter)
     property bool sessionsMode: false
     property bool coverageExpanded: false
     property bool driversExpanded: false
@@ -242,6 +243,28 @@ Kirigami.ScrollablePage {
         x: Math.max(0, (analystPage.availableWidth - width) / 2)
         spacing: Kirigami.Units.largeSpacing
 
+        Controls.ComboBox {
+            objectName: "insightsModePicker"
+            Layout.fillWidth: true
+            model: [i18n("Usage insights"), i18n("Coding sessions")]
+            currentIndex: analystPage.sessionsMode ? 1 : 0
+            Accessible.name: i18n("Insights mode")
+            onActivated: analystPage.sessionsMode = currentIndex === 1
+        }
+        Components.LocalSessionPanel {
+            id: analysisSessions
+            Layout.fillWidth: true
+            visible: analystPage.sessionsMode
+            presentationMode: "analysis"
+            sessionModel: analystPage.monitor ? analystPage.monitor.localSessions : null
+            sessionState: analystPage.sessionState
+            onSessionHistoryRequested: function(toolId, projectId, rangeDays, sessionId, pageOffset, modelFilter) {
+                analystPage.sessionHistoryRequested(toolId, projectId, rangeDays, sessionId, pageOffset, modelFilter);
+            }
+        }
+        ColumnLayout {
+            Layout.fillWidth: true
+            visible: !analystPage.sessionsMode
         Controls.BusyIndicator {
             Layout.alignment: Qt.AlignHCenter
             visible: analystState.loading
@@ -621,6 +644,7 @@ Kirigami.ScrollablePage {
                 }
             }
 
+        }
         }
 
     onSessionStateChanged: {
