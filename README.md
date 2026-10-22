@@ -26,6 +26,10 @@ The screenshots below use deterministic synthetic fixtures.
 
 The COPR package is the supported Fedora installation. It includes both the Plasma widget and the compiled Qt plugin.
 
+Fedora 44 remains the release baseline. Fedora 45 prerelease readiness is checked by a dedicated build/test job and an RPM build, test, and clean-install job using Fedora 45 packages. These container checks do not qualify a physical Plasma session, scaling, screen readers, wallet access, or browser sync. Fedora 45 COPR publication is a separate release step; this candidate does not promise an already published Fedora 45 package.
+
+Use `just fedora44-check` or `just fedora45-check` on the matching release. For isolated RPM upgrade/rollback checks, `just rpm-lifecycle-check BASE_RPM CANDIDATE_RPM 45` selects Fedora 45 (the default remains 44). Unsigned locally built candidates require the explicit `ALLOW_UNSIGNED_LOCAL_TEST_RPMS=1` opt-in, which applies only to local RPM transactions inside disposable test containers.
+
 ~~~bash
 sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor
 sudo dnf install plasma-ai-usage-monitor

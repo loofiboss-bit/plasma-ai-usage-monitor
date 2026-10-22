@@ -4,6 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+FEDORA_VERSION="${1:-44}"
+if [[ $# -gt 1 || ! "$FEDORA_VERSION" =~ ^(44|45)$ ]]; then
+  echo "Usage: $0 [44|45]" >&2
+  exit 2
+fi
+
 failures=0
 warnings=0
 
@@ -42,7 +48,7 @@ check_rpm() {
   fi
 }
 
-echo "=== Plasma AI Usage Monitor Fedora 44 Release Check ==="
+echo "=== Plasma AI Usage Monitor Fedora ${FEDORA_VERSION} Release Check ==="
 echo
 
 OS_ID="unknown"
@@ -56,12 +62,12 @@ if [[ -f /etc/os-release ]]; then
   OS_PRETTY="${PRETTY_NAME:-unknown}"
 fi
 
-if [[ "$OS_ID" == "fedora" && "$OS_VERSION" == "44" ]]; then
-  ok "Fedora version is 44 (${OS_PRETTY})"
+if [[ "$OS_ID" == "fedora" && "$OS_VERSION" == "$FEDORA_VERSION" ]]; then
+  ok "Fedora version is ${FEDORA_VERSION} (${OS_PRETTY})"
 elif [[ "$OS_ID" == "fedora" ]]; then
-  fail "Fedora version is ${OS_VERSION}, expected 44" "Run this gate inside Fedora KDE 44 or a fedora:44 validation container."
+  fail "Fedora version is ${OS_VERSION}, expected ${FEDORA_VERSION}" "Run this gate inside Fedora KDE ${FEDORA_VERSION} or a fedora:${FEDORA_VERSION} validation container."
 else
-  fail "OS is ${OS_PRETTY}, expected Fedora 44" "Run this gate inside Fedora KDE 44 or a fedora:44 validation container."
+  fail "OS is ${OS_PRETTY}, expected Fedora ${FEDORA_VERSION}" "Run this gate inside Fedora KDE ${FEDORA_VERSION} or a fedora:${FEDORA_VERSION} validation container."
 fi
 
 if command -v plasmashell >/dev/null 2>&1; then
@@ -158,8 +164,8 @@ if python3 scripts/check_package_payload.py; then ok "Package payload"; else fai
 
 echo
 if [[ "$failures" -gt 0 ]]; then
-  echo "Fedora 44 check: FAIL (${failures} failures, ${warnings} warnings)"
+  echo "Fedora ${FEDORA_VERSION} check: FAIL (${failures} failures, ${warnings} warnings)"
   exit 1
 fi
 
-echo "Fedora 44 check: PASS (${warnings} warnings)"
+echo "Fedora ${FEDORA_VERSION} check: PASS (${warnings} warnings)"
