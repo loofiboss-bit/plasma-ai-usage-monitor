@@ -1070,7 +1070,9 @@ ColumnLayout {
             && panel.presentationMode === "analysis" && panel.breakdownIndex === 1
             && !panel.loading && (panel.summary.modelBreakdown || []).length === 0
             && panel.queryErrorText === ""
-        text: i18n("No model usage was recorded for this period.")
+        text: panel.selectedProjectId !== "" || panel.selectedModelFilter.modelId !== undefined
+            ? i18n("No model usage matches the active filters. Clear filters or choose a different period.")
+            : i18n("No model usage was recorded for this period.")
         color: Kirigami.Theme.disabledTextColor
         wrapMode: Text.WordWrap
     }
@@ -1082,7 +1084,9 @@ ColumnLayout {
             && panel.presentationMode === "analysis" && panel.breakdownIndex === 2
             && !panel.loading && (panel.summary.projectBreakdown || []).length === 0
             && panel.queryErrorText === ""
-        text: i18n("No project usage was recorded for this period.")
+        text: panel.selectedProjectId !== "" || panel.selectedModelFilter.modelId !== undefined
+            ? i18n("No project usage matches the active filters. Clear filters or choose a different period.")
+            : i18n("No project usage was recorded for this period.")
         color: Kirigami.Theme.disabledTextColor
         wrapMode: Text.WordWrap
     }
@@ -1240,11 +1244,17 @@ ColumnLayout {
             }
         }
         PlasmaComponents.Label {
+            objectName: "sessionPageRangeLabel"
             Layout.fillWidth: true
             horizontalAlignment: Text.AlignHCenter
             text: panel.sessionRows.length > 0
-                ? i18n("Rows %1–%2", panel.pageOffset + 1,
-                       panel.pageOffset + panel.sessionRows.length)
+                ? (panel.summaryCurrent
+                    && Number(panel.summary.sessionCount || 0) >= panel.pageOffset + panel.sessionRows.length
+                    ? i18n("Rows %1–%2 of %3", panel.pageOffset + 1,
+                           panel.pageOffset + panel.sessionRows.length,
+                           panel.countText(panel.summary.sessionCount))
+                    : i18n("Rows %1–%2", panel.pageOffset + 1,
+                           panel.pageOffset + panel.sessionRows.length))
                 : i18n("No rows")
         }
         PlasmaComponents.Button {

@@ -6,18 +6,13 @@
 
 AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
 
-The **25.0.0 release (Searchable Session History)** is a local release candidate.
-It adds searchable project choices, exact model filters, and consistent filtered
-session summaries, details, and manual exports. Database errors offer retry,
-coverage explains incomplete imports, and bounded analysis lists show their
-full match count. Publication and physical desktop qualification remain pending.
+The **25.0.0 release (Searchable Session History)** adds searchable project
+choices, exact model filters, and consistent filtered session summaries,
+details, and manual exports. Database errors offer retry, coverage explains
+incomplete imports, and bounded analysis lists show their full match count.
 See the [session user guide](docs/user-guide/coding-sessions.md),
-[implementation plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V25_PLAN.md), and
-[qualification checklist](docs/release/v25.0.0-checklist.md).
-The reserved candidate release URL is
-[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v25.0.0);
-it is not publication evidence. Find existing published builds under
-[latest published release](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/latest).
+[qualification checklist](docs/release/v25.0.0-checklist.md), and
+[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v25.0.0).
 The screenshots below use deterministic synthetic fixtures.
 
 ![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)

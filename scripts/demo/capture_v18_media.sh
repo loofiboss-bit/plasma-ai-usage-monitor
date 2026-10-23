@@ -25,6 +25,8 @@ if [[ "${AI_USAGE_V18_CAPTURE_INNER:-0}" != "1" ]]; then
   }
   trap 'cleanup_virtual' EXIT
   dbus-run-session -- env \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
     HOME="$VIRTUAL_ROOT/home" \
     XDG_CONFIG_HOME="$VIRTUAL_ROOT/config" \
     XDG_CACHE_HOME="$VIRTUAL_ROOT/cache" \
@@ -252,6 +254,8 @@ capture_view() {
   XDG_CONFIG_HOME="$view_config_home" kwriteconfig6 \
     --file plasmarc --group Theme --key name breeze-dark
 
+  LANG=C.UTF-8 \
+  LC_ALL=C.UTF-8 \
   HOME="$view_home" \
   XDG_DATA_HOME="$view_data_home" \
   XDG_DATA_DIRS="$PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \
@@ -409,6 +413,8 @@ capture_panel() {
   # The quoted script expands its variables inside the isolated D-Bus session.
   # shellcheck disable=SC2016
   setsid dbus-run-session -- env \
+    LANG=C.UTF-8 \
+    LC_ALL=C.UTF-8 \
     HOME="$panel_home" \
     XDG_DATA_HOME="$panel_data_home" \
     XDG_DATA_DIRS="$PREFIX/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}" \

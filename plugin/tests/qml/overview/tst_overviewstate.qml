@@ -201,9 +201,9 @@ TestCase {
         verify(facts[0].label.indexOf("five-hour") >= 0);
         verify(facts[0].value.indexOf("resets in") >= 0);
         verify(facts[1].label.indexOf("today") >= 0);
-        verify(facts[1].value.indexOf("4.5") >= 0);
-        verify(facts[1].value.indexOf("20.00") < 0);
-        verify(facts[1].value.indexOf("1.00") < 0);
+        verify(facts[1].value.indexOf("4.5") >= 0 || facts[1].value.indexOf("4,5") >= 0);
+        verify(facts[1].value.indexOf("20.00") < 0 && facts[1].value.indexOf("20,00") < 0);
+        verify(facts[1].value.indexOf("1.00") < 0 && facts[1].value.indexOf("1,00") < 0);
     }
 
     function test_compactNumbersUseLocaleAndNonBreakingSpacing() {

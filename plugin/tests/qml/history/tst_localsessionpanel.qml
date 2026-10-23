@@ -64,16 +64,24 @@ TestCase {
         for (var i = 0; i < Math.min(100, data.count); ++i) rows.push({sessionId: String(i)});
         database.sessionsReady(panel.sessionsRequestId, rows);
         verify(!panel.hasNextPage);
+        if (rows.length > 0)
+            compare(findChild(panel, "sessionPageRangeLabel").text, "Rows 1–" + rows.length);
         database.summaryReady(panel.summaryRequestId, {sessionCount: data.count});
         verify(panel.loading);
         database.dailyReady(panel.dailyRequestId, []);
         compare(panel.hasNextPage, data.count > 100);
+        if (rows.length > 0)
+            compare(findChild(panel, "sessionPageRangeLabel").text,
+                    "Rows 1–" + rows.length + " of " + data.count);
+        else
+            compare(findChild(panel, "sessionPageRangeLabel").text, "No rows");
         if (data.count === 200) {
             panel.pageOffset = 100;
             panel.refresh();
             verify(!panel.hasNextPage);
             finish(200, rows);
             verify(!panel.hasNextPage);
+            compare(findChild(panel, "sessionPageRangeLabel").text, "Rows 101–200 of 200");
         }
     }
     function test_errors_retry_empty_and_stale() {
@@ -270,8 +278,19 @@ TestCase {
         panel.historyDisplayIndex = 1;
         verify(findChild(panel, "sessionDailyEmptyState").visible);
         verify(findChild(panel, "sessionDailyEmptyState").text.indexOf("active filters") >= 0);
+        panel.presentationMode = "analysis";
+        panel.breakdownIndex = 1;
+        verify(findChild(panel, "sessionModelEmptyState").visible);
+        verify(findChild(panel, "sessionModelEmptyState").text.indexOf("active filters") >= 0);
+        panel.breakdownIndex = 2;
+        verify(findChild(panel, "sessionProjectEmptyState").visible);
+        verify(findChild(panel, "sessionProjectEmptyState").text.indexOf("active filters") >= 0);
         findChild(panel, "sessionClearFilters").clicked();
+        finish(0);
         compare(panel.selectedModelFilter.modelId, undefined);
+        verify(findChild(panel, "sessionProjectEmptyState").text.indexOf("active filters") < 0);
+        panel.breakdownIndex = 1;
+        verify(findChild(panel, "sessionModelEmptyState").text.indexOf("active filters") < 0);
     }
     function test_restored_daily_view_and_model_search_with_old_state_default() {
         panel.sessionState = {toolId: "codex-cli", historyDisplayIndex: 1,

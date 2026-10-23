@@ -83,7 +83,7 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
-* Thu Oct 22 2026 Loofi <loofi@github.com> - 25.0.0-1
+* Fri Oct 23 2026 Loofi <loofi@github.com> - 25.0.0-1
 - Prepare v25.0.0 release
 
 * Mon Oct 12 2026 Loofi <loofi@github.com> - 24.2.0-1

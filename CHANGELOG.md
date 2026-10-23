@@ -7,9 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [25.0.0] — 2026-10-22
-
-Local release candidate; publication and manual desktop qualification pending.
+## [25.0.0] — 2026-10-23
 
 ### Added
 
