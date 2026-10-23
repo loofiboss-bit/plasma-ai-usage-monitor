@@ -3121,19 +3121,19 @@ QVariantMap UsageDatabase::pruneResult()
     if (!m_initialized) return operationResult(QStringLiteral("failed"), m_errorKey);
     if (!m_db.transaction()) return operationResult(QStringLiteral("failed"), QStringLiteral("maintenance-busy"));
     const QString cutoff = toDbDateTimeString(QDateTime::currentDateTimeUtc().addDays(-m_retentionDays));
-    const QList<QPair<QString, QString>> tables{
-        {QStringLiteral("usage_snapshots"), QStringLiteral("timestamp")},
-        {QStringLiteral("rate_limit_events"), QStringLiteral("timestamp")},
-        {QStringLiteral("subscription_tool_usage"), QStringLiteral("timestamp")},
-        {QStringLiteral("observations"), QStringLiteral("observed_at_utc")},
-        {QStringLiteral("guardrail_events"), QStringLiteral("observed_at_utc")},
-        {QStringLiteral("estimate_provenance"), QStringLiteral("observed_at_utc")},
-        {QStringLiteral("budget_policy_events"), QStringLiteral("created_at_utc")}
+    static const QStringList pruneQueries{
+        QStringLiteral("DELETE FROM usage_snapshots WHERE datetime(timestamp) < datetime(?)"),
+        QStringLiteral("DELETE FROM rate_limit_events WHERE datetime(timestamp) < datetime(?)"),
+        QStringLiteral("DELETE FROM subscription_tool_usage WHERE datetime(timestamp) < datetime(?)"),
+        QStringLiteral("DELETE FROM observations WHERE datetime(observed_at_utc) < datetime(?)"),
+        QStringLiteral("DELETE FROM guardrail_events WHERE datetime(observed_at_utc) < datetime(?)"),
+        QStringLiteral("DELETE FROM estimate_provenance WHERE datetime(observed_at_utc) < datetime(?)"),
+        QStringLiteral("DELETE FROM budget_policy_events WHERE datetime(created_at_utc) < datetime(?)")
     };
     qint64 deleted = 0;
-    for (const auto &table : tables) {
-        QSqlQuery query(m_db);
-        query.prepare(QStringLiteral("DELETE FROM %1 WHERE datetime(%2) < datetime(?)").arg(table.first, table.second));
+    QSqlQuery query(m_db);
+    for (const QString &queryString : pruneQueries) {
+        query.prepare(queryString);
         query.addBindValue(cutoff);
         if (!query.exec()) {
             m_db.rollback();
