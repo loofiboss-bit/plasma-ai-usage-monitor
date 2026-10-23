@@ -1812,35 +1812,37 @@ QVariantList UsageDatabase::getHistoryCatalog() const
     }
 
     const QStringList tools = getToolNames();
-    for (const QString &tool : tools) {
+    if (!tools.isEmpty()) {
         QSqlQuery query(m_db);
         query.prepare(
             QStringLiteral("SELECT MIN(timestamp), MAX(timestamp), COUNT(*), "
                            "SUM(CASE WHEN usage_limit > 0 THEN 1 ELSE 0 END) "
                            "FROM subscription_tool_usage WHERE tool_name = ?"));
-        query.addBindValue(tool);
-        if (!query.exec() || !query.next()) {
-            continue;
-        }
+        for (const QString &tool : tools) {
+            query.bindValue(0, tool);
+            if (!query.exec() || !query.next()) {
+                continue;
+            }
 
-        QStringList metrics{QStringLiteral("usageCount")};
-        if (query.value(3).toInt() > 0) {
-            metrics.append(QStringLiteral("percentUsed"));
-            metrics.append(QStringLiteral("remaining"));
-        }
+            QStringList metrics{QStringLiteral("usageCount")};
+            if (query.value(3).toInt() > 0) {
+                metrics.append(QStringLiteral("percentUsed"));
+                metrics.append(QStringLiteral("remaining"));
+            }
 
-        QVariantMap row;
-        row.insert(QStringLiteral("historyId"), QStringLiteral("tool:") + tool);
-        row.insert(QStringLiteral("dbName"), tool);
-        row.insert(QStringLiteral("displayName"), tool);
-        row.insert(QStringLiteral("sourceKind"), QStringLiteral("tool"));
-        row.insert(QStringLiteral("metricKinds"), metrics);
-        row.insert(QStringLiteral("sampleCount"), query.value(2).toInt());
-        row.insert(QStringLiteral("firstObservation"),
-                   parseSnapshotTimestamp(query.value(0).toString()));
-        row.insert(QStringLiteral("lastObservation"),
-                   parseSnapshotTimestamp(query.value(1).toString()));
-        catalog.append(row);
+            QVariantMap row;
+            row.insert(QStringLiteral("historyId"), QStringLiteral("tool:") + tool);
+            row.insert(QStringLiteral("dbName"), tool);
+            row.insert(QStringLiteral("displayName"), tool);
+            row.insert(QStringLiteral("sourceKind"), QStringLiteral("tool"));
+            row.insert(QStringLiteral("metricKinds"), metrics);
+            row.insert(QStringLiteral("sampleCount"), query.value(2).toInt());
+            row.insert(QStringLiteral("firstObservation"),
+                       parseSnapshotTimestamp(query.value(0).toString()));
+            row.insert(QStringLiteral("lastObservation"),
+                       parseSnapshotTimestamp(query.value(1).toString()));
+            catalog.append(row);
+        }
     }
 
     return catalog;
