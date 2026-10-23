@@ -1812,18 +1812,19 @@ QVariantList UsageDatabase::getHistoryCatalog() const
     }
 
     const QStringList tools = getToolNames();
-    for (const QString &tool : tools) {
+    if (!tools.isEmpty()) {
         QSqlQuery query(m_db);
         query.prepare(
             QStringLiteral("SELECT MIN(timestamp), MAX(timestamp), COUNT(*), "
                            "SUM(CASE WHEN usage_limit > 0 THEN 1 ELSE 0 END) "
                            "FROM subscription_tool_usage WHERE tool_name = ?"));
-        query.addBindValue(tool);
-        if (!query.exec() || !query.next()) {
-            continue;
-        }
+        for (const QString &tool : tools) {
+            query.bindValue(0, tool);
+            if (!query.exec() || !query.next()) {
+                continue;
+            }
 
-        QStringList metrics{QStringLiteral("usageCount")};
+            QStringList metrics{QStringLiteral("usageCount")};
         if (query.value(3).toInt() > 0) {
             metrics.append(QStringLiteral("percentUsed"));
             metrics.append(QStringLiteral("remaining"));
@@ -1841,6 +1842,7 @@ QVariantList UsageDatabase::getHistoryCatalog() const
         row.insert(QStringLiteral("lastObservation"),
                    parseSnapshotTimestamp(query.value(1).toString()));
         catalog.append(row);
+        }
     }
 
     return catalog;
