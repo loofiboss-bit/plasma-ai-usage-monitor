@@ -338,8 +338,11 @@ private:
                             const QString &usageSource,
                             const QString &dataQuality,
                             const QVariantMap &provenance);
+
+public:
     void ensureColumnExists(const QString &table, const QString &column, const QString &definition);
 
+private:
     QSqlDatabase m_db;
     QString m_connectionName;
     bool m_enabled = true;
