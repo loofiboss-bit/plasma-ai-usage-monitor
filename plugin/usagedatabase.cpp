@@ -2352,22 +2352,25 @@ QVariantList UsageDatabase::getProviderSeries(const QStringList &providers,
     }
 
     const int bucketSecs = effectiveBucketSeconds(fromUtc, toUtc, bucketMinutes);
+    const QString fromDbStr = toDbDateTimeString(fromUtc);
+    const QString toDbStr = toDbDateTimeString(toUtc);
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT timestamp, cost, input_tokens, output_tokens, request_count, "
+        "rl_requests, rl_requests_remaining, currency "
+        "FROM usage_snapshots "
+        "WHERE provider = ? AND timestamp >= ? AND timestamp <= ? "
+        "ORDER BY timestamp ASC"));
 
     for (const QString &provider : providers) {
         if (provider.isEmpty()) {
             continue;
         }
 
-        QSqlQuery query(m_db);
-        query.prepare(QStringLiteral(
-            "SELECT timestamp, cost, input_tokens, output_tokens, request_count, "
-            "rl_requests, rl_requests_remaining, currency "
-            "FROM usage_snapshots "
-            "WHERE provider = ? AND timestamp >= ? AND timestamp <= ? "
-            "ORDER BY timestamp ASC"));
-        query.addBindValue(provider);
-        query.addBindValue(toDbDateTimeString(fromUtc));
-        query.addBindValue(toDbDateTimeString(toUtc));
+        query.bindValue(0, provider);
+        query.bindValue(1, fromDbStr);
+        query.bindValue(2, toDbStr);
 
         if (!query.exec()) {
             qWarning() << "UsageDatabase: getProviderSeries query failed for"
@@ -2465,21 +2468,24 @@ QVariantList UsageDatabase::getToolSeries(const QStringList &tools,
     }
 
     const int bucketSecs = effectiveBucketSeconds(fromUtc, toUtc, bucketMinutes);
+    const QString fromDbStr = toDbDateTimeString(fromUtc);
+    const QString toDbStr = toDbDateTimeString(toUtc);
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT timestamp, usage_count, usage_limit "
+        "FROM subscription_tool_usage "
+        "WHERE tool_name = ? AND timestamp >= ? AND timestamp <= ? "
+        "ORDER BY timestamp ASC"));
 
     for (const QString &tool : tools) {
         if (tool.isEmpty()) {
             continue;
         }
 
-        QSqlQuery query(m_db);
-        query.prepare(QStringLiteral(
-            "SELECT timestamp, usage_count, usage_limit "
-            "FROM subscription_tool_usage "
-            "WHERE tool_name = ? AND timestamp >= ? AND timestamp <= ? "
-            "ORDER BY timestamp ASC"));
-        query.addBindValue(tool);
-        query.addBindValue(toDbDateTimeString(fromUtc));
-        query.addBindValue(toDbDateTimeString(toUtc));
+        query.bindValue(0, tool);
+        query.bindValue(1, fromDbStr);
+        query.bindValue(2, toDbStr);
 
         if (!query.exec()) {
             qWarning() << "UsageDatabase: getToolSeries query failed for" << tool
