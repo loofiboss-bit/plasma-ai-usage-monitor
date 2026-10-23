@@ -1943,11 +1943,10 @@ QVariantList LocalSessionModel::projectAliases() const {
 
 bool LocalSessionModel::setProjectAlias(const QString &projectId,
                                         const QString &alias) {
+  static const QRegularExpression validProjectId(
+      QStringLiteral("^[0-9a-f]{64}$"));
   const QString name = alias.trimmed();
-  if (projectId.size() != 64 ||
-      !QRegularExpression(QStringLiteral("^[0-9a-f]{64}$"))
-           .match(projectId)
-           .hasMatch() ||
+  if (projectId.size() != 64 || !validProjectId.match(projectId).hasMatch() ||
       name.size() > 80 || alias.contains(QChar::Null))
     return false;
   const QString connection = QStringLiteral("local_sessions_alias_%1")
