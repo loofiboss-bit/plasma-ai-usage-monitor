@@ -1,7 +1,7 @@
 # V25 — Searchable and reliable session history
 
-- **Target release:** `25.0.0`
-- **Status:** follow-up implemented and locally qualified; see the V25 release checklist for fresh evidence and manual limits.
+- **Target release:** `25.0.1`
+- **Status:** V25 features qualified; public correction 25.0.1 adds the RPM test dependency found during COPR publication. See the 25.0.1 checklist for fresh publication evidence and limits.
 
 ## Goal and boundaries
 
@@ -9,7 +9,10 @@ Prepare a local 25.0.0 candidate from current origin/main, including the catalog
 fix following 24.2.0, without changing older checkouts. Answer which sessions and
 reported tokens belong to a selected project and model. Preserve independent
 Codex/Claude Code consent, retention, privacy and nullable token semantics.
-No commit, push, publication or host installation is part of this task.
+This describes the original feature preparation. The subsequent 2026-10-23 V25
+launch authorizes publication. Version 25.0.1 retains these features and formats,
+adds the missing `kf6-kcmutils` RPM build requirement and Fedora 43 package CI,
+and preserves the published 25.0.0 tag.
 
 ## Query and interface changes
 

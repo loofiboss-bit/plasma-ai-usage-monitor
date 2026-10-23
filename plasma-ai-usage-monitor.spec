@@ -1,5 +1,5 @@
 Name:           plasma-ai-usage-monitor
-Version:        25.0.0
+Version:        25.0.1
 Release:        1%{?dist}
 Summary:        KDE Plasma 6 widget for truthful AI usage, quota, resets, and spend
 License:        GPL-3.0-or-later
@@ -17,6 +17,7 @@ BuildRequires:  kf6-kwallet-devel
 BuildRequires:  kf6-ki18n-devel
 BuildRequires:  kf6-knotifications-devel
 BuildRequires:  kf6-kcoreaddons-devel
+BuildRequires:  kf6-kcmutils
 BuildRequires:  libappstream-glib
 BuildRequires:  openssl-devel
 BuildRequires:  protobuf-compiler
@@ -85,6 +86,9 @@ appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.githu
 %{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
 %changelog
+* Fri Oct 23 2026 Loofi <loofi@github.com> - 25.0.1-1
+- Prepare v25.0.1 release
+
 * Fri Oct 23 2026 Loofi <loofi@github.com> - 25.0.0-1
 - Prepare v25.0.0 release
 

@@ -16,13 +16,14 @@ KWallet and history stays on your computer.
 [Latest release](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/latest) ·
 [Report a problem](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues)
 
-The **25.0.0 release (Searchable Session History)** adds searchable local
-project and model filters, daily and custom
-date views, consistent session summaries, and manual JSON/CSV exports. Session
-import is optional for each tool. Read the
-[session guide](docs/user-guide/coding-sessions.md) or the
-[release notes](docs/release/v25.0.0-notes.md) and
-[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v25.0.0).
+The **25.0.1 release (Searchable Session History)** includes V25's searchable
+local project and model filters, daily and custom date views, consistent session
+summaries, and manual JSON/CSV exports. This patch fixes a missing RPM build-test
+dependency found during COPR publication; session behavior and data formats are
+unchanged. Session import remains optional for each tool. Read the
+[session guide](docs/user-guide/coding-sessions.md),
+[release notes](docs/release/v25.0.1-notes.md), or
+[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v25.0.1).
 
 ![AI Usage Monitor Overview in the Plasma popup](assets/screenshots/overview-popup.png)
 
