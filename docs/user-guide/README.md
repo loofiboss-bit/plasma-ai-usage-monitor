@@ -1,10 +1,24 @@
 # User guide
 
-Install both required parts, verify one useful source in **Guided first
-success**, and learn what the result can prove before adding alerts or
-integrations. Budget Control then keeps current attention, typed cost policies,
-deterministic quota runway, retained history and analysis coverage consistent
-across the popup.
+AI Usage Monitor is a KDE Plasma 6 widget for AI provider usage, tool quotas,
+and optional local coding-session history. Start with one source; you can add
+budgets, alerts and integrations later.
+
+**New here?** [Install both required parts](installation.md), add **AI Usage
+Monitor** through Plasma's **Add Widgets** menu, then follow
+[first setup](getting-started.md). Fedora users only need the complete COPR
+package. The KDE Store download requires the matching native plugin.
+
+## Find the right task
+
+| I want to… | Read |
+| --- | --- |
+| Install, upgrade, or fix a version mismatch | [Installation](installation.md) |
+| Monitor a tool without setting up an API provider | [First setup](getting-started.md) and [tool sources](subscriptions.md) |
+| Search Codex or Claude Code tokens by project, model, or date | [Coding sessions](coding-sessions.md#try-it-with-one-tool) |
+| Connect an API provider | [Providers and permissions](providers.md) |
+| Understand missing values or estimates | [Understanding the data](understanding-data.md) |
+| Repair a source or collect a safe support report | [Troubleshooting](troubleshooting.md) |
 
 ## Set up the widget
 

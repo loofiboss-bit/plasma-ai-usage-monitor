@@ -7,6 +7,67 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [25.0.0] — 2026-10-23
+
+### Added
+
+- Add one-action search/filter reset in Overview and Sources without changing
+  monitoring settings.
+- Show Codex and Claude Code import health independently, with running and last
+  completed scan details, imported-event counts, and bounded reason keys.
+- Add inclusive custom calendar-date ranges to session history and activate
+  daily totals for filtered per-day session drilldown.
+
+- Add case-insensitive project search across local aliases and anonymous project
+  labels, with complete project choices independent of bounded analysis lists.
+- Add case-insensitive search over complete model choices while keeping the
+  active selection visible and leaving data filters unchanged until selection.
+- Add exact reported-model and unknown-model filtering to session summaries,
+  daily totals, session lists/details, and manual JSON/CSV exports.
+- Open filtered History sessions from project and model analysis rows while
+  preserving navigation context.
+
+### Fixed
+
+- Bind RPM package tests to the shipped catalog regardless of build path or
+  other installed widget versions.
+- Keep deleted Codex usage excluded across empty rescans and restarts; only
+  validated post-deletion session metadata permits a full first snapshot.
+- Skip oversized JSONL records with bounded, resumable reads so later records
+  are not blocked and partial record tails cannot become events.
+- Reject late Overview session summaries from destroyed view instances.
+- Distinguish filtered search misses from a genuinely empty attention list.
+- Keep the selected project visible during chooser searches.
+- Present every source verification state explicitly; unknown and waiting
+  states no longer imply success, and configuration/degraded states warn.
+
+- Distinguish failed database queries from valid empty history, offer retry,
+  finish loading after errors, and ignore superseded query responses.
+- Explain importer coverage in localized language without exposing status codes.
+- Report total matching project/model counts alongside bounded 100-row analysis
+  lists, with deterministic ties and complete aggregate totals.
+- Use the matching summary's session count for pagination and reset session
+  selection and page after filter changes.
+- Preserve unavailable token categories as JSON null in manual session exports.
+- Restore session/day mode, model search, selected-session focus and scroll
+  through navigation, including virtualized session rows.
+- Clamp pages after completed queries when refreshed or retained history shrinks.
+- Freeze export filters and format when opening the dialog; prevent overlapping
+  exports and retain localized, typed export status across history refreshes.
+- Stream JSON/CSV exports to private atomic files without buffering all events.
+- Clean up registered database connections on failed opens and early returns.
+- Resume large imports fairly by skipping unchanged completed files, rotating
+  pending files, and prioritizing new arrivals within the existing limits.
+- Verify Codex append-cache prefixes before reusing parser context, including
+  same-inode rewrites that grow the file.
+- Use one local-day UTC interval for custom-range summaries, lists, daily totals
+  and exports; restore daily focus and scroll after returning from a day.
+
+### Changed
+
+- Prepare 25.0.0 metadata and session guidance while preserving SQLite schema v9,
+  configuration schema v3, session-export schema v1, and existing export formats.
+
 ## [24.2.0] — 2026-10-12
 
 ### Added

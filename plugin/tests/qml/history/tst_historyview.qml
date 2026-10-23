@@ -1,6 +1,7 @@
 import QtQuick
 import QtTest
 import "../../../../package/contents/ui/views" as Views
+import "../../../../package/contents/ui" as MonitorUi
 
 TestCase {
     id: testCase
@@ -22,6 +23,10 @@ TestCase {
         property var lastTo: null
         property int exportRequestCount: 0
         property string lastExportFormat: ""
+        property bool codexEnabled: true
+        property bool claudeCodeEnabled: true
+        property int retentionDays: 30
+        property var sessionRanges: ({})
 
         signal observationsChanged()
         signal historyCatalogReady(string requestId, var sources)
@@ -53,6 +58,26 @@ TestCase {
             lastBucketMinutes = bucketMinutes;
             return "history-export-" + format;
         }
+
+        function requestProjects(requestId) {}
+        function requestSummary(requestId, toolId, from, to, projectId, filter) {
+            sessionRanges.summary = {toolId: toolId, from: from, to: to,
+                                     projectId: projectId, filter: filter};
+        }
+        function requestSessions(requestId, toolId, from, to, projectId,
+                                 offset, limit, filter) {
+            sessionRanges.sessions = {toolId: toolId, from: from, to: to,
+                                      projectId: projectId, filter: filter};
+        }
+        function requestDaily(requestId, toolId, from, to, projectId, zone, filter) {
+            sessionRanges.daily = {toolId: toolId, from: from, to: to,
+                                   projectId: projectId, filter: filter};
+        }
+        function requestExport(requestId, toolId, from, to, projectId,
+                               format, path, filter) {
+            sessionRanges.export = {toolId: toolId, from: from, to: to,
+                                    projectId: projectId, filter: filter};
+        }
     }
 
     QtObject {
@@ -75,9 +100,27 @@ TestCase {
         property var localSessions: null
     }
 
+    QtObject {
+        id: fullMonitor
+        property var usageDb: fakeDb
+        property var presentationDailyState: null
+        property var allProviders: fakeMonitor.allProviders
+        property var allSubscriptionTools: fakeMonitor.allSubscriptionTools
+        property var localSessions: fakeDb
+        function refreshAll() {}
+    }
+
     Component {
         id: historyViewComponent
         Views.HistoryView {
+            width: 1000
+            height: 700
+        }
+    }
+
+    Component {
+        id: fullRepresentationComponent
+        MonitorUi.FullRepresentation {
             width: 1000
             height: 700
         }
@@ -95,6 +138,7 @@ TestCase {
         fakeDb.lastTo = null;
         fakeDb.exportRequestCount = 0;
         fakeDb.lastExportFormat = "";
+        fakeDb.sessionRanges = ({});
     }
 
     function storedSources() {
@@ -273,7 +317,9 @@ TestCase {
                 projectId: "project-42",
                 rangeIndex: 2,
                 pageOffset: 100,
-                sessionId: "session-42"
+                sessionId: "session-42",
+                modelSearch: "sonnet",
+                historyDisplayIndex: 1
             }
         };
         var view = createTemporaryObject(historyViewComponent, testCase);
@@ -309,6 +355,8 @@ TestCase {
         compare(view.sessionState.rangeIndex, 2);
         compare(view.sessionState.pageOffset, 100);
         compare(view.sessionState.sessionId, "session-42");
+        compare(view.sessionState.modelSearch, "sonnet");
+        compare(view.sessionState.historyDisplayIndex, 1);
         flickable.contentY = 170;
         compare(view.captureViewState().contentY, 170);
         compare(findChild(view, "historySessionsPanel").selectedToolId,
@@ -323,6 +371,8 @@ TestCase {
         compare(captured.sessionToolId, "claude-code");
         compare(captured.session.projectId, "project-42");
         compare(captured.session.pageOffset, 100);
+        compare(captured.session.modelSearch, "sonnet");
+        compare(captured.session.historyDisplayIndex, 1);
         compare(captured.selectedMetric, "usageCount");
         compare(captured.compareMode, true);
     }
@@ -358,5 +408,124 @@ TestCase {
         compare(sessionsPanel.selectedRangeIndex, 2);
         compare(sessionsPanel.pageOffset, 80);
         compare(sessionsPanel.selectedSessionId, "session-42");
+    }
+
+    function test_fullRepresentationRoutesDayAndRestoresHistoryStateInLoadedView() {
+        var originalSessionState = {
+            toolId: "claude-code",
+            projectId: "project-42",
+            modelFilter: {modelId: "sonnet"},
+            rangeIndex: 3,
+            rangeMode: "custom",
+            customStartDate: "2026-10-01",
+            customEndDate: "2026-10-20",
+            historyDisplayIndex: 1,
+            dayDrilldown: false,
+            dailyScrollY: 80
+        };
+        var full = createTemporaryObject(fullRepresentationComponent, testCase, {
+            monitor: fullMonitor,
+            destination: 1,
+            historySessionsMode: true,
+            historySessionToolId: "claude-code",
+            historySessionProjectId: "project-42",
+            localSessionViewState: {
+                sourceDetail: ({}), history: originalSessionState,
+                analyst: ({})
+            }
+        });
+        verify(full !== null);
+        var loader = findChild(full, "destinationLoader");
+        verify(loader !== null);
+        tryCompare(loader, "status", Loader.Ready);
+        var view = loader.item;
+        verify(view !== null);
+        compare(view.sessionsMode, true);
+        var panel = findChild(view, "historySessionsPanel");
+        verify(panel !== null);
+        compare(panel.selectedToolId, "claude-code");
+        compare(panel.selectedProjectId, "project-42");
+        compare(panel.selectedModelFilter.modelId, "sonnet");
+        compare(panel.selectedRangeIndex, 3);
+
+        view.sessionHistoryRangeRequested({
+            toolId: "claude-code", projectId: "project-42",
+            modelFilter: {modelId: "sonnet"},
+            startDate: "2026-10-20", endDate: "2026-10-20",
+            dayDrilldown: true
+        });
+        tryCompare(panel, "selectedRangeIndex", 3);
+        compare(loader.item, view);
+        tryCompare(panel, "customStartDate", "2026-10-20");
+        compare(panel.customEndDate, "2026-10-20");
+        compare(panel.selectedToolId, "claude-code");
+        compare(panel.selectedProjectId, "project-42");
+        compare(panel.selectedModelFilter.modelId, "sonnet");
+        verify(panel.sessionState.dayDrilldown);
+
+        panel.refresh();
+        var expectedRange = panel.localRange();
+        compare(fakeDb.sessionRanges.summary.from, expectedRange.from);
+        compare(fakeDb.sessionRanges.summary.to, expectedRange.to);
+        compare(fakeDb.sessionRanges.sessions.from, expectedRange.from);
+        compare(fakeDb.sessionRanges.daily.from, expectedRange.from);
+
+        var returnButton = findChild(panel, "sessionDayDrilldownReturn");
+        verify(returnButton !== null);
+        returnButton.clicked();
+        tryCompare(panel, "customStartDate", "2026-10-01");
+        compare(loader.item, view);
+        compare(panel.customEndDate, "2026-10-20");
+        compare(panel.selectedToolId, "claude-code");
+        compare(panel.selectedProjectId, "project-42");
+        compare(panel.selectedModelFilter.modelId, "sonnet");
+        compare(panel.sessionState.dayDrilldown, false);
+        compare(panel.sessionState.dailyScrollY, 80);
+    }
+
+    function test_fullRepresentationPresetHandoffClearsCustomAndDayState() {
+        var full = createTemporaryObject(fullRepresentationComponent, testCase, {
+            monitor: fullMonitor,
+            destination: 1,
+            historySessionsMode: true,
+            localSessionViewState: {
+                sourceDetail: ({}),
+                history: {
+                    toolId: "claude-code", projectId: "project-42",
+                    rangeIndex: 3, rangeMode: "custom",
+                    customStartDate: "2026-10-01", customEndDate: "2026-10-20",
+                    dayDrilldown: true, dayFocusDate: "2026-10-20",
+                    dailyScrollY: 100
+                },
+                analyst: ({})
+            }
+        });
+        verify(full !== null);
+        var loader = findChild(full, "destinationLoader");
+        verify(loader !== null);
+        tryCompare(loader, "status", Loader.Ready);
+
+        full.destination = 2;
+        tryCompare(loader, "status", Loader.Ready);
+        tryVerify(function() { return loader.item && typeof loader.item.captureViewState === "function"; });
+        full.routeToSessionHistory("codex-cli", "project-new", 7,
+                                   "session-42", 100, {modelId: "gpt-5-codex"});
+        tryVerify(function() {
+            return loader.item && typeof loader.item.applyViewState === "function"
+                && loader.item.sessionsMode === true;
+        });
+        var panel = findChild(loader.item, "historySessionsPanel");
+        verify(panel !== null);
+        compare(panel.selectedToolId, "codex-cli");
+        compare(panel.selectedProjectId, "project-new");
+        compare(panel.selectedRangeIndex, 1);
+        compare(panel.sessionState.rangeMode, "preset");
+        compare(panel.customStartDate, "");
+        compare(panel.customEndDate, "");
+        compare(panel.sessionState.dayDrilldown, false);
+        compare(full.sessionDayReturnState, null);
+        compare(panel.selectedSessionId, "session-42");
+        compare(panel.pageOffset, 100);
+        compare(panel.selectedModelFilter.modelId, "gpt-5-codex");
     }
 }

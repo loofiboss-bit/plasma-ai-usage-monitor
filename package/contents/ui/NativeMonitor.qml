@@ -5,6 +5,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import com.github.loofi.aiusagemonitor 1.0
 import "Utils.js" as Utils
+import "SourceVerification.js" as Verification
 import "components" as Components
 
 Item {
@@ -190,21 +191,12 @@ Item {
     }
 
     function settingsVerificationMessage(source) {
-        var state = source.readinessStateKey || "failed";
-        if (state === "reporting_actual")
-            return i18n("Verification succeeded and returned supported usage or spend data.");
-        if (state === "reporting_estimate")
-            return i18n("Verification succeeded and returned estimated or local activity data.");
-        if (state === "connected_connectivity_only")
-            return i18n("Verification succeeded. This source confirms connectivity only.");
-        if (state === "degraded")
-            return source.nextActionText || i18n("Verification completed with degraded data.");
-        return source.nextActionText || i18n("Verification failed. Review the source configuration and retry.");
+        return Verification.message(source);
     }
 
     function finishSettingsVerification(source) {
         if (!source || source.stableId !== pendingSettingsVerificationSourceId) return;
-        var state = source.readinessStateKey || "failed";
+        var state = source.readinessStateKey || "";
         if (state === "verifying" || state === "ready_to_verify") return;
         Plasmoid.configuration.settingsVerificationState = state;
         Plasmoid.configuration.settingsVerificationMessage = root.settingsVerificationMessage(source);

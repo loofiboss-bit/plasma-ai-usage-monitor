@@ -69,7 +69,7 @@ QQC2.ScrollView {
     signal settingsRequested(string stableId)
     signal historyRequested(string historyId, string metric, int rangeDays)
     signal sessionHistoryRequested(string toolId, string projectId, int rangeDays,
-                                   string sessionId, int pageOffset)
+                                   string sessionId, int pageOffset, var modelFilter)
     Accessible.role: Accessible.Pane
     Accessible.name: sourceData.displayName
         ? i18n("%1 source details", sourceData.displayName)
@@ -737,9 +737,9 @@ QQC2.ScrollView {
             sessionState: detail.sessionState
             presentationMode: "summary"
             onSessionHistoryRequested: function(toolId, projectId, rangeDays,
-                                                sessionId, pageOffset) {
+                                                sessionId, pageOffset, modelFilter) {
                 detail.sessionHistoryRequested(toolId, projectId, rangeDays,
-                                               sessionId, pageOffset);
+                                               sessionId, pageOffset, modelFilter);
             }
         }
 

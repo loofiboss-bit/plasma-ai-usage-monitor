@@ -1,6 +1,8 @@
 #include "localsessionparser.h"
 
 #include <QCryptographicHash>
+#include <QDateTime>
+#include <QIODevice>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -57,6 +59,52 @@ bool containsUnverifiedLineage(const QJsonValue &value, int depth = 0) {
 } // namespace
 
 namespace LocalSessionParser {
+JsonlReadResult readJsonlRecord(QIODevice &device, qint64 byteBudget,
+                                const std::function<bool()> &cancelled) {
+  JsonlReadResult result;
+  constexpr qint64 maxRecordBytes = 1024 * 1024;
+  const qint64 start = device.pos();
+  if (start > 0) {
+    if (!device.seek(start - 1)) {
+      result.interrupted = true;
+      return result;
+    }
+    const QByteArray preceding = device.read(1);
+    if (!device.seek(start) || preceding.size() != 1) {
+      result.interrupted = true;
+      return result;
+    }
+    result.discarded = preceding != "\n";
+  }
+  while (!device.atEnd()) {
+    if (result.bytesRead >= byteBudget || (cancelled && cancelled())) {
+      result.interrupted = true;
+      break;
+    }
+    const qint64 chunkSize =
+        qMin<qint64>(64 * 1024, byteBudget - result.bytesRead);
+    const QByteArray chunk = device.readLine(chunkSize + 1);
+    if (chunk.isEmpty()) {
+      result.interrupted = true;
+      break;
+    }
+    result.bytesRead += chunk.size();
+    if (!result.discarded) {
+      if (result.line.size() + chunk.size() > maxRecordBytes) {
+        result.discarded = true;
+        result.line.clear();
+      } else {
+        result.line.append(chunk);
+      }
+    }
+    if (chunk.endsWith('\n')) {
+      result.complete = true;
+      break;
+    }
+  }
+  return result;
+}
+
 QByteArray identity(const QByteArray &key, const QByteArray &kind,
                     const QByteArray &value) {
   QByteArray input = kind;
@@ -241,6 +289,16 @@ bool updateCodexContext(const QByteArray &line, QVariantMap *context) {
                   safeModel(payload.value(QStringLiteral("model")).toString()));
   context->insert(QStringLiteral("sessionId"), session);
   context->insert(QStringLiteral("cwd"), cwd);
+  const QString createdText =
+      payload.value(QStringLiteral("timestamp")).toString();
+  const QDateTime created =
+      QDateTime::fromString(createdText, Qt::ISODateWithMs);
+  // A local wall-clock time cannot prove which side of the UTC clear cutoff
+  // this session was created on, even if Qt can parse it using the host zone.
+  static const QRegularExpression explicitZone(
+      QStringLiteral("(?:Z|[+-][0-9]{2}:[0-9]{2})$"));
+  if (created.isValid() && explicitZone.match(createdText).hasMatch())
+    context->insert(QStringLiteral("createdAtUtc"), created.toUTC());
   if (containsUnverifiedLineage(payload))
     context->insert(QStringLiteral("lineageUnverified"), true);
   return true;

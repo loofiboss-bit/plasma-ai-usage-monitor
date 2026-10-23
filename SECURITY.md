@@ -20,8 +20,12 @@ The project aims to acknowledge reports within 48 hours. Fix timing depends on s
 
 | Release line | Security updates |
 | --- | --- |
-| 24.x | Supported |
-| 23.x and older | Upgrade to the current 24.x release |
+| 25.x | Supported |
+| 24.x and older | Upgrade to the current published release |
+
+25.0.0 currently describes supported candidate source, not a published package.
+Until publication, 24.2.0 remains the current published release and its security
+reports are accepted.
 
 ## In scope
 
@@ -54,6 +58,11 @@ Requests use timeouts and the refresh scheduler respects retry guidance. Authent
 Browser Sync is disabled by default. Cookie databases are read through a native boundary, and temporary copies use owner-only permissions. Cookie values do not enter QML, logs, diagnostics, history, or exports.
 
 ### Local data
+
+Session model filters operate
+on allow-listed usage events; project aliases and search text remain local and
+are excluded from manual session exports, as are local paths. Codex and Claude
+Code session import each require their own opt-in.
 
 Usage history stays in a local SQLite database. The widget has no telemetry,
 hosted backend, or cloud sync. The optional Prometheus endpoint binds to

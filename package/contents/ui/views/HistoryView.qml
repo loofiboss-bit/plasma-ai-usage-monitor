@@ -32,6 +32,8 @@ ColumnLayout {
     property bool applyingViewState: false
     property bool restoreScrollPending: false
     property real savedContentY: 0
+    signal sessionHistoryRangeRequested(var selection)
+    signal sessionDayReturnRequested()
     Accessible.name: historyController.loading
         ? i18n("History view loading")
         : i18n("History view ready")
@@ -134,7 +136,20 @@ ColumnLayout {
         var session = ({
             toolId: sessionsPanel ? sessionsPanel.selectedToolId : sessionToolId,
             projectId: sessionsPanel ? sessionsPanel.selectedProjectId : sessionProjectId,
+            modelFilter: sessionsPanel ? sessionsPanel.selectedModelFilter : ({}),
+            projectSearch: sessionsPanel ? sessionsPanel.projectSearch : "",
+            modelSearch: sessionsPanel ? sessionsPanel.modelSearch : "",
+            historyDisplayIndex: sessionsPanel ? sessionsPanel.historyDisplayIndex : 0,
             rangeIndex: sessionsPanel ? sessionsPanel.selectedRangeIndex : 1,
+            rangeMode: sessionsPanel && sessionsPanel.selectedRangeIndex === 3 ? "custom" : "preset",
+            customStartDate: sessionsPanel ? sessionsPanel.customStartDate : "",
+            customEndDate: sessionsPanel ? sessionsPanel.customEndDate : "",
+            dayDrilldown: sessionsPanel && sessionsPanel.sessionState
+                ? !!sessionsPanel.sessionState.dayDrilldown : false,
+            dayFocusDate: sessionsPanel && sessionsPanel.sessionState
+                ? String(sessionsPanel.sessionState.dayFocusDate || "") : "",
+            dailyScrollY: sessionsPanel && sessionsPanel.sessionState
+                ? Number(sessionsPanel.sessionState.dailyScrollY || 0) : 0,
             pageOffset: sessionsPanel ? sessionsPanel.pageOffset : 0,
             sessionId: sessionsPanel ? sessionsPanel.selectedSessionId : ""
         });
@@ -168,8 +183,18 @@ ColumnLayout {
             sessionState = ({});
         sessionState.toolId = String(session.toolId || sessionToolId);
         sessionState.projectId = String(session.projectId || sessionProjectId);
-        sessionState.rangeIndex = Math.max(0, Math.min(2,
+        sessionState.modelFilter = session.modelFilter || ({});
+        sessionState.projectSearch = String(session.projectSearch || "");
+        sessionState.modelSearch = String(session.modelSearch || "");
+        sessionState.historyDisplayIndex = Number(session.historyDisplayIndex) === 1 ? 1 : 0;
+        sessionState.rangeIndex = Math.max(0, Math.min(3,
             Number(session.rangeIndex === undefined ? 1 : session.rangeIndex)));
+        sessionState.rangeMode = session.rangeMode === "custom" ? "custom" : "preset";
+        sessionState.customStartDate = String(session.customStartDate || "");
+        sessionState.customEndDate = String(session.customEndDate || "");
+        sessionState.dayDrilldown = session.dayDrilldown === true;
+        sessionState.dayFocusDate = String(session.dayFocusDate || "");
+        sessionState.dailyScrollY = Math.max(0, Number(session.dailyScrollY || 0));
         sessionState.pageOffset = Math.max(0, Number(session.pageOffset || 0));
         sessionState.sessionId = String(session.sessionId || "");
         sessionsPanel.restoreState();
@@ -577,6 +602,10 @@ ColumnLayout {
                     history.sessionProjectId = projectId;
                     history.requestedRangeDays = rangeDays;
                 }
+                onSessionHistoryRangeRequested: function(selection) {
+                    history.sessionHistoryRangeRequested(selection);
+                }
+                onSessionDayReturnRequested: history.sessionDayReturnRequested()
             }
 
         }

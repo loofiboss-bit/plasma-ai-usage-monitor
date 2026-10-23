@@ -17,6 +17,8 @@ QQC2.ScrollView {
     property var monitor: null
     property string sourceSearchText: ""
     property int sourceFilterIndex: 0
+    readonly property string sessionSummaryRequestPrefix: Date.now().toString(36)
+        + "-" + Math.random().toString(36).slice(2)
     property int sessionSummaryGeneration: 0
     property var sessionSummaryRequests: ({})
     property var sessionSummaryLatestByTool: ({})
@@ -33,6 +35,7 @@ QQC2.ScrollView {
 
     Components.DailyOverviewState {
         id: overviewState
+        objectName: "overviewState"
         dailyState: overview.monitor.presentationDailyState
     }
 
@@ -99,6 +102,8 @@ QQC2.ScrollView {
             { id: "codex-cli", enabled: !!model.codexEnabled },
             { id: "claude-code", enabled: !!model.claudeCodeEnabled }
         ];
+        // Superseded requests cannot update the current source state.
+        sessionSummaryRequests = ({});
         for (var i = 0; i < tools.length; ++i) {
             if (!tools[i].enabled) {
                 var disabledState = Object.assign({}, sessionSummaryByTool);
@@ -109,8 +114,8 @@ QQC2.ScrollView {
                 sessionSummaryLatestByTool = latestDisabled;
                 continue;
             }
-            var requestId = "overview-session-summary-"
-                + (++sessionSummaryGeneration);
+            var requestId = "overview-session-summary-" + sessionSummaryRequestPrefix
+                + "-" + (++sessionSummaryGeneration);
             var requests = Object.assign({}, sessionSummaryRequests);
             requests[requestId] = tools[i].id;
             sessionSummaryRequests = requests;
@@ -131,6 +136,7 @@ QQC2.ScrollView {
         if (!Object.prototype.hasOwnProperty.call(sessionSummaryByTool, stableId))
             return i18n("Loading session summary…");
         var summary = sessionSummaryByTool[stableId] || ({});
+        if (summary.queryFailed) return i18n("Session summary unavailable. It will be retried automatically.");
         var count = Math.max(0, Number(summary.sessionCount || 0));
         var lastActivity = Date.parse(summary.lastActivityAtUtc || "");
         var activityText = Number.isFinite(lastActivity)
@@ -144,20 +150,27 @@ QQC2.ScrollView {
                 ? i18n(" · partial import") : "");
     }
 
+    function acceptSessionSummary(requestId, summary, failed) {
+        var toolId = sessionSummaryRequests[requestId];
+        if (!toolId) return;
+        var requests = Object.assign({}, sessionSummaryRequests);
+        delete requests[requestId];
+        sessionSummaryRequests = requests;
+        if (sessionSummaryLatestByTool[toolId] !== requestId) return;
+        var next = Object.assign({}, sessionSummaryByTool);
+        next[toolId] = failed ? {queryFailed: true} : summary || {};
+        sessionSummaryByTool = next;
+    }
+
     Connections {
         target: overview.monitor ? overview.monitor.localSessions : null
         enabled: overview.monitor !== null && overview.monitor.localSessions !== null
         ignoreUnknownSignals: true
         function onSummaryReady(requestId, summary) {
-            var toolId = overview.sessionSummaryRequests[requestId];
-            if (!toolId) return;
-            var requests = Object.assign({}, overview.sessionSummaryRequests);
-            delete requests[requestId];
-            overview.sessionSummaryRequests = requests;
-            if (overview.sessionSummaryLatestByTool[toolId] !== requestId) return;
-            var next = Object.assign({}, overview.sessionSummaryByTool);
-            next[toolId] = summary || {};
-            overview.sessionSummaryByTool = next;
+            overview.acceptSessionSummary(requestId, summary, false);
+        }
+        function onQueryFailed(requestId, errorKey) {
+            overview.acceptSessionSummary(requestId, {}, true);
         }
         function onImportFinished() { overview.refreshSessionSummaries(); }
         function onEnabledChanged() { overview.refreshSessionSummaries(); }
@@ -264,6 +277,8 @@ QQC2.ScrollView {
             visible: overviewState.sourceRows.length > 0
 
             Kirigami.SearchField {
+                id: sourceSearch
+                objectName: "overviewSourceSearch"
                 Layout.fillWidth: true
                 placeholderText: i18n("Search sources")
                 Accessible.name: i18n("Search monitoring sources")
@@ -272,6 +287,7 @@ QQC2.ScrollView {
             }
 
             QQC2.ComboBox {
+                objectName: "overviewSourceFilter"
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
                 model: [i18n("All"), i18n("Needs attention")]
@@ -282,16 +298,32 @@ QQC2.ScrollView {
         }
 
         PlasmaComponents.Label {
+            objectName: "overviewSourcesEmptyState"
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.largeSpacing
             Layout.rightMargin: Kirigami.Units.largeSpacing
             visible: overviewState.sourceRows.length > 0
                 && overview.visibleSourceRows.length === 0
-            text: overview.sourceFilterIndex === 1
+            text: overview.sourceSearchText.trim() !== ""
+                ? i18n("No source matches your search and current filter.")
+                : overview.sourceFilterIndex === 1
                 ? i18n("No sources currently need attention.")
                 : i18n("No source matches your search.")
             wrapMode: Text.WordWrap
             color: Kirigami.Theme.disabledTextColor
+        }
+
+        PlasmaComponents.Button {
+            objectName: "overviewClearSourceFilters"
+            Layout.leftMargin: Kirigami.Units.largeSpacing
+            visible: overviewState.sourceRows.length > 0
+                && (overview.sourceSearchText !== "" || overview.sourceFilterIndex !== 0)
+            text: i18n("Clear search and filters")
+            onClicked: {
+                overview.sourceSearchText = "";
+                overview.sourceFilterIndex = 0;
+                sourceSearch.forceActiveFocus(Qt.TabFocusReason);
+            }
         }
 
         Repeater {

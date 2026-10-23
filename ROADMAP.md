@@ -1,10 +1,22 @@
 # Roadmap
 
-**Current release:** 24.2.0, Structured Usage & Sources
+**Current release:** 25.0.0, Searchable Session History
 
-**Last updated:** 2026-10-12
+**Last updated:** 2026-10-23
 
 ## Current release
+
+### 25.0.0 Searchable Session History
+
+Searchable project choices and exact model filters across sessions, daily
+totals, details, analysis and manual exports. Retryable query errors,
+understandable coverage, complete breakdown counts and correct paging make
+retained local history easier to trust. SQLite schema v9 and existing privacy
+boundaries remain unchanged. Pre-release work also preserves deleted Codex
+totals across rescans, recovers past oversized records, rejects old Overview
+responses and improves filter reset and verification status. See the
+[session user guide](docs/user-guide/coding-sessions.md) and
+[qualification checklist](docs/release/v25.0.0-checklist.md).
 
 ### 24.2.0 Structured Usage & Sources
 

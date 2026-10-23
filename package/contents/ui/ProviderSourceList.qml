@@ -20,13 +20,17 @@ ColumnLayout {
     }
 
     Kirigami.SearchField {
+        id: sourceSearch
+        objectName: "sourceSearchField"
         Layout.fillWidth: true
         placeholderText: i18n("Search sources")
         Accessible.name: i18n("Search provider sources")
+        text: sourceList.controller.searchText
         onTextChanged: sourceList.controller.searchText = text
     }
 
     QQC2.ComboBox {
+        objectName: "sourceFilterSelector"
         Layout.fillWidth: true
         textRole: "text"
         valueRole: "value"
@@ -36,7 +40,26 @@ ColumnLayout {
             { text: i18n("Enabled"), value: "enabled" },
             { text: i18n("Detected tools"), value: "detected" }
         ]
+        currentIndex: {
+            for (var i = 0; i < model.length; ++i)
+                if (model[i].value === sourceList.controller.filterKey) return i;
+            return 0;
+        }
         onActivated: sourceList.controller.filterKey = currentValue
+    }
+
+    QQC2.Button {
+        objectName: "sourceResetFilters"
+        Layout.fillWidth: true
+        visible: sourceList.controller.searchText.length > 0
+            || sourceList.controller.filterKey !== "all"
+        text: i18n("Clear search and filters")
+        icon.name: "edit-clear"
+        onClicked: {
+            sourceList.controller.searchText = "";
+            sourceList.controller.filterKey = "all";
+            sourceSearch.forceActiveFocus();
+        }
     }
 
     QQC2.Label {

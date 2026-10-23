@@ -9,7 +9,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFutureWatcher>
-#include <QJsonArray>
+#include <QHash>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLockFile>
@@ -79,6 +79,54 @@ QSqlDatabase openDb(const QString &connection) {
   p.exec(QStringLiteral("PRAGMA busy_timeout=5000"));
   return db;
 }
+// Own the connection until all local queries have been destroyed, including
+// early returns after failed open or SQL execution. Writers disable the read
+// snapshot and manage their own commit/rollback boundaries.
+struct SessionConnection {
+  QString name;
+  QSqlDatabase db;
+  bool snapshotStarted = false;
+  explicit SessionConnection(const QString &prefix, bool readSnapshot = true)
+      : name(prefix + QString::number(QRandomGenerator::global()->generate())),
+        db(openDb(name)),
+        snapshotStarted(readSnapshot && db.isOpen() && db.transaction()) {}
+  ~SessionConnection() {
+    if (snapshotStarted)
+      db.rollback();
+    db.close();
+    db = {};
+    QSqlDatabase::removeDatabase(name);
+  }
+};
+struct SessionQueryResult {
+  QVariantList rows;
+  QVariantMap summary;
+  QString error;
+};
+bool validSessionQuery(const QString &tool, const QDateTime &from,
+                       const QDateTime &to, const QVariantMap &filter) {
+  return (tool == QLatin1String("codex") ||
+          tool == QLatin1String("claude-code")) &&
+         from.isValid() && to.isValid() && from < to &&
+         (!filter.contains("modelId") ||
+          filter.value("modelId").metaType().id() == QMetaType::QString);
+}
+QString eventWhere() {
+  return QStringLiteral(" s.tool_id=? AND e.observed_at_utc>=? AND "
+                        "e.observed_at_utc<? AND (?='' OR s.project_id=?) "
+                        "AND (?=0 OR e.model_id=?) ");
+}
+void bindEventFilter(QSqlQuery &query, const QString &tool,
+                     const QDateTime &from, const QDateTime &to,
+                     const QString &project, const QVariantMap &filter) {
+  query.addBindValue(tool);
+  query.addBindValue(from.toUTC().toString(Qt::ISODateWithMs));
+  query.addBindValue(to.toUTC().toString(Qt::ISODateWithMs));
+  query.addBindValue(project.isEmpty() ? QStringLiteral("") : project);
+  query.addBindValue(project.isEmpty() ? QStringLiteral("") : project);
+  query.addBindValue(filter.contains("modelId") ? 1 : 0);
+  query.addBindValue(filter.value("modelId", QStringLiteral("")).toString());
+}
 bool recordToolCoverage(QSqlDatabase &db, const QString &tool, bool partial) {
   QSqlQuery query(db);
   query.prepare(QStringLiteral(
@@ -125,6 +173,43 @@ QString toolRoot(const QString &tool) {
 QString canonicalTool(QString tool) {
   return tool == QLatin1String("codex-cli") ? QStringLiteral("codex") : tool;
 }
+QString publicToolId(const QString &tool) {
+  return tool == QLatin1String("codex") ? QStringLiteral("codex-cli") : tool;
+}
+QString scanCursorPath(const QString &tool, bool changedQueue = false) {
+  const QString name = tool == QLatin1String("codex")
+                           ? QStringLiteral("codex")
+                           : QStringLiteral("claude-code");
+  return dataDirectory() +
+         QStringLiteral("/local-session-cursor-%1%2")
+             .arg(name, changedQueue ? QStringLiteral("-changed") : QString());
+}
+QString readScanCursor(const QString &tool, bool changedQueue = false) {
+  QFile file(scanCursorPath(tool, changedQueue));
+  if (!file.open(QIODevice::ReadOnly))
+    return {};
+  const QByteArray value = file.read(65).trimmed();
+  static const QRegularExpression validId(QStringLiteral("^[a-f0-9]{64}$"));
+  return validId.match(QString::fromLatin1(value)).hasMatch()
+             ? QString::fromLatin1(value)
+             : QString();
+}
+bool writeScanCursor(const QString &tool, const QString &fileId,
+                     bool changedQueue = false) {
+  if (fileId.isEmpty())
+    return false;
+  QSaveFile file(scanCursorPath(tool, changedQueue));
+  file.setDirectWriteFallback(false);
+  if (!file.open(QIODevice::WriteOnly))
+    return false;
+  file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+  const QByteArray bytes = fileId.toLatin1();
+  if (file.write(bytes) != bytes.size() || !file.commit())
+    return false;
+  QFile::setPermissions(scanCursorPath(tool, changedQueue),
+                        QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+  return true;
+}
 } // namespace
 
 LocalSessionModel::LocalSessionModel(QObject *parent) : QObject(parent) {
@@ -163,6 +248,16 @@ void LocalSessionModel::setToolEnabled(const QString &toolId, bool enabled) {
   *target = enabled;
   ++m_generation;
   m_generationState->store(m_generation, std::memory_order_release);
+  m_codexAppendContexts.clear();
+  const QString publicId = publicToolId(canonicalTool(toolId));
+  QVariantMap toolState = m_importStates.value(publicId).toMap();
+  toolState.insert(QStringLiteral("state"), enabled
+                                                ? QStringLiteral("unknown")
+                                                : QStringLiteral("disabled"));
+  toolState.insert(QStringLiteral("reasonKeys"), QStringList{});
+  toolState.insert(QStringLiteral("errorKey"), QString());
+  m_importStates.insert(publicId, toolState);
+  emit importStatesChanged();
   if (m_codexEnabled || m_claudeEnabled)
     m_importTimer->start();
   else
@@ -186,40 +281,128 @@ void LocalSessionModel::requestImport() {
     m_importAgain = true;
     return;
   }
+  const QString startedAtUtc =
+      QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+  for (const auto &entry : {qMakePair(QStringLiteral("codex-cli"), codex),
+                            qMakePair(QStringLiteral("claude-code"), claude)}) {
+    if (!entry.second)
+      continue;
+    QVariantMap toolState = m_importStates.value(entry.first).toMap();
+    toolState.insert(QStringLiteral("state"), QStringLiteral("running"));
+    toolState.insert(QStringLiteral("lastAttemptAtUtc"), startedAtUtc);
+    toolState.insert(QStringLiteral("reasonKeys"), QStringList{});
+    toolState.insert(QStringLiteral("errorKey"), QString());
+    m_importStates.insert(entry.first, toolState);
+  }
+  emit importStatesChanged();
   ++m_pending;
   emit statusChanged();
   auto *watcher = new QFutureWatcher<QVariantMap>(this);
-  connect(watcher, &QFutureWatcher<QVariantMap>::finished, this,
-          [this, watcher, generation]() {
-            const QVariantMap result = watcher->result();
-            watcher->deleteLater();
-            m_pending = qMax(0, m_pending - 1);
-            if (generation == m_generation) {
-              m_status =
-                  result.value(QStringLiteral("errorKey")).toString().isEmpty()
-                      ? QStringLiteral("ready")
-                      : QStringLiteral("error");
-              emit statusChanged();
-              QString completedTool =
-                  result.value(QStringLiteral("toolId")).toString();
-              if (completedTool == QLatin1String("codex"))
-                completedTool = QStringLiteral("codex-cli");
-              emit importFinished(
-                  completedTool, result.value(QStringLiteral("count")).toInt(),
-                  result.value(QStringLiteral("partial")).toBool(),
-                  result.value(QStringLiteral("errorKey")).toString());
+  connect(
+      watcher, &QFutureWatcher<QVariantMap>::finished, this,
+      [this, watcher, generation]() {
+        const QVariantMap result = watcher->result();
+        watcher->deleteLater();
+        m_pending = qMax(0, m_pending - 1);
+        if (generation == m_generation) {
+          const QVariantList outcomes =
+              result.value(QStringLiteral("toolResults")).toList();
+          QVariantMap legacyOutcome;
+          if (!outcomes.isEmpty()) {
+            bool anyToolError = false;
+            for (const QVariant &value : outcomes) {
+              const QVariantMap outcome = value.toMap();
+              const QString tool =
+                  outcome.value(QStringLiteral("toolId")).toString();
+              const QString publicId = publicToolId(tool);
+              QVariantMap toolState = m_importStates.value(publicId).toMap();
+              const QString errorKey =
+                  outcome.value(QStringLiteral("errorKey")).toString();
+              const QString scanStatus =
+                  outcome.value(QStringLiteral("scanStatus")).toString();
+              anyToolError |=
+                  !errorKey.isEmpty() || scanStatus == QLatin1String("error");
+              toolState.insert(
+                  QStringLiteral("state"),
+                  (!errorKey.isEmpty() || scanStatus == QLatin1String("error"))
+                      ? QStringLiteral("error")
+                  : scanStatus == QLatin1String("partial")
+                      ? QStringLiteral("partial")
+                      : QStringLiteral("complete"));
+              toolState.insert(
+                  QStringLiteral("lastCompletedAtUtc"),
+                  QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+              toolState.insert(QStringLiteral("importedEventCount"),
+                               outcome.value(QStringLiteral("count")));
+              toolState.insert(QStringLiteral("reasonKeys"),
+                               outcome.value(QStringLiteral("reasonKeys")));
+              toolState.insert(QStringLiteral("errorKey"), errorKey);
+              m_importStates.insert(publicId, toolState);
+              if (tool == QLatin1String("codex") &&
+                  outcome.contains(QStringLiteral("codexContextCache")))
+                m_codexAppendContexts =
+                    outcome.value(QStringLiteral("codexContextCache")).toList();
+              legacyOutcome = outcome;
             }
-            emit statusChanged();
-            if (m_importAgain) {
-              m_importAgain = false;
-              requestImport();
+            m_status = anyToolError ? QStringLiteral("error")
+                                    : QStringLiteral("ready");
+          } else {
+            const QString errorKey =
+                result.value(QStringLiteral("errorKey")).toString();
+            const QString failedTool =
+                result.value(QStringLiteral("toolId")).toString();
+            const QStringList tools =
+                failedTool.isEmpty()
+                    ? QStringList{QStringLiteral("codex-cli"),
+                                  QStringLiteral("claude-code")}
+                    : QStringList{publicToolId(failedTool)};
+            for (const QString &tool : tools) {
+              if ((tool == QLatin1String("codex-cli") && !m_codexEnabled) ||
+                  (tool == QLatin1String("claude-code") && !m_claudeEnabled))
+                continue;
+              QVariantMap toolState = m_importStates.value(tool).toMap();
+              toolState.insert(QStringLiteral("state"),
+                               QStringLiteral("error"));
+              toolState.insert(
+                  QStringLiteral("lastCompletedAtUtc"),
+                  QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+              toolState.insert(QStringLiteral("errorKey"), errorKey);
+              toolState.insert(QStringLiteral("reasonKeys"), QStringList{});
+              m_importStates.insert(tool, toolState);
+              legacyOutcome = {
+                  {QStringLiteral("toolId"), tool == QLatin1String("codex-cli")
+                                                 ? QStringLiteral("codex")
+                                                 : tool},
+                  {QStringLiteral("errorKey"), errorKey},
+                  {QStringLiteral("count"), 0},
+                  {QStringLiteral("partial"), false}};
             }
-          });
+            m_status = errorKey.isEmpty() ? QStringLiteral("ready")
+                                          : QStringLiteral("error");
+          }
+          emit importStatesChanged();
+          emit statusChanged();
+          emit importFinished(
+              publicToolId(
+                  legacyOutcome.value(QStringLiteral("toolId")).toString()),
+              legacyOutcome.value(QStringLiteral("count")).toInt(),
+              legacyOutcome.value(QStringLiteral("partial")).toBool(),
+              legacyOutcome.value(QStringLiteral("errorKey")).toString());
+        }
+        emit statusChanged();
+        if (m_importAgain) {
+          m_importAgain = false;
+          requestImport();
+        }
+      });
+  const QVariantList cachedCodexContexts = m_codexAppendContexts;
   watcher->setFuture(QtConcurrent::run([codex, claude, generation, retention,
-                                        generationState]() {
+                                        generationState,
+                                        cachedCodexContexts]() {
     QVariantMap result;
     result.insert(QStringLiteral("count"), 0);
     result.insert(QStringLiteral("partial"), false);
+    QVariantList toolResults;
     QLockFile lock(dataDirectory() + QStringLiteral("/session-import.lock"));
     lock.setStaleLockTime(30000);
     if (!lock.tryLock(5000)) {
@@ -233,12 +416,14 @@ void LocalSessionModel::requestImport() {
                     QStringLiteral("session-key-unavailable"));
       return result;
     }
+    QVariantList nextCodexContextCache = cachedCodexContexts;
     bool retentionCleanupFailed = false;
     {
       const QString cleanupConnection =
           QStringLiteral("local_sessions_retention_%1")
               .arg(QRandomGenerator::global()->generate());
-      auto cleanupDb = openDb(cleanupConnection);
+      SessionConnection connectionOwner(cleanupConnection, false);
+      auto &cleanupDb = connectionOwner.db;
       if (!cleanupDb.isOpen()) {
         result.insert(QStringLiteral("errorKey"),
                       QStringLiteral("session-database-unavailable"));
@@ -268,15 +453,15 @@ void LocalSessionModel::requestImport() {
         retentionCleanupFailed = true;
         result.insert(QStringLiteral("partial"), true);
       }
-      cleanupDb.close();
-      cleanupDb = {};
-      QSqlDatabase::removeDatabase(cleanupConnection);
     }
     for (const QString &tool :
          {QStringLiteral("codex"), QStringLiteral("claude-code")}) {
       if ((tool == QLatin1String("codex") && !codex) ||
           (tool == QLatin1String("claude-code") && !claude))
         continue;
+      result = {{QStringLiteral("toolId"), tool},
+                {QStringLiteral("count"), 0},
+                {QStringLiteral("partial"), false}};
       result.insert(QStringLiteral("toolId"), tool);
       QString cutoffUtc;
       bool rebaselinePending = false;
@@ -285,11 +470,42 @@ void LocalSessionModel::requestImport() {
         const QString checkpointConnection =
             QStringLiteral("local_sessions_checkpoint_%1")
                 .arg(QRandomGenerator::global()->generate());
-        auto checkpointDb = openDb(checkpointConnection);
+        SessionConnection connectionOwner(checkpointConnection, false);
+        auto &checkpointDb = connectionOwner.db;
         if (!checkpointDb.isOpen()) {
-          result.insert(QStringLiteral("errorKey"),
-                        QStringLiteral("session-database-unavailable"));
-          return result;
+          const QString errorKey =
+              QStringLiteral("session-database-unavailable");
+          result.insert(QStringLiteral("errorKey"), errorKey);
+          result.insert(QStringLiteral("scanStatus"), QStringLiteral("error"));
+          result.insert(QStringLiteral("reasonKeys"), QStringList{});
+          if (tool == QLatin1String("codex"))
+            result.insert(QStringLiteral("codexContextCache"),
+                          nextCodexContextCache);
+          toolResults.append(result);
+          bool appendFollowingTools = false;
+          for (const QString &followingTool :
+               {QStringLiteral("codex"), QStringLiteral("claude-code")}) {
+            if (followingTool == tool) {
+              appendFollowingTools = true;
+              continue;
+            }
+            if (!appendFollowingTools ||
+                (followingTool == QLatin1String("codex") && !codex) ||
+                (followingTool == QLatin1String("claude-code") && !claude))
+              continue;
+            QVariantMap following{
+                {QStringLiteral("toolId"), followingTool},
+                {QStringLiteral("count"), 0},
+                {QStringLiteral("partial"), false},
+                {QStringLiteral("errorKey"), errorKey},
+                {QStringLiteral("scanStatus"), QStringLiteral("error")},
+                {QStringLiteral("reasonKeys"), QStringList{}}};
+            if (followingTool == QLatin1String("codex"))
+              following.insert(QStringLiteral("codexContextCache"),
+                               nextCodexContextCache);
+            toolResults.append(following);
+          }
+          return QVariantMap{{QStringLiteral("toolResults"), toolResults}};
         }
         QSqlQuery checkpoint(checkpointDb);
         checkpoint.prepare(
@@ -298,47 +514,100 @@ void LocalSessionModel::requestImport() {
         checkpoint.addBindValue(tool);
         if (checkpoint.exec() && checkpoint.next()) {
           cutoffUtc = checkpoint.value(0).toString();
-          rebaselinePending = checkpoint.value(1).toBool();
+          // The durable cutoff also covers databases whose older importer
+          // already cleared the pending flag during an empty scan.
+          rebaselinePending =
+              !cutoffUtc.isEmpty() || checkpoint.value(1).toBool();
           persistedCoverage = checkpoint.value(2).toString();
         }
-        checkpointDb.close();
-        checkpointDb = {};
-        QSqlDatabase::removeDatabase(checkpointConnection);
       }
       bool toolPartial = retentionCleanupFailed ||
                          persistedCoverage == QLatin1String("partial");
-      const auto markPartial = [&]() {
+      bool scanPartial = retentionCleanupFailed;
+      QStringList reasonKeys;
+      if (retentionCleanupFailed)
+        reasonKeys.append(QStringLiteral("retention-maintenance"));
+      const auto markPartial = [&](const QString &reason =
+                                       QStringLiteral("incomplete-record")) {
         toolPartial = true;
+        scanPartial = true;
+        if (!reasonKeys.contains(reason))
+          reasonKeys.append(reason);
         result.insert(QStringLiteral("partial"), true);
+      };
+      const auto finishTool = [&]() {
+        result.insert(QStringLiteral("scanStatus"),
+                      scanPartial ? QStringLiteral("partial")
+                                  : QStringLiteral("complete"));
+        result.insert(QStringLiteral("coverage"),
+                      toolPartial ? QStringLiteral("partial")
+                                  : QStringLiteral("reported"));
+        result.insert(QStringLiteral("reasonKeys"), reasonKeys);
+        if (tool == QLatin1String("codex"))
+          result.insert(QStringLiteral("codexContextCache"),
+                        nextCodexContextCache);
+        toolResults.append(result);
+      };
+      const auto failTool = [&]() {
+        result.insert(QStringLiteral("scanStatus"), QStringLiteral("error"));
+        result.insert(QStringLiteral("reasonKeys"), reasonKeys);
+        const QString errorKey =
+            result.value(QStringLiteral("errorKey")).toString();
+        if (tool == QLatin1String("codex"))
+          result.insert(QStringLiteral("codexContextCache"),
+                        nextCodexContextCache);
+        toolResults.append(result);
+        bool appendFollowingTools = false;
+        for (const QString &followingTool :
+             {QStringLiteral("codex"), QStringLiteral("claude-code")}) {
+          if (followingTool == tool) {
+            appendFollowingTools = true;
+            continue;
+          }
+          if (!appendFollowingTools ||
+              (followingTool == QLatin1String("codex") && !codex) ||
+              (followingTool == QLatin1String("claude-code") && !claude))
+            continue;
+          toolResults.append(QVariantMap{
+              {QStringLiteral("toolId"), followingTool},
+              {QStringLiteral("count"), 0},
+              {QStringLiteral("partial"), false},
+              {QStringLiteral("scanStatus"), QStringLiteral("error")},
+              {QStringLiteral("errorKey"), errorKey},
+              {QStringLiteral("reasonKeys"), QStringList{}}});
+        }
+        return QVariantMap{{QStringLiteral("toolResults"), toolResults}};
       };
       const QString root = toolRoot(tool);
       const QFileInfo rootInfo(root);
       if (!rootInfo.exists()) {
+        if (tool == QLatin1String("codex"))
+          nextCodexContextCache.clear();
         const QString statusConnection =
             QStringLiteral("local_sessions_status_%1")
                 .arg(QRandomGenerator::global()->generate());
-        auto statusDb = openDb(statusConnection);
+        SessionConnection connectionOwner(statusConnection, false);
+        auto &statusDb = connectionOwner.db;
         if (statusDb.isOpen()) {
           recordToolCoverage(statusDb, tool, true);
-          statusDb.close();
-          statusDb = {};
-          QSqlDatabase::removeDatabase(statusConnection);
         }
-        markPartial();
+        markPartial(QStringLiteral("source-unavailable"));
+        finishTool();
         continue;
       }
       if (rootInfo.isSymLink() || !rootInfo.isDir()) {
-        markPartial();
+        if (tool == QLatin1String("codex"))
+          nextCodexContextCache.clear();
+        markPartial(QStringLiteral("source-unavailable"));
         const QString statusConnection =
             QStringLiteral("local_sessions_status_%1")
                 .arg(QRandomGenerator::global()->generate());
-        auto statusDb = openDb(statusConnection);
+        SessionConnection connectionOwner(statusConnection, false);
+        auto &statusDb = connectionOwner.db;
         if (statusDb.isOpen()) {
           recordToolCoverage(statusDb, tool, true);
-          statusDb.close();
-          statusDb = {};
-          QSqlDatabase::removeDatabase(statusConnection);
         }
+        finishTool();
         continue;
       }
       QDirIterator it(root, {QStringLiteral("*.jsonl")}, QDir::Files,
@@ -350,8 +619,6 @@ void LocalSessionModel::requestImport() {
           return result;
         candidates.append(it.next());
       }
-      if (it.hasNext())
-        markPartial();
       std::sort(candidates.begin(), candidates.end(),
                 [](const QString &left, const QString &right) {
                   const QFileInfo leftInfo(left), rightInfo(right);
@@ -359,28 +626,137 @@ void LocalSessionModel::requestImport() {
                     return leftInfo.lastModified() > rightInfo.lastModified();
                   return left < right;
                 });
-      if (candidates.size() > 5000) {
-        candidates = candidates.mid(0, 5000);
-        markPartial();
+
+      QHash<QString, QVariantMap> checkpoints;
+      {
+        const QString checkpointConnection =
+            QStringLiteral("local_sessions_file_index_%1")
+                .arg(QRandomGenerator::global()->generate());
+        SessionConnection connectionOwner(checkpointConnection, false);
+        auto &checkpointDb = connectionOwner.db;
+        QSqlQuery query(checkpointDb);
+        query.prepare(QStringLiteral(
+            "SELECT file_id,file_offset,file_size,modified_at_utc "
+            "FROM local_file_checkpoints WHERE tool_id=?"));
+        query.addBindValue(tool);
+        if (!checkpointDb.isOpen() || !query.exec()) {
+          result.insert(QStringLiteral("errorKey"),
+                        QStringLiteral("session-database-unavailable"));
+          return failTool();
+        }
+        while (query.next()) {
+          checkpoints.insert(
+              query.value(0).toString(),
+              {{QStringLiteral("offset"), query.value(1)},
+               {QStringLiteral("size"), query.value(2)},
+               {QStringLiteral("modifiedAtUtc"), query.value(3)}});
+        }
       }
+
+      QStringList newCandidates;
+      QStringList changedCandidates;
+      QHash<QString, QString> candidateIds;
+      for (const QString &path : candidates) {
+        const QString fileId = QString::fromLatin1(
+            LocalSessionParser::identity(key, "file", QFile::encodeName(path)));
+        candidateIds.insert(path, fileId);
+        const QFileInfo info(path);
+        const QVariantMap checkpoint = checkpoints.value(fileId);
+        const QString modifiedUtc =
+            info.lastModified().toUTC().toString(Qt::ISODateWithMs);
+        if (checkpoint.isEmpty()) {
+          newCandidates.append(path);
+        } else if (info.size() !=
+                       checkpoint.value(QStringLiteral("size")).toLongLong() ||
+                   modifiedUtc !=
+                       checkpoint.value(QStringLiteral("modifiedAtUtc"))
+                           .toString() ||
+                   checkpoint.value(QStringLiteral("offset")).toLongLong() !=
+                       info.size()) {
+          changedCandidates.append(path);
+        }
+      }
+      if (tool == QLatin1String("codex") && !it.hasNext()) {
+        QSet<QString> discoveredIds;
+        for (auto entry = candidateIds.cbegin(); entry != candidateIds.cend();
+             ++entry)
+          discoveredIds.insert(entry.value());
+        nextCodexContextCache.erase(
+            std::remove_if(
+                nextCodexContextCache.begin(), nextCodexContextCache.end(),
+                [&](const QVariant &entry) {
+                  return !discoveredIds.contains(
+                      entry.toMap().value(QStringLiteral("fileId")).toString());
+                }),
+            nextCodexContextCache.end());
+      }
+      const auto rotateAfterCursor = [&](QStringList &pending,
+                                         const QString &previousCursor) {
+        if (previousCursor.isEmpty())
+          return;
+        const auto cursor = std::find_if(
+            pending.begin(), pending.end(), [&](const QString &path) {
+              return candidateIds.value(path) == previousCursor;
+            });
+        if (cursor != pending.end())
+          std::rotate(pending.begin(), std::next(cursor), pending.end());
+      };
+      // Candidates rejected before checkpointing remain pending on every scan.
+      // Each queue needs its own cursor: the last item in a weighted batch can
+      // belong to only one queue, while the other must also make progress.
+      rotateAfterCursor(newCandidates, readScanCursor(tool));
+      rotateAfterCursor(changedCandidates, readScanCursor(tool, true));
+      QSet<QString> newCandidateIds;
+      for (const QString &path : newCandidates)
+        newCandidateIds.insert(candidateIds.value(path));
+      candidates.clear();
+      qsizetype newIndex = 0;
+      qsizetype changedIndex = 0;
+      while (newIndex < newCandidates.size() ||
+             changedIndex < changedCandidates.size()) {
+        for (int prioritySlot = 0;
+             prioritySlot < 4 && newIndex < newCandidates.size();
+             ++prioritySlot)
+          candidates.append(newCandidates.at(newIndex++));
+        if (changedIndex < changedCandidates.size())
+          candidates.append(changedCandidates.at(changedIndex++));
+      }
+      if (it.hasNext())
+        markPartial(QStringLiteral("discovery-limit"));
+
       qsizetype fileCount = 0;
       qint64 bytesRead = 0;
+      QString lastProcessedNewFileId;
+      QString lastProcessedChangedFileId;
+      const auto recordProcessedCandidate = [&](const QString &fileId) {
+        if (newCandidateIds.contains(fileId))
+          lastProcessedNewFileId = fileId;
+        else
+          lastProcessedChangedFileId = fileId;
+      };
       const QDateTime retentionBoundary =
           QDateTime::currentDateTimeUtc().addDays(-qMin(30, retention));
-      for (const QString &path : candidates) {
+      for (qsizetype candidateIndex = 0; candidateIndex < candidates.size();
+           ++candidateIndex) {
+        const QString &path = candidates.at(candidateIndex);
         if (generationState->load(std::memory_order_acquire) != generation)
           return result;
-        if (++fileCount > 5000 || bytesRead > 256ll * 1024 * 1024) {
-          markPartial();
+        if (fileCount >= 5000 || bytesRead >= 256ll * 1024 * 1024) {
+          markPartial(QStringLiteral("scan-budget"));
           break;
         }
+        ++fileCount;
         QFileInfo info(path);
         if (info.isSymLink() || !info.isFile() ||
             info.size() > 100ll * 1024 * 1024) {
-          markPartial();
+          markPartial(info.size() > 100ll * 1024 * 1024
+                          ? QStringLiteral("file-size-limit")
+                          : QStringLiteral("source-unavailable"));
+          recordProcessedCandidate(candidateIds.value(path));
           continue;
         }
         const QByteArray nativePath = QFile::encodeName(path);
+        const QString fileId = candidateIds.value(path);
         const int sourceFd =
             ::open(nativePath.constData(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
         struct stat sourceStat{};
@@ -388,28 +764,29 @@ void LocalSessionModel::requestImport() {
             !S_ISREG(sourceStat.st_mode)) {
           if (sourceFd >= 0)
             ::close(sourceFd);
-          markPartial();
+          markPartial(QStringLiteral("source-unavailable"));
+          recordProcessedCandidate(fileId);
           continue;
         }
         QFile file;
         if (!file.open(sourceFd, QIODevice::ReadOnly,
                        QFileDevice::AutoCloseHandle)) {
           ::close(sourceFd);
-          markPartial();
+          markPartial(QStringLiteral("source-unavailable"));
+          recordProcessedCandidate(fileId);
           continue;
         }
         const QString conn =
             QStringLiteral("local_sessions_import_%1_%2")
                 .arg(reinterpret_cast<quintptr>(QThread::currentThreadId()))
                 .arg(QRandomGenerator::global()->generate());
-        QSqlDatabase db = openDb(conn);
+        SessionConnection connectionOwner(conn, false);
+        auto &db = connectionOwner.db;
         if (!db.isOpen()) {
           result.insert(QStringLiteral("errorKey"),
                         QStringLiteral("session-database-unavailable"));
-          return result;
+          return failTool();
         }
-        const QString fileId = QString::fromLatin1(
-            LocalSessionParser::identity(key, "file", nativePath));
         const qint64 currentSize = sourceStat.st_size;
         const QString modifiedUtc =
             info.lastModified().toUTC().toString(Qt::ISODateWithMs);
@@ -428,15 +805,24 @@ void LocalSessionModel::requestImport() {
         }
         if (currentSize == previousSize && modifiedUtc == previousModified &&
             startOffset == currentSize) {
-          db.close();
-          db = {};
-          QSqlDatabase::removeDatabase(conn);
+          recordProcessedCandidate(fileId);
           continue;
         }
         if (currentSize < previousSize ||
             (previousSize >= 0 && currentSize <= previousSize &&
              modifiedUtc != previousModified)) {
           startOffset = 0;
+          if (tool == QLatin1String("codex")) {
+            nextCodexContextCache.erase(
+                std::remove_if(nextCodexContextCache.begin(),
+                               nextCodexContextCache.end(),
+                               [&](const QVariant &entry) {
+                                 return entry.toMap()
+                                            .value(QStringLiteral("fileId"))
+                                            .toString() == fileId;
+                               }),
+                nextCodexContextCache.end());
+          }
           markPartial();
         }
         if (startOffset > currentSize)
@@ -448,26 +834,114 @@ void LocalSessionModel::requestImport() {
         }
         qint64 safeOffset = startOffset;
         QVariantMap codexContext;
+        QCryptographicHash codexPrefixHash(QCryptographicHash::Sha256);
+        qint64 hashedOffset = 0;
+        bool codexPrefixCacheable = true;
         if (tool == QLatin1String("codex") && startOffset > 0) {
-          file.seek(0);
-          while (file.pos() < startOffset && !file.atEnd()) {
-            const QByteArray line = file.readLine(1024 * 1024 + 1);
-            bytesRead += line.size();
-            if (bytesRead > 256ll * 1024 * 1024) {
-              markPartial();
+          QVariantMap cache;
+          for (const QVariant &entry : nextCodexContextCache) {
+            const QVariantMap candidate = entry.toMap();
+            if (candidate.value(QStringLiteral("fileId")).toString() ==
+                fileId) {
+              cache = candidate;
               break;
             }
-            LocalSessionParser::updateCodexContext(line, &codexContext);
           }
-          if (bytesRead > 256ll * 1024 * 1024) {
-            db.close();
-            db = {};
-            QSqlDatabase::removeDatabase(conn);
+          const bool matchingCacheIdentity =
+              cache.value(QStringLiteral("fileId")).toString() == fileId &&
+              cache.value(QStringLiteral("prefixOffset")).toLongLong() ==
+                  startOffset &&
+              cache.value(QStringLiteral("fileSize")).toLongLong() ==
+                  previousSize &&
+              cache.value(QStringLiteral("modifiedAtUtc")).toString() ==
+                  previousModified &&
+              cache.value(QStringLiteral("device")).toULongLong() ==
+                  sourceStat.st_dev &&
+              cache.value(QStringLiteral("inode")).toULongLong() ==
+                  sourceStat.st_ino &&
+              !cache.value(QStringLiteral("prefixHash"))
+                   .toByteArray()
+                   .isEmpty() &&
+              !cache.value(QStringLiteral("context")).toMap().isEmpty();
+          bool validCachedPrefix = matchingCacheIdentity &&
+                                   startOffset <= currentSize && file.seek(0);
+          qint64 prefixBytesRemaining = startOffset;
+          while (validCachedPrefix && prefixBytesRemaining > 0) {
+            const qint64 budgetRemaining = 256ll * 1024 * 1024 - bytesRead;
+            if (budgetRemaining <= 0) {
+              markPartial(QStringLiteral("scan-budget"));
+              validCachedPrefix = false;
+              break;
+            }
+            const QByteArray chunk = file.read(qMin<qint64>(
+                64 * 1024, qMin(prefixBytesRemaining, budgetRemaining)));
+            if (chunk.isEmpty()) {
+              markPartial(QStringLiteral("source-unavailable"));
+              validCachedPrefix = false;
+              break;
+            }
+            codexPrefixHash.addData(chunk);
+            bytesRead += chunk.size();
+            prefixBytesRemaining -= chunk.size();
+          }
+          if (prefixBytesRemaining != 0 ||
+              (validCachedPrefix &&
+               codexPrefixHash.result().toHex() !=
+                   cache.value(QStringLiteral("prefixHash")).toByteArray()))
+            validCachedPrefix = false;
+          if (matchingCacheIdentity && prefixBytesRemaining != 0) {
+            markPartial();
+            break;
+          }
+          if (validCachedPrefix && file.seek(startOffset)) {
+            codexContext = cache.value(QStringLiteral("context")).toMap();
+            hashedOffset = startOffset;
+          } else {
+            codexPrefixHash.reset();
+            nextCodexContextCache.erase(
+                std::remove_if(nextCodexContextCache.begin(),
+                               nextCodexContextCache.end(),
+                               [&](const QVariant &entry) {
+                                 return entry.toMap()
+                                            .value(QStringLiteral("fileId"))
+                                            .toString() == fileId;
+                               }),
+                nextCodexContextCache.end());
+            file.seek(0);
+            while (file.pos() < startOffset && !file.atEnd()) {
+              const auto record = LocalSessionParser::readJsonlRecord(
+                  file,
+                  qMin(startOffset - file.pos(),
+                       256ll * 1024 * 1024 - bytesRead),
+                  [&]() {
+                    return generationState->load(std::memory_order_acquire) !=
+                           generation;
+                  });
+              bytesRead += record.bytesRead;
+              if (record.discarded) {
+                markPartial();
+                codexPrefixCacheable = false;
+              }
+              if (!record.discarded && record.complete) {
+                LocalSessionParser::updateCodexContext(record.line,
+                                                       &codexContext);
+                codexPrefixHash.addData(record.line);
+                hashedOffset += record.line.size();
+              }
+              if (record.interrupted)
+                break;
+            }
+          }
+          if (file.pos() < startOffset) {
+            markPartial();
             break;
           }
           if (codexContext.isEmpty()) {
             startOffset = 0;
             safeOffset = 0;
+            codexPrefixHash.reset();
+            hashedOffset = 0;
+            codexPrefixCacheable = true;
             file.seek(0);
             markPartial();
           }
@@ -480,7 +954,7 @@ void LocalSessionModel::requestImport() {
         if (!db.transaction()) {
           result.insert(QStringLiteral("errorKey"),
                         QStringLiteral("session-database-unavailable"));
-          return result;
+          return failTool();
         }
         bool writesOk = true;
         int fileImportedCount = 0;
@@ -506,29 +980,36 @@ void LocalSessionModel::requestImport() {
         while (!file.atEnd()) {
           if (generationState->load(std::memory_order_acquire) != generation) {
             db.rollback();
-            db.close();
-            db = {};
-            QSqlDatabase::removeDatabase(conn);
             return result;
           }
-          const QByteArray line = file.readLine(1024 * 1024 + 1);
-          bytesRead += line.size();
-          if (bytesRead > 256ll * 1024 * 1024) {
+          const auto record = LocalSessionParser::readJsonlRecord(
+              file, 256ll * 1024 * 1024 - bytesRead, [&]() {
+                return generationState->load(std::memory_order_acquire) !=
+                       generation;
+              });
+          bytesRead += record.bytesRead;
+          if (record.discarded) {
             markPartial();
-            break;
-          }
-          if (!line.endsWith('\n') && !file.atEnd()) {
-            markPartial();
-            break;
-          }
-          if (line.size() > 1024 * 1024) {
-            markPartial();
-            if (line.endsWith('\n'))
-              safeOffset = file.pos();
-            continue;
-          }
-          if (line.endsWith('\n'))
+            if (tool == QLatin1String("codex"))
+              codexPrefixCacheable = false;
+            // Mid-record cursors are safe only when the entire suffix will
+            // also be discarded by readJsonlRecord on the next scan.
             safeOffset = file.pos();
+          } else if (record.complete) {
+            safeOffset = file.pos();
+          }
+          if (tool == QLatin1String("codex") && record.complete &&
+              !record.discarded) {
+            codexPrefixHash.addData(record.line);
+            hashedOffset += record.line.size();
+          }
+          if (record.interrupted) {
+            markPartial();
+            break;
+          }
+          if (record.discarded)
+            continue;
+          const QByteArray &line = record.line;
           if (tool == QLatin1String("codex") &&
               LocalSessionParser::updateCodexContext(line, &codexContext))
             continue;
@@ -720,7 +1201,24 @@ void LocalSessionModel::requestImport() {
                                             QStringLiteral("cacheWriteTokens")};
             bool unchanged = !previous.isEmpty();
             bool reset = false;
-            const bool baselineOnly = previous.isEmpty() && rebaselinePending;
+            const QDateTime created =
+                codexContext.value(QStringLiteral("createdAtUtc")).toDateTime();
+            const QDateTime observed = QDateTime::fromString(
+                row.value(QStringLiteral("timestampUtc")).toString(),
+                Qt::ISODateWithMs);
+            const bool matchingMetadata =
+                !codexContext.value(QStringLiteral("sessionId"))
+                     .toString()
+                     .isEmpty() &&
+                row.value(QStringLiteral("sessionId")).toString() ==
+                    QString::fromLatin1(LocalSessionParser::identity(
+                        key, "session",
+                        codexContext.value("sessionId").toString().toUtf8()));
+            const bool createdAfterClear =
+                matchingMetadata && created.isValid() && created <= observed &&
+                created.toString(Qt::ISODateWithMs) > cutoffUtc;
+            const bool baselineOnly =
+                previous.isEmpty() && rebaselinePending && !createdAfterClear;
             for (qsizetype index = 0; index < counterFields.size(); ++index) {
               const QString &field = counterFields.at(index);
               if (!row.contains(field))
@@ -839,9 +1337,6 @@ void LocalSessionModel::requestImport() {
         writesOk = writesOk && recordToolCoverage(db, tool, toolPartial);
         if (generationState->load(std::memory_order_acquire) != generation) {
           db.rollback();
-          db.close();
-          db = {};
-          QSqlDatabase::removeDatabase(conn);
           return result;
         }
         if (!writesOk || file.error() != QFileDevice::NoError || !db.commit()) {
@@ -853,112 +1348,155 @@ void LocalSessionModel::requestImport() {
           result.insert(QStringLiteral("count"),
                         result.value(QStringLiteral("count")).toInt() +
                             fileImportedCount);
+          if (tool == QLatin1String("codex") && !codexContext.isEmpty() &&
+              codexPrefixCacheable && hashedOffset == safeOffset) {
+            nextCodexContextCache.erase(
+                std::remove_if(nextCodexContextCache.begin(),
+                               nextCodexContextCache.end(),
+                               [&](const QVariant &entry) {
+                                 return entry.toMap()
+                                            .value(QStringLiteral("fileId"))
+                                            .toString() == fileId;
+                               }),
+                nextCodexContextCache.end());
+            nextCodexContextCache.prepend(QVariantMap{
+                {QStringLiteral("fileId"), fileId},
+                {QStringLiteral("prefixOffset"), safeOffset},
+                {QStringLiteral("fileSize"), currentSize},
+                {QStringLiteral("modifiedAtUtc"), modifiedUtc},
+                {QStringLiteral("device"), qulonglong(sourceStat.st_dev)},
+                {QStringLiteral("inode"), qulonglong(sourceStat.st_ino)},
+                {QStringLiteral("prefixHash"),
+                 codexPrefixHash.result().toHex()},
+                {QStringLiteral("context"), codexContext}});
+            constexpr qsizetype maxCachedContexts = 16;
+            while (nextCodexContextCache.size() > maxCachedContexts)
+              nextCodexContextCache.removeLast();
+          }
         }
-        db.close();
-        db = {};
-        QSqlDatabase::removeDatabase(conn);
+        recordProcessedCandidate(fileId);
       }
+      if (!lastProcessedNewFileId.isEmpty() &&
+          !writeScanCursor(tool, lastProcessedNewFileId))
+        markPartial(QStringLiteral("checkpoint-write"));
+      if (!lastProcessedChangedFileId.isEmpty() &&
+          !writeScanCursor(tool, lastProcessedChangedFileId, true))
+        markPartial(QStringLiteral("checkpoint-write"));
       const QString statusConnection =
           QStringLiteral("local_sessions_status_%1")
               .arg(QRandomGenerator::global()->generate());
-      auto statusDb = openDb(statusConnection);
+      SessionConnection connectionOwner(statusConnection, false);
+      auto &statusDb = connectionOwner.db;
       if (statusDb.isOpen()) {
-        recordToolCoverage(statusDb, tool, toolPartial);
-        if (!toolPartial) {
-          QSqlQuery complete(statusDb);
-          complete.prepare(QStringLiteral(
-              "UPDATE local_import_checkpoints SET rebaseline_pending=0 "
-              "WHERE tool_id=?"));
-          complete.addBindValue(tool);
-          complete.exec();
-        }
-        statusDb.close();
-        statusDb = {};
-        QSqlDatabase::removeDatabase(statusConnection);
+        if (!recordToolCoverage(statusDb, tool, toolPartial))
+          markPartial(QStringLiteral("checkpoint-write"));
+        // Keep the clear policy across empty scans and restarts: another old
+        // session may resume later. Creation metadata exempts proven new
+        // sessions.
+      } else {
+        markPartial(QStringLiteral("checkpoint-write"));
       }
+      finishTool();
     }
+    result.clear();
+    result.insert(QStringLiteral("toolResults"), toolResults);
     return result;
   }));
 }
 
 void LocalSessionModel::requestSessions(
     const QString &requestId, const QString &toolId, const QDateTime &fromUtc,
-    const QDateTime &toUtc, const QString &projectId, int offset, int limit) {
+    const QDateTime &toUtc, const QString &projectId, int offset, int limit,
+    const QVariantMap &modelFilter) {
   const QString storedTool = canonicalTool(toolId);
   offset = qMax(0, offset);
   limit = qBound(1, limit, 100);
-  auto *w = new QFutureWatcher<QVariantList>(this);
-  connect(w, &QFutureWatcher<QVariantList>::finished, this,
-          [this, w, requestId]() {
-            emit sessionsReady(requestId, w->result());
-            w->deleteLater();
+  auto *watcher = new QFutureWatcher<SessionQueryResult>(this);
+  connect(watcher, &QFutureWatcher<SessionQueryResult>::finished, this,
+          [this, watcher, requestId]() {
+            const auto result = watcher->result();
+            watcher->deleteLater();
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit sessionsReady(requestId, result.rows);
           });
-  w->setFuture(QtConcurrent::run([=]() {
-    QVariantList rows;
-    const QString c = QStringLiteral("local_sessions_query_%1")
-                          .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
-    if (!db.isOpen())
-      return rows;
-    QSqlQuery q(db);
-    q.prepare(QStringLiteral(
-        "SELECT "
-        "s.session_id,s.project_id,s.started_at_utc,s.last_seen_at_utc,s."
-        "coverage,COUNT(e.event_id),SUM(e.input_tokens),SUM(e.output_tokens),"
-        "SUM(e.cache_read_tokens),SUM(e.cache_write_tokens) FROM "
-        "local_sessions s JOIN local_usage_events e ON "
-        "e.session_id=s.session_id AND e.observed_at_utc>=? AND "
-        "e.observed_at_utc<? WHERE s.tool_id=? AND (?='' OR s.project_id=?) "
-        "GROUP BY "
-        "s.session_id ORDER BY MAX(e.observed_at_utc) DESC,s.session_id LIMIT "
-        "? OFFSET ?"));
-    q.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    q.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    q.addBindValue(storedTool);
-    q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    q.addBindValue(limit);
-    q.addBindValue(offset);
-    if (q.exec())
-      while (q.next()) {
-        QVariantMap r;
-        r.insert("sessionId", q.value(0));
-        r.insert("projectId", q.value(1));
-        r.insert("startedAtUtc", q.value(2));
-        r.insert("lastSeenAtUtc", q.value(3));
-        r.insert("coverage", q.value(4));
-        r.insert("eventCount", q.value(5));
-        r.insert("inputTokens", q.value(6));
-        r.insert("outputTokens", q.value(7));
-        r.insert("cacheReadTokens", q.value(8));
-        r.insert("cacheWriteTokens", q.value(9));
-        QSqlQuery models(db);
-        models.prepare(QStringLiteral(
-            "SELECT model_id,COUNT(*),SUM(input_tokens),SUM(output_tokens) "
-            "FROM local_usage_events WHERE session_id=? AND observed_at_utc>=? "
-            "AND observed_at_utc<? GROUP BY model_id ORDER BY COUNT(*) DESC "
-            "LIMIT 100"));
-        models.addBindValue(q.value(0));
-        models.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-        models.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-        QVariantList modelRows;
-        if (models.exec())
-          while (models.next()) {
-            QVariantMap m;
-            m.insert("modelId", models.value(0));
-            m.insert("eventCount", models.value(1));
-            m.insert("inputTokens", models.value(2));
-            m.insert("outputTokens", models.value(3));
-            modelRows.append(m);
-          }
-        r.insert("modelBreakdown", modelRows);
-        rows.append(r);
+  watcher->setFuture(QtConcurrent::run([=]() {
+    SessionQueryResult result;
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter)) {
+      result.error = QStringLiteral("session-invalid-query");
+      return result;
+    }
+    SessionConnection connection(QStringLiteral("local_sessions_query_"));
+    auto &db = connection.db;
+    if (!db.isOpen()) {
+      result.error = QStringLiteral("session-database-unavailable");
+      return result;
+    }
+    result.error = QStringLiteral("session-query-failed");
+    if (!connection.snapshotStarted)
+      return result;
+    QSqlQuery query(db);
+    query.prepare(
+        QStringLiteral(
+            "SELECT "
+            "s.session_id,s.project_id,s.started_at_utc,s.last_seen_at_utc,"
+            "s.coverage,COUNT(e.event_id),SUM(e.input_tokens),SUM(e.output_"
+            "tokens),"
+            "SUM(e.cache_read_tokens),SUM(e.cache_write_tokens) FROM "
+            "local_sessions s "
+            "JOIN local_usage_events e ON e.session_id=s.session_id WHERE ") +
+        eventWhere() +
+        QStringLiteral(
+            " GROUP BY s.session_id ORDER BY "
+            "MAX(e.observed_at_utc) DESC,s.session_id LIMIT ? OFFSET ?"));
+    bindEventFilter(query, storedTool, fromUtc, toUtc, projectId, modelFilter);
+    query.addBindValue(limit);
+    query.addBindValue(offset);
+    if (!query.exec())
+      return result;
+    while (query.next()) {
+      QVariantMap row;
+      const QStringList keys{
+          "sessionId",       "projectId",       "startedAtUtc", "lastSeenAtUtc",
+          "coverage",        "eventCount",      "inputTokens",  "outputTokens",
+          "cacheReadTokens", "cacheWriteTokens"};
+      for (int i = 0; i < keys.size(); ++i)
+        row.insert(keys[i], query.value(i));
+      QSqlQuery models(db);
+      models.prepare(
+          QStringLiteral("SELECT e.model_id,COUNT(*),SUM(e.input_tokens),"
+                         "SUM(e.output_tokens) FROM local_usage_events e JOIN "
+                         "local_sessions s ON "
+                         "s.session_id=e.session_id WHERE ") +
+          eventWhere() +
+          QStringLiteral(" AND s.session_id=? GROUP BY e.model_id ORDER BY "
+                         "COUNT(*) DESC,e.model_id"));
+      bindEventFilter(models, storedTool, fromUtc, toUtc, projectId,
+                      modelFilter);
+      models.addBindValue(query.value(0));
+      if (!models.exec())
+        return result;
+      QVariantList breakdown;
+      int count = 0;
+      while (models.next()) {
+        ++count;
+        if (count <= 100)
+          breakdown.append(QVariantMap{{"modelId", models.value(0)},
+                                       {"eventCount", models.value(1)},
+                                       {"inputTokens", models.value(2)},
+                                       {"outputTokens", models.value(3)}});
       }
-    else
-      db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
-    return rows;
+      if (models.lastError().isValid())
+        return result;
+      row.insert("modelBreakdown", breakdown);
+      row.insert("modelBreakdownTotalCount", count);
+      result.rows.append(row);
+    }
+    if (query.lastError().isValid())
+      return result;
+    result.error.clear();
+    return result;
   }));
 }
 
@@ -966,203 +1504,220 @@ void LocalSessionModel::requestSummary(const QString &requestId,
                                        const QString &toolId,
                                        const QDateTime &fromUtc,
                                        const QDateTime &toUtc,
-                                       const QString &projectId) {
+                                       const QString &projectId,
+                                       const QVariantMap &modelFilter) {
   const QString storedTool = canonicalTool(toolId);
-  const bool toolEnabled =
+  const bool enabled =
       storedTool == QLatin1String("codex") ? m_codexEnabled : m_claudeEnabled;
-  auto *w = new QFutureWatcher<QVariantMap>(this);
-  connect(w, &QFutureWatcher<QVariantMap>::finished, this,
-          [this, w, requestId]() {
-            emit summaryReady(requestId, w->result());
-            w->deleteLater();
+  auto *watcher = new QFutureWatcher<SessionQueryResult>(this);
+  connect(watcher, &QFutureWatcher<SessionQueryResult>::finished, this,
+          [this, watcher, requestId]() {
+            const auto result = watcher->result();
+            watcher->deleteLater();
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit summaryReady(requestId, result.summary);
           });
-  w->setFuture(QtConcurrent::run([=]() {
-    QVariantMap result;
-    const QString c = QStringLiteral("local_sessions_summary_%1")
-                          .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
-    if (!db.isOpen())
+  watcher->setFuture(QtConcurrent::run([=]() {
+    SessionQueryResult result;
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter)) {
+      result.error = QStringLiteral("session-invalid-query");
       return result;
-    QSqlQuery q(db);
-    q.prepare(QStringLiteral(
-        "SELECT COUNT(DISTINCT "
-        "s.session_id),COUNT(e.event_id),SUM(e.input_tokens),SUM(e.output_"
-        "tokens),SUM(e.cache_read_tokens),SUM(e.cache_write_tokens),COUNT("
-        "DISTINCT s.project_id),MAX(e.observed_at_utc),CASE WHEN SUM(CASE "
-        "WHEN s.coverage!='reported' THEN 1 ELSE 0 END)>0 THEN 'partial' "
-        "ELSE 'reported' END FROM local_sessions s "
-        "JOIN "
-        "local_usage_events e ON e.session_id=s.session_id AND "
-        "e.observed_at_utc>=? AND e.observed_at_utc<? WHERE s.tool_id=? AND "
-        "(?='' OR s.project_id=?)"));
-    q.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    q.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    q.addBindValue(storedTool);
-    q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    if (q.exec() && q.next()) {
-      result.insert("sessionCount", q.value(0));
-      result.insert("eventCount", q.value(1));
-      result.insert("inputTokens", q.value(2));
-      result.insert("outputTokens", q.value(3));
-      result.insert("cacheReadTokens", q.value(4));
-      result.insert("cacheWriteTokens", q.value(5));
-      result.insert("projectCount", q.value(6));
-      result.insert("lastActivityAtUtc", q.value(7));
-      result.insert("coverage", q.value(0).toInt() == 0
-                                    ? QStringLiteral("unavailable")
-                                    : q.value(8).toString());
     }
-    QString toolCoverage;
+    SessionConnection connection(QStringLiteral("local_sessions_summary_"));
+    auto &db = connection.db;
+    if (!db.isOpen()) {
+      result.error = QStringLiteral("session-database-unavailable");
+      return result;
+    }
+    result.error = QStringLiteral("session-query-failed");
+    if (!connection.snapshotStarted)
+      return result;
+    auto &summary = result.summary;
+    const QString from =
+        QStringLiteral(" FROM local_sessions s JOIN local_usage_events e ON "
+                       "e.session_id=s.session_id WHERE ");
+    QSqlQuery query(db);
+    query.prepare(
+        QStringLiteral(
+            "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),"
+            "SUM(e.input_tokens),SUM(e.output_tokens),SUM(e.cache_read_tokens),"
+            "SUM(e.cache_write_tokens),"
+            "COUNT(DISTINCT s.project_id),MAX(e.observed_at_utc),CASE WHEN "
+            "SUM(CASE WHEN "
+            "s.coverage!='reported' THEN 1 ELSE 0 END)>0 THEN 'partial' ELSE "
+            "'reported' END") +
+        from + eventWhere());
+    bindEventFilter(query, storedTool, fromUtc, toUtc, projectId, modelFilter);
+    if (!query.exec() || !query.next())
+      return result;
+    const QStringList keys{
+        "sessionCount", "eventCount",        "inputTokens",
+        "outputTokens", "cacheReadTokens",   "cacheWriteTokens",
+        "projectCount", "lastActivityAtUtc", "coverage"};
+    for (int i = 0; i < keys.size(); ++i)
+      summary.insert(keys[i], query.value(i));
+    if (!query.value(0).toInt())
+      summary.insert("coverage", QStringLiteral("unavailable"));
     QSqlQuery checkpoint(db);
     checkpoint.prepare(QStringLiteral(
         "SELECT coverage FROM local_import_checkpoints WHERE tool_id=?"));
     checkpoint.addBindValue(storedTool);
-    if (checkpoint.exec() && checkpoint.next())
-      toolCoverage = checkpoint.value(0).toString();
-    QString persistedStatus = QStringLiteral("unknown");
-    if (!toolEnabled) {
-      persistedStatus = QStringLiteral("disabled");
-    } else if (toolCoverage == QLatin1String("partial")) {
-      persistedStatus = QStringLiteral("partial");
-      result.insert("coverage", QStringLiteral("partial"));
-    } else if (toolCoverage == QLatin1String("reported")) {
-      persistedStatus = QStringLiteral("reported");
-    }
-    result.insert("toolCoverage", toolCoverage.isEmpty()
-                                      ? QStringLiteral("unknown")
-                                      : toolCoverage);
-    result.insert("toolEnabled", toolEnabled);
-    result.insert("importStatus", persistedStatus);
-    QVariantList modelBreakdown;
+    if (!checkpoint.exec())
+      return result;
+    const QString coverage = checkpoint.next() ? checkpoint.value(0).toString()
+                                               : QStringLiteral("unknown");
+    summary.insert("toolCoverage", coverage);
+    summary.insert("toolEnabled", enabled);
+    summary.insert("importStatus",
+                   !enabled ? QStringLiteral("disabled") : coverage);
+    if (enabled && coverage == QLatin1String("partial"))
+      summary.insert("coverage", coverage);
     QSqlQuery models(db);
-    models.prepare(QStringLiteral(
-        "SELECT e.model_id,COUNT(*),SUM(e.input_tokens),SUM(e.output_tokens) "
-        "FROM local_usage_events e JOIN local_sessions s ON "
-        "s.session_id=e.session_id WHERE s.tool_id=? AND e.observed_at_utc>=? "
-        "AND e.observed_at_utc<? AND (?='' OR s.project_id=?) GROUP BY "
-        "e.model_id ORDER BY COUNT(*) DESC LIMIT 100"));
-    models.addBindValue(storedTool);
-    models.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    models.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    models.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    models.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    if (models.exec())
-      while (models.next()) {
-        QVariantMap row;
-        row.insert("modelId", models.value(0));
-        row.insert("eventCount", models.value(1));
-        row.insert("inputTokens", models.value(2));
-        row.insert("outputTokens", models.value(3));
-        modelBreakdown.append(row);
-      }
-    result.insert("modelBreakdown", modelBreakdown);
-    QVariantList projectBreakdown;
-    QSqlQuery groupedProjects(db);
-    groupedProjects.prepare(QStringLiteral(
-        "SELECT s.project_id,COUNT(DISTINCT "
-        "s.session_id),SUM(e.input_tokens),SUM(e.output_tokens) FROM "
-        "local_sessions s JOIN local_usage_events e ON "
-        "e.session_id=s.session_id AND e.observed_at_utc>=? AND "
-        "e.observed_at_utc<? WHERE s.tool_id=? AND (?='' OR s.project_id=?) "
-        "GROUP BY "
-        "s.project_id ORDER BY COUNT(DISTINCT s.session_id) DESC LIMIT 100"));
-    groupedProjects.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    groupedProjects.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    groupedProjects.addBindValue(storedTool);
-    groupedProjects.addBindValue(projectId.isEmpty() ? QStringLiteral("")
-                                                     : projectId);
-    groupedProjects.addBindValue(projectId.isEmpty() ? QStringLiteral("")
-                                                     : projectId);
-    if (groupedProjects.exec())
-      while (groupedProjects.next()) {
-        QVariantMap row;
-        row.insert("projectId", groupedProjects.value(0));
-        row.insert("sessionCount", groupedProjects.value(1));
-        row.insert("inputTokens", groupedProjects.value(2));
-        row.insert("outputTokens", groupedProjects.value(3));
-        QSqlQuery a(db);
-        a.prepare(QStringLiteral(
-            "SELECT alias FROM local_project_aliases WHERE project_id=?"));
-        a.addBindValue(groupedProjects.value(0));
-        if (a.exec() && a.next())
-          row.insert("alias", a.value(0));
-        projectBreakdown.append(row);
-      }
-    result.insert("projectBreakdown", projectBreakdown);
-    QSqlQuery p(db);
-    p.prepare(QStringLiteral("SELECT DISTINCT s.project_id FROM local_sessions "
-                             "s JOIN local_usage_events e "
-                             "ON e.session_id=s.session_id WHERE s.tool_id=? "
-                             "AND e.observed_at_utc>=? "
-                             "AND e.observed_at_utc<? ORDER BY s.project_id"));
-    p.addBindValue(storedTool);
-    p.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
-    p.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
-    QVariantList projects;
-    if (p.exec())
-      while (p.next()) {
-        QVariantMap x;
-        x.insert("projectId", p.value(0));
-        QSqlQuery a(db);
-        a.prepare(QStringLiteral(
-            "SELECT alias FROM local_project_aliases WHERE project_id=?"));
-        a.addBindValue(p.value(0));
-        if (a.exec() && a.next())
-          x.insert("alias", a.value(0));
-        projects.append(x);
-      }
-    result.insert("projectOptions", projects);
-    result.insert("toolId", toolId);
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
+    models.prepare(
+        QStringLiteral(
+            "SELECT "
+            "e.model_id,COUNT(*),SUM(e.input_tokens),SUM(e.output_tokens)") +
+        from + eventWhere() +
+        QStringLiteral(
+            " GROUP BY e.model_id ORDER BY COUNT(*) DESC,e.model_id"));
+    bindEventFilter(models, storedTool, fromUtc, toUtc, projectId, modelFilter);
+    if (!models.exec())
+      return result;
+    QVariantList modelRows;
+    int modelCount = 0;
+    while (models.next()) {
+      ++modelCount;
+      if (modelCount <= 100)
+        modelRows.append(QVariantMap{{"modelId", models.value(0)},
+                                     {"eventCount", models.value(1)},
+                                     {"inputTokens", models.value(2)},
+                                     {"outputTokens", models.value(3)}});
+    }
+    if (models.lastError().isValid())
+      return result;
+    summary.insert("modelBreakdown", modelRows);
+    summary.insert("modelBreakdownTotalCount", modelCount);
+    QSqlQuery projects(db);
+    projects.prepare(
+        QStringLiteral("SELECT s.project_id,COUNT(DISTINCT s.session_id),"
+                       "SUM(e.input_tokens),SUM(e.output_tokens),COALESCE(a."
+                       "alias,'') FROM local_sessions s "
+                       "JOIN local_usage_events e ON e.session_id=s.session_id "
+                       "LEFT JOIN local_project_aliases a "
+                       "ON a.project_id=s.project_id WHERE ") +
+        eventWhere() +
+        QStringLiteral(" GROUP BY s.project_id ORDER BY COUNT(DISTINCT "
+                       "s.session_id) DESC,s.project_id"));
+    bindEventFilter(projects, storedTool, fromUtc, toUtc, projectId,
+                    modelFilter);
+    if (!projects.exec())
+      return result;
+    QVariantList projectRows;
+    int projectCount = 0;
+    while (projects.next()) {
+      ++projectCount;
+      if (projectCount <= 100)
+        projectRows.append(QVariantMap{{"projectId", projects.value(0)},
+                                       {"sessionCount", projects.value(1)},
+                                       {"inputTokens", projects.value(2)},
+                                       {"outputTokens", projects.value(3)},
+                                       {"alias", projects.value(4)}});
+    }
+    if (projects.lastError().isValid())
+      return result;
+    summary.insert("projectBreakdown", projectRows);
+    summary.insert("projectBreakdownTotalCount", projectCount);
+    // Project choices remain available independently of the current
+    // project/model.
+    QSqlQuery choices(db);
+    choices.prepare(
+        QStringLiteral("SELECT DISTINCT s.project_id,COALESCE(a.alias,'') "
+                       "FROM local_sessions s JOIN local_usage_events e ON "
+                       "e.session_id=s.session_id "
+                       "LEFT JOIN local_project_aliases a ON "
+                       "a.project_id=s.project_id WHERE ") +
+        eventWhere() + QStringLiteral(" ORDER BY s.project_id"));
+    bindEventFilter(choices, storedTool, fromUtc, toUtc, {}, {});
+    if (!choices.exec())
+      return result;
+    QVariantList options;
+    while (choices.next())
+      options.append(QVariantMap{{"projectId", choices.value(0)},
+                                 {"alias", choices.value(1)}});
+    if (choices.lastError().isValid())
+      return result;
+    summary.insert("projectOptions", options);
+    QSqlQuery modelOptions(db);
+    modelOptions.prepare(QStringLiteral("SELECT DISTINCT e.model_id") + from +
+                         eventWhere() + QStringLiteral(" ORDER BY e.model_id"));
+    bindEventFilter(modelOptions, storedTool, fromUtc, toUtc, projectId, {});
+    if (!modelOptions.exec())
+      return result;
+    options.clear();
+    while (modelOptions.next())
+      options.append(QVariantMap{{"modelId", modelOptions.value(0)}});
+    if (modelOptions.lastError().isValid())
+      return result;
+    summary.insert("modelOptions", options);
+    summary.insert("toolId", toolId);
+    result.error.clear();
     return result;
   }));
 }
 
-void LocalSessionModel::requestDaily(const QString &requestId,
-                                     const QString &toolId,
-                                     const QDateTime &fromUtc,
-                                     const QDateTime &toUtc,
-                                     const QString &projectId,
-                                     const QString &timeZoneId) {
+void LocalSessionModel::requestDaily(
+    const QString &requestId, const QString &toolId, const QDateTime &fromUtc,
+    const QDateTime &toUtc, const QString &projectId, const QString &timeZoneId,
+    const QVariantMap &modelFilter) {
   const QString storedTool = canonicalTool(toolId);
   const QTimeZone zone = timeZoneId.isEmpty() ? QTimeZone::systemTimeZone()
                                               : QTimeZone(timeZoneId.toUtf8());
-  auto *watcher = new QFutureWatcher<QVariantList>(this);
-  connect(watcher, &QFutureWatcher<QVariantList>::finished, this,
+  auto *watcher = new QFutureWatcher<SessionQueryResult>(this);
+  connect(watcher, &QFutureWatcher<SessionQueryResult>::finished, this,
           [this, watcher, requestId]() {
-            emit dailyReady(requestId, watcher->result());
+            const auto result = watcher->result();
             watcher->deleteLater();
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit dailyReady(requestId, result.rows);
           });
   watcher->setFuture(QtConcurrent::run([=]() {
-    QVariantList rows;
-    if (!zone.isValid() || !fromUtc.isValid() || !toUtc.isValid() ||
-        toUtc <= fromUtc)
-      return rows;
+    SessionQueryResult result;
     const QDate first = fromUtc.toTimeZone(zone).date();
     const QDate last = toUtc.addMSecs(-1).toTimeZone(zone).date();
-    if (!first.isValid() || !last.isValid() || first.daysTo(last) > 30)
-      return rows;
-    const QString connection = QStringLiteral("local_sessions_daily_%1")
-                                   .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(connection);
-    if (!db.isOpen())
-      return rows;
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter) ||
+        !zone.isValid() || !first.isValid() || !last.isValid() ||
+        first.daysTo(last) > 3650) {
+      result.error = QStringLiteral("session-invalid-query");
+      return result;
+    }
+    SessionConnection connection(QStringLiteral("local_sessions_daily_"));
+    auto &db = connection.db;
+    if (!db.isOpen()) {
+      result.error = QStringLiteral("session-database-unavailable");
+      return result;
+    }
+    result.error = QStringLiteral("session-query-failed");
+    if (!connection.snapshotStarted)
+      return result;
     QSqlQuery query(db);
-    query.prepare(QStringLiteral(
-        "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),SUM(e.input_"
-        "tokens),SUM(e.output_tokens),SUM(e.cache_read_tokens),SUM(e.cache_"
-        "write_tokens) FROM local_usage_events e JOIN local_sessions s ON "
-        "s.session_id=e.session_id WHERE s.tool_id=? AND "
-        "e.observed_at_utc>=? "
-        "AND e.observed_at_utc<? AND (?='' OR s.project_id=?)"));
+    if (!query.prepare(
+            QStringLiteral(
+                "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),"
+                "SUM(e.input_tokens),SUM(e.output_tokens),SUM(e.cache_"
+                "read_tokens),SUM(e.cache_write_tokens) "
+                "FROM local_sessions s JOIN local_usage_events e ON "
+                "e.session_id=s.session_id WHERE ") +
+            eventWhere()))
+      return result;
     for (QDate date = first; date <= last; date = date.addDays(1)) {
-      const QDateTime dayStart(date, QTime(0, 0), zone);
-      const QDateTime dayEnd(date.addDays(1), QTime(0, 0), zone);
-      const QDateTime lower = qMax(fromUtc.toUTC(), dayStart.toUTC());
-      const QDateTime upper = qMin(toUtc.toUTC(), dayEnd.toUTC());
+      const auto lower =
+          qMax(fromUtc.toUTC(), QDateTime(date, QTime(0, 0), zone).toUTC());
+      const auto upper = qMin(
+          toUtc.toUTC(), QDateTime(date.addDays(1), QTime(0, 0), zone).toUTC());
       if (upper <= lower)
         continue;
       query.bindValue(0, storedTool);
@@ -1170,29 +1725,29 @@ void LocalSessionModel::requestDaily(const QString &requestId,
       query.bindValue(2, upper.toString(Qt::ISODateWithMs));
       query.bindValue(3, projectId.isEmpty() ? QStringLiteral("") : projectId);
       query.bindValue(4, projectId.isEmpty() ? QStringLiteral("") : projectId);
-      if (query.exec() && query.next()) {
-        QVariantMap row;
-        row.insert("localDate", date.toString(Qt::ISODate));
-        row.insert("sessionCount", query.value(0));
-        row.insert("eventCount", query.value(1));
-        row.insert("inputTokens", query.value(2));
-        row.insert("outputTokens", query.value(3));
-        row.insert("cacheReadTokens", query.value(4));
-        row.insert("cacheWriteTokens", query.value(5));
-        rows.append(row);
-      }
+      query.bindValue(5, modelFilter.contains("modelId") ? 1 : 0);
+      query.bindValue(
+          6, modelFilter.value("modelId", QStringLiteral("")).toString());
+      if (!query.exec() || !query.next())
+        return result;
+      QVariantMap row{{"localDate", date.toString(Qt::ISODate)}};
+      const QStringList keys{"sessionCount",    "eventCount",
+                             "inputTokens",     "outputTokens",
+                             "cacheReadTokens", "cacheWriteTokens"};
+      for (int i = 0; i < keys.size(); ++i)
+        row.insert(keys[i], query.value(i));
+      result.rows.append(row);
+      query.finish();
     }
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(connection);
-    return rows;
+    result.error.clear();
+    return result;
   }));
 }
 
 void LocalSessionModel::requestExport(
     const QString &requestId, const QString &toolId, const QDateTime &fromUtc,
     const QDateTime &toUtc, const QString &projectId, const QString &format,
-    const QString &destinationPath) {
+    const QString &destinationPath, const QVariantMap &modelFilter) {
   const QString storedTool = canonicalTool(toolId);
   auto *w = new QFutureWatcher<QString>(this);
   connect(w, &QFutureWatcher<QString>::finished, this, [this, w, requestId]() {
@@ -1202,84 +1757,98 @@ void LocalSessionModel::requestExport(
   w->setFuture(QtConcurrent::run([=]() {
     if (format != QLatin1String("json") && format != QLatin1String("csv"))
       return QStringLiteral("session-export-format-invalid");
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter))
+      return QStringLiteral("session-invalid-query");
     QFileInfo destinationInfo(destinationPath);
     if (destinationPath.isEmpty() || destinationInfo.isDir() ||
         destinationInfo.isSymLink())
       return QStringLiteral("session-export-destination-invalid");
-    QVariantList rows;
     QByteArray exportKey(32, Qt::Uninitialized);
     for (qsizetype index = 0; index < exportKey.size(); index += 4) {
       const quint32 random = QRandomGenerator::system()->generate();
       qToLittleEndian(random,
                       reinterpret_cast<uchar *>(exportKey.data() + index));
     }
-    const QString c = QStringLiteral("local_sessions_export_%1")
-                          .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
+    SessionConnection connection(QStringLiteral("local_sessions_export_"));
+    auto &db = connection.db;
     if (!db.isOpen())
       return QStringLiteral("session-database-unavailable");
+    if (!connection.snapshotStarted)
+      return QStringLiteral("session-query-failed");
     QSqlQuery q(db);
+    q.setForwardOnly(true);
     q.prepare(QStringLiteral(
         "SELECT "
         "s.session_id,s.project_id,e.observed_at_utc,e.model_id,e.input_"
         "tokens,e.output_tokens,e.cache_read_tokens,e.cache_write_tokens FROM "
         "local_sessions s JOIN local_usage_events e ON "
         "e.session_id=s.session_id WHERE s.tool_id=? AND e.observed_at_utc>=? "
-        "AND e.observed_at_utc<? AND (?='' OR s.project_id=?) ORDER BY "
+        "AND e.observed_at_utc<? AND (?='' OR s.project_id=?) AND (?=0 OR "
+        "e.model_id=?) ORDER BY "
         "e.observed_at_utc"));
     q.addBindValue(storedTool);
     q.addBindValue(fromUtc.toUTC().toString(Qt::ISODateWithMs));
     q.addBindValue(toUtc.toUTC().toString(Qt::ISODateWithMs));
     q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
     q.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-    if (q.exec())
-      while (q.next()) {
-        QVariantMap r;
-        r.insert("sessionId",
-                 QString::fromLatin1(LocalSessionParser::identity(
-                     exportKey, "export-session", q.value(0).toByteArray())));
-        r.insert("projectId",
-                 QString::fromLatin1(LocalSessionParser::identity(
-                     exportKey, "export-project", q.value(1).toByteArray())));
-        r.insert("timestampUtc", q.value(2));
-        r.insert("modelId", q.value(3));
-        r.insert("inputTokens", q.value(4));
-        r.insert("outputTokens", q.value(5));
-        r.insert("cacheReadTokens", q.value(6));
-        r.insert("cacheWriteTokens", q.value(7));
-        rows.append(r);
-      }
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
+    q.addBindValue(modelFilter.contains("modelId") ? 1 : 0);
+    q.addBindValue(modelFilter.value("modelId", QStringLiteral("")).toString());
+    if (!q.exec())
+      return QStringLiteral("session-query-failed");
     QSaveFile file(destinationPath);
     file.setDirectWriteFallback(false);
-    if (!file.open(QIODevice::WriteOnly))
+    if (!file.open(QIODevice::WriteOnly) ||
+        !file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner))
       return QStringLiteral("session-export-write-failed");
-    file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
-    QByteArray bytes;
-    if (format == QLatin1String("json"))
-      bytes = QJsonDocument(
-                  QJsonObject{{"schemaVersion", 1},
-                              {"sessions", QJsonArray::fromVariantList(rows)}})
-                  .toJson(QJsonDocument::Indented);
-    else {
-      bytes = "sessionId,projectId,timestampUtc,modelId,inputTokens,"
-              "outputTokens,cacheReadTokens,cacheWriteTokens\n";
-      for (const auto &v : rows) {
-        const auto r = v.toMap();
+    const auto write = [&file](const QByteArray &bytes) {
+      return file.write(bytes) == bytes.size();
+    };
+    const bool json = format == QLatin1String("json");
+    if (!write(json ? QByteArray("{\"schemaVersion\":1,\"sessions\":[\n")
+                    : QByteArray("sessionId,projectId,timestampUtc,modelId,"
+                                 "inputTokens,outputTokens,cacheReadTokens,"
+                                 "cacheWriteTokens\n")))
+      return QStringLiteral("session-export-write-failed");
+    bool firstRow = true;
+    while (q.next()) {
+      QVariantMap row;
+      row.insert("sessionId",
+                 QString::fromLatin1(LocalSessionParser::identity(
+                     exportKey, "export-session", q.value(0).toByteArray())));
+      row.insert("projectId",
+                 QString::fromLatin1(LocalSessionParser::identity(
+                     exportKey, "export-project", q.value(1).toByteArray())));
+      row.insert("timestampUtc", q.value(2));
+      row.insert("modelId", q.value(3));
+      const QStringList tokenKeys{"inputTokens", "outputTokens",
+                                  "cacheReadTokens", "cacheWriteTokens"};
+      for (int i = 0; i < tokenKeys.size(); ++i)
+        row.insert(tokenKeys[i],
+                   q.value(i + 4).isNull() ? QVariant() : q.value(i + 4));
+      QByteArray bytes;
+      if (json) {
+        if (!firstRow)
+          bytes = ",\n";
+        bytes += QJsonDocument(QJsonObject::fromVariantMap(row))
+                     .toJson(QJsonDocument::Compact);
+      } else {
         QStringList fields;
-        for (const auto &k : {"sessionId", "projectId", "timestampUtc",
-                              "modelId", "inputTokens", "outputTokens",
-                              "cacheReadTokens", "cacheWriteTokens"}) {
-          QString s = r.value(QLatin1String(k)).toString();
-          s.replace('"', "\"\"");
-          fields << ('"' + s + '"');
+        for (const auto &key : {"sessionId", "projectId", "timestampUtc",
+                                "modelId", "inputTokens", "outputTokens",
+                                "cacheReadTokens", "cacheWriteTokens"}) {
+          QString value = row.value(QLatin1String(key)).toString();
+          value.replace('"', "\"\"");
+          fields << ('"' + value + '"');
         }
-        bytes += fields.join(',').toUtf8() + "\n";
+        bytes = fields.join(',').toUtf8() + "\n";
       }
+      if (!write(bytes))
+        return QStringLiteral("session-export-write-failed");
+      firstRow = false;
     }
-    if (file.write(bytes) != bytes.size() || !file.commit())
+    if (q.lastError().isValid())
+      return QStringLiteral("session-query-failed");
+    if ((json && !write("\n]}\n")) || !file.commit())
       return QStringLiteral("session-export-write-failed");
     return QString();
   }));
@@ -1312,7 +1881,8 @@ QString LocalSessionModel::createProjectAlias(const QUrl &directory,
                                  .arg(QRandomGenerator::global()->generate());
   bool queried = true;
   {
-    auto db = openDb(connection);
+    SessionConnection connectionOwner(connection, false);
+    auto &db = connectionOwner.db;
     queried = db.isOpen();
     if (queried) {
       QString existingAlias;
@@ -1342,7 +1912,6 @@ QString LocalSessionModel::createProjectAlias(const QUrl &directory,
         projectId = existingAlias;
     }
   }
-  QSqlDatabase::removeDatabase(connection);
   return queried && setProjectAlias(projectId, name) ? projectId : QString();
 }
 
@@ -1351,7 +1920,8 @@ QVariantList LocalSessionModel::projectAliases() const {
                                  .arg(QRandomGenerator::global()->generate());
   QVariantList rows;
   {
-    auto db = openDb(connection);
+    SessionConnection connectionOwner(connection, false);
+    auto &db = connectionOwner.db;
     if (db.isOpen()) {
       QSqlQuery query(db);
       if (query.exec(QStringLiteral(
@@ -1368,7 +1938,6 @@ QVariantList LocalSessionModel::projectAliases() const {
       }
     }
   }
-  QSqlDatabase::removeDatabase(connection);
   return rows;
 }
 
@@ -1385,7 +1954,8 @@ bool LocalSessionModel::setProjectAlias(const QString &projectId,
                                  .arg(QRandomGenerator::global()->generate());
   bool ok = false;
   {
-    auto db = openDb(connection);
+    SessionConnection connectionOwner(connection, false);
+    auto &db = connectionOwner.db;
     if (db.isOpen()) {
       QSqlQuery query(db);
       query.prepare(
@@ -1402,13 +1972,13 @@ bool LocalSessionModel::setProjectAlias(const QString &projectId,
       ok = query.exec();
     }
   }
-  QSqlDatabase::removeDatabase(connection);
   return ok;
 }
 QString LocalSessionModel::projectAlias(const QString &projectId) const {
   const QString c = QStringLiteral("local_sessions_alias_read_%1")
                         .arg(QRandomGenerator::global()->generate());
-  auto db = openDb(c);
+  SessionConnection connectionOwner(c, false);
+  auto &db = connectionOwner.db;
   if (!db.isOpen())
     return {};
   QSqlQuery q(db);
@@ -1418,25 +1988,39 @@ QString LocalSessionModel::projectAlias(const QString &projectId) const {
   QString result;
   if (q.exec() && q.next())
     result = q.value(0).toString();
-  db.close();
-  db = {};
-  QSqlDatabase::removeDatabase(c);
   return result;
 }
 void LocalSessionModel::clearSessions() { clearSessions(QString()); }
 void LocalSessionModel::clearSessions(const QString &requestId) {
   ++m_generation;
   m_generationState->store(m_generation, std::memory_order_release);
+  m_codexAppendContexts.clear();
   const QString lockPath =
       dataDirectory() + QStringLiteral("/session-import.lock");
   auto *w = new QFutureWatcher<QVariantMap>(this);
-  connect(w, &QFutureWatcher<QVariantMap>::finished, this,
-          [this, w, requestId]() {
-            const auto r = w->result();
-            emit clearFinished(requestId, r.value("ok").toBool(),
-                               r.value("errorKey").toString());
-            w->deleteLater();
-          });
+  connect(
+      w, &QFutureWatcher<QVariantMap>::finished, this, [this, w, requestId]() {
+        const auto r = w->result();
+        if (r.value("ok").toBool()) {
+          m_codexAppendContexts.clear();
+          for (const auto &entry :
+               {qMakePair(QStringLiteral("codex-cli"), m_codexEnabled),
+                qMakePair(QStringLiteral("claude-code"), m_claudeEnabled)}) {
+            QVariantMap state = m_importStates.value(entry.first).toMap();
+            state.insert(QStringLiteral("state"),
+                         entry.second ? QStringLiteral("unknown")
+                                      : QStringLiteral("disabled"));
+            state.insert(QStringLiteral("importedEventCount"), 0);
+            state.insert(QStringLiteral("reasonKeys"), QStringList{});
+            state.insert(QStringLiteral("errorKey"), QString());
+            m_importStates.insert(entry.first, state);
+          }
+          emit importStatesChanged();
+        }
+        emit clearFinished(requestId, r.value("ok").toBool(),
+                           r.value("errorKey").toString());
+        w->deleteLater();
+      });
   w->setFuture(QtConcurrent::run([lockPath]() {
     QVariantMap result;
     QLockFile lock(lockPath);
@@ -1447,7 +2031,8 @@ void LocalSessionModel::clearSessions(const QString &requestId) {
     }
     const QString c = QStringLiteral("local_sessions_clear_%1")
                           .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
+    SessionConnection connectionOwner(c, false);
+    auto &db = connectionOwner.db;
     if (!db.isOpen()) {
       result.insert("errorKey", QStringLiteral("session-database-unavailable"));
       return result;
@@ -1479,28 +2064,40 @@ void LocalSessionModel::clearSessions(const QString &requestId) {
     if (!ok) {
       db.rollback();
       result.insert("errorKey", QStringLiteral("session-clear-failed"));
-    } else
+    } else {
+      QFile::remove(scanCursorPath(QStringLiteral("codex")));
+      QFile::remove(scanCursorPath(QStringLiteral("claude-code")));
+      QFile::remove(scanCursorPath(QStringLiteral("codex"), true));
+      QFile::remove(scanCursorPath(QStringLiteral("claude-code"), true));
       result.insert("ok", true);
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
+    }
     return result;
   }));
 }
 void LocalSessionModel::requestProjects(const QString &requestId) {
-  auto *w = new QFutureWatcher<QVariantList>(this);
-  connect(w, &QFutureWatcher<QVariantList>::finished, this,
+  auto *w = new QFutureWatcher<SessionQueryResult>(this);
+  connect(w, &QFutureWatcher<SessionQueryResult>::finished, this,
           [this, w, requestId]() {
-            emit projectsReady(requestId, w->result());
+            const auto result = w->result();
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit projectsReady(requestId, result.rows);
             w->deleteLater();
           });
   w->setFuture(QtConcurrent::run([]() {
-    QVariantList rows;
-    const QString c = QStringLiteral("local_sessions_projects_%1")
-                          .arg(QRandomGenerator::global()->generate());
-    auto db = openDb(c);
-    if (!db.isOpen())
-      return rows;
+    SessionQueryResult result;
+    auto &rows = result.rows;
+    SessionConnection connection(QStringLiteral("local_sessions_projects_"));
+    auto &db = connection.db;
+    if (!db.isOpen()) {
+      result.error = QStringLiteral("session-database-unavailable");
+      return result;
+    }
+    if (!connection.snapshotStarted) {
+      result.error = QStringLiteral("session-query-failed");
+      return result;
+    }
     QSqlQuery q(db);
     if (q.exec(QStringLiteral(
             "SELECT s.tool_id,s.project_id,COALESCE(a.alias,''),COUNT(DISTINCT "
@@ -1517,9 +2114,10 @@ void LocalSessionModel::requestProjects(const QString &requestId) {
         r.insert("sessionCount", q.value(3));
         rows.append(r);
       }
-    db.close();
-    db = {};
-    QSqlDatabase::removeDatabase(c);
-    return rows;
+    else
+      result.error = QStringLiteral("session-query-failed");
+    if (q.lastError().isValid())
+      result.error = QStringLiteral("session-query-failed");
+    return result;
   }));
 }

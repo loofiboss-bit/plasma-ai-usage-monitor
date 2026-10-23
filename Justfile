@@ -132,6 +132,10 @@ phase7-check: build-debug
 fedora44-check:
     bash scripts/fedora44_check.sh
 
+# Fedora KDE 45 prerelease environment validation
+fedora45-check:
+    bash scripts/fedora44_check.sh 45
+
 # Create a tarball package for distribution
 package:
     bash scripts/package_source_tarball.sh
@@ -236,9 +240,9 @@ copr-submit TAG PROJECT="loofitheboss/plasma-ai-usage-monitor":
     mkdir -p dist
     bash scripts/copr_submit_build.sh --project "{{PROJECT}}" --tag "{{TAG}}" --output-dir dist
 
-# Verify clean Fedora 44 install plus base upgrade, rollback, re-upgrade, reinstall, and removal
-rpm-lifecycle-check BASE_RPM CANDIDATE_RPM:
-    bash scripts/test_fedora44_rpm_lifecycle.sh "{{BASE_RPM}}" "{{CANDIDATE_RPM}}"
+# Verify clean Fedora 44/45 install plus base upgrade, rollback, re-upgrade, reinstall, and removal
+rpm-lifecycle-check BASE_RPM CANDIDATE_RPM FEDORA_VERSION="44":
+    bash scripts/test_fedora44_rpm_lifecycle.sh "{{BASE_RPM}}" "{{CANDIDATE_RPM}}" "{{FEDORA_VERSION}}"
 
 # Enable the COPR repository
 copr-enable:

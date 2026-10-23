@@ -89,6 +89,23 @@ This can be correct. Many provider APIs expose model discovery but no account us
 
 Connectivity-only responses do not create fake usage rows.
 
+## Local coding sessions are empty or incomplete
+
+Session history has a separate opt-in from provider history and tool quota
+monitoring. Enable **Codex session data** or **Claude Code session data** in
+**Settings → History**, choose **Apply**, and wait for that tool's scan.
+
+In **History → Sessions**, select the expected tool, use **30 days**, and clear
+project and model filters. Initial import covers at most 30 days within
+retention. A chooser search only narrows its choices; select a result to change
+the actual data filter. No supported recent logs means no imported sessions.
+
+Check the per-tool scan result and coverage in Settings. Use **Rescan local
+sessions** to retry discovery after correcting file access. A query error offers
+**Try again**. Do not delete history to fix a filter or query error: deletion
+also clears local project aliases. See [Coding sessions](coding-sessions.md)
+for import limits and deletion behavior.
+
 ## Budget policy or runway forecast is unavailable
 
 Open Source Detail or Analyst and read the unavailable reason, samples,

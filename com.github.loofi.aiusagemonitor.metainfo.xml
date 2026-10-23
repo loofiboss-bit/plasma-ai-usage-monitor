@@ -90,6 +90,17 @@
 
   <releases>
 
+    <release version="25.0.0" date="2026-10-23">
+      <description>
+        <ul>
+          <li>Search local project choices and reported models across Codex and Claude Code session history.</li>
+          <li>Keep filters and navigation context across summaries, daily totals, analysis, and session details.</li>
+          <li>Add streamed private JSON and CSV manual exports matching active filters.</li>
+          <li>Improve import recovery for deleted Codex usage and oversized log records.</li>
+          <li>Add one-action search and filter reset in Overview and Sources.</li>
+        </ul>
+      </description>
+    </release>
     <release version="24.2.0" date="2026-10-12"/>
     <release version="24.1.0" date="2026-10-12"/>
     <release version="24.0.1" date="2026-10-12"/>

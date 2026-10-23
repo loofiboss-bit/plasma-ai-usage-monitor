@@ -27,6 +27,7 @@ Item {
     property string historySourceId: ""
     property string historyMetric: ""
     property int historyRangeDays: 7
+    property var sessionDayReturnState: null
     property bool historyRequestPending: false
     property var overviewViewState: ({})
     property var historyViewState: ({})
@@ -38,7 +39,9 @@ Item {
     property string historySessionProjectId: ""
     property var localSessionViewState: ({
         sourceDetail: ({ toolId: "codex-cli", rangeIndex: 1 }),
-        history: ({ toolId: "codex-cli", rangeIndex: 1 }),
+        history: ({ toolId: "codex-cli", rangeIndex: 1,
+            modelFilter: AppInfo.demoMode && AppInfo.smokeView === "media-history-sessions"
+                ? {modelId: "gpt-5-codex"} : ({}) }),
         analyst: ({
             analystMode: false,
             toolId: "codex-cli", rangeIndex: 1
@@ -70,6 +73,129 @@ Item {
         else if (destination === 1) historyViewState = state;
         else if (destination === 2) insightsViewState = state;
         // qmllint enable missing-property
+    }
+
+    function cloneViewState(value) {
+        try { return JSON.parse(JSON.stringify(value || ({}))); }
+        catch (error) { return ({}); }
+    }
+
+    function applyHistoryRoute(item) {
+        // qmllint disable missing-property
+        if (!item || typeof item.applyViewState !== "function") return false;
+        item.sessionsMode = fullRoot.historySessionsMode;
+        item.sessionToolId = fullRoot.historySessionToolId;
+        item.sessionProjectId = fullRoot.historySessionProjectId;
+        item.sessionState = fullRoot.localSessionViewState.history;
+        item.viewState = fullRoot.historyViewState;
+        if (fullRoot.historyRequestPending) {
+            item.requestedSourceId = fullRoot.historySourceId;
+            item.requestedMetric = fullRoot.historyMetric;
+            item.requestedRangeDays = fullRoot.historyRangeDays;
+            fullRoot.historyRequestPending = false;
+            fullRoot.historySourceId = "";
+            fullRoot.historyMetric = "";
+        }
+        // qmllint enable missing-property
+        return true;
+    }
+
+    function syncLoadedHistoryRoute() {
+        if (sourceDetailVisible || destination !== 1
+                || destinationLoader.status !== Loader.Ready)
+            return false;
+        return applyHistoryRoute(destinationLoader.item);
+    }
+
+    function routeToSessionHistory(toolId, projectId, rangeDays,
+                                  sessionId, pageOffset, modelFilter) {
+        captureCurrentViewState();
+        historyViewState = ({});
+        historySessionsMode = true;
+        historySessionToolId = String(toolId || "codex-cli");
+        historySessionProjectId = String(projectId || "");
+        historyRangeDays = rangeDays;
+        historyRequestPending = false;
+        var nextSessionState = Object.assign({}, localSessionViewState.history);
+        nextSessionState.toolId = historySessionToolId;
+        nextSessionState.projectId = historySessionProjectId;
+        nextSessionState.rangeIndex = [1, 7, 30].indexOf(Number(rangeDays));
+        if (nextSessionState.rangeIndex < 0) nextSessionState.rangeIndex = 1;
+        nextSessionState.rangeMode = "preset";
+        nextSessionState.customStartDate = "";
+        nextSessionState.customEndDate = "";
+        nextSessionState.dayDrilldown = false;
+        nextSessionState.dayFocusDate = "";
+        nextSessionState.dailyScrollY = 0;
+        nextSessionState.sessionId = String(sessionId || "");
+        nextSessionState.pageOffset = pageOffset;
+        nextSessionState.modelFilter = modelFilter || ({});
+        nextSessionState.historyDisplayIndex = 0;
+        nextSessionState.projectSearch = "";
+        nextSessionState.modelSearch = "";
+        localSessionViewState = Object.assign({}, localSessionViewState,
+            { history: nextSessionState });
+        sessionDayReturnState = null;
+        sourceDetailVisible = false;
+        destination = 1;
+        Qt.callLater(syncLoadedHistoryRoute);
+    }
+
+    function routeToSessionHistoryRange(selection) {
+        if (!selection || !selection.startDate || !selection.endDate)
+            return;
+        captureCurrentViewState();
+        sessionDayReturnState = {
+            destination: destination,
+            historyViewState: cloneViewState(historyViewState),
+            insightsViewState: cloneViewState(insightsViewState),
+            localSessionViewState: cloneViewState(localSessionViewState),
+            historySessionsMode: historySessionsMode,
+            historySessionToolId: historySessionToolId,
+            historySessionProjectId: historySessionProjectId
+        };
+        historyViewState = ({});
+        historySessionsMode = true;
+        historySessionToolId = String(selection.toolId || "codex-cli");
+        historySessionProjectId = String(selection.projectId || "");
+        historyRangeDays = 1;
+        historyRequestPending = false;
+        var nextSessionState = cloneViewState(localSessionViewState.history);
+        nextSessionState.toolId = historySessionToolId;
+        nextSessionState.projectId = historySessionProjectId;
+        nextSessionState.modelFilter = selection.modelFilter || ({});
+        nextSessionState.rangeIndex = 3;
+        nextSessionState.rangeMode = "custom";
+        nextSessionState.customStartDate = String(selection.startDate);
+        nextSessionState.customEndDate = String(selection.endDate);
+        nextSessionState.historyDisplayIndex = 0;
+        nextSessionState.pageOffset = 0;
+        nextSessionState.sessionId = "";
+        nextSessionState.projectSearch = "";
+        nextSessionState.modelSearch = "";
+        nextSessionState.dayDrilldown = selection.dayDrilldown === true;
+        if (selection.dayDrilldown === true)
+            nextSessionState.dayFocusDate = String(selection.startDate);
+        localSessionViewState = Object.assign({}, localSessionViewState,
+            { history: nextSessionState });
+        sourceDetailVisible = false;
+        destination = 1;
+        Qt.callLater(syncLoadedHistoryRoute);
+    }
+
+    function returnToSessionDayOverview() {
+        var saved = sessionDayReturnState;
+        if (!saved) return;
+        historyViewState = cloneViewState(saved.historyViewState);
+        insightsViewState = cloneViewState(saved.insightsViewState);
+        localSessionViewState = cloneViewState(saved.localSessionViewState);
+        historySessionsMode = !!saved.historySessionsMode;
+        historySessionToolId = String(saved.historySessionToolId || "codex-cli");
+        historySessionProjectId = String(saved.historySessionProjectId || "");
+        sessionDayReturnState = null;
+        sourceDetailVisible = false;
+        destination = Number(saved.destination) === 2 ? 2 : 1;
+        Qt.callLater(syncLoadedHistoryRoute);
     }
 
     readonly property bool hasConfiguration: {
@@ -225,6 +351,7 @@ Item {
 
         Loader {
             id: destinationLoader
+            objectName: "destinationLoader"
             Layout.fillWidth: true
             Layout.maximumWidth: Kirigami.Units.gridUnit * 64
             Layout.minimumWidth: 0
@@ -243,19 +370,7 @@ Item {
                     item.sourceId = fullRoot.detailSourceId;
                     item.sessionState = fullRoot.localSessionViewState.sourceDetail;
                 } else if (fullRoot.destination === 1) {
-                    item.viewState = fullRoot.historyViewState;
-                    item.sessionsMode = fullRoot.historySessionsMode;
-                    item.sessionToolId = fullRoot.historySessionToolId;
-                    item.sessionProjectId = fullRoot.historySessionProjectId;
-                    item.sessionState = fullRoot.localSessionViewState.history;
-                    if (fullRoot.historyRequestPending) {
-                        item.requestedSourceId = fullRoot.historySourceId;
-                        item.requestedMetric = fullRoot.historyMetric;
-                        item.requestedRangeDays = fullRoot.historyRangeDays;
-                        fullRoot.historyRequestPending = false;
-                        fullRoot.historySourceId = "";
-                        fullRoot.historyMetric = "";
-                    }
+                    fullRoot.applyHistoryRoute(item);
                 } else if (fullRoot.destination === 2) {
                     item.viewState = fullRoot.insightsViewState;
                     item.sessionState = fullRoot.localSessionViewState.analyst;
@@ -266,7 +381,9 @@ Item {
                         fullRoot.returnFocusSourceId = "";
                         Qt.callLater(function() {
                             // qmllint disable missing-property
-                            destinationLoader.item.restoreSourceFocus(sourceId);
+                            if (destinationLoader.item && typeof destinationLoader.item.restoreSourceFocus === "function") {
+                                destinationLoader.item.restoreSourceFocus(sourceId);
+                            }
                             // qmllint enable missing-property
                         });
                     }
@@ -316,24 +433,15 @@ Item {
                 fullRoot.destination = 1;
             }
             function onSessionHistoryRequested(toolId, projectId, rangeDays,
-                                               sessionId, pageOffset) {
-                fullRoot.historyViewState = ({});
-                fullRoot.historySessionsMode = true;
-                fullRoot.historySessionToolId = toolId;
-                fullRoot.historySessionProjectId = projectId;
-                fullRoot.historyRangeDays = rangeDays;
-                fullRoot.historyRequestPending = false;
-                var nextSessionState = Object.assign({},
-                    fullRoot.localSessionViewState.history);
-                nextSessionState.toolId = toolId;
-                nextSessionState.projectId = projectId;
-                nextSessionState.rangeIndex = [1, 7, 30].indexOf(rangeDays);
-                nextSessionState.sessionId = sessionId;
-                nextSessionState.pageOffset = pageOffset;
-                fullRoot.localSessionViewState = Object.assign({},
-                    fullRoot.localSessionViewState, { history: nextSessionState });
-                fullRoot.sourceDetailVisible = false;
-                fullRoot.destination = 1;
+                                               sessionId, pageOffset, modelFilter) {
+                fullRoot.routeToSessionHistory(toolId, projectId, rangeDays,
+                    sessionId, pageOffset, modelFilter);
+            }
+            function onSessionHistoryRangeRequested(selection) {
+                fullRoot.routeToSessionHistoryRange(selection);
+            }
+            function onSessionDayReturnRequested() {
+                fullRoot.returnToSessionDayOverview();
             }
             function onSessionsModeChanged() {
                 if (fullRoot.destination === 1 && !fullRoot.sourceDetailVisible) {

@@ -21,6 +21,8 @@ KCM.SimpleKCM {
     property alias cfg_autoExportEnabled: autoExportSwitch.checked
     property alias cfg_autoExportDirectory: autoExportDirectoryField.text
     property alias cfg_autoExportIntervalMinutes: autoExportIntervalSpin.value
+    property var sessionBackend: localSessions
+    property var historyDatabase: historyDb
     property string cfg_autoExportFormat: Plasmoid.configuration.autoExportFormat
 
     function readRuntimeSnapshot(value) {
@@ -65,7 +67,7 @@ KCM.SimpleKCM {
 
     Components.HistoryMaintenanceController {
         id: maintenance
-        database: historyDb
+        database: historyPage.historyDatabase
     }
 
     LocalSessionModel {
@@ -74,26 +76,15 @@ KCM.SimpleKCM {
     }
 
     Connections {
-        target: localSessions
+        target: historyPage.sessionBackend
         function onSummaryReady(requestId, summary) {
-            summary = summary || {};
-            var toolId = String(summary.toolId || "");
-            if (!toolId || historyPage.sessionSummaryRequestIds[toolId] !== requestId)
-                return;
-            var summaries = Object.assign({}, historyPage.sessionSummaries);
-            summaries[toolId] = summary;
-            historyPage.sessionSummaries = summaries;
+            historyPage.acceptSessionSummary(requestId, summary, false);
+        }
+        function onQueryFailed(requestId, errorKey) {
+            historyPage.acceptSessionSummary(requestId, {}, true);
         }
 
         function onImportFinished(toolId, importedCount, partial, errorKey) {
-            var count = Math.max(0, Number(importedCount) || 0);
-            historyPage.sessionStatusText = errorKey !== ""
-                ? i18n("A session file could not be imported. It will be retried automatically.")
-                : partial
-                ? i18np("Import is partial: %1 session event was stored.",
-                        "Import is partial: %1 session events were stored.", count)
-                : i18np("Imported %1 session event.",
-                            "Imported %1 session events.", count);
             historyPage.refreshProjectAliases();
             historyPage.refreshSessionSummaries();
         }
@@ -116,16 +107,16 @@ KCM.SimpleKCM {
     property bool sessionOperationBusy: false
 
     function syncSessionConsent() {
-        localSessions.setToolEnabled("codex-cli",
+        sessionBackend.setToolEnabled("codex-cli",
             !!Plasmoid.configuration.codexSessionHistoryEnabled);
-        localSessions.setToolEnabled("claude-code",
+        sessionBackend.setToolEnabled("claude-code",
             !!Plasmoid.configuration.claudeCodeSessionHistoryEnabled);
         refreshProjectAliases();
         refreshSessionSummaries();
     }
 
     function refreshSessionSummaries() {
-        if (!localSessions || typeof localSessions.requestSummary !== "function")
+        if (!sessionBackend || typeof sessionBackend.requestSummary !== "function")
             return;
         var today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -133,15 +124,34 @@ KCM.SimpleKCM {
         from.setDate(from.getDate() - 29);
         var to = new Date(today.getTime());
         to.setDate(to.getDate() + 1);
-        var ids = Object.assign({}, sessionSummaryRequestIds);
+        var ids = ({});
+        var pending = [];
         ["codex-cli", "claude-code"].forEach(function(toolId) {
             var requestId = "session-status-" + toolId + "-"
                 + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
             ids[toolId] = requestId;
-            localSessions.requestSummary(requestId, toolId,
-                from.toISOString(), to.toISOString(), "");
+            pending.push({requestId: requestId, toolId: toolId});
         });
         sessionSummaryRequestIds = ids;
+        pending.forEach(function(request) {
+            sessionBackend.requestSummary(request.requestId, request.toolId,
+                from.toISOString(), to.toISOString(), "");
+        });
+    }
+
+    function acceptSessionSummary(requestId, summary, failed) {
+        var tools = Object.keys(sessionSummaryRequestIds);
+        for (var i = 0; i < tools.length; ++i) {
+            var toolId = tools[i];
+            if (sessionSummaryRequestIds[toolId] !== requestId) continue;
+            var ids = Object.assign({}, sessionSummaryRequestIds);
+            delete ids[toolId];
+            sessionSummaryRequestIds = ids;
+            var summaries = Object.assign({}, sessionSummaries);
+            summaries[toolId] = failed ? {queryFailed: true} : summary || {};
+            sessionSummaries = summaries;
+            return;
+        }
     }
 
     function sessionImportStatus(toolId) {
@@ -150,17 +160,79 @@ KCM.SimpleKCM {
             : !!Plasmoid.configuration.claudeCodeSessionHistoryEnabled;
         if (!enabled) return i18n("Disabled");
         var summary = sessionSummaries[toolId] || {};
+        if (summary.queryFailed) return i18n("Historical coverage could not be loaded. Try again.");
         var coverage = String(summary.toolCoverage || "unknown");
-        var status = String(summary.importStatus || "unknown");
-        if (coverage === "partial" || status.indexOf("partial") >= 0)
-            return i18n("Partial import; some local data could not be verified.");
-        if (status === "running" || status === "enabled")
-            return i18n("Enabled; checking supported local files.");
-        if (status === "error")
-            return i18n("The local import encountered an error.");
-        if (coverage === "reported" || status === "ready" || status === "complete")
-            return i18n("Scanned; values reflect usage reported by the tool.");
-        return i18n("Enabled; no completed scan status is available yet.");
+        if (coverage === "partial")
+            return i18n("Historical data has known gaps; a successful new scan does not repair earlier gaps.");
+        if (coverage === "reported")
+            return i18n("No known coverage gaps in the imported history.");
+        return i18n("Historical coverage is not known yet.");
+    }
+
+    function sessionStateText(toolId) {
+        var enabled = toolId === "codex-cli"
+            ? !!Plasmoid.configuration.codexSessionHistoryEnabled
+            : !!Plasmoid.configuration.claudeCodeSessionHistoryEnabled;
+        if (!enabled) return i18n("Disabled");
+        var states = historyPage.sessionBackend
+            ? historyPage.sessionBackend.importStates || ({}) : ({});
+        return scanStateText(states[toolId] || ({}));
+    }
+
+    function scanStateText(state) {
+        var status = String(state.state || "unknown");
+        if (status === "unknown") return i18n("No scan status is available in this settings session yet.");
+        var completed = Date.parse(state.lastCompletedAtUtc || "");
+        var imported = Math.max(0, Number(state.importedEventCount || 0));
+        if (status === "running") {
+            var runningText = i18n("Scanning local session files…");
+            if (Number.isFinite(completed)) {
+                runningText += " " + i18np("Previous scan imported %1 event.",
+                    "Previous scan imported %1 events.", imported);
+                runningText += " " + i18n("Last completed: %1.",
+                    new Date(completed).toLocaleString(Qt.locale()));
+            }
+            return runningText;
+        }
+        var message = status === "complete"
+            ? i18n("Latest scan completed; %1 events imported.",
+                imported)
+            : status === "partial"
+                ? i18n("Latest scan completed with limits or unreadable data.")
+                : status === "error" ? i18n("Latest scan failed.")
+                : i18n("No scan status is available yet.");
+        if (status === "partial" || status === "error")
+            message += " " + i18np("%1 event imported.", "%1 events imported.", imported);
+        var reasons = (state.reasonKeys || []).map(function(key) {
+            if (key === "discovery-limit") return i18n("more than 50,000 files were found");
+            if (key === "scan-budget") return i18n("the per-scan file or byte limit was reached");
+            if (key === "file-size-limit") return i18n("a file exceeded the supported size limit");
+            if (key === "source-unavailable") return i18n("a local source file was unavailable");
+            if (key === "retention-maintenance") return i18n("retention cleanup did not complete");
+            if (key === "checkpoint-write") return i18n("scan progress could not be saved");
+            return i18n("some records could not be verified");
+        });
+        if (String(state.errorKey || "") !== "") {
+            var errors = {
+                "session-import-busy": i18n("another import is still running"),
+                "session-key-unavailable": i18n("the local identity key is unavailable"),
+                "session-database-unavailable": i18n("the local history database is unavailable"),
+                "session-database-write-failed": i18n("the local history database could not be updated")
+            };
+            reasons.push(errors[state.errorKey] || i18n("the import could not complete"));
+        }
+        if (reasons.length > 0) message += " " + reasons.join("; ") + ".";
+        if (Number.isFinite(completed))
+            message += " " + i18n("Last completed: %1.", new Date(completed).toLocaleString(Qt.locale()));
+        return message;
+    }
+
+    function anySessionImportRunning() {
+        var states = historyPage.sessionBackend
+            ? historyPage.sessionBackend.importStates || ({}) : ({});
+        return Object.keys(states).some(function(toolId) {
+            return String((states[toolId] || {}).state || "") === "running";
+        });
     }
 
     function refreshProjectAliases() {
@@ -184,7 +256,7 @@ KCM.SimpleKCM {
     }
 
     Component.onCompleted: {
-        historyDb.init();
+        historyDatabase.init();
         historyPage.syncSessionConsent();
     }
 
@@ -231,11 +303,41 @@ KCM.SimpleKCM {
         }
 
         QQC2.Label {
-            Kirigami.FormData.label: i18n("Import status:")
+            Kirigami.FormData.label: i18n("Codex scan:")
             Layout.fillWidth: true
-            text: historyPage.sessionStatusText.length > 0
-                ? historyPage.sessionStatusText
-                : i18n("Session import has not run in this settings view yet.")
+            text: historyPage.sessionStateText("codex-cli")
+            wrapMode: Text.WordWrap
+            Accessible.name: text
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Codex coverage:")
+            Layout.fillWidth: true
+            text: historyPage.sessionImportStatus("codex-cli")
+            wrapMode: Text.WordWrap
+            Accessible.name: text
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Claude Code scan:")
+            Layout.fillWidth: true
+            text: historyPage.sessionStateText("claude-code")
+            wrapMode: Text.WordWrap
+            Accessible.name: text
+        }
+
+        QQC2.Label {
+            Kirigami.FormData.label: i18n("Claude Code coverage:")
+            Layout.fillWidth: true
+            text: historyPage.sessionImportStatus("claude-code")
+            wrapMode: Text.WordWrap
+            Accessible.name: text
+        }
+
+        QQC2.Label {
+            Layout.fillWidth: true
+            visible: historyPage.sessionStatusText !== ""
+            text: historyPage.sessionStatusText
             wrapMode: Text.WordWrap
             Accessible.name: text
         }
@@ -250,9 +352,9 @@ KCM.SimpleKCM {
                 enabled: (Plasmoid.configuration.codexSessionHistoryEnabled
                           || Plasmoid.configuration.claudeCodeSessionHistoryEnabled)
                     && !historyPage.sessionOperationBusy
+                    && !historyPage.anySessionImportRunning()
                 onClicked: {
-                    historyPage.sessionStatusText = i18n("Scanning local sessions…");
-                    localSessions.requestImport();
+                    historyPage.sessionBackend.requestImport();
                 }
             }
 
@@ -266,7 +368,7 @@ KCM.SimpleKCM {
         ProjectAliasEditor {
             id: projectAliases
             Kirigami.FormData.isSection: true
-            backend: localSessions
+            backend: historyPage.sessionBackend
         }
 
         Kirigami.Separator {
@@ -514,7 +616,7 @@ KCM.SimpleKCM {
             historyPage.sessionOperationBusy = true;
             historyPage.clearRequestId = "clear-sessions-"
                 + Date.now().toString(36);
-            localSessions.clearSessions(historyPage.clearRequestId);
+            historyPage.sessionBackend.clearSessions(historyPage.clearRequestId);
         }
     }
 

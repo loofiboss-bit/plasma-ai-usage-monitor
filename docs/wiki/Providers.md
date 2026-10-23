@@ -1,9 +1,15 @@
 <!-- Generated from docs/user-guide/providers.md by scripts/generate_wiki_docs.py; do not edit. -->
 # Configure sources
 
-Open **Settings → Sources** to configure API services and AI tools in one searchable list. Use **All**, **Enabled**, or **Detected tools** to narrow it; active sources appear first within **AI tools** and **API services**. The detail pane shows one source at a time.
+Open **Settings → Sources** to configure API services and AI tools in one searchable list. Use **All**, **Enabled**, or **Detected tools** to narrow it; active sources appear first within **AI tools** and **API services**. The detail pane shows one source at a time. **Clear search and filters** restores
+the complete list without changing enabled sources or staged settings.
 
 Select a source to see what it reports, the permission it needs, and its required fields. Enable it, enter credentials, and choose **Apply** before **Verify**. Verification stays disabled while configuration or credential changes are pending. Cancel discards those staged changes; failed Wallet writes remain available for another Apply attempt.
+
+Verification distinguishes confirmed reporting or connectivity from waiting
+for activity, disabled sources, missing local tools and configuration problems.
+Degraded data is a warning, a failed check is an error, and an unknown status
+asks you to verify again instead of indicating success.
 
 ## Common fields
 

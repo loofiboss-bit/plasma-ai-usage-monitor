@@ -4,23 +4,37 @@
   <img src="assets/logo.png" alt="AI Usage Monitor logo" width="180">
 </p>
 
-AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
+AI Usage Monitor is a KDE Plasma 6 panel widget for AI API usage, costs,
+subscription quotas, and local Codex and Claude Code session history. See what
+needs attention without opening every provider dashboard. API keys stay in
+KWallet and history stays on your computer.
 
-The **24.2.0 release (Structured Usage & Sources)** brings a clearer daily
-overview, a unified Sources area for API services and AI tools, and easier
-session history with named project aliases. Navigation preserves session
-filters and selection across views. Opt-in Codex and Claude Code history,
-anonymous project identities, and redacted exports remain available.
-See the [V24 user guide](docs/user-guide/coding-sessions.md),
-[qualification checklist](docs/release/v24.2.0-checklist.md), and
-[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v24.2.0).
-The screenshots below use deterministic synthetic fixtures.
+[Install](docs/user-guide/installation.md) ·
+[First setup](docs/user-guide/getting-started.md) ·
+[User guide](docs/user-guide/README.md) ·
+[KDE Store](https://store.kde.org/p/2353976) ·
+[Latest release](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/latest) ·
+[Report a problem](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues)
 
-![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
+The **25.0.0 release (Searchable Session History)** adds searchable local
+project and model filters, daily and custom
+date views, consistent session summaries, and manual JSON/CSV exports. Session
+import is optional for each tool. Read the
+[session guide](docs/user-guide/coding-sessions.md) or the
+[release notes](docs/release/v25.0.0-notes.md) and
+[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v25.0.0).
+
+![AI Usage Monitor Overview in the Plasma popup](assets/screenshots/overview-popup.png)
+
+Screenshots use deterministic synthetic data.
 
 ## Install on Fedora
 
-The COPR package is the supported Fedora installation. It includes both the Plasma widget and the compiled Qt plugin.
+Use the [Fedora COPR repository](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/).
+Its package includes both required parts: the Plasma widget and the matching
+compiled Qt plugin. You do not need a separate KDE Store download on Fedora.
+Fedora 44 is the release baseline; check the COPR project's available builds
+for your Fedora version before installing.
 
 ~~~bash
 sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor
@@ -37,10 +51,27 @@ Log out and back in after the first install. Then:
 To update later:
 
 ~~~bash
-sudo dnf upgrade plasma-ai-usage-monitor
+sudo dnf upgrade --refresh plasma-ai-usage-monitor
 ~~~
 
-For source builds and other installation details, read the [installation guide](docs/user-guide/installation.md).
+Log out and back in after updating, then check matching frontend and plugin
+versions in **Settings → Diagnostics**.
+
+For other Plasma 6 distributions, use the [source installation guide](docs/user-guide/installation.md#guided-source-install).
+The KDE Store `.plasmoid` contains the frontend only and requires the matching
+native plugin. Plasma 5 and the old Flatpak scaffold are not supported.
+
+## Choose your first source
+
+| What you want to see | Start with | What the numbers mean |
+| --- | --- | --- |
+| Local Codex or Claude Code sessions | **Settings → History** → enable that tool's session data → **Apply** | Reported local session tokens, searchable by project, model, and date |
+| Tool quota and reset time | **Guided first success** → choose your installed tool | Live quota when the source supports it; local activity otherwise remains a labelled estimate |
+| API usage or spend | **Guided first success** → choose your provider | Only values exposed by that provider; OpenAI account usage requires an Admin API key |
+
+A local-tool setup does not require adding an API provider. A successful
+connection check alone does not prove token usage or spend. Start with one
+source and review its result before adding budgets or integrations.
 
 ## Start here
 
@@ -73,7 +104,7 @@ Hosted-provider support includes:
 
 The generated [provider capability matrix](docs/provider-capabilities.md) lists the scheduled endpoint and monitoring level for every provider.
 
-The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI. Antigravity 2.x can report the signed-in plan, live per-model quota, and shared five-hour and weekly windows from its read-only localhost daemon; local activity and configured plan limits for other tools remain estimates unless a supported authenticated source provides a live quota window. In V24, Codex and Claude Code can separately opt in to local session-token history; these reported tokens are not subscription percentages or billed cost.
+The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilot, Cursor, Windsurf, and JetBrains AI. Antigravity 2.x can report the signed-in plan, live per-model quota, and shared five-hour and weekly windows from its read-only localhost daemon; local activity and configured plan limits for other tools remain estimates unless a supported authenticated source provides a live quota window. Codex and Claude Code can separately opt in to local session-token history; these reported tokens are not subscription percentages or billed cost.
 
 ## Main features
 
@@ -82,7 +113,7 @@ The widget also tracks Google Antigravity, Claude Code, Codex CLI, GitHub Copilo
 - Action-first Overview for attention, lowest live quota, next reset, spend categories, and source quality
 - Provider usage, spend, balances, limits, and connection state where the provider exposes them
 - Retained local history for enabled, disabled, and history-only sources, with explicit chart gaps
-- Optional Codex and Claude Code session history with project filtering and manual redacted JSON/CSV export
+- Optional Codex and Claude Code session history with searchable projects, model filters, and manual redacted JSON/CSV export
 - Analyst snapshots with documented sample requirements, coverage, spend trends, activity, anomalies, and compatible drivers
 - Typed Budget Control policies for day, ISO week, month, anchored month and reviewed provider reset periods
 - Deterministic safe-today, remaining allowance, period projection and previous-period comparison

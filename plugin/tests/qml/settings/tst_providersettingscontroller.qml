@@ -255,6 +255,32 @@ TestCase {
         compare(controller.selectedSourceId, "");
     }
 
+    function test_resetFiltersRestoresControlsWithoutChangingConfiguration() {
+        var list = createTemporaryObject(sourceListComponent, testCase);
+        verify(list !== null);
+        var search = findChild(list, "sourceSearchField");
+        var filter = findChild(list, "sourceFilterSelector");
+        var reset = findChild(list, "sourceResetFilters");
+        verify(search !== null && filter !== null && reset !== null);
+        search.forceActiveFocus();
+        for (var key of [Qt.Key_M, Qt.Key_I, Qt.Key_S, Qt.Key_S, Qt.Key_I, Qt.Key_N, Qt.Key_G])
+            keyClick(key);
+        controller.filterKey = "enabled";
+        compare(search.text, "missing");
+        compare(filter.currentIndex, 1);
+        compare(controller.visibleSources.length, 0);
+        verify(reset.visible);
+        mouseClick(reset);
+        compare(controller.searchText, "");
+        compare(controller.filterKey, "all");
+        compare(search.text, "");
+        compare(filter.currentIndex, 0);
+        compare(controller.visibleSources.length, 5);
+        verify(!controller.dirty);
+        verify(!fakeConfiguration.cfg_openaiEnabled);
+        verify(search.activeFocus);
+    }
+
     function test_stableToolDescriptorsRemainSelectableWhenNotInstalled() {
         var tools = ["claude-code", "codex-cli", "github-copilot", "cursor", "windsurf", "jetbrains-ai", "google-antigravity"];
         var rows = [];

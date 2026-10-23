@@ -19,6 +19,7 @@ TestCase {
         property int exportRequests: 0
         property string lastExportFormat: ""
         property string lastExportPath: ""
+        signal exportReady(string requestId, string errorKey)
         signal importFinished(string toolId, int importedCount, bool partial, string errorKey)
         function requestProjects(requestId) { requests++; }
         function requestSummary(requestId, toolId, from, to, project) { requests++; }
@@ -79,6 +80,8 @@ TestCase {
             panel.beginExport(panel.localPath(selectedUrl));
             compare(fakeModel.lastExportFormat, format);
             compare(fakeModel.lastExportPath, expectedPath);
+            fakeModel.exportReady(panel.exportRequestId, "");
+            compare(panel.exportState, "saved");
         }
 
         compare(fakeModel.exportRequests, 2);
@@ -193,7 +196,7 @@ TestCase {
         panel.breakdownIndex = 2;
         verify(findChild(panel, "sessionProjectEmptyState").visible);
 
-        panel.summary = ({errorText: "database unavailable"});
+        panel.queryErrorKey = "session-database-unavailable";
         verify(findChild(panel, "sessionQueryError").visible);
         verify(!findChild(panel, "sessionModelEmptyState").visible);
     }

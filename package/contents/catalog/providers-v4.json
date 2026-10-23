@@ -1,11 +1,11 @@
 {
   "schemaVersion": 7,
-  "catalogVersion": "2026.10.18",
-  "release": "24.2.0",
-  "lastReviewed": "2026-10-18",
+  "catalogVersion": "2026.10.23",
+  "release": "25.0.0",
+  "lastReviewed": "2026-10-23",
   "runtimeScraping": false,
   "sequence": 1,
-  "hardExpiresAt": "2026-11-17T00:00:00Z",
+  "hardExpiresAt": "2026-11-22T00:00:00Z",
   "freshnessSloDays": 30,
   "verificationState": "packaged",
   "estimatesAllowed": true,
@@ -38,7 +38,7 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://platform.openai.com/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -81,7 +81,7 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://platform.openai.com/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -124,7 +124,7 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://platform.openai.com/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -155,7 +155,7 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://platform.openai.com/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -186,7 +186,7 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://platform.openai.com/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -217,7 +217,7 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://platform.openai.com/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -248,7 +248,7 @@
             {
               "label": "OpenAI API pricing",
               "url": "https://platform.openai.com/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -310,7 +310,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_account_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "openai",
         "enabled": "openaiEnabled",
@@ -347,7 +347,7 @@
             {
               "label": "Anthropic Claude pricing",
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -372,7 +372,7 @@
             {
               "label": "Anthropic Claude pricing",
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -410,7 +410,7 @@
             {
               "label": "Anthropic Claude pricing",
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -436,7 +436,7 @@
             {
               "label": "Anthropic Claude pricing",
               "url": "https://docs.anthropic.com/en/docs/about-claude/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -530,7 +530,7 @@
         "billing_api"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "anthropic",
         "enabled": "anthropicEnabled",
@@ -590,7 +590,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -651,7 +651,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -726,7 +726,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -750,7 +750,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -780,12 +780,12 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             },
             {
               "label": "Google Gemini model documentation",
               "url": "https://ai.google.dev/gemini-api/docs/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -813,12 +813,12 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             },
             {
               "label": "Google Gemini model documentation",
               "url": "https://ai.google.dev/gemini-api/docs/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -846,12 +846,12 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             },
             {
               "label": "Google Gemini model documentation",
               "url": "https://ai.google.dev/gemini-api/docs/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -896,7 +896,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "google",
         "enabled": "googleEnabled",
@@ -932,7 +932,7 @@
             {
               "label": "Mistral pricing",
               "url": "https://mistral.ai/products/la-plateforme#pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -956,7 +956,7 @@
             {
               "label": "Mistral pricing",
               "url": "https://mistral.ai/products/la-plateforme#pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -980,7 +980,7 @@
             {
               "label": "Mistral pricing",
               "url": "https://mistral.ai/products/la-plateforme#pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1004,7 +1004,7 @@
             {
               "label": "Mistral pricing",
               "url": "https://mistral.ai/products/la-plateforme#pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1047,7 +1047,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "mistral",
         "enabled": "mistralEnabled",
@@ -1084,7 +1084,7 @@
             {
               "label": "DeepSeek API models and pricing",
               "url": "https://api-docs.deepseek.com/quick_start/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "context": {
@@ -1115,7 +1115,7 @@
             {
               "label": "DeepSeek API models and pricing",
               "url": "https://api-docs.deepseek.com/quick_start/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "context": {
@@ -1146,7 +1146,7 @@
             {
               "label": "DeepSeek API models and pricing",
               "url": "https://api-docs.deepseek.com/quick_start/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1175,7 +1175,7 @@
             {
               "label": "DeepSeek API models and pricing",
               "url": "https://api-docs.deepseek.com/quick_start/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1227,7 +1227,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_balance_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "deepseek",
         "enabled": "deepseekEnabled",
@@ -1263,7 +1263,7 @@
             {
               "label": "Groq models and pricing",
               "url": "https://console.groq.com/docs/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1291,7 +1291,7 @@
             {
               "label": "Groq models and pricing",
               "url": "https://console.groq.com/docs/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1334,7 +1334,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "groq",
         "enabled": "groqEnabled",
@@ -1371,7 +1371,7 @@
             {
               "label": "xAI models and pricing",
               "url": "https://docs.x.ai/docs/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1396,7 +1396,7 @@
             {
               "label": "xAI models and pricing",
               "url": "https://docs.x.ai/docs/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1420,7 +1420,7 @@
             {
               "label": "xAI models and pricing",
               "url": "https://docs.x.ai/docs/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1444,7 +1444,7 @@
             {
               "label": "xAI models and pricing",
               "url": "https://docs.x.ai/docs/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1487,7 +1487,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "xai",
         "enabled": "xaiEnabled",
@@ -1523,7 +1523,7 @@
             {
               "label": "Ollama Cloud pricing",
               "url": "https://ollama.com/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1566,7 +1566,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "ollama",
         "enabled": "ollamaEnabled",
@@ -1603,7 +1603,7 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1627,7 +1627,7 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1651,7 +1651,7 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1675,7 +1675,7 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1700,7 +1700,7 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1725,7 +1725,7 @@
             {
               "label": "OpenRouter model catalog",
               "url": "https://openrouter.ai/models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1780,7 +1780,7 @@
         "usage_api"
       ],
       "probePolicy": "read_only_key_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "openrouter",
         "enabled": "openrouterEnabled",
@@ -1816,7 +1816,7 @@
             {
               "label": "Together AI pricing",
               "url": "https://www.together.ai/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1840,7 +1840,7 @@
             {
               "label": "Together AI pricing",
               "url": "https://www.together.ai/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1883,7 +1883,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "together",
         "enabled": "togetherEnabled",
@@ -1919,7 +1919,7 @@
             {
               "label": "Cohere pricing",
               "url": "https://cohere.com/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1943,7 +1943,7 @@
             {
               "label": "Cohere pricing",
               "url": "https://cohere.com/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -1986,7 +1986,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "cohere",
         "enabled": "cohereEnabled",
@@ -2021,7 +2021,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -2044,7 +2044,7 @@
             {
               "label": "Google AI pricing",
               "url": "https://ai.google.dev/gemini-api/docs/pricing",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -2087,7 +2087,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "googleveo",
         "enabled": "googleveoEnabled",
@@ -2124,7 +2124,7 @@
             {
               "label": "Azure OpenAI Service pricing",
               "url": "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -2149,7 +2149,7 @@
             {
               "label": "Azure OpenAI Service pricing",
               "url": "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -2174,7 +2174,7 @@
             {
               "label": "Azure OpenAI Service pricing",
               "url": "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/openai-service/",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -2217,7 +2217,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "azure",
         "enabled": "azureEnabled",
@@ -2253,7 +2253,7 @@
             {
               "label": "Amazon Bedrock pricing",
               "url": "https://aws.amazon.com/bedrock/pricing/",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -2298,7 +2298,7 @@
         "estimated_pricing"
       ],
       "probePolicy": "read_only_model_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "config": {
         "key": "bedrock",
         "enabled": "bedrockEnabled",
@@ -2361,7 +2361,7 @@
         "usage_api"
       ],
       "probePolicy": "read_only_account_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "models": [
         {
           "id": "gateway-default",
@@ -2378,7 +2378,7 @@
             {
               "label": "LiteLLM spend tracking",
               "url": "https://docs.litellm.ai/docs/proxy/cost_tracking",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -2437,7 +2437,7 @@
         "response_headers"
       ],
       "probePolicy": "read_only_account_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "models": [
         {
           "id": "llama-4-scout-17b-16e-instruct",
@@ -2456,7 +2456,7 @@
             {
               "label": "Cerebras inference documentation",
               "url": "https://inference-docs.cerebras.ai/",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -2515,7 +2515,7 @@
         "model_discovery_api"
       ],
       "probePolicy": "read_only_account_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "models": [
         {
           "id": "accounts/fireworks/models/llama-v3p3-70b-instruct",
@@ -2534,7 +2534,7 @@
             {
               "label": "Fireworks model API",
               "url": "https://docs.fireworks.ai/api-reference/list-models",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
@@ -2589,7 +2589,7 @@
         "model_discovery_api"
       ],
       "probePolicy": "read_only_account_api",
-      "reviewExpiresAt": "2026-11-17",
+      "reviewExpiresAt": "2026-11-22",
       "models": [
         {
           "id": "perplexity/sonar",
@@ -2615,7 +2615,7 @@
             {
               "label": "Perplexity model discovery",
               "url": "https://docs.perplexity.ai/api-reference/models-get",
-              "reviewedAt": "2026-10-18"
+              "reviewedAt": "2026-10-23"
             }
           ],
           "lifecycle": {
