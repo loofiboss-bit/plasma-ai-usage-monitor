@@ -63,6 +63,17 @@ paths from exports. Do not infer price, subscription use or productivity from
 tokens. No new providers, period comparisons or broad UI redesign.
 Update metadata, user guide, generated wiki and deterministic synthetic media.
 
+## Final pre-release follow-up
+
+Preserve deletion/rebaseline over empty rescans and restarts, using matching
+explicit-timezone creation metadata only to exempt proven new Codex sessions.
+Skip oversized records with bounded resume-safe reads and mark partial coverage.
+Reject Overview replies from previous view instances, distinguish search misses
+from healthy empty lists, add search/filter reset in Overview and Sources, pin
+selected projects during search and present every verification state explicitly.
+Keep schema/API/privacy compatibility and qualify the final sources and Fedora
+44/45 package lifecycles before separately authorized publication.
+
 ## Acceptance
 
 Cover open/SQL failures, empty results, retry, late replies, all coverage states,

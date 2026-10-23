@@ -344,7 +344,10 @@ void LocalSessionModel::requestImport() {
         checkpoint.addBindValue(tool);
         if (checkpoint.exec() && checkpoint.next()) {
           cutoffUtc = checkpoint.value(0).toString();
-          rebaselinePending = checkpoint.value(1).toBool();
+          // The durable cutoff also covers databases whose older importer
+          // already cleared the pending flag during an empty scan.
+          rebaselinePending =
+              !cutoffUtc.isEmpty() || checkpoint.value(1).toBool();
           persistedCoverage = checkpoint.value(2).toString();
         }
       }
@@ -488,15 +491,24 @@ void LocalSessionModel::requestImport() {
         if (tool == QLatin1String("codex") && startOffset > 0) {
           file.seek(0);
           while (file.pos() < startOffset && !file.atEnd()) {
-            const QByteArray line = file.readLine(1024 * 1024 + 1);
-            bytesRead += line.size();
-            if (bytesRead > 256ll * 1024 * 1024) {
+            const auto record = LocalSessionParser::readJsonlRecord(
+                file,
+                qMin(startOffset - file.pos(), 256ll * 1024 * 1024 - bytesRead),
+                [&]() {
+                  return generationState->load(std::memory_order_acquire) !=
+                         generation;
+                });
+            bytesRead += record.bytesRead;
+            if (record.discarded)
               markPartial();
+            if (!record.discarded && record.complete)
+              LocalSessionParser::updateCodexContext(record.line,
+                                                     &codexContext);
+            if (record.interrupted)
               break;
-            }
-            LocalSessionParser::updateCodexContext(line, &codexContext);
           }
-          if (bytesRead > 256ll * 1024 * 1024) {
+          if (file.pos() < startOffset) {
+            markPartial();
             break;
           }
           if (codexContext.isEmpty()) {
@@ -542,24 +554,27 @@ void LocalSessionModel::requestImport() {
             db.rollback();
             return result;
           }
-          const QByteArray line = file.readLine(1024 * 1024 + 1);
-          bytesRead += line.size();
-          if (bytesRead > 256ll * 1024 * 1024) {
+          const auto record = LocalSessionParser::readJsonlRecord(
+              file, 256ll * 1024 * 1024 - bytesRead, [&]() {
+                return generationState->load(std::memory_order_acquire) !=
+                       generation;
+              });
+          bytesRead += record.bytesRead;
+          if (record.discarded) {
             markPartial();
-            break;
-          }
-          if (!line.endsWith('\n') && !file.atEnd()) {
-            markPartial();
-            break;
-          }
-          if (line.size() > 1024 * 1024) {
-            markPartial();
-            if (line.endsWith('\n'))
-              safeOffset = file.pos();
-            continue;
-          }
-          if (line.endsWith('\n'))
+            // Mid-record cursors are safe only when the entire suffix will
+            // also be discarded by readJsonlRecord on the next scan.
             safeOffset = file.pos();
+          } else if (record.complete) {
+            safeOffset = file.pos();
+          }
+          if (record.interrupted) {
+            markPartial();
+            break;
+          }
+          if (record.discarded)
+            continue;
+          const QByteArray &line = record.line;
           if (tool == QLatin1String("codex") &&
               LocalSessionParser::updateCodexContext(line, &codexContext))
             continue;
@@ -751,7 +766,24 @@ void LocalSessionModel::requestImport() {
                                             QStringLiteral("cacheWriteTokens")};
             bool unchanged = !previous.isEmpty();
             bool reset = false;
-            const bool baselineOnly = previous.isEmpty() && rebaselinePending;
+            const QDateTime created =
+                codexContext.value(QStringLiteral("createdAtUtc")).toDateTime();
+            const QDateTime observed = QDateTime::fromString(
+                row.value(QStringLiteral("timestampUtc")).toString(),
+                Qt::ISODateWithMs);
+            const bool matchingMetadata =
+                !codexContext.value(QStringLiteral("sessionId"))
+                     .toString()
+                     .isEmpty() &&
+                row.value(QStringLiteral("sessionId")).toString() ==
+                    QString::fromLatin1(LocalSessionParser::identity(
+                        key, "session",
+                        codexContext.value("sessionId").toString().toUtf8()));
+            const bool createdAfterClear =
+                matchingMetadata && created.isValid() && created <= observed &&
+                created.toString(Qt::ISODateWithMs) > cutoffUtc;
+            const bool baselineOnly =
+                previous.isEmpty() && rebaselinePending && !createdAfterClear;
             for (qsizetype index = 0; index < counterFields.size(); ++index) {
               const QString &field = counterFields.at(index);
               if (!row.contains(field))
@@ -890,14 +922,9 @@ void LocalSessionModel::requestImport() {
       auto &statusDb = connectionOwner.db;
       if (statusDb.isOpen()) {
         recordToolCoverage(statusDb, tool, toolPartial);
-        if (!toolPartial) {
-          QSqlQuery complete(statusDb);
-          complete.prepare(QStringLiteral(
-              "UPDATE local_import_checkpoints SET rebaseline_pending=0 "
-              "WHERE tool_id=?"));
-          complete.addBindValue(tool);
-          complete.exec();
-        }
+        // Keep the clear policy across empty scans and restarts: another old
+        // session may resume later. Creation metadata exempts proven new
+        // sessions.
       }
     }
     return result;

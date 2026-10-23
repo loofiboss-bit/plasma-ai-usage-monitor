@@ -131,6 +131,22 @@ TestCase {
         panel.projectSearch = "missing";
         database.projectsReady(panel.projectsRequestId, projects);
         compare(panel.selectedProjectId, "p149");
+        compare(panel.matchingProjectCount(), 0);
+        compare(panel.displayedProjects().length, 2);
+        compare(panel.displayedProjects()[1].projectId, "p149");
+        compare(panel.projectIndex(), 1);
+        var picker = findChild(panel, "sessionProjectPicker");
+        compare(picker.currentIndex, 1);
+        verify(findChild(panel, "sessionProjectSearchEmpty").visible);
+        panel.projectSearch = "renamed";
+        compare(panel.matchingProjectCount(), 1);
+        compare(panel.displayedProjects().length, 2);
+        verify(!findChild(panel, "sessionProjectSearchEmpty").visible);
+        panel.projectSearch = "missing";
+        panel.clearFilters();
+        compare(panel.selectedProjectId, "");
+        compare(panel.projectSearch, "");
+        compare(panel.projectIndex(), 0);
     }
     function test_model_filter_all_requests_and_old_state() {
         panel.sessionState = {toolId: "codex-cli", rangeIndex: 1};

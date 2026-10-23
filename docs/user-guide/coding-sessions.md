@@ -22,7 +22,16 @@ read a supported log format. Unsupported, truncated, unreadable, or ambiguous
 records remain excluded from verified totals. **Rescan local sessions** asks
 the importer to continue discovery. **Delete session history** removes the
 shared local session records and project aliases; it does not remove the
-original tool logs.
+original tool logs. After deletion, existing Codex sessions establish a new
+cumulative baseline before counting later increases. Empty rescans and restarts
+do not bring deleted totals back. A session proven by valid creation metadata
+to have started after deletion can count its first snapshot; otherwise its
+first snapshot is conservatively excluded with partial coverage. No list of
+deleted sessions or old counters is retained.
+
+Oversized log records are skipped in bounded chunks, so later supported records
+can still import. A skipped or incomplete record marks coverage as partial;
+rescans resume without treating a record fragment as a new event.
 
 ## Project identities
 
@@ -44,7 +53,9 @@ a direct link to History.
 In History or Insights session mode, search the project chooser by your local
 alias or the displayed anonymous project name. Matching ignores case and
 searches the complete project list, including projects beyond the first 100
-analysis rows. A search with no matches does not remove stored history. Renaming
+analysis rows. The active project remains visible even when it does not match
+the chooser search. The no-match message counts search matches separately from
+the pinned selection. A search with no matches does not remove stored history. Renaming
 an alias changes its displayed name without changing the anonymous identity.
 
 Search the model chooser without case sensitivity across every reported model

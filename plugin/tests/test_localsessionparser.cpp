@@ -1,5 +1,7 @@
 #include "localsessionparser.h"
 
+#include <QBuffer>
+#include <QDateTime>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTest>
@@ -7,6 +9,73 @@
 class LocalSessionParserTest : public QObject {
   Q_OBJECT
 private Q_SLOTS:
+  void oversizedRecordsResumeWithoutParsingSuffixes() {
+    QByteArray bytes = QByteArray(1024 * 1024 + 50, 'x') +
+                       "{\"type\":\"session_meta\"}\n{\"valid\":true}\n";
+    QBuffer input(&bytes);
+    QVERIFY(input.open(QIODevice::ReadOnly));
+    const auto first =
+        LocalSessionParser::readJsonlRecord(input, 1024 * 1024 + 10);
+    QVERIFY(first.discarded);
+    QVERIFY(first.interrupted);
+    QVERIFY(first.line.isEmpty());
+    const qint64 cursor = input.pos();
+    // A new device represents restart with only the persisted byte cursor.
+    QBuffer resumed(&bytes);
+    QVERIFY(resumed.open(QIODevice::ReadOnly));
+    QVERIFY(resumed.seek(cursor));
+    const auto suffix = LocalSessionParser::readJsonlRecord(resumed, 1024);
+    QVERIFY(suffix.discarded);
+    QVERIFY(suffix.complete);
+    QVERIFY(suffix.line.isEmpty());
+    const auto valid = LocalSessionParser::readJsonlRecord(resumed, 1024);
+    QCOMPARE(valid.line, QByteArray("{\"valid\":true}\n"));
+    QVERIFY(valid.complete);
+    QVERIFY(!valid.discarded);
+  }
+
+  void incompleteRecordsKeepReplayableContents() {
+    QByteArray bytes("{\"valid\":");
+    QBuffer input(&bytes);
+    QVERIFY(input.open(QIODevice::ReadOnly));
+    const auto tail = LocalSessionParser::readJsonlRecord(input, 1024);
+    QVERIFY(!tail.complete);
+    QVERIFY(!tail.discarded);
+    QVERIFY(!tail.interrupted);
+    QCOMPARE(tail.line, bytes);
+    bytes += "true}\n";
+    QVERIFY(input.seek(0));
+    const auto complete = LocalSessionParser::readJsonlRecord(input, 1024);
+    QVERIFY(complete.complete);
+    QCOMPARE(complete.line, bytes);
+    QVERIFY(input.seek(0));
+    const auto budget = LocalSessionParser::readJsonlRecord(input, 4);
+    QVERIFY(budget.interrupted);
+    QVERIFY(!budget.discarded);
+  }
+
+  void codexCreationProofRequiresValidMetadata() {
+    QVariantMap context;
+    QVERIFY(LocalSessionParser::updateCodexContext(
+        R"({"type":"session_meta","payload":{"id":"s","cwd":"/p","timestamp":"2026-10-23T10:00:00Z"}})",
+        &context));
+    QCOMPARE(context.value("createdAtUtc").toDateTime(),
+             QDateTime::fromString("2026-10-23T10:00:00Z", Qt::ISODate));
+    QVERIFY(LocalSessionParser::updateCodexContext(
+        R"({"type":"session_meta","payload":{"id":"s","cwd":"/p","timestamp":"invalid"}})",
+        &context));
+    QVERIFY(!context.contains("createdAtUtc"));
+    QVERIFY(LocalSessionParser::updateCodexContext(
+        R"({"type":"session_meta","payload":{"id":"s","cwd":"/p","timestamp":"2026-10-23T10:00:00"}})",
+        &context));
+    QVERIFY(!context.contains("createdAtUtc"));
+    QVERIFY(LocalSessionParser::updateCodexContext(
+        R"({"type":"session_meta","payload":{"id":"s","cwd":"/p","timestamp":"2026-10-23T12:00:00+02:00"}})",
+        &context));
+    QCOMPARE(context.value("createdAtUtc").toDateTime(),
+             QDateTime::fromString("2026-10-23T10:00:00Z", Qt::ISODate));
+  }
+
   void codexUsesTurnContextAndAllowsUnknownModels() {
     const QByteArray key(32, 'c');
     QVariantMap context;

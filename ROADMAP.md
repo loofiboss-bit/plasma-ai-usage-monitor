@@ -2,7 +2,7 @@
 
 **Current release:** 25.0.0, Searchable Session History (local candidate)
 
-**Last updated:** 2026-10-22
+**Last updated:** 2026-10-23
 
 ## Current release
 
@@ -12,7 +12,10 @@ Local candidate: searchable project choices and exact model filters across
 sessions, daily totals, details, analysis and manual exports. Retryable query
 errors, understandable coverage, complete breakdown counts and correct paging
 make retained local history easier to trust. SQLite schema v9 and existing
-privacy boundaries remain unchanged. Publication and physical desktop checks
+privacy boundaries remain unchanged. Final pre-release work also preserves
+deleted Codex totals across rescans, recovers past oversized records, rejects
+old Overview responses and improves filter reset and verification status.
+Publication and physical desktop checks
 are pending; see the [implementation plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V25_PLAN.md)
 and [qualification checklist](docs/release/v25.0.0-checklist.md).
 

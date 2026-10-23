@@ -188,16 +188,33 @@ ColumnLayout {
             ? !!activeSessionModel.codexEnabled : !!activeSessionModel.claudeCodeEnabled;
     }
 
+    function projectMatchesSearch(alias, anonymous) {
+        var search = projectSearch.trim().toLocaleLowerCase();
+        return !search || (alias + " " + anonymous).toLocaleLowerCase().indexOf(search) >= 0;
+    }
+
+    function matchingProjectCount() {
+        var count = 0;
+        var ordinal = 0;
+        for (var i = 0; i < projectRows.length; ++i) {
+            var row = projectRows[i] || {};
+            if (row.toolId !== activeToolId) continue;
+            if (projectMatchesSearch(String(row.alias || "").trim(),
+                    i18n("Unnamed project %1", ++ordinal))) ++count;
+        }
+        return count;
+    }
+
     function displayedProjects() {
         var rows = [{ label: i18n("All projects"), projectId: "" }];
         var ordinal = 0;
-        var search = projectSearch.trim().toLocaleLowerCase();
         for (var i = 0; i < projectRows.length; ++i) {
             var row = projectRows[i] || {};
             if (row.toolId !== activeToolId) continue;
             var anonymous = i18n("Unnamed project %1", ++ordinal);
             var alias = String(row.alias || "").trim();
-            if (search && (alias + " " + anonymous).toLocaleLowerCase().indexOf(search) < 0) continue;
+            if (!projectMatchesSearch(alias, anonymous)
+                    && String(row.projectId || "") !== selectedProjectId) continue;
             rows.push({ label: alias || anonymous, projectId: String(row.projectId || "") });
         }
         return rows;
@@ -638,6 +655,7 @@ ColumnLayout {
             }
 
             QQC2.ComboBox {
+                objectName: "sessionProjectPicker"
                 Layout.fillWidth: true
                 model: panel.displayedProjects()
                 textRole: "label"
@@ -652,7 +670,8 @@ ColumnLayout {
 
             PlasmaComponents.Label {
                 Layout.fillWidth: true
-                visible: panel.projectSearch.trim() !== "" && panel.displayedProjects().length === 1
+                objectName: "sessionProjectSearchEmpty"
+                visible: panel.projectSearch.trim() !== "" && panel.matchingProjectCount() === 0
                 text: i18n("No projects match this search.")
                 wrapMode: Text.WordWrap
                 color: Kirigami.Theme.disabledTextColor

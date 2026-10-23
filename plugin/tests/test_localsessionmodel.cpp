@@ -90,6 +90,190 @@ public:
 class LocalSessionModelTest : public QObject {
   Q_OBJECT
 private Q_SLOTS:
+  void oversizedRecordsDoNotBlockLaterUsageOrContextReplay() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    const QByteArray metadata =
+        R"({"type":"session_meta","payload":{"id":"thread","cwd":"/private/project"}})";
+    QVERIFY(fixture.write(metadata + '\n' + QByteArray(1024 * 1024 + 100, 'x') +
+                          '\n' + fixture.codexRecord(100)));
+    LocalSessionModel model;
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    model.setToolEnabled("codex", true);
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+    QVERIFY(imports.takeFirst()[3].toString().isEmpty());
+    QVERIFY(fixture.write(fixture.codexRecord(120), QIODevice::Append));
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+    QVERIFY(imports.takeFirst()[3].toString().isEmpty());
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+    const QString connection = "oversized-record-verify";
+    {
+      auto db = QSqlDatabase::addDatabase("QSQLITE", connection);
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery query(db);
+      QVERIFY(query.exec(
+          "SELECT COUNT(*),SUM(input_tokens) FROM local_usage_events"));
+      QVERIFY(query.next());
+      QCOMPARE(query.value(0).toInt(), 2);
+      QCOMPARE(query.value(1).toLongLong(), 120);
+    }
+    QSqlDatabase::removeDatabase(connection);
+  }
+
+  void clearPolicySurvivesEmptyScansAndRestart() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    const QByteArray metadata =
+        R"({"type":"session_meta","payload":{"id":"thread","cwd":"/private/project"}})";
+    QVERIFY(fixture.write(metadata + '\n' + fixture.codexRecord(100)));
+    {
+      LocalSessionModel model;
+      QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+      QSignalSpy clears(&model, &LocalSessionModel::clearFinished);
+      model.setToolEnabled("codex", true);
+      QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+      model.clearSessions("clear");
+      QTRY_COMPARE_WITH_TIMEOUT(clears.size(), 1, 5000);
+      QVERIFY(clears.first()[1].toBool());
+      for (int i = 0; i < 2; ++i) {
+        imports.clear();
+        model.requestImport();
+        QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+      }
+    }
+    // Simulate an older importer that prematurely cleared the pending flag.
+    const QString legacyConnection = "clear-legacy-pending-seed";
+    {
+      auto db = QSqlDatabase::addDatabase("QSQLITE", legacyConnection);
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery query(db);
+      QVERIFY(query.exec(
+          "UPDATE local_import_checkpoints SET rebaseline_pending=0"));
+    }
+    QSqlDatabase::removeDatabase(legacyConnection);
+    QTest::qWait(5);
+    LocalSessionModel restarted;
+    QSignalSpy imports(&restarted, &LocalSessionModel::importFinished);
+    restarted.setToolEnabled("codex", true);
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+    for (int total : {1000, 1020}) {
+      imports.clear();
+      QVERIFY(fixture.write(fixture.codexRecord(total), QIODevice::Append));
+      restarted.requestImport();
+      QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+      QVERIFY(imports.first()[3].toString().isEmpty());
+    }
+    // An old session discovered only after other sessions resumed still needs
+    // its own baseline; completing another session must not end the policy.
+    QFile delayed(fixture.root + "/delayed.jsonl");
+    QVERIFY(delayed.open(QIODevice::WriteOnly));
+    const QByteArray delayedMetadata =
+        QJsonDocument(
+            QJsonObject{
+                {"type", "session_meta"},
+                {"payload",
+                 QJsonObject{{"id", "delayed-thread"},
+                             {"cwd", "/private/delayed"},
+                             {"timestamp", QDateTime::currentDateTimeUtc()
+                                               .addDays(-1)
+                                               .toString(Qt::ISODateWithMs)}}}})
+            .toJson(QJsonDocument::Compact) +
+        '\n';
+    const QByteArray delayedFirst = delayedMetadata + fixture.codexRecord(300);
+    QCOMPARE(delayed.write(delayedFirst), delayedFirst.size());
+    delayed.close();
+    imports.clear();
+    restarted.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+    QVERIFY(delayed.open(QIODevice::Append));
+    const QByteArray delayedIncrease = fixture.codexRecord(340);
+    QCOMPARE(delayed.write(delayedIncrease), delayedIncrease.size());
+    delayed.close();
+    imports.clear();
+    restarted.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+    const QString connection = "clear-empty-scan-verify";
+    {
+      auto db = QSqlDatabase::addDatabase("QSQLITE", connection);
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery query(db);
+      QVERIFY(query.exec(
+          "SELECT COUNT(*),SUM(input_tokens) FROM local_usage_events"));
+      QVERIFY(query.next());
+      QCOMPARE(query.value(0).toInt(), 2);
+      QCOMPARE(query.value(1).toLongLong(), 60);
+    }
+    QSqlDatabase::removeDatabase(connection);
+  }
+
+  void unprovenCreationMetadataCannotRestoreClearedTotals_data() {
+    QTest::addColumn<QString>("proof");
+    QTest::newRow("missing-timezone") << QStringLiteral("missing-timezone");
+    QTest::newRow("mismatched-session") << QStringLiteral("mismatched-session");
+    QTest::newRow("future-creation") << QStringLiteral("future-creation");
+  }
+
+  void unprovenCreationMetadataCannotRestoreClearedTotals() {
+    QFETCH(QString, proof);
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    LocalSessionModel model;
+    QSignalSpy clears(&model, &LocalSessionModel::clearFinished);
+    model.clearSessions("clear-proof");
+    QTRY_COMPARE_WITH_TIMEOUT(clears.size(), 1, 5000);
+    QVERIFY(clears.first()[1].toBool());
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    QString created = now.addSecs(proof == "future-creation" ? 20 : 1)
+                          .toString(Qt::ISODateWithMs);
+    if (proof == "missing-timezone")
+      created.chop(1);
+    const QByteArray metadata =
+        QJsonDocument(
+            QJsonObject{
+                {"type", "session_meta"},
+                {"payload", QJsonObject{{"id", proof == "mismatched-session"
+                                                   ? "different-thread"
+                                                   : "thread"},
+                                        {"cwd", "/private/project"},
+                                        {"timestamp", created}}}})
+            .toJson(QJsonDocument::Compact) +
+        '\n';
+    const auto usage = [&](int total, int seconds) {
+      QJsonObject row =
+          QJsonDocument::fromJson(fixture.codexRecord(total)).object();
+      row.insert("thread_id", "thread");
+      row.insert("timestamp", now.addSecs(seconds).toString(Qt::ISODateWithMs));
+      return QJsonDocument(row).toJson(QJsonDocument::Compact) + '\n';
+    };
+    QVERIFY(fixture.write(metadata + usage(1000, 10) + usage(1020, 11)));
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    model.setToolEnabled("codex", true);
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+    QVERIFY(imports.first()[3].toString().isEmpty());
+    const QString connection = "clear-proof-verify";
+    {
+      auto db = QSqlDatabase::addDatabase("QSQLITE", connection);
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery query(db);
+      QVERIFY(query.exec(
+          "SELECT COUNT(*),SUM(input_tokens) FROM local_usage_events"));
+      QVERIFY(query.next());
+      QCOMPARE(query.value(0).toInt(), 1);
+      QCOMPARE(query.value(1).toLongLong(), 20);
+      QVERIFY(query.exec("SELECT coverage FROM local_sessions"));
+      QVERIFY(query.next());
+      QCOMPARE(query.value(0).toString(),
+               QStringLiteral("partial-clear-rebaseline"));
+    }
+    QSqlDatabase::removeDatabase(connection);
+  }
+
   void modelFiltersAgreeAcrossQueriesAndExports() {
     SessionFixture fixture;
     QVERIFY(fixture.valid);
@@ -1359,6 +1543,9 @@ private Q_SLOTS:
     const QString newThread = QStringLiteral("created-after-clear");
     const QJsonObject newPayload{
         {QStringLiteral("id"), newThread},
+        {QStringLiteral("timestamp"),
+         QDateTime::currentDateTimeUtc().addSecs(1).toString(
+             Qt::ISODateWithMs)},
         {QStringLiteral("cwd"), QStringLiteral("/private/new-project")}};
     const QByteArray newMetadata =
         QJsonDocument(QJsonObject{{QStringLiteral("type"),

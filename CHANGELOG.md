@@ -13,6 +13,9 @@ Local release candidate; publication and manual desktop qualification pending.
 
 ### Added
 
+- Add one-action search/filter reset in Overview and Sources without changing
+  monitoring settings.
+
 - Add case-insensitive project search across local aliases and anonymous project
   labels, with complete project choices independent of bounded analysis lists.
 - Add case-insensitive search over complete model choices while keeping the
@@ -23,6 +26,16 @@ Local release candidate; publication and manual desktop qualification pending.
   preserving navigation context.
 
 ### Fixed
+
+- Keep deleted Codex usage excluded across empty rescans and restarts; only
+  validated post-deletion session metadata permits a full first snapshot.
+- Skip oversized JSONL records with bounded, resumable reads so later records
+  are not blocked and partial record tails cannot become events.
+- Reject late Overview session summaries from destroyed view instances.
+- Distinguish filtered search misses from a genuinely empty attention list.
+- Keep the selected project visible during chooser searches.
+- Present every source verification state explicitly; unknown and waiting
+  states no longer imply success, and configuration/degraded states warn.
 
 - Distinguish failed database queries from valid empty history, offer retry,
   finish loading after errors, and ignore superseded query responses.

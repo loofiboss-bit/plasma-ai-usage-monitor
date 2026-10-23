@@ -17,6 +17,8 @@ QQC2.ScrollView {
     property var monitor: null
     property string sourceSearchText: ""
     property int sourceFilterIndex: 0
+    readonly property string sessionSummaryRequestPrefix: Date.now().toString(36)
+        + "-" + Math.random().toString(36).slice(2)
     property int sessionSummaryGeneration: 0
     property var sessionSummaryRequests: ({})
     property var sessionSummaryLatestByTool: ({})
@@ -33,6 +35,7 @@ QQC2.ScrollView {
 
     Components.DailyOverviewState {
         id: overviewState
+        objectName: "overviewState"
         dailyState: overview.monitor.presentationDailyState
     }
 
@@ -111,8 +114,8 @@ QQC2.ScrollView {
                 sessionSummaryLatestByTool = latestDisabled;
                 continue;
             }
-            var requestId = "overview-session-summary-"
-                + (++sessionSummaryGeneration);
+            var requestId = "overview-session-summary-" + sessionSummaryRequestPrefix
+                + "-" + (++sessionSummaryGeneration);
             var requests = Object.assign({}, sessionSummaryRequests);
             requests[requestId] = tools[i].id;
             sessionSummaryRequests = requests;
@@ -274,6 +277,8 @@ QQC2.ScrollView {
             visible: overviewState.sourceRows.length > 0
 
             Kirigami.SearchField {
+                id: sourceSearch
+                objectName: "overviewSourceSearch"
                 Layout.fillWidth: true
                 placeholderText: i18n("Search sources")
                 Accessible.name: i18n("Search monitoring sources")
@@ -282,6 +287,7 @@ QQC2.ScrollView {
             }
 
             QQC2.ComboBox {
+                objectName: "overviewSourceFilter"
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
                 model: [i18n("All"), i18n("Needs attention")]
@@ -292,16 +298,32 @@ QQC2.ScrollView {
         }
 
         PlasmaComponents.Label {
+            objectName: "overviewSourcesEmptyState"
             Layout.fillWidth: true
             Layout.leftMargin: Kirigami.Units.largeSpacing
             Layout.rightMargin: Kirigami.Units.largeSpacing
             visible: overviewState.sourceRows.length > 0
                 && overview.visibleSourceRows.length === 0
-            text: overview.sourceFilterIndex === 1
+            text: overview.sourceSearchText.trim() !== ""
+                ? i18n("No source matches your search and current filter.")
+                : overview.sourceFilterIndex === 1
                 ? i18n("No sources currently need attention.")
                 : i18n("No source matches your search.")
             wrapMode: Text.WordWrap
             color: Kirigami.Theme.disabledTextColor
+        }
+
+        PlasmaComponents.Button {
+            objectName: "overviewClearSourceFilters"
+            Layout.leftMargin: Kirigami.Units.largeSpacing
+            visible: overviewState.sourceRows.length > 0
+                && (overview.sourceSearchText !== "" || overview.sourceFilterIndex !== 0)
+            text: i18n("Clear search and filters")
+            onClicked: {
+                overview.sourceSearchText = "";
+                overview.sourceFilterIndex = 0;
+                sourceSearch.forceActiveFocus(Qt.TabFocusReason);
+            }
         }
 
         Repeater {
