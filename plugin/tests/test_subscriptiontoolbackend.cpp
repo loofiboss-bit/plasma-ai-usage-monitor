@@ -1,7 +1,10 @@
 #include <QtTest>
 #include <QSignalSpy>
+#include <QTemporaryDir>
+#include <QFile>
 
 #include "subscriptiontoolbackend.h"
+#include "localactivitymonitorbase.h"
 
 /**
  * Minimal concrete subclass for testing SubscriptionToolBackend's non-virtual logic.
@@ -52,6 +55,38 @@ private:
     bool m_hasSecondary;
 };
 
+/**
+ * Minimal concrete subclass for testing LocalActivityMonitorBase.
+ */
+class TestLocalActivityMonitor : public LocalActivityMonitorBase
+{
+    Q_OBJECT
+public:
+    explicit TestLocalActivityMonitor(QObject *parent = nullptr)
+        : LocalActivityMonitorBase(parent)
+    {}
+
+    QString toolName() const override { return QStringLiteral("TestLocalMonitor"); }
+    QString iconName() const override { return QStringLiteral("test-icon"); }
+    QString toolColor() const override { return QStringLiteral("#00FF00"); }
+    QString periodLabel() const override { return QStringLiteral("monthly"); }
+    QStringList availablePlans() const override { return {QStringLiteral("Free"), QStringLiteral("Pro")}; }
+    int defaultLimitForPlan(const QString &plan) const override {
+        return plan == QStringLiteral("Pro") ? 500 : 100;
+    }
+
+    using LocalActivityMonitorBase::setInstallExecutableNames;
+    using LocalActivityMonitorBase::setInstallPaths;
+    using LocalActivityMonitorBase::setWatchedPaths;
+    using LocalActivityMonitorBase::setIgnoredPathSuffixes;
+    using LocalActivityMonitorBase::setDebounceIntervalMs;
+    using LocalActivityMonitorBase::watchedPaths;
+    using LocalActivityMonitorBase::updateWatchHealth;
+
+protected:
+    UsagePeriod primaryPeriodType() const override { return Monthly; }
+};
+
 class SubscriptionToolBackendTest : public QObject
 {
     Q_OBJECT
@@ -77,6 +112,10 @@ private Q_SLOTS:
   void testDefaultLimitForPlan();
   void testTimeUntilResetFormat();
   void testQuotaWindowsAndNotify();
+  void testLocalActivityMonitorHealthAndDiagnostics();
+  void testLocalActivityMonitorSetters();
+  void testLocalActivityMonitorCheckInstalled();
+  void testLocalActivityMonitorDetectActivity();
 };
 
 void SubscriptionToolBackendTest::testAutomaticSyncRetryPolicy() {
@@ -375,6 +414,91 @@ void SubscriptionToolBackendTest::testQuotaWindowsAndNotify()
     QCOMPARE(first.value(QStringLiteral("badge")).toString(), QStringLiteral("Custom"));
     QCOMPARE(first.value(QStringLiteral("used")).toInt(), 4);
     QCOMPARE(first.value(QStringLiteral("limit")).toInt(), 10);
+}
+
+void SubscriptionToolBackendTest::testLocalActivityMonitorHealthAndDiagnostics()
+{
+    TestLocalActivityMonitor monitor;
+    QCOMPARE(monitor.watchDiagnosticCode(), QString());
+
+    QSignalSpy spy(&monitor, &LocalActivityMonitorBase::watchHealthChanged);
+
+    monitor.updateWatchHealth(true);
+    QCOMPARE(monitor.watchDiagnosticCode(), QStringLiteral("watch_incomplete"));
+    QCOMPARE(spy.count(), 1);
+
+    // Call updateWatchHealth(true) again with no change -> should not re-emit signal
+    monitor.updateWatchHealth(true);
+    QCOMPARE(spy.count(), 1);
+
+    monitor.updateWatchHealth(false);
+    QCOMPARE(monitor.watchDiagnosticCode(), QString());
+    QCOMPARE(spy.count(), 2);
+}
+
+void SubscriptionToolBackendTest::testLocalActivityMonitorSetters()
+{
+    TestLocalActivityMonitor monitor;
+
+    const QStringList paths = {QStringLiteral("/tmp/path1"), QStringLiteral("/tmp/path2")};
+    monitor.setWatchedPaths(paths);
+    QCOMPARE(monitor.watchedPaths(), paths);
+
+    // Re-setting same watched paths should be a no-op
+    monitor.setWatchedPaths(paths);
+    QCOMPARE(monitor.watchedPaths(), paths);
+
+    const QStringList suffixes = {QStringLiteral(".log"), QStringLiteral(".tmp")};
+    monitor.setIgnoredPathSuffixes(suffixes);
+    monitor.setIgnoredPathSuffixes(suffixes);
+
+    monitor.setDebounceIntervalMs(100);
+    monitor.setInstallExecutableNames({QStringLiteral("nonexistent_binary_xyz_123")});
+    monitor.setInstallPaths({QStringLiteral("/nonexistent/path/xyz/123")});
+}
+
+void SubscriptionToolBackendTest::testLocalActivityMonitorCheckInstalled()
+{
+    TestLocalActivityMonitor monitor;
+
+    monitor.setInstallExecutableNames({QStringLiteral("nonexistent_binary_xyz_123")});
+    monitor.setInstallPaths({QStringLiteral("/nonexistent/path/xyz/123")});
+    monitor.checkToolInstalled();
+    QVERIFY(!monitor.isInstalled());
+
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    const QString dummyFile = tempDir.filePath(QStringLiteral("test_tool"));
+    QFile file(dummyFile);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("dummy");
+    file.close();
+
+    monitor.setInstallPaths({dummyFile});
+    monitor.checkToolInstalled();
+    QVERIFY(monitor.isInstalled());
+}
+
+void SubscriptionToolBackendTest::testLocalActivityMonitorDetectActivity()
+{
+    TestLocalActivityMonitor monitor;
+    monitor.setEnabled(true);
+    monitor.setWatchedPaths({QStringLiteral("/tmp")});
+
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+    const QString dummyFile = tempDir.filePath(QStringLiteral("test_exec"));
+    QFile file(dummyFile);
+    QVERIFY(file.open(QIODevice::WriteOnly));
+    file.write("dummy");
+    file.close();
+
+    monitor.setInstallPaths({dummyFile});
+    monitor.checkToolInstalled();
+    QVERIFY(monitor.isInstalled());
+
+    monitor.setDebounceIntervalMs(250);
+    monitor.detectActivity();
 }
 
 QTEST_MAIN(SubscriptionToolBackendTest)
