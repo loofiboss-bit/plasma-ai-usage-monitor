@@ -4,26 +4,37 @@
   <img src="assets/logo.png" alt="AI Usage Monitor logo" width="180">
 </p>
 
-AI Usage Monitor puts trustworthy daily AI usage, spend, quota, reset, and local coding-tool status in your Plasma panel. It stores API keys in KWallet and keeps history on your computer.
+AI Usage Monitor is a KDE Plasma 6 panel widget for AI API usage, costs,
+subscription quotas, and local Codex and Claude Code session history. See what
+needs attention without opening every provider dashboard. API keys stay in
+KWallet and history stays on your computer.
 
-The **25.0.0 release (Searchable Session History)** adds searchable project
-choices, exact model filters, and consistent filtered session summaries,
-details, and manual exports. Database errors offer retry, coverage explains
-incomplete imports, and bounded analysis lists show their full match count.
-See the [session user guide](docs/user-guide/coding-sessions.md),
-[qualification checklist](docs/release/v25.0.0-checklist.md), and
+[Install](docs/user-guide/installation.md) ·
+[First setup](docs/user-guide/getting-started.md) ·
+[User guide](docs/user-guide/README.md) ·
+[KDE Store](https://store.kde.org/p/2353976) ·
+[Latest release](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/latest) ·
+[Report a problem](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues)
+
+The **25.0.0 release (Searchable Session History)** adds searchable local
+project and model filters, daily and custom
+date views, consistent session summaries, and manual JSON/CSV exports. Session
+import is optional for each tool. Read the
+[session guide](docs/user-guide/coding-sessions.md) or the
+[release notes](docs/release/v25.0.0-notes.md) and
 [GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v25.0.0).
-The screenshots below use deterministic synthetic fixtures.
 
-![Narrow AI Usage Monitor Overview popup](assets/screenshots/overview-popup.png)
+![AI Usage Monitor Overview in the Plasma popup](assets/screenshots/overview-popup.png)
+
+Screenshots use deterministic synthetic data.
 
 ## Install on Fedora
 
-The COPR package is the supported Fedora installation. It includes both the Plasma widget and the compiled Qt plugin.
-
-Fedora 44 remains the release baseline. Fedora 45 prerelease readiness is checked by a dedicated build/test job and an RPM build, test, and clean-install job using Fedora 45 packages. These container checks do not qualify a physical Plasma session, scaling, screen readers, wallet access, or browser sync. Fedora 45 COPR publication is a separate release step; this candidate does not promise an already published Fedora 45 package.
-
-Use `just fedora44-check` or `just fedora45-check` on the matching release. For isolated RPM upgrade/rollback checks, `just rpm-lifecycle-check BASE_RPM CANDIDATE_RPM 45` selects Fedora 45 (the default remains 44). Unsigned locally built candidates require the explicit `ALLOW_UNSIGNED_LOCAL_TEST_RPMS=1` opt-in, which applies only to local RPM transactions inside disposable test containers.
+Use the [Fedora COPR repository](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/).
+Its package includes both required parts: the Plasma widget and the matching
+compiled Qt plugin. You do not need a separate KDE Store download on Fedora.
+Fedora 44 is the release baseline; check the COPR project's available builds
+for your Fedora version before installing.
 
 ~~~bash
 sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor
@@ -40,10 +51,27 @@ Log out and back in after the first install. Then:
 To update later:
 
 ~~~bash
-sudo dnf upgrade plasma-ai-usage-monitor
+sudo dnf upgrade --refresh plasma-ai-usage-monitor
 ~~~
 
-For source builds and other installation details, read the [installation guide](docs/user-guide/installation.md).
+Log out and back in after updating, then check matching frontend and plugin
+versions in **Settings → Diagnostics**.
+
+For other Plasma 6 distributions, use the [source installation guide](docs/user-guide/installation.md#guided-source-install).
+The KDE Store `.plasmoid` contains the frontend only and requires the matching
+native plugin. Plasma 5 and the old Flatpak scaffold are not supported.
+
+## Choose your first source
+
+| What you want to see | Start with | What the numbers mean |
+| --- | --- | --- |
+| Local Codex or Claude Code sessions | **Settings → History** → enable that tool's session data → **Apply** | Reported local session tokens, searchable by project, model, and date |
+| Tool quota and reset time | **Guided first success** → choose your installed tool | Live quota when the source supports it; local activity otherwise remains a labelled estimate |
+| API usage or spend | **Guided first success** → choose your provider | Only values exposed by that provider; OpenAI account usage requires an Admin API key |
+
+A local-tool setup does not require adding an API provider. A successful
+connection check alone does not prove token usage or spend. Start with one
+source and review its result before adding budgets or integrations.
 
 ## Start here
 

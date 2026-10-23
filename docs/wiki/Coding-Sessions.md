@@ -6,6 +6,25 @@ Code. This is separate from the tools' quota cards: session tokens describe
 what the local tool recorded, and are not a subscription percentage, bill, or
 productivity measure.
 
+## Try it with one tool
+
+1. Open **Settings → History**, enable **Codex session data** or **Claude Code
+   session data**, and choose **Apply**. You do not need an API key for this.
+2. Wait for that tool's first scan to finish. If you have no supported recent
+   logs, use the tool normally and wait for the next scan.
+3. Open **History → Sessions** and select the tool and a period. Start with
+   **30 days** when checking an existing history.
+4. Search the project or model chooser, then select a result to filter the
+   data. Typing in a chooser only searches its choices.
+5. Open a session or daily total to inspect the matching tokens and coverage.
+   Use **Export → Export JSON** or **Export CSV** for a manual filtered export.
+
+For recognizable project names, add local names in **Settings → History →
+Project aliases**. If nothing matches, use **Clear filters**, check that the
+selected period contains activity, and read the tool's scan status in Settings.
+A partial result means some evidence is missing; it is not a complete account
+usage report.
+
 ## Enable a tool
 
 Open **Settings → History**, enable **Codex session data** or **Claude Code

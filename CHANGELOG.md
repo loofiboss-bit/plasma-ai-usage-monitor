@@ -29,6 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bind RPM package tests to the shipped catalog regardless of build path or
+  other installed widget versions.
 - Keep deleted Codex usage excluded across empty rescans and restarts; only
   validated post-deletion session metadata permits a full first snapshot.
 - Skip oversized JSONL records with bounded, resumable reads so later records

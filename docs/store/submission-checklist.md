@@ -1,126 +1,54 @@
-# v18 GitHub and KDE Store submission checklist
+# GitHub, KDE Store and COPR submission checklist
 
-Use this checklist only after runtime, performance, accessibility,
-documentation, and release media qualification is complete for the exact
-v18.0.0 release commit.
+Use this checklist for the current version in `VERSION`. For 25.0.0, the
+qualification record is [the release checklist](../release/v25.0.0-checklist.md).
 
-## Preconditions
+## Prepare the exact candidate
 
-- every mandatory command in `docs/release/v18.0.0-checklist.md` passes against
-  the exact candidate tree
-- isolated Fedora 44 lifecycle, performance, accessibility, privacy, and
-  teardown evidence is complete
-- the v17/v18 popup comparison contains at least three warmups and 20 valid
-  first-open and warm-open samples per version from one boot and one virtual
-  Plasma session family
-- roadmap, changelog, user guide, generated wiki, AppStream, and RPM metadata agree
-- the ten canonical screenshots pass `scripts/check_release_media.py`
-- the Store archive remains the frontend and explicitly requires the matching
-  compiled plugin
+- Run `just build-debug`, `ctest --preset debug --output-on-failure`,
+  `just check`, `just qml-lint` and `just release-check`.
+- Confirm required CI checks pass for the final PR head before merging.
+- Keep README, changelog, user guide, generated wiki, AppStream and RPM metadata
+  aligned with the release. Generate the wiki with
+  `python3 scripts/generate_wiki_docs.py`.
+- Validate all 13 canonical synthetic screenshots with
+  `python3 scripts/check_release_media.py`. Their source identity must match
+  the shipped runtime. Keep physical desktop/accessibility limits explicit.
+- Review [Store listing copy](v25.0.0-listing.md) and
+  [release notes](../release/v25.0.0-notes.md).
+- State that the Store archive contains the frontend and requires the matching
+  compiled plugin. Fedora COPR provides both components.
 
-## Listing copy
+## Publish
 
-### Short description
+1. Merge the qualified PR into `main` and fetch the resulting commit.
+2. Create an annotated `v25.0.0` tag on that exact `origin/main` commit.
+   Run `bash scripts/verify_exact_tag.sh v25.0.0`, then push the tag.
+3. Wait for the canonical tag-triggered Release workflow to succeed. Read back
+   the published source tarball, plasmoid, SPDX source SBOM, SHA-256 checksums
+   and GitHub build provenance before claiming GitHub delivery.
+4. Run `just copr-submit v25.0.0` against the same tag. Verify every enabled
+   Fedora target independently, including signed RPM metadata and repository
+   publication. A submitted build is not a successful package publication.
+5. Update [KDE Store product 2353976](https://store.kde.org/p/2353976) with the
+   exact GitHub plasmoid, version, listing and changelog. Use five representative
+   current captures: Overview, session history, source detail, provider settings
+   and Budget Control. Reload and verify persistence and public download bytes.
+6. Publish `docs/wiki/*.md` to the GitHub wiki from the release commit. Read back
+   the public installation and getting-started guides.
+7. Record exact tag/commit, workflow, asset hashes, COPR build/targets, Store
+   version/artifact and wiki identity in a separate publication-evidence commit.
+   Preserve the release tag.
 
-Control AI spend with local policies, scoped costs, pacing, and private alerts.
+## Public discovery
 
-### Long description
+- README starts with the purpose, installation route and first successful use.
+- GitHub repository description, homepage and topics identify the Plasma widget.
+- GitHub release notes link to installation, user guide and troubleshooting.
+- COPR description and installation instructions explain the complete package.
+- KDE Store clearly links the native-plugin prerequisite and installation guide.
+- Unavailable values, estimates and opt-in local collection remain explicit.
 
-AI Usage Monitor 18 adds Budget Control: typed local policies for calendar
-days, ISO weeks, calendar or anchored months, and verified provider reset
-periods. The Plasma overview prioritizes active incidents, shows spent and
-remaining budget, safe-today pacing, reset timing, and a direct action without
-treating missing data as zero.
-
-Policies can target aggregate spend or provider-declared scopes. Compatible
-scoped costs reconcile against aggregate totals and show Unattributed cost when
-the provider omits a dimension. Actual and estimated values, currencies, and
-scopes remain separate; unsupported or incomplete evidence produces an
-explicit unavailable reason instead of an invented forecast.
-
-The searchable Budget Control editor stages create, duplicate, enable, snooze,
-and delete operations until Apply. Warning, critical, exceeded, recovered, and
-period-reset transitions are persisted before delivery and deduplicated across
-restarts. Notifications and optional local integrations expose only allowlisted,
-low-cardinality summaries.
-
-Secrets stay in KWallet and observations, policies, and event state stay in a
-local SQLite database. There is no telemetry, hosted backend, currency
-conversion, provider-side budget mutation, billable inference, or automatic
-model switching. Explicit configuration backups may contain sensitive local
-scope identifiers and should be protected accordingly.
-
-The KDE Store package contains the frontend. Install the matching native plugin
-from the supported COPR repository or a source build first.
-
-## Release media inventory
-
-Keep the ten reviewed Breeze Dark captures from the same isolated headless
-session in the release manifest:
-
-- `assets/screenshots/overview-popup.png`
-- `assets/screenshots/attention-state.png`
-- `assets/screenshots/source-detail.png`
-- `assets/screenshots/history-gap.png`
-- `assets/screenshots/analyst-sufficient.png`
-- `assets/screenshots/analyst-insufficient.png`
-- `assets/screenshots/guided-first-success.png`
-- `assets/screenshots/budget-control.png`
-- `assets/screenshots/plugin-recovery.png`
-- `assets/screenshots/panel-lowest-quota.png`
-
-The manifest must identify the capture commit, date, Plasma version, scale,
-fixture digest, scenario for every file, source-tree digest, accessibility
-evidence, and file hashes.
-
-KDE Store accepts at most five gallery pictures. Upload these representative
-captures there:
-
-- `assets/screenshots/overview-popup.png`
-- `assets/screenshots/source-detail.png`
-- `assets/screenshots/history-gap.png`
-- `assets/screenshots/analyst-sufficient.png`
-- `assets/screenshots/budget-control.png`
-
-## GitHub release pack
-
-- source tarball
-- `com.github.loofi.aiusagemonitor.plasmoid`
-- SHA-256 checksums
-- SPDX source SBOM
-- v18 changelog and release notes
-- exact-tag provenance from the release workflow
-
-Release notes must describe policy periods and time zones, actual versus
-estimated value classes, scoped reconciliation and Unattributed, typed
-unavailable forecasts, transition-only alerts, migration and rollback, explicit
-backup sensitivity, and the read-only/frontend-native-plugin boundaries.
-
-## Publication sequence
-
-1. verify `docs/release/v18.0.0-checklist.md` is complete through qualification
-2. bump every version surface to 18.0.0 and rerun the full exact-tree gate
-3. create and verify reproducible plasmoid, source, RPM, SBOM, and checksum artifacts
-4. fast-forward `main`, verify CI, and create annotated tag `v18.0.0` on the exact release commit
-5. verify the tag workflow draft release, artifact lineage, hashes, and signatures
-6. publish the GitHub release without rebuilding or replacing artifacts
-7. submit the same tag to COPR for every supported Fedora target and verify a clean install
-8. upload the exact plasmoid, listing copy, and five gallery images to KDE Store product `2353976`
-9. publish the generated wiki mirror from the same release commit
-10. perform unauthenticated readback of GitHub, COPR, KDE Store, and wiki
-11. record publication evidence in a separate commit on `main` without moving the tag
-
-If any mandatory surface, credential, lineage check, or unauthenticated readback
-is unavailable, the release remains blocked and must not be described as
-published.
-
-## Final review
-
-- unavailable values never look like actual zeroes
-- policy periods use documented local-time boundaries converted to exact UTC intervals
-- actual, estimated, currency, and scope classes are never mixed
-- aggregate equals compatible scoped values plus Unattributed within defined rounding
-- raw scope identifiers appear only in local storage and explicit configuration backups
-- Budget Control saves only through Apply and Cancel leaves both persistence layers unchanged
-- notifications and integrations contain no policy IDs or raw provider scope IDs
-- GitHub, COPR, KDE Store, and wiki describe the same v18 product and exact artifacts
+If a named surface cannot be verified, record its actual blocker and continue
+independent publication work. The overall release is incomplete until all named
+surfaces have direct public evidence.

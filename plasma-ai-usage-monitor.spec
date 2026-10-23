@@ -70,6 +70,8 @@ Features:
 %cmake_install
 
 %check
+# Test the packaged catalog independently of build paths or installed widgets.
+export AIUSAGE_MONITOR_CATALOG_DIR="$PWD/package/contents/catalog"
 %ctest
 appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.github.loofi.aiusagemonitor.metainfo.xml
 
