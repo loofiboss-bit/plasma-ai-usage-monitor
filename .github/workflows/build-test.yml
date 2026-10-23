@@ -39,7 +39,6 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:45
     env:
-      AIUSAGE_MONITOR_DEVELOPMENT: "1"
       QT_QPA_PLATFORM: offscreen
     steps:
       - run: dnf install -y git rpm-build dnf5-plugins python3 python3-pyqt6
@@ -61,6 +60,43 @@ jobs:
           set -euo pipefail
           source /etc/os-release
           test "$ID" = fedora && test "$VERSION_ID" = 45
+          ! rpm -q plasma-ai-usage-monitor
+          # This unsigned candidate is trusted only in this disposable CI container.
+          # Repository package signature checking remains enabled.
+          dnf install -y --setopt=localpkg_gpgcheck=False "$RUNNER_TEMP"/rpmbuild/RPMS/*/plasma-ai-usage-monitor-[0-9]*.rpm
+          test "$(rpm -q --qf '%{VERSION}' plasma-ai-usage-monitor)" = "$(cat VERSION)"
+          rpm -V plasma-ai-usage-monitor
+          test -f /usr/share/plasma/plasmoids/com.github.loofi.aiusagemonitor/metadata.json
+          test -f /usr/lib64/qt6/qml/com/github/loofi/aiusagemonitor/libaiusagemonitorplugin.so
+          ldd /usr/lib64/qt6/qml/com/github/loofi/aiusagemonitor/libaiusagemonitorplugin.so > /tmp/plugin-linkage.txt
+          ! grep -F 'not found' /tmp/plugin-linkage.txt
+          python3 scripts/smoke_test_installed_qml.py
+
+  fedora-43-rpm:
+    runs-on: ubuntu-latest
+    container: fedora:43
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - run: dnf install -y git rpm-build dnf5-plugins python3 python3-pyqt6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Install original spec build dependencies
+        run: dnf builddep -y plasma-ai-usage-monitor.spec
+      - name: Build and test the candidate RPM from its source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rpm_root="$RUNNER_TEMP/rpmbuild"
+          mkdir -p "$rpm_root/SOURCES"
+          bash scripts/package_source_tarball.sh --output-dir "$rpm_root/SOURCES"
+          rpmbuild -ba --define "_topdir $rpm_root" --define '_smp_mflags -j2' --define '_smp_build_ncpus 2' plasma-ai-usage-monitor.spec
+      - name: Clean-install and verify the local candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          source /etc/os-release
+          test "$ID" = fedora && test "$VERSION_ID" = 43
           ! rpm -q plasma-ai-usage-monitor
           # This unsigned candidate is trusted only in this disposable CI container.
           # Repository package signature checking remains enabled.

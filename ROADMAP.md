@@ -1,10 +1,22 @@
 # Roadmap
 
-**Current release:** 25.0.0, Searchable Session History
+**Current release:** 25.0.1, Searchable Session History
 
 **Last updated:** 2026-10-23
 
 ## Current release
+
+### 25.0.1 RPM Build Dependency Correction
+
+Declare the KCMUtils dependency needed by History settings QML tests in clean
+Fedora RPM buildroots, correcting the V25.0.0 COPR Fedora 43 `%check` failure.
+Dedicated Fedora 43 RPM CI coverage complements Fedora 45 package checks;
+both run without the global development override. V25's session features,
+privacy boundaries and persisted schemas are unchanged.
+The frontend and native plugin both use 25.0.1 and must be installed together.
+See the [release notes](docs/release/v25.0.1-notes.md) and
+[qualification checklist](docs/release/v25.0.1-checklist.md) for this patch's
+scope and publication evidence. The published V25.0.0 tag remains unchanged.
 
 ### 25.0.0 Searchable Session History
 

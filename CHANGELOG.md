@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [25.0.1] — 2026-10-23
+
+### Fixed
+
+- Declare the KDE KCMUtils build dependency required by History settings QML
+  tests in clean Fedora RPM buildroots. The missing dependency caused the
+  V25.0.0 COPR Fedora 43 build to fail during `%check`.
+
+### Changed
+
+- Add dedicated Fedora 43 RPM CI regression coverage alongside Fedora 45 and
+  remove the global development override from both RPM test jobs.
+- Publish a matching V25.0.1 frontend and native plugin while retaining V25's
+  session behavior, SQLite schema v9, configuration schema v3 and session-export
+  schema v1. Existing settings, aliases, history and session opt-ins are retained.
+
 ## [25.0.0] — 2026-10-23
 
 ### Added
