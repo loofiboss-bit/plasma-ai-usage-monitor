@@ -18,8 +18,11 @@ finishes. Failed database writes roll back the file transaction, including
 counters and checkpoints, so the next scan can retry.
 
 The settings page shows whether the import completed, is partial, or could not
-read a supported log format. Unsupported, truncated, unreadable, or ambiguous
-records remain excluded from verified totals. **Rescan local sessions** asks
+read a supported log format. Codex and Claude Code each show their current scan,
+latest completed scan, imported-event count and any limit or error. A successful
+latest scan does not erase a historical coverage gap. Unsupported, truncated,
+unreadable, or ambiguous records remain excluded from verified totals. While a
+scan is running, the rescan action is disabled. **Rescan local sessions** asks
 the importer to continue discovery. **Delete session history** removes the
 shared local session records and project aliases; it does not remove the
 original tool logs. After deletion, existing Codex sessions establish a new
@@ -31,7 +34,13 @@ deleted sessions or old counters is retained.
 
 Oversized log records are skipped in bounded chunks, so later supported records
 can still import. A skipped or incomplete record marks coverage as partial;
-rescans resume without treating a record fragment as a new event.
+rescans resume without treating a record fragment as a new event. Completed
+unchanged files do not consume the per-scan file allowance. Changed files rotate
+between scans, with new files receiving priority while pending files retain a
+share of each scan. Each scan discovers at most 50,000 files, processes at most
+5,000 files and reads at most 256 MiB; an individual file over 100 MiB is
+skipped. A reached discovery or processing limit is shown for that tool, and
+files beyond the discovery limit are not guaranteed to be found.
 
 ## Project identities
 
@@ -119,8 +128,15 @@ model is unknown. Claude cache-read and cache-write values are input subtotals a
 are not counted a second time on top of input.
 
 Local calendar-day filters use the system time zone, with UTC boundaries in the
-database. **Today**, **7 days**, and **30 days** use the same filters and
-summary rules in all session views. Account quotas remain separate and retain
+database. **Today**, **7 days**, and **30 days** remain available. Choose
+**Custom** to enter inclusive start and end dates within the configured
+retention window and through today. The first import still covers at most 30
+days. Today ends at the current time; earlier selected days end at the next
+local midnight. The same UTC interval drives summaries, session rows, daily
+totals and exports, including across daylight-saving changes. Select a daily
+row by mouse or keyboard to open that day's sessions while keeping the current
+tool, project and model filters. Return to the daily overview to restore its
+filters, focus and scroll position. Account quotas remain separate and retain
 their existing provider-reported meaning.
 
 ## Export

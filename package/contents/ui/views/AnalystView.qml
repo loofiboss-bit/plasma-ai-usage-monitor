@@ -7,6 +7,7 @@ Item {
     property var sessionState: null
     property var viewState: null
     signal sessionHistoryRequested(string toolId, string projectId, int rangeDays, string sessionId, int pageOffset, var modelFilter)
+    signal sessionHistoryRangeRequested(var selection)
 
     function captureViewState() {
         return analystPage.captureViewState();
@@ -20,6 +21,9 @@ Item {
         viewState: analystView.viewState
         onSessionHistoryRequested: function(toolId, projectId, rangeDays, sessionId, pageOffset, modelFilter) {
             analystView.sessionHistoryRequested(toolId, projectId, rangeDays, sessionId, pageOffset, modelFilter);
+        }
+        onSessionHistoryRangeRequested: function(selection) {
+            analystView.sessionHistoryRangeRequested(selection);
         }
     }
 }

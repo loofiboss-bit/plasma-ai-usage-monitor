@@ -46,4 +46,24 @@ TestCase {
         backend.summaryReady(page.sessionSummaryRequestIds["codex-cli"], {toolId: "codex-cli", importStatus: "complete"});
         verify(!page.sessionSummaries["codex-cli"].queryFailed);
     }
+
+    function test_scan_text_keeps_last_result_visible_while_running() {
+        var factory = Qt.createComponent(Qt.resolvedUrl("../../../../package/contents/ui/configHistory.qml"));
+        compare(factory.status, Component.Ready, factory.errorString());
+        var page = createTemporaryObject(factory, tests, {sessionBackend: backend, historyDatabase: storage});
+        verify(page !== null);
+        var running = page.scanStateText({state: "running", importedEventCount: 4,
+            lastCompletedAtUtc: "2026-10-23T07:00:00.000Z"});
+        verify(running.indexOf("Scanning local session files") >= 0);
+        verify(running.indexOf("Previous scan imported 4 events") >= 0);
+        verify(running.indexOf("Last completed:") >= 0);
+        var partial = page.scanStateText({state: "partial", importedEventCount: 2,
+            reasonKeys: ["file-size-limit"]});
+        verify(partial.indexOf("2 events imported") >= 0);
+        verify(partial.indexOf("file exceeded") >= 0);
+        var failed = page.scanStateText({state: "error", importedEventCount: 0,
+            errorKey: "session-database-write-failed"});
+        verify(failed.indexOf("0 events imported") >= 0);
+        verify(failed.indexOf("database could not be updated") >= 0);
+    }
 }

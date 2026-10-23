@@ -17,19 +17,23 @@
 #include <QTimer>
 #include <signal.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
 
 class SessionFixture {
 public:
   QTemporaryDir directory;
   QString root;
+  QString claudeHome;
   QString database;
   bool valid = false;
   QMap<QByteArray, QByteArray> originalEnvironment;
   SessionFixture() {
-    for (const auto &name : {QByteArray("HOME"), QByteArray("XDG_DATA_HOME"),
-                             QByteArray("CODEX_HOME")})
+    for (const auto &name :
+         {QByteArray("HOME"), QByteArray("XDG_DATA_HOME"),
+          QByteArray("CODEX_HOME"), QByteArray("CLAUDE_CONFIG_DIR")})
       originalEnvironment.insert(name, qgetenv(name.constData()));
     root = directory.filePath(QStringLiteral("codex/sessions"));
+    claudeHome = directory.filePath(QStringLiteral("claude"));
     const QString data = directory.filePath(QStringLiteral("data"));
     database =
         data + QStringLiteral("/plasma-ai-usage-monitor/usage_history.db");
@@ -40,6 +44,7 @@ public:
     qputenv("XDG_DATA_HOME", QFile::encodeName(data));
     qputenv("CODEX_HOME",
             QFile::encodeName(directory.filePath(QStringLiteral("codex"))));
+    qputenv("CLAUDE_CONFIG_DIR", QFile::encodeName(claudeHome));
     const QString connection = QStringLiteral("session_regression_seed");
     auto db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
     db.setDatabaseName(database);
@@ -85,6 +90,10 @@ public:
     QFile file(root + QStringLiteral("/session.jsonl"));
     return file.open(mode) && file.write(bytes) == bytes.size();
   }
+  bool writeNamed(const QString &name, const QByteArray &bytes) {
+    QFile file(root + QLatin1Char('/') + name);
+    return file.open(QIODevice::WriteOnly) && file.write(bytes) == bytes.size();
+  }
 };
 
 class LocalSessionModelTest : public QObject {
@@ -121,6 +130,505 @@ private Q_SLOTS:
       QCOMPARE(query.value(1).toLongLong(), 120);
     }
     QSqlDatabase::removeDatabase(connection);
+  }
+
+  void codexAppendCacheRejectsAnInPlaceRewriteWithGrowth() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    const QString path = fixture.root + QStringLiteral("/session.jsonl");
+    const QByteArray metadata =
+        R"({"type":"session_meta","payload":{"id":"original-thread","cwd":"/original/project"}})";
+    const QByteArray original = metadata + '\n' + fixture.codexRecord(100);
+    QVERIFY(fixture.write(original));
+
+    LocalSessionModel model;
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    model.setToolEnabled(QStringLiteral("codex-cli"), true);
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 5000);
+    QCOMPARE(imports.first().at(1).toInt(), 1);
+
+    struct stat before{};
+    QFile beforeFile(path);
+    QVERIFY(beforeFile.open(QIODevice::ReadOnly));
+    QVERIFY(::fstat(beforeFile.handle(), &before) == 0);
+    beforeFile.close();
+
+    const QByteArray replacement =
+        QByteArray("{\"padding\":\"") + QByteArray(original.size(), 'x') +
+        QByteArray("\"}") + '\n' + fixture.codexRecord(250);
+    QVERIFY(replacement.size() > original.size());
+    QFile rewritten(path);
+    QVERIFY(rewritten.open(QIODevice::WriteOnly | QIODevice::Truncate));
+    QCOMPARE(rewritten.write(replacement), qint64(replacement.size()));
+    QVERIFY(rewritten.setFileTime(QDateTime::currentDateTimeUtc().addSecs(3),
+                                  QFileDevice::FileModificationTime));
+    rewritten.close();
+    struct stat after{};
+    QFile afterFile(path);
+    QVERIFY(afterFile.open(QIODevice::ReadOnly));
+    QVERIFY(::fstat(afterFile.handle(), &after) == 0);
+    afterFile.close();
+    QCOMPARE(after.st_dev, before.st_dev);
+    QCOMPARE(after.st_ino, before.st_ino);
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 2, 5000);
+    QCOMPARE(imports.last().at(1).toInt(), 0);
+    const QString connection = QStringLiteral("codex-rewrite-cache-verify");
+    {
+      auto db =
+          QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery query(db);
+      QVERIFY(query.exec(
+          QStringLiteral("SELECT COUNT(*) FROM local_usage_events")));
+      QVERIFY(query.next());
+      QCOMPARE(query.value(0).toInt(), 1);
+    }
+    QSqlDatabase::removeDatabase(connection);
+  }
+
+  void importStatesAreToolSpecificAndKeepHistoricalGaps() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    QVERIFY(fixture.write(
+        R"({"type":"session_meta","payload":{"id":"codex-thread","cwd":"/private/codex"}})" +
+        QByteArray("\n") + fixture.codexRecord(100)));
+
+    LocalSessionModel model;
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    QSignalSpy statesChanged(&model, &LocalSessionModel::importStatesChanged);
+    model.setToolEnabled(QStringLiteral("codex-cli"), true);
+    model.setToolEnabled(QStringLiteral("claude-code"), true);
+    auto *timer =
+        model.findChild<QTimer *>(QStringLiteral("local-session-import-timer"));
+    QVERIFY(timer);
+    timer->stop();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 30000);
+
+    QVariantMap states = model.importStates();
+    QCOMPARE(states.value(QStringLiteral("codex-cli"))
+                 .toMap()
+                 .value(QStringLiteral("state"))
+                 .toString(),
+             QStringLiteral("complete"));
+    QCOMPARE(states.value(QStringLiteral("codex-cli"))
+                 .toMap()
+                 .value(QStringLiteral("importedEventCount"))
+                 .toInt(),
+             1);
+    QCOMPARE(states.value(QStringLiteral("claude-code"))
+                 .toMap()
+                 .value(QStringLiteral("state"))
+                 .toString(),
+             QStringLiteral("partial"));
+    QVERIFY(!states.value(QStringLiteral("codex-cli"))
+                 .toMap()
+                 .value(QStringLiteral("lastCompletedAtUtc"))
+                 .toString()
+                 .isEmpty());
+
+    const QString claudeProjects =
+        fixture.claudeHome + QStringLiteral("/projects/synthetic");
+    QVERIFY(QDir().mkpath(claudeProjects));
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const QJsonObject usage{{QStringLiteral("input_tokens"), 12},
+                            {QStringLiteral("output_tokens"), 3},
+                            {QStringLiteral("cache_read_input_tokens"), 0},
+                            {QStringLiteral("cache_creation_input_tokens"), 0}};
+    const QJsonObject assistant{
+        {QStringLiteral("type"), QStringLiteral("assistant")},
+        {QStringLiteral("sessionId"), QStringLiteral("claude-session")},
+        {QStringLiteral("cwd"), QStringLiteral("/private/claude")},
+        {QStringLiteral("timestamp"), now.toString(Qt::ISODateWithMs)},
+        {QStringLiteral("message"),
+         QJsonObject{{QStringLiteral("id"), QStringLiteral("message-1")},
+                     {QStringLiteral("model"), QStringLiteral("claude-sonnet")},
+                     {QStringLiteral("usage"), usage}}}};
+    QFile claudeLog(claudeProjects + QStringLiteral("/session.jsonl"));
+    QVERIFY(claudeLog.open(QIODevice::WriteOnly));
+    QCOMPARE(
+        claudeLog.write(
+            QJsonDocument(assistant).toJson(QJsonDocument::Compact) + '\n'),
+        QJsonDocument(assistant).toJson(QJsonDocument::Compact).size() + 1);
+    claudeLog.close();
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 2, 30000);
+    states = model.importStates();
+    QCOMPARE(states.value(QStringLiteral("claude-code"))
+                 .toMap()
+                 .value(QStringLiteral("state"))
+                 .toString(),
+             QStringLiteral("complete"));
+    QCOMPARE(states.value(QStringLiteral("claude-code"))
+                 .toMap()
+                 .value(QStringLiteral("importedEventCount"))
+                 .toInt(),
+             1);
+    QVERIFY(statesChanged.size() >= 4);
+
+    QSignalSpy summaries(&model, &LocalSessionModel::summaryReady);
+    model.requestSummary(QStringLiteral("coverage-after-recovery"),
+                         QStringLiteral("claude-code"), now.addDays(-1),
+                         now.addDays(1));
+    QTRY_COMPARE_WITH_TIMEOUT(summaries.size(), 1, 5000);
+    QCOMPARE(summaries.first()
+                 .at(1)
+                 .toMap()
+                 .value(QStringLiteral("toolCoverage"))
+                 .toString(),
+             QStringLiteral("partial"));
+
+    model.setToolEnabled(QStringLiteral("codex-cli"), false);
+    QCOMPARE(model.importStates()
+                 .value(QStringLiteral("codex-cli"))
+                 .toMap()
+                 .value(QStringLiteral("state"))
+                 .toString(),
+             QStringLiteral("disabled"));
+    QTRY_COMPARE_WITH_TIMEOUT(model.pendingWorkerCount(), 0, 30000);
+  }
+
+  void largeImportsContinuePastTheFirstFiveThousandFiles() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    constexpr int fileCount = 5002;
+    const QByteArray newline("\n");
+    const QByteArray record = fixture.codexRecord(1);
+    for (int i = 0; i < fileCount; ++i) {
+      const QString id =
+          QStringLiteral("thread-%1").arg(i, 5, 10, QLatin1Char('0'));
+      const QByteArray metadata =
+          QJsonDocument(
+              QJsonObject{
+                  {QStringLiteral("type"), QStringLiteral("session_meta")},
+                  {QStringLiteral("payload"),
+                   QJsonObject{
+                       {QStringLiteral("id"), id},
+                       {QStringLiteral("cwd"), QStringLiteral("/synthetic")}}}})
+              .toJson(QJsonDocument::Compact);
+      QVERIFY2(
+          fixture.writeNamed(id + QStringLiteral(".jsonl"),
+                             metadata + newline + record),
+          qPrintable(QStringLiteral("Failed to create fixture %1").arg(i)));
+    }
+
+    LocalSessionModel model;
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    model.setToolEnabled(QStringLiteral("codex-cli"), true);
+    auto *timer =
+        model.findChild<QTimer *>(QStringLiteral("local-session-import-timer"));
+    QVERIFY(timer);
+    timer->stop();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 120000);
+    QVERIFY(imports.first().at(2).toBool());
+
+    auto countEvents = [&fixture]() {
+      const QString connection = QStringLiteral("large-session-import-count");
+      auto db =
+          QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+      db.setDatabaseName(fixture.database);
+      if (!db.open())
+        return qint64(-1);
+      QSqlQuery query(db);
+      const bool ok = query.exec(QStringLiteral(
+                          "SELECT COUNT(*) FROM local_usage_events")) &&
+                      query.next();
+      const qint64 count = ok ? query.value(0).toLongLong() : -1;
+      query.finish();
+      db.close();
+      db = {};
+      QSqlDatabase::removeDatabase(connection);
+      return count;
+    };
+    QCOMPARE(countEvents(), qint64(5000));
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 2, 120000);
+    QVERIFY(!imports.last().at(2).toBool());
+    QCOMPARE(countEvents(), qint64(5002));
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 3, 30000);
+    QVERIFY(!imports.last().at(2).toBool());
+    QCOMPARE(imports.last().at(1).toInt(), 0);
+    QCOMPARE(countEvents(), qint64(5002));
+
+    const QByteArray metadata =
+        R"({"type":"session_meta","payload":{"id":"late-thread","cwd":"/synthetic"}})";
+    QVERIFY(fixture.writeNamed(QStringLiteral("late-session.jsonl"),
+                               metadata + newline + record));
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 4, 30000);
+    QCOMPARE(imports.last().at(1).toInt(), 1);
+    QCOMPARE(countEvents(), qint64(5003));
+
+    QDir sessionDirectory(fixture.root);
+    const QStringList existingFiles =
+        sessionDirectory.entryList({QStringLiteral("*.jsonl")}, QDir::Files);
+    QCOMPARE(existingFiles.size(), fileCount + 1);
+    const QDateTime changedAt = QDateTime::currentDateTimeUtc().addSecs(120);
+    for (const QString &name : existingFiles) {
+      QFile changedFile(sessionDirectory.filePath(name));
+      QVERIFY(changedFile.open(QIODevice::ReadWrite));
+      QVERIFY(changedFile.setFileTime(changedAt,
+                                      QFileDevice::FileModificationTime));
+    }
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 5, 120000);
+    QVERIFY(imports.last().at(2).toBool());
+    QCOMPARE(imports.last().at(1).toInt(), 0);
+    QCOMPARE(countEvents(), qint64(5003));
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 6, 120000);
+    QVERIFY(imports.last().at(2).toBool());
+    QCOMPARE(imports.last().at(1).toInt(), 0);
+    QCOMPARE(countEvents(), qint64(5003));
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 7, 30000);
+    QVERIFY(!imports.last().at(2).toBool());
+    QCOMPARE(imports.last().at(1).toInt(), 0);
+    QCOMPARE(countEvents(), qint64(5003));
+    QCOMPARE(model.importStates()
+                 .value(QStringLiteral("codex-cli"))
+                 .toMap()
+                 .value(QStringLiteral("state"))
+                 .toString(),
+             QStringLiteral("complete"));
+  }
+
+  void persistentRejectedNewFilesCannotStarveLaterValidFiles() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    constexpr int rejectedFileCount = 5000;
+    constexpr qint64 oversizedFileSize = 100ll * 1024 * 1024 + 1;
+    const QDateTime rejectedModified =
+        QDateTime::currentDateTimeUtc().addSecs(120);
+    const QDateTime validModified =
+        QDateTime::currentDateTimeUtc().addSecs(-120);
+
+    const QByteArray metadata =
+        R"({"type":"session_meta","payload":{"id":"valid-thread","cwd":"/synthetic"}})";
+    QVERIFY(fixture.writeNamed(QStringLiteral("z-valid.jsonl"),
+                               metadata + '\n' + fixture.codexRecord(42)));
+    QFile validFile(fixture.root + QStringLiteral("/z-valid.jsonl"));
+    QVERIFY(validFile.open(QIODevice::ReadOnly));
+    QVERIFY(validFile.setFileTime(validModified,
+                                  QFileDevice::FileModificationTime));
+    validFile.close();
+
+    for (int i = 0; i < rejectedFileCount; ++i) {
+      const QString path = fixture.root + QStringLiteral("/a-rejected-%1.jsonl")
+                                              .arg(i, 5, 10, QLatin1Char('0'));
+      QFile rejected(path);
+      QVERIFY2(rejected.open(QIODevice::WriteOnly), qPrintable(path));
+      QVERIFY(rejected.resize(oversizedFileSize));
+      QVERIFY(rejected.setFileTime(rejectedModified,
+                                   QFileDevice::FileModificationTime));
+    }
+
+    LocalSessionModel model;
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    model.setToolEnabled(QStringLiteral("codex-cli"), true);
+    auto *timer =
+        model.findChild<QTimer *>(QStringLiteral("local-session-import-timer"));
+    QVERIFY(timer);
+    timer->stop();
+
+    auto countEvents = [&fixture]() {
+      const QString connection =
+          QStringLiteral("rejected-new-file-event-count");
+      auto db =
+          QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+      db.setDatabaseName(fixture.database);
+      if (!db.open())
+        return qint64(-1);
+      QSqlQuery query(db);
+      const bool ok = query.exec(QStringLiteral(
+                          "SELECT COUNT(*) FROM local_usage_events")) &&
+                      query.next();
+      const qint64 count = ok ? query.value(0).toLongLong() : -1;
+      query.finish();
+      db.close();
+      db = {};
+      QSqlDatabase::removeDatabase(connection);
+      return count;
+    };
+
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 30000);
+    QVERIFY(imports.first().at(2).toBool());
+    QCOMPARE(countEvents(), qint64(0));
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 2, 30000);
+    QVERIFY(imports.last().at(2).toBool());
+    QCOMPARE(imports.last().at(1).toInt(), 1);
+    QCOMPARE(countEvents(), qint64(1));
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 3, 30000);
+    QCOMPARE(imports.last().at(1).toInt(), 0);
+    QCOMPARE(countEvents(), qint64(1));
+  }
+
+  void mixedRejectedQueuesCannotStarveLaterValidNewFiles() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    constexpr int changedFileCount = 1000;
+    constexpr int rejectedNewFileCount = 4000;
+    constexpr qint64 oversizedFileSize = 100ll * 1024 * 1024 + 1;
+    const QDateTime now = QDateTime::currentDateTimeUtc();
+    const QByteArray newline("\n");
+
+    for (int i = 0; i < changedFileCount; ++i) {
+      const QString id =
+          QStringLiteral("changed-thread-%1").arg(i, 4, 10, QLatin1Char('0'));
+      const QByteArray metadata =
+          QJsonDocument(
+              QJsonObject{
+                  {QStringLiteral("type"), QStringLiteral("session_meta")},
+                  {QStringLiteral("payload"),
+                   QJsonObject{
+                       {QStringLiteral("id"), id},
+                       {QStringLiteral("cwd"), QStringLiteral("/synthetic")}}}})
+              .toJson(QJsonDocument::Compact);
+      QVERIFY(fixture.writeNamed(id + QStringLiteral(".jsonl"),
+                                 metadata + newline + fixture.codexRecord(1)));
+    }
+
+    LocalSessionModel model;
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    model.setToolEnabled(QStringLiteral("codex-cli"), true);
+    auto *timer =
+        model.findChild<QTimer *>(QStringLiteral("local-session-import-timer"));
+    QVERIFY(timer);
+    timer->stop();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 30000);
+    QCOMPARE(imports.last().at(1).toInt(), changedFileCount);
+
+    QDir sessionDirectory(fixture.root);
+    const QStringList checkpointed =
+        sessionDirectory.entryList({QStringLiteral("*.jsonl")}, QDir::Files);
+    QCOMPARE(checkpointed.size(), changedFileCount);
+    for (const QString &name : checkpointed) {
+      QFile changed(sessionDirectory.filePath(name));
+      QVERIFY(changed.open(QIODevice::ReadWrite));
+      QVERIFY(changed.resize(oversizedFileSize));
+      QVERIFY(changed.setFileTime(now.addSecs(120),
+                                  QFileDevice::FileModificationTime));
+    }
+
+    const QByteArray validMetadata =
+        R"({"type":"session_meta","payload":{"id":"valid-later","cwd":"/synthetic"}})";
+    QVERIFY(
+        fixture.writeNamed(QStringLiteral("z-valid-later.jsonl"),
+                           validMetadata + newline + fixture.codexRecord(42)));
+    QFile validFile(
+        sessionDirectory.filePath(QStringLiteral("z-valid-later.jsonl")));
+    QVERIFY(validFile.open(QIODevice::ReadOnly));
+    QVERIFY(validFile.setFileTime(now.addSecs(-120),
+                                  QFileDevice::FileModificationTime));
+    validFile.close();
+
+    for (int i = 0; i < rejectedNewFileCount; ++i) {
+      const QString path =
+          sessionDirectory.filePath(QStringLiteral("a-rejected-%1.jsonl")
+                                        .arg(i, 4, 10, QLatin1Char('0')));
+      QFile rejected(path);
+      QVERIFY(rejected.open(QIODevice::WriteOnly));
+      QVERIFY(rejected.resize(oversizedFileSize));
+      QVERIFY(rejected.setFileTime(now.addSecs(240),
+                                   QFileDevice::FileModificationTime));
+    }
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 2, 30000);
+    QVERIFY(imports.last().at(2).toBool());
+    QCOMPARE(imports.last().at(1).toInt(), 0);
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 3, 30000);
+    QCOMPARE(imports.last().at(1).toInt(), 1);
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 4, 30000);
+    QCOMPARE(imports.last().at(1).toInt(), 0);
+
+    const QString connection =
+        QStringLiteral("mixed-rejected-file-event-count");
+    auto db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+    db.setDatabaseName(fixture.database);
+    QVERIFY(db.open());
+    {
+      QSqlQuery query(db);
+      QVERIFY(query.exec(
+          QStringLiteral("SELECT COUNT(*) FROM local_usage_events")));
+      QVERIFY(query.next());
+      QCOMPARE(query.value(0).toInt(), changedFileCount + 1);
+    }
+    db.close();
+    db = {};
+    QSqlDatabase::removeDatabase(connection);
+  }
+
+  void byteLimitedImportsResumeWithoutRepeatingCompletedFiles() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    constexpr qint64 sparseFileSize = 90ll * 1024 * 1024;
+    for (int i = 0; i < 3; ++i) {
+      QFile file(fixture.root + QStringLiteral("/large-%1.jsonl").arg(i));
+      QVERIFY(file.open(QIODevice::WriteOnly));
+      QVERIFY(file.resize(sparseFileSize));
+    }
+
+    LocalSessionModel model;
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    model.setToolEnabled(QStringLiteral("codex-cli"), true);
+    auto *timer =
+        model.findChild<QTimer *>(QStringLiteral("local-session-import-timer"));
+    QVERIFY(timer);
+    timer->stop();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 1, 30000);
+    QVERIFY(imports.first().at(2).toBool());
+    auto completedCheckpoints = [&fixture]() {
+      const QString connection = QStringLiteral("byte-limit-checkpoint-count");
+      auto db =
+          QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+      db.setDatabaseName(fixture.database);
+      if (!db.open())
+        return -1;
+      QSqlQuery query(db);
+      const bool ok = query.exec(QStringLiteral(
+                          "SELECT COUNT(*) FROM local_file_checkpoints WHERE "
+                          "tool_id='codex' "
+                          "AND file_offset=file_size")) &&
+                      query.next();
+      const int count = ok ? query.value(0).toInt() : -1;
+      query.finish();
+      db.close();
+      db = {};
+      QSqlDatabase::removeDatabase(connection);
+      return count;
+    };
+    QVERIFY(completedCheckpoints() < 3);
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 2, 30000);
+    QVERIFY(imports.last().at(2).toBool());
+    QCOMPARE(completedCheckpoints(), 3);
+
+    model.requestImport();
+    QTRY_COMPARE_WITH_TIMEOUT(imports.size(), 3, 30000);
+    QVERIFY(!imports.last().at(2).toBool());
+    QCOMPARE(imports.last().at(1).toInt(), 0);
+    QCOMPARE(completedCheckpoints(), 3);
+    QCOMPARE(model.importStates()
+                 .value(QStringLiteral("codex-cli"))
+                 .toMap()
+                 .value(QStringLiteral("state"))
+                 .toString(),
+             QStringLiteral("complete"));
   }
 
   void clearPolicySurvivesEmptyScansAndRestart() {
@@ -389,6 +897,163 @@ private Q_SLOTS:
       QVERIFY(csvFile.open(QIODevice::ReadOnly));
       QCOMPARE(csvFile.readAll().count('\n'), counts[i] + 1);
     }
+  }
+
+  void dailyQueriesUseInclusiveLocalDaysAcrossDstChanges() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    {
+      auto db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"),
+                                          QStringLiteral("dst-session-seed"));
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery query(db);
+      QVERIFY(query.exec(QStringLiteral(
+          "INSERT INTO local_sessions(session_id,tool_id,project_id,started_at_"
+          "utc,last_seen_at_utc) VALUES"
+          "('spring-before','codex','','2026-03-28T22:59:59.999Z','2026-03-"
+          "28T22:59:59.999Z'),"
+          "('spring-lower','codex','','2026-03-28T23:00:00.000Z','2026-03-"
+          "28T23:00:00.000Z'),"
+          "('spring-mid','codex','','2026-03-29T22:30:00.000Z','2026-03-"
+          "29T22:30:00.000Z'),"
+          "('spring-last','codex','','2026-03-30T21:59:59.999Z','2026-03-"
+          "30T21:59:59.999Z'),"
+          "('spring-end','codex','','2026-03-30T22:00:00.000Z','2026-03-"
+          "30T22:00:00.000Z'),"
+          "('autumn-start','codex','','2026-10-24T22:00:00.000Z','2026-10-"
+          "24T22:00:00.000Z'),"
+          "('autumn-mid','codex','','2026-10-25T01:30:00.000Z','2026-10-"
+          "25T01:30:00.000Z'),"
+          "('autumn-last','codex','','2026-10-26T22:59:59.999Z','2026-10-"
+          "26T22:59:59.999Z'),"
+          "('autumn-end','codex','','2026-10-26T23:00:00.000Z','2026-10-"
+          "26T23:00:00.000Z')")));
+      QVERIFY(query.exec(QStringLiteral(
+          "INSERT INTO local_usage_events(event_id,session_id,observed_at_utc,"
+          "model_id,input_tokens,output_tokens,parser_revision) VALUES"
+          "('spring-before','spring-before','2026-03-28T22:59:59.999Z','m',"
+          "500,1,1),"
+          "('spring-lower','spring-lower','2026-03-28T23:00:00.000Z','m',"
+          "10,1,1),"
+          "('spring-mid','spring-mid','2026-03-29T22:30:00.000Z','m',20,1,1),"
+          "('spring-last','spring-last','2026-03-30T21:59:59.999Z','m',30,1,1),"
+          "('spring-end','spring-end','2026-03-30T22:00:00.000Z','m',999,1,1),"
+          "('autumn-start','autumn-start','2026-10-24T22:00:00.000Z','m',"
+          "10,1,1),"
+          "('autumn-mid','autumn-mid','2026-10-25T01:30:00.000Z','m',20,1,1),"
+          "('autumn-last','autumn-last','2026-10-26T22:59:59.999Z','m',30,1,1),"
+          "('autumn-end','autumn-end','2026-10-26T23:00:00.000Z','m',999,1,"
+          "1)")));
+      query.finish();
+      db.close();
+    }
+    QSqlDatabase::removeDatabase(QStringLiteral("dst-session-seed"));
+
+    LocalSessionModel model;
+    QSignalSpy summaries(&model, &LocalSessionModel::summaryReady);
+    QSignalSpy sessions(&model, &LocalSessionModel::sessionsReady);
+    QSignalSpy daily(&model, &LocalSessionModel::dailyReady);
+    QSignalSpy exports(&model, &LocalSessionModel::exportReady);
+    const auto springFrom = QDateTime::fromString(
+        QStringLiteral("2026-03-28T23:00:00.000Z"), Qt::ISODateWithMs);
+    const auto springTo = QDateTime::fromString(
+        QStringLiteral("2026-03-30T22:00:00.000Z"), Qt::ISODateWithMs);
+    const auto autumnFrom = QDateTime::fromString(
+        QStringLiteral("2026-10-24T22:00:00.000Z"), Qt::ISODateWithMs);
+    const auto autumnTo = QDateTime::fromString(
+        QStringLiteral("2026-10-26T23:00:00.000Z"), Qt::ISODateWithMs);
+    QCOMPARE(springFrom.secsTo(springTo), 47 * 60 * 60);
+    QCOMPARE(autumnFrom.secsTo(autumnTo), 49 * 60 * 60);
+
+    model.requestSummary(QStringLiteral("spring-summary"),
+                         QStringLiteral("codex"), springFrom, springTo);
+    model.requestSessions(QStringLiteral("spring-sessions"),
+                          QStringLiteral("codex-cli"), springFrom, springTo);
+    model.requestDaily(QStringLiteral("spring-daily"), QStringLiteral("codex"),
+                       springFrom, springTo, {},
+                       QStringLiteral("Europe/Stockholm"));
+    model.requestDaily(QStringLiteral("autumn-daily"), QStringLiteral("codex"),
+                       autumnFrom, autumnTo, {},
+                       QStringLiteral("Europe/Stockholm"));
+    const QString output =
+        fixture.directory.filePath(QStringLiteral("spring.json"));
+    model.requestExport(QStringLiteral("spring-export"),
+                        QStringLiteral("codex"), springFrom, springTo, {},
+                        QStringLiteral("json"), output);
+    QTRY_COMPARE_WITH_TIMEOUT(summaries.size(), 1, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(sessions.size(), 1, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(daily.size(), 2, 5000);
+    QTRY_COMPARE_WITH_TIMEOUT(exports.size(), 1, 5000);
+
+    const QVariantMap springSummary = summaries.first().at(1).toMap();
+    QCOMPARE(springSummary.value(QStringLiteral("eventCount")).toInt(), 3);
+    QCOMPARE(springSummary.value(QStringLiteral("inputTokens")).toLongLong(),
+             60);
+    QCOMPARE(sessions.first().at(1).toList().size(), 3);
+    QVERIFY(exports.first().at(1).toString().isEmpty());
+    QFile outputFile(output);
+    QVERIFY(outputFile.open(QIODevice::ReadOnly));
+    const auto exported = QJsonDocument::fromJson(outputFile.readAll())
+                              .object()
+                              .value(QStringLiteral("sessions"))
+                              .toArray();
+    QCOMPARE(exported.size(), 3);
+
+    QHash<QString, QVariantList> dailyByRequest;
+    for (const auto &reply : daily)
+      dailyByRequest.insert(reply.at(0).toString(), reply.at(1).toList());
+    const QVariantList springRows =
+        dailyByRequest.value(QStringLiteral("spring-daily"));
+    QCOMPARE(springRows.size(), 2);
+    QCOMPARE(
+        springRows.at(0).toMap().value(QStringLiteral("localDate")).toString(),
+        QStringLiteral("2026-03-29"));
+    QCOMPARE(
+        springRows.at(0).toMap().value(QStringLiteral("eventCount")).toInt(),
+        1);
+    QCOMPARE(springRows.at(0)
+                 .toMap()
+                 .value(QStringLiteral("inputTokens"))
+                 .toLongLong(),
+             10);
+    QCOMPARE(
+        springRows.at(1).toMap().value(QStringLiteral("localDate")).toString(),
+        QStringLiteral("2026-03-30"));
+    QCOMPARE(
+        springRows.at(1).toMap().value(QStringLiteral("eventCount")).toInt(),
+        2);
+    QCOMPARE(springRows.at(1)
+                 .toMap()
+                 .value(QStringLiteral("inputTokens"))
+                 .toLongLong(),
+             50);
+
+    const QVariantList autumnRows =
+        dailyByRequest.value(QStringLiteral("autumn-daily"));
+    QCOMPARE(autumnRows.size(), 2);
+    QCOMPARE(
+        autumnRows.at(0).toMap().value(QStringLiteral("localDate")).toString(),
+        QStringLiteral("2026-10-25"));
+    QCOMPARE(
+        autumnRows.at(0).toMap().value(QStringLiteral("eventCount")).toInt(),
+        2);
+    QCOMPARE(autumnRows.at(0)
+                 .toMap()
+                 .value(QStringLiteral("inputTokens"))
+                 .toLongLong(),
+             30);
+    QCOMPARE(
+        autumnRows.at(1).toMap().value(QStringLiteral("localDate")).toString(),
+        QStringLiteral("2026-10-26"));
+    QCOMPARE(
+        autumnRows.at(1).toMap().value(QStringLiteral("eventCount")).toInt(),
+        1);
+    QCOMPARE(autumnRows.at(1)
+                 .toMap()
+                 .value(QStringLiteral("inputTokens"))
+                 .toLongLong(),
+             30);
   }
 
   void queryErrorsAreDistinctFromEmptyAndRecover() {
@@ -1081,6 +1746,7 @@ private Q_SLOTS:
       QTRY_COMPARE_WITH_TIMEOUT(imports.count(), 1, 5000);
       QCOMPARE(imports.takeFirst().at(3).toString(),
                QStringLiteral("session-database-write-failed"));
+      QCOMPARE(model.status(), QStringLiteral("error"));
       for (const QString &target : {QStringLiteral("local_usage_events"),
                                     QStringLiteral("local_session_counters"),
                                     QStringLiteral("local_file_checkpoints")}) {
@@ -1094,6 +1760,7 @@ private Q_SLOTS:
       model.requestImport();
       QTRY_COMPARE_WITH_TIMEOUT(imports.count(), 1, 5000);
       QVERIFY(imports.takeFirst().at(3).toString().isEmpty());
+      QCOMPARE(model.status(), QStringLiteral("ready"));
       QVERIFY(query.exec(
           QStringLiteral("SELECT COUNT(*),SUM(input_tokens),MIN(model_id) FROM "
                          "local_usage_events")));

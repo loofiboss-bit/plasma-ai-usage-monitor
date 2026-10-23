@@ -14,8 +14,10 @@ TestCase {
         id: database
         property bool codexEnabled: true
         property bool claudeCodeEnabled: true
+        property int retentionDays: 30
         property var requests: ({})
         property var filters: ({})
+        property var ranges: ({})
         signal sessionsReady(string requestId, var rows)
         signal summaryReady(string requestId, var payload)
         signal dailyReady(string requestId, var rows)
@@ -26,12 +28,13 @@ TestCase {
         property int exportCount: 0
         property var exportedSelection: ({})
         function requestProjects(id) { requests.projects = id; }
-        function requestSummary(id, tool, from, to, project, filter) { requests.summary = id; filters.summary = filter; }
-        function requestSessions(id, tool, from, to, project, offset, limit, filter) { requests.sessions = id; filters.sessions = filter; }
-        function requestDaily(id, tool, from, to, project, zone, filter) { requests.daily = id; filters.daily = filter; }
+        function requestSummary(id, tool, from, to, project, filter) { requests.summary = id; filters.summary = filter; ranges.summary = {from: from, to: to}; }
+        function requestSessions(id, tool, from, to, project, offset, limit, filter) { requests.sessions = id; filters.sessions = filter; ranges.sessions = {from: from, to: to}; }
+        function requestDaily(id, tool, from, to, project, zone, filter) { requests.daily = id; filters.daily = filter; ranges.daily = {from: from, to: to, zone: zone}; }
         function requestExport(id, tool, from, to, project, format, path, filter) {
             filters.export = filter;
             ++exportCount;
+            ranges.export = {from: from, to: to};
             exportedSelection = {tool: tool, from: from, to: to, project: project, format: format, path: path, filter: filter};
         }
     }
@@ -47,6 +50,7 @@ TestCase {
     property var panel: null
     function init() {
         database.exportCount = 0;
+        database.ranges = ({});
         panel = createTemporaryObject(panelComponent, testCase);
         verify(panel !== null);
         panel.refresh();
@@ -303,6 +307,131 @@ TestCase {
         panel.sessionState = {toolId: "codex-cli"};
         compare(panel.historyDisplayIndex, 0);
         compare(panel.modelSearch, "");
+    }
+    function test_custom_date_range_uses_one_local_interval_for_queries_and_export() {
+        database.retentionDays = 3650;
+        panel.sessionState = {toolId: "codex-cli", rangeIndex: 3,
+                              rangeMode: "custom", customStartDate: "2026-03-28",
+                              customEndDate: "2026-03-30"};
+        panel.restoreState();
+        compare(panel.selectedRangeIndex, 3);
+        compare(panel.sessionState.rangeMode, "custom");
+        panel.customRangeErrorKey = panel.customRangeProblem();
+        compare(panel.customRangeErrorKey, "");
+        panel.selectedProjectId = "project-a";
+        panel.selectedModelFilter = {modelId: "model-a"};
+        panel.filtersUpdated();
+        finish(3);
+
+        var range = panel.localRange();
+        compare(database.ranges.summary.from, range.from);
+        compare(database.ranges.summary.to, range.to);
+        compare(database.ranges.sessions.from, range.from);
+        compare(database.ranges.sessions.to, range.to);
+        compare(database.ranges.daily.from, range.from);
+        compare(database.ranges.daily.to, range.to);
+        compare(new Date(Date.parse(range.from)).getHours(), 0);
+        compare(panel.localDateString(new Date(Date.parse(range.from))), "2026-03-28");
+        compare(panel.localDateString(new Date(Date.parse(range.to) - 1)), "2026-03-30");
+
+        verify(panel.prepareExport("json"));
+        compare(panel.pendingExportSelection.from, range.from);
+        compare(panel.pendingExportSelection.to, range.to);
+        compare(panel.pendingExportSelection.projectId, "project-a");
+        compare(panel.pendingExportSelection.modelFilter.modelId, "model-a");
+        compare(panel.sessionState.rangeIndex, 3);
+        compare(panel.sessionState.customStartDate, "2026-03-28");
+        compare(panel.sessionState.customEndDate, "2026-03-30");
+    }
+    function test_custom_date_range_rejects_invalid_future_order_and_retention() {
+        panel.selectedRangeIndex = 3;
+        panel.customStartDate = "2026-02-30";
+        panel.customEndDate = "2026-03-01";
+        compare(panel.customRangeProblem(), "invalid-date");
+
+        panel.customStartDate = "2026-04-10";
+        panel.customEndDate = "2026-04-09";
+        compare(panel.customRangeProblem(), "range-order");
+
+        var tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        panel.customStartDate = panel.localDateString(new Date());
+        panel.customEndDate = panel.localDateString(tomorrow);
+        compare(panel.customRangeProblem(), "range-future");
+
+        var today = new Date();
+        var tooOld = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        tooOld.setDate(tooOld.getDate() - 5);
+        panel.customStartDate = panel.localDateString(tooOld);
+        panel.customEndDate = panel.localDateString(today);
+        database.retentionDays = 5;
+        compare(panel.customRangeProblem(), "range-retention");
+        var oldRequest = panel.summaryRequestId;
+        panel.refresh();
+        compare(panel.customRangeErrorKey, "range-retention");
+        compare(panel.summaryRequestId, oldRequest);
+        verify(!panel.loading);
+        compare(panel.sessionRows.length, 0);
+        verify(!panel.prepareExport("csv"));
+    }
+    function test_daily_rows_open_filtered_sessions_with_mouse_and_keyboard() {
+        panel.sessionState = {toolId: "codex-cli", rangeIndex: 1};
+        panel.restoreState();
+        panel.selectedProjectId = "project-a";
+        panel.selectedModelFilter = {modelId: "model-a"};
+        panel.historyDisplayIndex = 1;
+        panel.dailyRows = [{localDate: "2026-10-20", sessionCount: 2,
+                            inputTokens: 10, outputTokens: 4}];
+        var opened = [];
+        panel.sessionHistoryRangeRequested.connect(function(selection) {
+            opened.push(selection);
+        });
+        var list = findChild(panel, "sessionDailyList");
+        tryVerify(function() { return list.itemAtIndex(0) !== null; });
+        var row = list.itemAtIndex(0);
+        mouseClick(row);
+        compare(opened.length, 1);
+        compare(opened[0].startDate, "2026-10-20");
+        compare(opened[0].endDate, "2026-10-20");
+        compare(opened[0].toolId, "codex-cli");
+        compare(opened[0].projectId, "project-a");
+        compare(opened[0].modelFilter.modelId, "model-a");
+        verify(opened[0].dayDrilldown);
+
+        row.forceActiveFocus(Qt.TabFocusReason);
+        tryCompare(row, "activeFocus", true);
+        keyClick(Qt.Key_Space);
+        compare(opened.length, 2);
+        panel.sessionState = Object.assign({}, panel.sessionState, {dayDrilldown: true});
+        var returnButton = findChild(panel, "sessionDayDrilldownReturn");
+        verify(returnButton.visible);
+        var returned = false;
+        panel.sessionDayReturnRequested.connect(function() { returned = true; });
+        returnButton.clicked();
+        verify(returned);
+    }
+    function test_daily_focus_and_scroll_restore_after_drilldown() {
+        var rows = [];
+        for (var i = 1; i <= 30; ++i)
+            rows.push({localDate: "2026-10-" + String(i).padStart(2, "0"),
+                       sessionCount: 1, inputTokens: i, outputTokens: 1});
+        panel.sessionState = {toolId: "codex-cli", rangeIndex: 1,
+                              historyDisplayIndex: 1,
+                              dayFocusDate: "2026-10-03", dailyScrollY: 120};
+        panel.restoreState();
+        panel.dailyRows = rows;
+        panel.historyDisplayIndex = 1;
+        var list = findChild(panel, "sessionDailyList");
+        tryVerify(function() {
+            return list.visible && list.count === 30 && list.itemAtIndex(2) !== null;
+        });
+        panel.restoreDailyFocus();
+        tryVerify(function() {
+            var row = list.itemAtIndex(2);
+            return row !== null && row.activeFocus;
+        });
+        verify(Math.abs(list.contentY - 120) < 2);
+        compare(panel.sessionState.dailyScrollY, 120);
     }
     function test_retention_clamps_page_after_complete_generation_data() {
         return [{tag: "last-page", total: 101, offset: 100}, {tag: "empty", total: 0, offset: 0}];

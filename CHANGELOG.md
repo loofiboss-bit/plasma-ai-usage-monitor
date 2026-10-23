@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Add one-action search/filter reset in Overview and Sources without changing
   monitoring settings.
+- Show Codex and Claude Code import health independently, with running and last
+  completed scan details, imported-event counts, and bounded reason keys.
+- Add inclusive custom calendar-date ranges to session history and activate
+  daily totals for filtered per-day session drilldown.
 
 - Add case-insensitive project search across local aliases and anonymous project
   labels, with complete project choices independent of bounded analysis lists.
@@ -50,6 +54,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exports and retain localized, typed export status across history refreshes.
 - Stream JSON/CSV exports to private atomic files without buffering all events.
 - Clean up registered database connections on failed opens and early returns.
+- Resume large imports fairly by skipping unchanged completed files, rotating
+  pending files, and prioritizing new arrivals within the existing limits.
+- Verify Codex append-cache prefixes before reusing parser context, including
+  same-inode rewrites that grow the file.
+- Use one local-day UTC interval for custom-range summaries, lists, daily totals
+  and exports; restore daily focus and scroll after returning from a day.
 
 ### Changed
 

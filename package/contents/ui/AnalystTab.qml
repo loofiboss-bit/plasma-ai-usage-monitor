@@ -14,6 +14,7 @@ Kirigami.ScrollablePage {
     property var sessionState: null
     property var viewState: null
     signal sessionHistoryRequested(string toolId, string projectId, int rangeDays, string sessionId, int pageOffset, var modelFilter)
+    signal sessionHistoryRangeRequested(var selection)
     property bool sessionsMode: false
     property bool coverageExpanded: false
     property bool driversExpanded: false
@@ -260,6 +261,9 @@ Kirigami.ScrollablePage {
             sessionState: analystPage.sessionState
             onSessionHistoryRequested: function(toolId, projectId, rangeDays, sessionId, pageOffset, modelFilter) {
                 analystPage.sessionHistoryRequested(toolId, projectId, rangeDays, sessionId, pageOffset, modelFilter);
+            }
+            onSessionHistoryRangeRequested: function(selection) {
+                analystPage.sessionHistoryRangeRequested(selection);
             }
         }
         ColumnLayout {

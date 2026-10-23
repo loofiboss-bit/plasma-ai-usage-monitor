@@ -93,6 +93,9 @@ ColumnLayout {
     property string exportErrorKey: ""
     property bool exportDialogOpen: false
     property var pendingExportSelection: null
+    property string customStartDate: ""
+    property string customEndDate: ""
+    property string customRangeErrorKey: ""
     readonly property bool exportBusy: exportDialogOpen || exportState === "writing"
     readonly property string statusText: exportState === "writing"
         ? i18n("Writing redacted export…")
@@ -118,6 +121,8 @@ ColumnLayout {
 
     signal sessionHistoryRequested(string toolId, string projectId, int rangeDays,
                                    string sessionId, int pageOffset, var modelFilter)
+    signal sessionHistoryRangeRequested(var selection)
+    signal sessionDayReturnRequested()
     signal filtersChanged(string toolId, string projectId, int rangeDays)
     Accessible.role: Accessible.Pane
     Accessible.name: i18n("Local coding session history")
@@ -129,10 +134,92 @@ ColumnLayout {
 
     readonly property string activeToolId: fixedToolId.length > 0
         ? fixedToolId : selectedToolId
-    readonly property int rangeDays: [1, 7, 30][selectedRangeIndex] || 7
+    readonly property int rangeDays: selectedRangeIndex === 3
+        ? Math.max(1, customRangeDayCount())
+        : ([1, 7, 30][selectedRangeIndex] || 7)
+
+    function localDateString(date) {
+        return String(date.getFullYear()).padStart(4, "0") + "-"
+            + String(date.getMonth() + 1).padStart(2, "0") + "-"
+            + String(date.getDate()).padStart(2, "0");
+    }
+
+    function parseLocalDate(value) {
+        var parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ""));
+        if (!parts) return null;
+        var year = Number(parts[1]);
+        var month = Number(parts[2]);
+        var day = Number(parts[3]);
+        var date = new Date(year, month - 1, day);
+        if (year < 100) date.setFullYear(year);
+        return date.getFullYear() === year && date.getMonth() === month - 1
+            && date.getDate() === day ? date : null;
+    }
+
+    function ensureCustomDates() {
+        if (parseLocalDate(customStartDate) && parseLocalDate(customEndDate)) return;
+        var end = new Date();
+        end.setHours(0, 0, 0, 0);
+        var start = new Date(end.getTime());
+        start.setDate(start.getDate() - 6);
+        customStartDate = localDateString(start);
+        customEndDate = localDateString(end);
+    }
+
+    function customRangeProblem() {
+        var from = parseLocalDate(customStartDate);
+        var through = parseLocalDate(customEndDate);
+        if (!from || !through) return "invalid-date";
+        if (from > through) return "range-order";
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (through > today) return "range-future";
+        var retentionDays = sessionModel && Number(sessionModel.retentionDays) > 0
+            ? Math.floor(Number(sessionModel.retentionDays)) : 90;
+        var earliest = new Date(today.getTime());
+        earliest.setDate(earliest.getDate() - retentionDays + 1);
+        if (from < earliest) return "range-retention";
+        return "";
+    }
+
+    function customRangeErrorText() {
+        if (customRangeErrorKey === "invalid-date")
+            return i18n("Enter both dates in YYYY-MM-DD format.");
+        if (customRangeErrorKey === "range-order")
+            return i18n("The start date must be on or before the end date.");
+        if (customRangeErrorKey === "range-future")
+            return i18n("The end date cannot be in the future.");
+        if (customRangeErrorKey === "range-retention")
+            return i18n("Choose dates within the configured history retention period.");
+        return "";
+    }
+
+    function customRangeDayCount() {
+        var from = parseLocalDate(customStartDate);
+        var through = parseLocalDate(customEndDate);
+        if (!from || !through || from > through) return 0;
+        var days = 0;
+        for (var date = new Date(from.getTime()); date <= through && days <= 3650;
+             date.setDate(date.getDate() + 1)) ++days;
+        return days;
+    }
 
     function localRange() {
         var now = new Date();
+        if (selectedRangeIndex === 3) {
+            var customFrom = parseLocalDate(customStartDate);
+            var customThrough = parseLocalDate(customEndDate);
+            if (!customFrom || !customThrough) return { from: "", to: "" };
+            var customTo = new Date(customThrough.getTime());
+            customTo.setDate(customTo.getDate() + 1);
+            customTo.setHours(0, 0, 0, 0);
+            var today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            return {
+                from: customFrom.toISOString(),
+                to: customThrough.getTime() === today.getTime()
+                    ? now.toISOString() : customTo.toISOString()
+            };
+        }
         var from = new Date(now.getTime());
         from.setHours(0, 0, 0, 0);
         from.setDate(from.getDate() - rangeDays + 1);
@@ -149,6 +236,9 @@ ColumnLayout {
         sessionState.historyDisplayIndex = historyDisplayIndex;
         sessionState.breakdownIndex = breakdownIndex;
         sessionState.rangeIndex = selectedRangeIndex;
+        sessionState.rangeMode = selectedRangeIndex === 3 ? "custom" : "preset";
+        sessionState.customStartDate = customStartDate;
+        sessionState.customEndDate = customEndDate;
         sessionState.pageOffset = pageOffset;
         sessionState.sessionId = selectedSessionId;
     }
@@ -163,11 +253,18 @@ ColumnLayout {
         modelSearch = String(sessionState.modelSearch || "");
         historyDisplayIndex = Number(sessionState.historyDisplayIndex) === 1 ? 1 : 0;
         breakdownIndex = Math.max(0, Math.min(2, Number(sessionState.breakdownIndex || 0)));
-        selectedRangeIndex = Math.max(0, Math.min(2,
+        selectedRangeIndex = Math.max(0, Math.min(3,
             Number(sessionState.rangeIndex === undefined
                 ? ([1, 7, 30].indexOf(Number(initialRangeDays)) < 0 ? 1
                     : [1, 7, 30].indexOf(Number(initialRangeDays)))
                 : sessionState.rangeIndex)));
+        customStartDate = String(sessionState.customStartDate || "");
+        customEndDate = String(sessionState.customEndDate || "");
+        if (sessionState.rangeMode === "custom" || selectedRangeIndex === 3) {
+            selectedRangeIndex = 3;
+            ensureCustomDates();
+        }
+        customRangeErrorKey = selectedRangeIndex === 3 ? customRangeProblem() : "";
         pageOffset = Math.max(0, Number(sessionState.pageOffset || 0));
         selectedSessionId = String(sessionState.sessionId || "");
         restoringState = false;
@@ -293,7 +390,56 @@ ColumnLayout {
 
     function drillDown(projectId, modelFilter) {
         persistState();
+        if (selectedRangeIndex === 3) {
+            sessionHistoryRangeRequested({
+                toolId: activeToolId,
+                projectId: projectId,
+                modelFilter: modelFilter || ({}),
+                startDate: customStartDate,
+                endDate: customEndDate,
+                dayDrilldown: false
+            });
+            return;
+        }
         sessionHistoryRequested(activeToolId, projectId, rangeDays, "", 0, modelFilter);
+    }
+
+    function openDay(localDate) {
+        if (!parseLocalDate(localDate)) return;
+        if (sessionState) {
+            sessionState.dayFocusDate = localDate;
+            sessionState.dailyScrollY = Number(dailyList.contentY || 0);
+        }
+        persistState();
+        sessionHistoryRangeRequested({
+            toolId: activeToolId,
+            projectId: selectedProjectId,
+            modelFilter: selectedModelFilter,
+            startDate: localDate,
+            endDate: localDate,
+            dayDrilldown: true
+        });
+    }
+
+    function restoreDailyFocus() {
+        if (!sessionState || !sessionState.dayFocusDate || !dailyList.visible) return;
+        var index = -1;
+        for (var i = 0; i < dailyRows.length; ++i) {
+            if (String(dailyRows[i].localDate || "") === String(sessionState.dayFocusDate)) {
+                index = i;
+                break;
+            }
+        }
+        if (index < 0) return;
+        dailyList.positionViewAtIndex(index, ListView.Contain);
+        dailyList.forceLayout();
+        Qt.callLater(function() {
+            var savedY = Math.max(0, Number(sessionState.dailyScrollY || 0));
+            var maxY = Math.max(0, dailyList.contentHeight - dailyList.height);
+            dailyList.contentY = Math.min(savedY, maxY);
+            var row = dailyList.itemAtIndex(index);
+            if (row) row.forceActiveFocus(Qt.TabFocusReason);
+        });
     }
 
     function restoreBreakdownFocus() {
@@ -410,6 +556,19 @@ ColumnLayout {
     }
 
     function refresh() {
+        if (selectedRangeIndex === 3) {
+            customRangeErrorKey = customRangeProblem();
+            if (customRangeErrorKey !== "") {
+                ++requestGeneration;
+                pendingQueryIds = [];
+                loading = false;
+                summaryCurrent = false;
+                sessionRows = [];
+                dailyRows = [];
+                summary = ({});
+                return;
+            }
+        }
         if (!sessionModel || !selectedToolEnabled()) {
             loading = false;
             pendingQueryIds = [];
@@ -453,6 +612,7 @@ ColumnLayout {
 
     function prepareExport(format) {
         if (exportBusy || !selectedToolEnabled()) return false;
+        if (selectedRangeIndex === 3 && customRangeProblem() !== "") return false;
         var range = localRange();
         pendingExportSelection = {
             toolId: activeToolId, projectId: selectedProjectId,
@@ -636,13 +796,85 @@ ColumnLayout {
 
             QQC2.ComboBox {
                 Layout.fillWidth: true
-                model: [i18n("Today"), i18n("7 days"), i18n("30 days")]
+                model: panel.presentationMode === "history"
+                    ? [i18n("Today"), i18n("7 days"), i18n("30 days"), i18n("Custom")]
+                    : [i18n("Today"), i18n("7 days"), i18n("30 days")]
                 currentIndex: panel.selectedRangeIndex
                 Accessible.name: i18n("Session period")
                 onActivated: {
                     panel.selectedRangeIndex = currentIndex;
-                    panel.filtersUpdated();
+                    if (currentIndex === 3) {
+                        panel.ensureCustomDates();
+                        panel.customRangeErrorKey = panel.customRangeProblem();
+                        if (panel.customRangeErrorKey === "")
+                            panel.filtersUpdated();
+                        else
+                            panel.persistState();
+                    } else {
+                        panel.customRangeErrorKey = "";
+                        panel.filtersUpdated();
+                    }
                 }
+            }
+
+            RowLayout {
+                objectName: "sessionCustomRange"
+                Layout.fillWidth: true
+                visible: panel.presentationMode === "history"
+                    && panel.selectedRangeIndex === 3
+                QQC2.TextField {
+                    objectName: "sessionCustomStartDate"
+                    Layout.fillWidth: true
+                    placeholderText: i18n("Start date (YYYY-MM-DD)")
+                    Accessible.name: placeholderText
+                    inputMask: "0000-00-00;_"
+                    text: panel.customStartDate
+                    onTextEdited: panel.customStartDate = text
+                    onEditingFinished: {
+                        panel.customRangeErrorKey = panel.customRangeProblem();
+                        if (panel.customRangeErrorKey === "")
+                            panel.filtersUpdated();
+                        else
+                            panel.persistState();
+                    }
+                }
+                QQC2.TextField {
+                    objectName: "sessionCustomEndDate"
+                    Layout.fillWidth: true
+                    placeholderText: i18n("End date (YYYY-MM-DD)")
+                    Accessible.name: placeholderText
+                    inputMask: "0000-00-00;_"
+                    text: panel.customEndDate
+                    onTextEdited: panel.customEndDate = text
+                    onEditingFinished: {
+                        panel.customRangeErrorKey = panel.customRangeProblem();
+                        if (panel.customRangeErrorKey === "")
+                            panel.filtersUpdated();
+                        else
+                            panel.persistState();
+                    }
+                }
+            }
+
+            PlasmaComponents.Label {
+                objectName: "sessionCustomRangeError"
+                Layout.fillWidth: true
+                visible: panel.presentationMode === "history"
+                    && panel.selectedRangeIndex === 3
+                    && panel.customRangeErrorKey !== ""
+                text: panel.customRangeErrorText()
+                color: Kirigami.Theme.negativeTextColor
+                wrapMode: Text.WordWrap
+                Accessible.name: text
+            }
+
+            PlasmaComponents.Label {
+                Layout.fillWidth: true
+                visible: panel.presentationMode === "history"
+                    && panel.selectedRangeIndex === 3
+                text: i18n("Available within the configured retention period. Initial local import covers up to 30 days.")
+                color: Kirigami.Theme.disabledTextColor
+                wrapMode: Text.WordWrap
             }
 
             QQC2.TextField {
@@ -720,6 +952,16 @@ ColumnLayout {
                 visible: panel.selectedProjectId !== "" || panel.selectedModelFilter.modelId !== undefined
                     || panel.projectSearch !== "" || panel.modelSearch !== ""
                 onClicked: panel.clearFilters()
+            }
+
+            PlasmaComponents.Button {
+                objectName: "sessionDayDrilldownReturn"
+                visible: panel.presentationMode === "history"
+                    && !!(panel.sessionState && panel.sessionState.dayDrilldown)
+                text: i18n("Back to daily overview")
+                icon.name: "go-previous"
+                activeFocusOnTab: true
+                onClicked: panel.sessionDayReturnRequested()
             }
 
             PlasmaComponents.Button {
@@ -840,6 +1082,8 @@ ColumnLayout {
             ListView {
                 id: dailyList
                 objectName: "sessionDailyList"
+                onCountChanged: Qt.callLater(panel.restoreDailyFocus)
+                onVisibleChanged: if (visible) Qt.callLater(panel.restoreDailyFocus)
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(
                     panel.dailyRows.length * Kirigami.Units.gridUnit * 3,
@@ -853,38 +1097,43 @@ ColumnLayout {
                     policy: QQC2.ScrollBar.AsNeeded
                 }
 
-                delegate: ColumnLayout {
+                delegate: QQC2.ItemDelegate {
                     id: dailyRow
+                    objectName: "sessionDailyRow"
+                    required property int index
                     required property var modelData
                     width: dailyList.width
-                    spacing: 0
-                    RowLayout {
-                        Layout.fillWidth: true
+                    activeFocusOnTab: true
+                    Accessible.name: i18n("Open sessions for %1, %2 sessions",
+                        panel.dayText(modelData.localDate),
+                        panel.countText(modelData.sessionCount))
+                    Accessible.description: i18n("Input %1, output %2",
+                        panel.countText(modelData.inputTokens),
+                        panel.countText(modelData.outputTokens))
+                    onClicked: panel.openDay(String(modelData.localDate || ""))
+
+                    contentItem: ColumnLayout {
+                        spacing: 0
+                        RowLayout {
+                            Layout.fillWidth: true
+                            PlasmaComponents.Label {
+                                Layout.fillWidth: true
+                                text: panel.dayText(dailyRow.modelData.localDate)
+                                font.bold: true
+                            }
+                            PlasmaComponents.Label {
+                                text: i18np("%1 session", "%1 sessions",
+                                    Number(dailyRow.modelData.sessionCount || 0))
+                            }
+                        }
                         PlasmaComponents.Label {
                             Layout.fillWidth: true
-                            text: panel.dayText(dailyRow.modelData.localDate)
-                            font.bold: true
+                            text: i18n("Input %1 · output %2",
+                                panel.tokenText(dailyRow.modelData.inputTokens),
+                                panel.tokenText(dailyRow.modelData.outputTokens))
+                            color: Kirigami.Theme.disabledTextColor
+                            wrapMode: Text.WordWrap
                         }
-                        PlasmaComponents.Label {
-                            text: i18np("%1 session", "%1 sessions",
-                                Number(dailyRow.modelData.sessionCount || 0))
-                        }
-                    }
-                    PlasmaComponents.Label {
-                        id: dailyUsageValue
-                        activeFocusOnTab: true
-                        Accessible.name: i18n("Input tokens: %1 · Output tokens: %2",
-                            panel.countText(dailyRow.modelData.inputTokens),
-                            panel.countText(dailyRow.modelData.outputTokens))
-                        QQC2.ToolTip.visible: dailyUsageValueHover.hovered || activeFocus
-                        QQC2.ToolTip.text: Accessible.name
-                        HoverHandler { id: dailyUsageValueHover }
-                        Layout.fillWidth: true
-                        text: i18n("Input %1 · output %2",
-                            panel.tokenText(dailyRow.modelData.inputTokens),
-                            panel.tokenText(dailyRow.modelData.outputTokens))
-                        color: Kirigami.Theme.disabledTextColor
-                        wrapMode: Text.WordWrap
                     }
                 }
             }

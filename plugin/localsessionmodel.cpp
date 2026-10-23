@@ -9,6 +9,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QFutureWatcher>
+#include <QHash>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLockFile>
@@ -172,6 +173,43 @@ QString toolRoot(const QString &tool) {
 QString canonicalTool(QString tool) {
   return tool == QLatin1String("codex-cli") ? QStringLiteral("codex") : tool;
 }
+QString publicToolId(const QString &tool) {
+  return tool == QLatin1String("codex") ? QStringLiteral("codex-cli") : tool;
+}
+QString scanCursorPath(const QString &tool, bool changedQueue = false) {
+  const QString name = tool == QLatin1String("codex")
+                           ? QStringLiteral("codex")
+                           : QStringLiteral("claude-code");
+  return dataDirectory() +
+         QStringLiteral("/local-session-cursor-%1%2")
+             .arg(name, changedQueue ? QStringLiteral("-changed") : QString());
+}
+QString readScanCursor(const QString &tool, bool changedQueue = false) {
+  QFile file(scanCursorPath(tool, changedQueue));
+  if (!file.open(QIODevice::ReadOnly))
+    return {};
+  const QByteArray value = file.read(65).trimmed();
+  static const QRegularExpression validId(QStringLiteral("^[a-f0-9]{64}$"));
+  return validId.match(QString::fromLatin1(value)).hasMatch()
+             ? QString::fromLatin1(value)
+             : QString();
+}
+bool writeScanCursor(const QString &tool, const QString &fileId,
+                     bool changedQueue = false) {
+  if (fileId.isEmpty())
+    return false;
+  QSaveFile file(scanCursorPath(tool, changedQueue));
+  file.setDirectWriteFallback(false);
+  if (!file.open(QIODevice::WriteOnly))
+    return false;
+  file.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+  const QByteArray bytes = fileId.toLatin1();
+  if (file.write(bytes) != bytes.size() || !file.commit())
+    return false;
+  QFile::setPermissions(scanCursorPath(tool, changedQueue),
+                        QFileDevice::ReadOwner | QFileDevice::WriteOwner);
+  return true;
+}
 } // namespace
 
 LocalSessionModel::LocalSessionModel(QObject *parent) : QObject(parent) {
@@ -210,6 +248,16 @@ void LocalSessionModel::setToolEnabled(const QString &toolId, bool enabled) {
   *target = enabled;
   ++m_generation;
   m_generationState->store(m_generation, std::memory_order_release);
+  m_codexAppendContexts.clear();
+  const QString publicId = publicToolId(canonicalTool(toolId));
+  QVariantMap toolState = m_importStates.value(publicId).toMap();
+  toolState.insert(QStringLiteral("state"), enabled
+                                                ? QStringLiteral("unknown")
+                                                : QStringLiteral("disabled"));
+  toolState.insert(QStringLiteral("reasonKeys"), QStringList{});
+  toolState.insert(QStringLiteral("errorKey"), QString());
+  m_importStates.insert(publicId, toolState);
+  emit importStatesChanged();
   if (m_codexEnabled || m_claudeEnabled)
     m_importTimer->start();
   else
@@ -233,40 +281,128 @@ void LocalSessionModel::requestImport() {
     m_importAgain = true;
     return;
   }
+  const QString startedAtUtc =
+      QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs);
+  for (const auto &entry : {qMakePair(QStringLiteral("codex-cli"), codex),
+                            qMakePair(QStringLiteral("claude-code"), claude)}) {
+    if (!entry.second)
+      continue;
+    QVariantMap toolState = m_importStates.value(entry.first).toMap();
+    toolState.insert(QStringLiteral("state"), QStringLiteral("running"));
+    toolState.insert(QStringLiteral("lastAttemptAtUtc"), startedAtUtc);
+    toolState.insert(QStringLiteral("reasonKeys"), QStringList{});
+    toolState.insert(QStringLiteral("errorKey"), QString());
+    m_importStates.insert(entry.first, toolState);
+  }
+  emit importStatesChanged();
   ++m_pending;
   emit statusChanged();
   auto *watcher = new QFutureWatcher<QVariantMap>(this);
-  connect(watcher, &QFutureWatcher<QVariantMap>::finished, this,
-          [this, watcher, generation]() {
-            const QVariantMap result = watcher->result();
-            watcher->deleteLater();
-            m_pending = qMax(0, m_pending - 1);
-            if (generation == m_generation) {
-              m_status =
-                  result.value(QStringLiteral("errorKey")).toString().isEmpty()
-                      ? QStringLiteral("ready")
-                      : QStringLiteral("error");
-              emit statusChanged();
-              QString completedTool =
-                  result.value(QStringLiteral("toolId")).toString();
-              if (completedTool == QLatin1String("codex"))
-                completedTool = QStringLiteral("codex-cli");
-              emit importFinished(
-                  completedTool, result.value(QStringLiteral("count")).toInt(),
-                  result.value(QStringLiteral("partial")).toBool(),
-                  result.value(QStringLiteral("errorKey")).toString());
+  connect(
+      watcher, &QFutureWatcher<QVariantMap>::finished, this,
+      [this, watcher, generation]() {
+        const QVariantMap result = watcher->result();
+        watcher->deleteLater();
+        m_pending = qMax(0, m_pending - 1);
+        if (generation == m_generation) {
+          const QVariantList outcomes =
+              result.value(QStringLiteral("toolResults")).toList();
+          QVariantMap legacyOutcome;
+          if (!outcomes.isEmpty()) {
+            bool anyToolError = false;
+            for (const QVariant &value : outcomes) {
+              const QVariantMap outcome = value.toMap();
+              const QString tool =
+                  outcome.value(QStringLiteral("toolId")).toString();
+              const QString publicId = publicToolId(tool);
+              QVariantMap toolState = m_importStates.value(publicId).toMap();
+              const QString errorKey =
+                  outcome.value(QStringLiteral("errorKey")).toString();
+              const QString scanStatus =
+                  outcome.value(QStringLiteral("scanStatus")).toString();
+              anyToolError |=
+                  !errorKey.isEmpty() || scanStatus == QLatin1String("error");
+              toolState.insert(
+                  QStringLiteral("state"),
+                  (!errorKey.isEmpty() || scanStatus == QLatin1String("error"))
+                      ? QStringLiteral("error")
+                  : scanStatus == QLatin1String("partial")
+                      ? QStringLiteral("partial")
+                      : QStringLiteral("complete"));
+              toolState.insert(
+                  QStringLiteral("lastCompletedAtUtc"),
+                  QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+              toolState.insert(QStringLiteral("importedEventCount"),
+                               outcome.value(QStringLiteral("count")));
+              toolState.insert(QStringLiteral("reasonKeys"),
+                               outcome.value(QStringLiteral("reasonKeys")));
+              toolState.insert(QStringLiteral("errorKey"), errorKey);
+              m_importStates.insert(publicId, toolState);
+              if (tool == QLatin1String("codex") &&
+                  outcome.contains(QStringLiteral("codexContextCache")))
+                m_codexAppendContexts =
+                    outcome.value(QStringLiteral("codexContextCache")).toList();
+              legacyOutcome = outcome;
             }
-            emit statusChanged();
-            if (m_importAgain) {
-              m_importAgain = false;
-              requestImport();
+            m_status = anyToolError ? QStringLiteral("error")
+                                    : QStringLiteral("ready");
+          } else {
+            const QString errorKey =
+                result.value(QStringLiteral("errorKey")).toString();
+            const QString failedTool =
+                result.value(QStringLiteral("toolId")).toString();
+            const QStringList tools =
+                failedTool.isEmpty()
+                    ? QStringList{QStringLiteral("codex-cli"),
+                                  QStringLiteral("claude-code")}
+                    : QStringList{publicToolId(failedTool)};
+            for (const QString &tool : tools) {
+              if ((tool == QLatin1String("codex-cli") && !m_codexEnabled) ||
+                  (tool == QLatin1String("claude-code") && !m_claudeEnabled))
+                continue;
+              QVariantMap toolState = m_importStates.value(tool).toMap();
+              toolState.insert(QStringLiteral("state"),
+                               QStringLiteral("error"));
+              toolState.insert(
+                  QStringLiteral("lastCompletedAtUtc"),
+                  QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs));
+              toolState.insert(QStringLiteral("errorKey"), errorKey);
+              toolState.insert(QStringLiteral("reasonKeys"), QStringList{});
+              m_importStates.insert(tool, toolState);
+              legacyOutcome = {
+                  {QStringLiteral("toolId"), tool == QLatin1String("codex-cli")
+                                                 ? QStringLiteral("codex")
+                                                 : tool},
+                  {QStringLiteral("errorKey"), errorKey},
+                  {QStringLiteral("count"), 0},
+                  {QStringLiteral("partial"), false}};
             }
-          });
+            m_status = errorKey.isEmpty() ? QStringLiteral("ready")
+                                          : QStringLiteral("error");
+          }
+          emit importStatesChanged();
+          emit statusChanged();
+          emit importFinished(
+              publicToolId(
+                  legacyOutcome.value(QStringLiteral("toolId")).toString()),
+              legacyOutcome.value(QStringLiteral("count")).toInt(),
+              legacyOutcome.value(QStringLiteral("partial")).toBool(),
+              legacyOutcome.value(QStringLiteral("errorKey")).toString());
+        }
+        emit statusChanged();
+        if (m_importAgain) {
+          m_importAgain = false;
+          requestImport();
+        }
+      });
+  const QVariantList cachedCodexContexts = m_codexAppendContexts;
   watcher->setFuture(QtConcurrent::run([codex, claude, generation, retention,
-                                        generationState]() {
+                                        generationState,
+                                        cachedCodexContexts]() {
     QVariantMap result;
     result.insert(QStringLiteral("count"), 0);
     result.insert(QStringLiteral("partial"), false);
+    QVariantList toolResults;
     QLockFile lock(dataDirectory() + QStringLiteral("/session-import.lock"));
     lock.setStaleLockTime(30000);
     if (!lock.tryLock(5000)) {
@@ -280,6 +416,7 @@ void LocalSessionModel::requestImport() {
                     QStringLiteral("session-key-unavailable"));
       return result;
     }
+    QVariantList nextCodexContextCache = cachedCodexContexts;
     bool retentionCleanupFailed = false;
     {
       const QString cleanupConnection =
@@ -322,6 +459,9 @@ void LocalSessionModel::requestImport() {
       if ((tool == QLatin1String("codex") && !codex) ||
           (tool == QLatin1String("claude-code") && !claude))
         continue;
+      result = {{QStringLiteral("toolId"), tool},
+                {QStringLiteral("count"), 0},
+                {QStringLiteral("partial"), false}};
       result.insert(QStringLiteral("toolId"), tool);
       QString cutoffUtc;
       bool rebaselinePending = false;
@@ -333,9 +473,39 @@ void LocalSessionModel::requestImport() {
         SessionConnection connectionOwner(checkpointConnection, false);
         auto &checkpointDb = connectionOwner.db;
         if (!checkpointDb.isOpen()) {
-          result.insert(QStringLiteral("errorKey"),
-                        QStringLiteral("session-database-unavailable"));
-          return result;
+          const QString errorKey =
+              QStringLiteral("session-database-unavailable");
+          result.insert(QStringLiteral("errorKey"), errorKey);
+          result.insert(QStringLiteral("scanStatus"), QStringLiteral("error"));
+          result.insert(QStringLiteral("reasonKeys"), QStringList{});
+          if (tool == QLatin1String("codex"))
+            result.insert(QStringLiteral("codexContextCache"),
+                          nextCodexContextCache);
+          toolResults.append(result);
+          bool appendFollowingTools = false;
+          for (const QString &followingTool :
+               {QStringLiteral("codex"), QStringLiteral("claude-code")}) {
+            if (followingTool == tool) {
+              appendFollowingTools = true;
+              continue;
+            }
+            if (!appendFollowingTools ||
+                (followingTool == QLatin1String("codex") && !codex) ||
+                (followingTool == QLatin1String("claude-code") && !claude))
+              continue;
+            QVariantMap following{
+                {QStringLiteral("toolId"), followingTool},
+                {QStringLiteral("count"), 0},
+                {QStringLiteral("partial"), false},
+                {QStringLiteral("errorKey"), errorKey},
+                {QStringLiteral("scanStatus"), QStringLiteral("error")},
+                {QStringLiteral("reasonKeys"), QStringList{}}};
+            if (followingTool == QLatin1String("codex"))
+              following.insert(QStringLiteral("codexContextCache"),
+                               nextCodexContextCache);
+            toolResults.append(following);
+          }
+          return QVariantMap{{QStringLiteral("toolResults"), toolResults}};
         }
         QSqlQuery checkpoint(checkpointDb);
         checkpoint.prepare(
@@ -353,13 +523,66 @@ void LocalSessionModel::requestImport() {
       }
       bool toolPartial = retentionCleanupFailed ||
                          persistedCoverage == QLatin1String("partial");
-      const auto markPartial = [&]() {
+      bool scanPartial = retentionCleanupFailed;
+      QStringList reasonKeys;
+      if (retentionCleanupFailed)
+        reasonKeys.append(QStringLiteral("retention-maintenance"));
+      const auto markPartial = [&](const QString &reason =
+                                       QStringLiteral("incomplete-record")) {
         toolPartial = true;
+        scanPartial = true;
+        if (!reasonKeys.contains(reason))
+          reasonKeys.append(reason);
         result.insert(QStringLiteral("partial"), true);
+      };
+      const auto finishTool = [&]() {
+        result.insert(QStringLiteral("scanStatus"),
+                      scanPartial ? QStringLiteral("partial")
+                                  : QStringLiteral("complete"));
+        result.insert(QStringLiteral("coverage"),
+                      toolPartial ? QStringLiteral("partial")
+                                  : QStringLiteral("reported"));
+        result.insert(QStringLiteral("reasonKeys"), reasonKeys);
+        if (tool == QLatin1String("codex"))
+          result.insert(QStringLiteral("codexContextCache"),
+                        nextCodexContextCache);
+        toolResults.append(result);
+      };
+      const auto failTool = [&]() {
+        result.insert(QStringLiteral("scanStatus"), QStringLiteral("error"));
+        result.insert(QStringLiteral("reasonKeys"), reasonKeys);
+        const QString errorKey =
+            result.value(QStringLiteral("errorKey")).toString();
+        if (tool == QLatin1String("codex"))
+          result.insert(QStringLiteral("codexContextCache"),
+                        nextCodexContextCache);
+        toolResults.append(result);
+        bool appendFollowingTools = false;
+        for (const QString &followingTool :
+             {QStringLiteral("codex"), QStringLiteral("claude-code")}) {
+          if (followingTool == tool) {
+            appendFollowingTools = true;
+            continue;
+          }
+          if (!appendFollowingTools ||
+              (followingTool == QLatin1String("codex") && !codex) ||
+              (followingTool == QLatin1String("claude-code") && !claude))
+            continue;
+          toolResults.append(QVariantMap{
+              {QStringLiteral("toolId"), followingTool},
+              {QStringLiteral("count"), 0},
+              {QStringLiteral("partial"), false},
+              {QStringLiteral("scanStatus"), QStringLiteral("error")},
+              {QStringLiteral("errorKey"), errorKey},
+              {QStringLiteral("reasonKeys"), QStringList{}}});
+        }
+        return QVariantMap{{QStringLiteral("toolResults"), toolResults}};
       };
       const QString root = toolRoot(tool);
       const QFileInfo rootInfo(root);
       if (!rootInfo.exists()) {
+        if (tool == QLatin1String("codex"))
+          nextCodexContextCache.clear();
         const QString statusConnection =
             QStringLiteral("local_sessions_status_%1")
                 .arg(QRandomGenerator::global()->generate());
@@ -368,11 +591,14 @@ void LocalSessionModel::requestImport() {
         if (statusDb.isOpen()) {
           recordToolCoverage(statusDb, tool, true);
         }
-        markPartial();
+        markPartial(QStringLiteral("source-unavailable"));
+        finishTool();
         continue;
       }
       if (rootInfo.isSymLink() || !rootInfo.isDir()) {
-        markPartial();
+        if (tool == QLatin1String("codex"))
+          nextCodexContextCache.clear();
+        markPartial(QStringLiteral("source-unavailable"));
         const QString statusConnection =
             QStringLiteral("local_sessions_status_%1")
                 .arg(QRandomGenerator::global()->generate());
@@ -381,6 +607,7 @@ void LocalSessionModel::requestImport() {
         if (statusDb.isOpen()) {
           recordToolCoverage(statusDb, tool, true);
         }
+        finishTool();
         continue;
       }
       QDirIterator it(root, {QStringLiteral("*.jsonl")}, QDir::Files,
@@ -392,8 +619,6 @@ void LocalSessionModel::requestImport() {
           return result;
         candidates.append(it.next());
       }
-      if (it.hasNext())
-        markPartial();
       std::sort(candidates.begin(), candidates.end(),
                 [](const QString &left, const QString &right) {
                   const QFileInfo leftInfo(left), rightInfo(right);
@@ -401,28 +626,137 @@ void LocalSessionModel::requestImport() {
                     return leftInfo.lastModified() > rightInfo.lastModified();
                   return left < right;
                 });
-      if (candidates.size() > 5000) {
-        candidates = candidates.mid(0, 5000);
-        markPartial();
+
+      QHash<QString, QVariantMap> checkpoints;
+      {
+        const QString checkpointConnection =
+            QStringLiteral("local_sessions_file_index_%1")
+                .arg(QRandomGenerator::global()->generate());
+        SessionConnection connectionOwner(checkpointConnection, false);
+        auto &checkpointDb = connectionOwner.db;
+        QSqlQuery query(checkpointDb);
+        query.prepare(QStringLiteral(
+            "SELECT file_id,file_offset,file_size,modified_at_utc "
+            "FROM local_file_checkpoints WHERE tool_id=?"));
+        query.addBindValue(tool);
+        if (!checkpointDb.isOpen() || !query.exec()) {
+          result.insert(QStringLiteral("errorKey"),
+                        QStringLiteral("session-database-unavailable"));
+          return failTool();
+        }
+        while (query.next()) {
+          checkpoints.insert(
+              query.value(0).toString(),
+              {{QStringLiteral("offset"), query.value(1)},
+               {QStringLiteral("size"), query.value(2)},
+               {QStringLiteral("modifiedAtUtc"), query.value(3)}});
+        }
       }
+
+      QStringList newCandidates;
+      QStringList changedCandidates;
+      QHash<QString, QString> candidateIds;
+      for (const QString &path : candidates) {
+        const QString fileId = QString::fromLatin1(
+            LocalSessionParser::identity(key, "file", QFile::encodeName(path)));
+        candidateIds.insert(path, fileId);
+        const QFileInfo info(path);
+        const QVariantMap checkpoint = checkpoints.value(fileId);
+        const QString modifiedUtc =
+            info.lastModified().toUTC().toString(Qt::ISODateWithMs);
+        if (checkpoint.isEmpty()) {
+          newCandidates.append(path);
+        } else if (info.size() !=
+                       checkpoint.value(QStringLiteral("size")).toLongLong() ||
+                   modifiedUtc !=
+                       checkpoint.value(QStringLiteral("modifiedAtUtc"))
+                           .toString() ||
+                   checkpoint.value(QStringLiteral("offset")).toLongLong() !=
+                       info.size()) {
+          changedCandidates.append(path);
+        }
+      }
+      if (tool == QLatin1String("codex") && !it.hasNext()) {
+        QSet<QString> discoveredIds;
+        for (auto entry = candidateIds.cbegin(); entry != candidateIds.cend();
+             ++entry)
+          discoveredIds.insert(entry.value());
+        nextCodexContextCache.erase(
+            std::remove_if(
+                nextCodexContextCache.begin(), nextCodexContextCache.end(),
+                [&](const QVariant &entry) {
+                  return !discoveredIds.contains(
+                      entry.toMap().value(QStringLiteral("fileId")).toString());
+                }),
+            nextCodexContextCache.end());
+      }
+      const auto rotateAfterCursor = [&](QStringList &pending,
+                                         const QString &previousCursor) {
+        if (previousCursor.isEmpty())
+          return;
+        const auto cursor = std::find_if(
+            pending.begin(), pending.end(), [&](const QString &path) {
+              return candidateIds.value(path) == previousCursor;
+            });
+        if (cursor != pending.end())
+          std::rotate(pending.begin(), std::next(cursor), pending.end());
+      };
+      // Candidates rejected before checkpointing remain pending on every scan.
+      // Each queue needs its own cursor: the last item in a weighted batch can
+      // belong to only one queue, while the other must also make progress.
+      rotateAfterCursor(newCandidates, readScanCursor(tool));
+      rotateAfterCursor(changedCandidates, readScanCursor(tool, true));
+      QSet<QString> newCandidateIds;
+      for (const QString &path : newCandidates)
+        newCandidateIds.insert(candidateIds.value(path));
+      candidates.clear();
+      qsizetype newIndex = 0;
+      qsizetype changedIndex = 0;
+      while (newIndex < newCandidates.size() ||
+             changedIndex < changedCandidates.size()) {
+        for (int prioritySlot = 0;
+             prioritySlot < 4 && newIndex < newCandidates.size();
+             ++prioritySlot)
+          candidates.append(newCandidates.at(newIndex++));
+        if (changedIndex < changedCandidates.size())
+          candidates.append(changedCandidates.at(changedIndex++));
+      }
+      if (it.hasNext())
+        markPartial(QStringLiteral("discovery-limit"));
+
       qsizetype fileCount = 0;
       qint64 bytesRead = 0;
+      QString lastProcessedNewFileId;
+      QString lastProcessedChangedFileId;
+      const auto recordProcessedCandidate = [&](const QString &fileId) {
+        if (newCandidateIds.contains(fileId))
+          lastProcessedNewFileId = fileId;
+        else
+          lastProcessedChangedFileId = fileId;
+      };
       const QDateTime retentionBoundary =
           QDateTime::currentDateTimeUtc().addDays(-qMin(30, retention));
-      for (const QString &path : candidates) {
+      for (qsizetype candidateIndex = 0; candidateIndex < candidates.size();
+           ++candidateIndex) {
+        const QString &path = candidates.at(candidateIndex);
         if (generationState->load(std::memory_order_acquire) != generation)
           return result;
-        if (++fileCount > 5000 || bytesRead > 256ll * 1024 * 1024) {
-          markPartial();
+        if (fileCount >= 5000 || bytesRead >= 256ll * 1024 * 1024) {
+          markPartial(QStringLiteral("scan-budget"));
           break;
         }
+        ++fileCount;
         QFileInfo info(path);
         if (info.isSymLink() || !info.isFile() ||
             info.size() > 100ll * 1024 * 1024) {
-          markPartial();
+          markPartial(info.size() > 100ll * 1024 * 1024
+                          ? QStringLiteral("file-size-limit")
+                          : QStringLiteral("source-unavailable"));
+          recordProcessedCandidate(candidateIds.value(path));
           continue;
         }
         const QByteArray nativePath = QFile::encodeName(path);
+        const QString fileId = candidateIds.value(path);
         const int sourceFd =
             ::open(nativePath.constData(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
         struct stat sourceStat{};
@@ -430,14 +764,16 @@ void LocalSessionModel::requestImport() {
             !S_ISREG(sourceStat.st_mode)) {
           if (sourceFd >= 0)
             ::close(sourceFd);
-          markPartial();
+          markPartial(QStringLiteral("source-unavailable"));
+          recordProcessedCandidate(fileId);
           continue;
         }
         QFile file;
         if (!file.open(sourceFd, QIODevice::ReadOnly,
                        QFileDevice::AutoCloseHandle)) {
           ::close(sourceFd);
-          markPartial();
+          markPartial(QStringLiteral("source-unavailable"));
+          recordProcessedCandidate(fileId);
           continue;
         }
         const QString conn =
@@ -449,10 +785,8 @@ void LocalSessionModel::requestImport() {
         if (!db.isOpen()) {
           result.insert(QStringLiteral("errorKey"),
                         QStringLiteral("session-database-unavailable"));
-          return result;
+          return failTool();
         }
-        const QString fileId = QString::fromLatin1(
-            LocalSessionParser::identity(key, "file", nativePath));
         const qint64 currentSize = sourceStat.st_size;
         const QString modifiedUtc =
             info.lastModified().toUTC().toString(Qt::ISODateWithMs);
@@ -471,12 +805,24 @@ void LocalSessionModel::requestImport() {
         }
         if (currentSize == previousSize && modifiedUtc == previousModified &&
             startOffset == currentSize) {
+          recordProcessedCandidate(fileId);
           continue;
         }
         if (currentSize < previousSize ||
             (previousSize >= 0 && currentSize <= previousSize &&
              modifiedUtc != previousModified)) {
           startOffset = 0;
+          if (tool == QLatin1String("codex")) {
+            nextCodexContextCache.erase(
+                std::remove_if(nextCodexContextCache.begin(),
+                               nextCodexContextCache.end(),
+                               [&](const QVariant &entry) {
+                                 return entry.toMap()
+                                            .value(QStringLiteral("fileId"))
+                                            .toString() == fileId;
+                               }),
+                nextCodexContextCache.end());
+          }
           markPartial();
         }
         if (startOffset > currentSize)
@@ -488,24 +834,103 @@ void LocalSessionModel::requestImport() {
         }
         qint64 safeOffset = startOffset;
         QVariantMap codexContext;
+        QCryptographicHash codexPrefixHash(QCryptographicHash::Sha256);
+        qint64 hashedOffset = 0;
+        bool codexPrefixCacheable = true;
         if (tool == QLatin1String("codex") && startOffset > 0) {
-          file.seek(0);
-          while (file.pos() < startOffset && !file.atEnd()) {
-            const auto record = LocalSessionParser::readJsonlRecord(
-                file,
-                qMin(startOffset - file.pos(), 256ll * 1024 * 1024 - bytesRead),
-                [&]() {
-                  return generationState->load(std::memory_order_acquire) !=
-                         generation;
-                });
-            bytesRead += record.bytesRead;
-            if (record.discarded)
-              markPartial();
-            if (!record.discarded && record.complete)
-              LocalSessionParser::updateCodexContext(record.line,
-                                                     &codexContext);
-            if (record.interrupted)
+          QVariantMap cache;
+          for (const QVariant &entry : nextCodexContextCache) {
+            const QVariantMap candidate = entry.toMap();
+            if (candidate.value(QStringLiteral("fileId")).toString() ==
+                fileId) {
+              cache = candidate;
               break;
+            }
+          }
+          const bool matchingCacheIdentity =
+              cache.value(QStringLiteral("fileId")).toString() == fileId &&
+              cache.value(QStringLiteral("prefixOffset")).toLongLong() ==
+                  startOffset &&
+              cache.value(QStringLiteral("fileSize")).toLongLong() ==
+                  previousSize &&
+              cache.value(QStringLiteral("modifiedAtUtc")).toString() ==
+                  previousModified &&
+              cache.value(QStringLiteral("device")).toULongLong() ==
+                  sourceStat.st_dev &&
+              cache.value(QStringLiteral("inode")).toULongLong() ==
+                  sourceStat.st_ino &&
+              !cache.value(QStringLiteral("prefixHash"))
+                   .toByteArray()
+                   .isEmpty() &&
+              !cache.value(QStringLiteral("context")).toMap().isEmpty();
+          bool validCachedPrefix = matchingCacheIdentity &&
+                                   startOffset <= currentSize && file.seek(0);
+          qint64 prefixBytesRemaining = startOffset;
+          while (validCachedPrefix && prefixBytesRemaining > 0) {
+            const qint64 budgetRemaining = 256ll * 1024 * 1024 - bytesRead;
+            if (budgetRemaining <= 0) {
+              markPartial(QStringLiteral("scan-budget"));
+              validCachedPrefix = false;
+              break;
+            }
+            const QByteArray chunk = file.read(qMin<qint64>(
+                64 * 1024, qMin(prefixBytesRemaining, budgetRemaining)));
+            if (chunk.isEmpty()) {
+              markPartial(QStringLiteral("source-unavailable"));
+              validCachedPrefix = false;
+              break;
+            }
+            codexPrefixHash.addData(chunk);
+            bytesRead += chunk.size();
+            prefixBytesRemaining -= chunk.size();
+          }
+          if (prefixBytesRemaining != 0 ||
+              (validCachedPrefix &&
+               codexPrefixHash.result().toHex() !=
+                   cache.value(QStringLiteral("prefixHash")).toByteArray()))
+            validCachedPrefix = false;
+          if (matchingCacheIdentity && prefixBytesRemaining != 0) {
+            markPartial();
+            break;
+          }
+          if (validCachedPrefix && file.seek(startOffset)) {
+            codexContext = cache.value(QStringLiteral("context")).toMap();
+            hashedOffset = startOffset;
+          } else {
+            codexPrefixHash.reset();
+            nextCodexContextCache.erase(
+                std::remove_if(nextCodexContextCache.begin(),
+                               nextCodexContextCache.end(),
+                               [&](const QVariant &entry) {
+                                 return entry.toMap()
+                                            .value(QStringLiteral("fileId"))
+                                            .toString() == fileId;
+                               }),
+                nextCodexContextCache.end());
+            file.seek(0);
+            while (file.pos() < startOffset && !file.atEnd()) {
+              const auto record = LocalSessionParser::readJsonlRecord(
+                  file,
+                  qMin(startOffset - file.pos(),
+                       256ll * 1024 * 1024 - bytesRead),
+                  [&]() {
+                    return generationState->load(std::memory_order_acquire) !=
+                           generation;
+                  });
+              bytesRead += record.bytesRead;
+              if (record.discarded) {
+                markPartial();
+                codexPrefixCacheable = false;
+              }
+              if (!record.discarded && record.complete) {
+                LocalSessionParser::updateCodexContext(record.line,
+                                                       &codexContext);
+                codexPrefixHash.addData(record.line);
+                hashedOffset += record.line.size();
+              }
+              if (record.interrupted)
+                break;
+            }
           }
           if (file.pos() < startOffset) {
             markPartial();
@@ -514,6 +939,9 @@ void LocalSessionModel::requestImport() {
           if (codexContext.isEmpty()) {
             startOffset = 0;
             safeOffset = 0;
+            codexPrefixHash.reset();
+            hashedOffset = 0;
+            codexPrefixCacheable = true;
             file.seek(0);
             markPartial();
           }
@@ -526,7 +954,7 @@ void LocalSessionModel::requestImport() {
         if (!db.transaction()) {
           result.insert(QStringLiteral("errorKey"),
                         QStringLiteral("session-database-unavailable"));
-          return result;
+          return failTool();
         }
         bool writesOk = true;
         int fileImportedCount = 0;
@@ -562,11 +990,18 @@ void LocalSessionModel::requestImport() {
           bytesRead += record.bytesRead;
           if (record.discarded) {
             markPartial();
+            if (tool == QLatin1String("codex"))
+              codexPrefixCacheable = false;
             // Mid-record cursors are safe only when the entire suffix will
             // also be discarded by readJsonlRecord on the next scan.
             safeOffset = file.pos();
           } else if (record.complete) {
             safeOffset = file.pos();
+          }
+          if (tool == QLatin1String("codex") && record.complete &&
+              !record.discarded) {
+            codexPrefixHash.addData(record.line);
+            hashedOffset += record.line.size();
           }
           if (record.interrupted) {
             markPartial();
@@ -913,20 +1348,58 @@ void LocalSessionModel::requestImport() {
           result.insert(QStringLiteral("count"),
                         result.value(QStringLiteral("count")).toInt() +
                             fileImportedCount);
+          if (tool == QLatin1String("codex") && !codexContext.isEmpty() &&
+              codexPrefixCacheable && hashedOffset == safeOffset) {
+            nextCodexContextCache.erase(
+                std::remove_if(nextCodexContextCache.begin(),
+                               nextCodexContextCache.end(),
+                               [&](const QVariant &entry) {
+                                 return entry.toMap()
+                                            .value(QStringLiteral("fileId"))
+                                            .toString() == fileId;
+                               }),
+                nextCodexContextCache.end());
+            nextCodexContextCache.prepend(QVariantMap{
+                {QStringLiteral("fileId"), fileId},
+                {QStringLiteral("prefixOffset"), safeOffset},
+                {QStringLiteral("fileSize"), currentSize},
+                {QStringLiteral("modifiedAtUtc"), modifiedUtc},
+                {QStringLiteral("device"), qulonglong(sourceStat.st_dev)},
+                {QStringLiteral("inode"), qulonglong(sourceStat.st_ino)},
+                {QStringLiteral("prefixHash"),
+                 codexPrefixHash.result().toHex()},
+                {QStringLiteral("context"), codexContext}});
+            constexpr qsizetype maxCachedContexts = 16;
+            while (nextCodexContextCache.size() > maxCachedContexts)
+              nextCodexContextCache.removeLast();
+          }
         }
+        recordProcessedCandidate(fileId);
       }
+      if (!lastProcessedNewFileId.isEmpty() &&
+          !writeScanCursor(tool, lastProcessedNewFileId))
+        markPartial(QStringLiteral("checkpoint-write"));
+      if (!lastProcessedChangedFileId.isEmpty() &&
+          !writeScanCursor(tool, lastProcessedChangedFileId, true))
+        markPartial(QStringLiteral("checkpoint-write"));
       const QString statusConnection =
           QStringLiteral("local_sessions_status_%1")
               .arg(QRandomGenerator::global()->generate());
       SessionConnection connectionOwner(statusConnection, false);
       auto &statusDb = connectionOwner.db;
       if (statusDb.isOpen()) {
-        recordToolCoverage(statusDb, tool, toolPartial);
+        if (!recordToolCoverage(statusDb, tool, toolPartial))
+          markPartial(QStringLiteral("checkpoint-write"));
         // Keep the clear policy across empty scans and restarts: another old
         // session may resume later. Creation metadata exempts proven new
         // sessions.
+      } else {
+        markPartial(QStringLiteral("checkpoint-write"));
       }
+      finishTool();
     }
+    result.clear();
+    result.insert(QStringLiteral("toolResults"), toolResults);
     return result;
   }));
 }
@@ -1217,7 +1690,7 @@ void LocalSessionModel::requestDaily(
     const QDate last = toUtc.addMSecs(-1).toTimeZone(zone).date();
     if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter) ||
         !zone.isValid() || !first.isValid() || !last.isValid() ||
-        first.daysTo(last) > 30) {
+        first.daysTo(last) > 3650) {
       result.error = QStringLiteral("session-invalid-query");
       return result;
     }
@@ -1511,16 +1984,33 @@ void LocalSessionModel::clearSessions() { clearSessions(QString()); }
 void LocalSessionModel::clearSessions(const QString &requestId) {
   ++m_generation;
   m_generationState->store(m_generation, std::memory_order_release);
+  m_codexAppendContexts.clear();
   const QString lockPath =
       dataDirectory() + QStringLiteral("/session-import.lock");
   auto *w = new QFutureWatcher<QVariantMap>(this);
-  connect(w, &QFutureWatcher<QVariantMap>::finished, this,
-          [this, w, requestId]() {
-            const auto r = w->result();
-            emit clearFinished(requestId, r.value("ok").toBool(),
-                               r.value("errorKey").toString());
-            w->deleteLater();
-          });
+  connect(
+      w, &QFutureWatcher<QVariantMap>::finished, this, [this, w, requestId]() {
+        const auto r = w->result();
+        if (r.value("ok").toBool()) {
+          m_codexAppendContexts.clear();
+          for (const auto &entry :
+               {qMakePair(QStringLiteral("codex-cli"), m_codexEnabled),
+                qMakePair(QStringLiteral("claude-code"), m_claudeEnabled)}) {
+            QVariantMap state = m_importStates.value(entry.first).toMap();
+            state.insert(QStringLiteral("state"),
+                         entry.second ? QStringLiteral("unknown")
+                                      : QStringLiteral("disabled"));
+            state.insert(QStringLiteral("importedEventCount"), 0);
+            state.insert(QStringLiteral("reasonKeys"), QStringList{});
+            state.insert(QStringLiteral("errorKey"), QString());
+            m_importStates.insert(entry.first, state);
+          }
+          emit importStatesChanged();
+        }
+        emit clearFinished(requestId, r.value("ok").toBool(),
+                           r.value("errorKey").toString());
+        w->deleteLater();
+      });
   w->setFuture(QtConcurrent::run([lockPath]() {
     QVariantMap result;
     QLockFile lock(lockPath);
@@ -1564,8 +2054,13 @@ void LocalSessionModel::clearSessions(const QString &requestId) {
     if (!ok) {
       db.rollback();
       result.insert("errorKey", QStringLiteral("session-clear-failed"));
-    } else
+    } else {
+      QFile::remove(scanCursorPath(QStringLiteral("codex")));
+      QFile::remove(scanCursorPath(QStringLiteral("claude-code")));
+      QFile::remove(scanCursorPath(QStringLiteral("codex"), true));
+      QFile::remove(scanCursorPath(QStringLiteral("claude-code"), true));
       result.insert("ok", true);
+    }
     return result;
   }));
 }
