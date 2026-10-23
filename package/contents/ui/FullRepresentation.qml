@@ -268,7 +268,9 @@ Item {
                         fullRoot.returnFocusSourceId = "";
                         Qt.callLater(function() {
                             // qmllint disable missing-property
-                            destinationLoader.item.restoreSourceFocus(sourceId);
+                            if (destinationLoader.item && typeof destinationLoader.item.restoreSourceFocus === "function") {
+                                destinationLoader.item.restoreSourceFocus(sourceId);
+                            }
                             // qmllint enable missing-property
                         });
                     }
