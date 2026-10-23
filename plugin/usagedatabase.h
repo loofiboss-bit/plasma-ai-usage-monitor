@@ -1,15 +1,15 @@
 #ifndef USAGEDATABASE_H
 #define USAGEDATABASE_H
 
-#include <QObject>
-#include <QString>
 #include <QDateTime>
+#include <QHash>
+#include <QObject>
+#include <QSqlDatabase>
+#include <QString>
 #include <QVariantList>
 #include <QVariantMap>
-#include <QSqlDatabase>
-#include <QHash>
-#include <atomic>
 #include <QtQmlIntegration/qqmlintegration.h>
+#include <atomic>
 
 /**
  * SQLite database for persisting AI usage history.
@@ -17,346 +17,336 @@
  * Stores periodic snapshots of provider usage data and rate limit events.
  * Supports configurable retention and querying by time range for charts.
  */
-class UsageDatabase : public QObject
-{
-    Q_OBJECT
-    QML_ELEMENT
+class UsageDatabase : public QObject {
+  Q_OBJECT
+  QML_ELEMENT
 
-    Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
-    Q_PROPERTY(int retentionDays READ retentionDays WRITE setRetentionDays NOTIFY retentionDaysChanged)
-    Q_PROPERTY(int pendingWorkerCount READ pendingWorkerCount NOTIFY pendingWorkerCountChanged)
-    Q_PROPERTY(bool initialized READ initialized NOTIFY databaseStateChanged)
-    Q_PROPERTY(QString errorKey READ errorKey NOTIFY databaseStateChanged)
+  Q_PROPERTY(bool enabled READ isEnabled WRITE setEnabled NOTIFY enabledChanged)
+  Q_PROPERTY(int retentionDays READ retentionDays WRITE setRetentionDays NOTIFY
+                 retentionDaysChanged)
+  Q_PROPERTY(int pendingWorkerCount READ pendingWorkerCount NOTIFY
+                 pendingWorkerCountChanged)
+  Q_PROPERTY(bool initialized READ initialized NOTIFY databaseStateChanged)
+  Q_PROPERTY(QString errorKey READ errorKey NOTIFY databaseStateChanged)
 
 public:
-    explicit UsageDatabase(QObject *parent = nullptr);
-    ~UsageDatabase() override;
+  explicit UsageDatabase(QObject *parent = nullptr);
+  ~UsageDatabase() override;
 
-    bool isEnabled() const;
-    void setEnabled(bool enabled);
-    int retentionDays() const;
-    void setRetentionDays(int days);
-    int pendingWorkerCount() const;
-    int databaseConnectionCount() const;
-    bool initialized() const { return m_initialized; }
-    QString errorKey() const { return m_errorKey; }
+  bool isEnabled() const;
+  void setEnabled(bool enabled);
+  int retentionDays() const;
+  void setRetentionDays(int days);
+  int pendingWorkerCount() const;
+  int databaseConnectionCount() const;
+  bool initialized() const { return m_initialized; }
+  QString errorKey() const { return m_errorKey; }
 
-    /**
-     * Record a usage snapshot for a provider.
-     * Called automatically after each successful refresh.
-     */
-    Q_INVOKABLE void recordSnapshot(const QString &provider,
-                                    qint64 inputTokens,
-                                    qint64 outputTokens,
-                                    int requestCount,
-                                    double cost,
-                                    double dailyCost,
-                                    double monthlyCost,
-                                    int rateLimitRequests,
-                                    int rateLimitRequestsRemaining,
-                                    int rateLimitTokens,
-                                    int rateLimitTokensRemaining,
-                                    const QString &model = QString(),
-                                    bool isEstimatedCost = false,
-                                    const QString &costSource = QStringLiteral("unknown"),
-                                    const QString &usageSource = QStringLiteral("unknown"),
-                                    const QString &currency = QStringLiteral("USD"),
-                                    const QString &dataQuality = QStringLiteral("unknown"),
-                                    const QVariantMap &provenance = {});
+  /**
+   * Record a usage snapshot for a provider.
+   * Called automatically after each successful refresh.
+   */
+  Q_INVOKABLE void
+  recordSnapshot(const QString &provider, qint64 inputTokens,
+                 qint64 outputTokens, int requestCount, double cost,
+                 double dailyCost, double monthlyCost, int rateLimitRequests,
+                 int rateLimitRequestsRemaining, int rateLimitTokens,
+                 int rateLimitTokensRemaining, const QString &model = QString(),
+                 bool isEstimatedCost = false,
+                 const QString &costSource = QStringLiteral("unknown"),
+                 const QString &usageSource = QStringLiteral("unknown"),
+                 const QString &currency = QStringLiteral("USD"),
+                 const QString &dataQuality = QStringLiteral("unknown"),
+                 const QVariantMap &provenance = {});
 
-    /**
-     * Record a usage snapshot for a subscription tool.
-     * Tracks usage count against limits for tools like Claude Code, Codex,
-     * Copilot.
-     */
-    Q_INVOKABLE void recordToolSnapshot(const QString &toolName,
-                                        int usageCount,
-                                        int usageLimit,
-                                        const QString &periodType,
-                                        const QString &planTier,
-                                        bool limitReached);
+  /**
+   * Record a usage snapshot for a subscription tool.
+   * Tracks usage count against limits for tools like Claude Code, Codex,
+   * Copilot.
+   */
+  Q_INVOKABLE void recordToolSnapshot(const QString &toolName, int usageCount,
+                                      int usageLimit, const QString &periodType,
+                                      const QString &planTier,
+                                      bool limitReached);
 
-    /**
-     * Record a rate limit event (hitting or approaching limits).
-     */
-    Q_INVOKABLE void
-    recordRateLimitEvent(const QString &provider, const QString &eventType, int percentUsed);
-    Q_INVOKABLE bool recordProviderMetrics(const QString &provider, const QVariantList &metrics);
+  /**
+   * Record a rate limit event (hitting or approaching limits).
+   */
+  Q_INVOKABLE void recordRateLimitEvent(const QString &provider,
+                                        const QString &eventType,
+                                        int percentUsed);
+  Q_INVOKABLE bool recordProviderMetrics(const QString &provider,
+                                         const QVariantList &metrics);
 
-    /**
-     * Persist one guardrail state transition. Forecast calculations remain
-     * ephemeral; only warning, critical, and recovered transitions are stored.
-     *
-     * Returns true only when a new transition was inserted. Repeated current
-     * state after refresh or restart returns false.
-     */
-    Q_INVOKABLE bool recordGuardrailTransition(const QVariantMap &forecast, const QString &transition);
-    Q_INVOKABLE QVariantMap lastGuardrailTransition(const QString &stableId) const;
+  /**
+   * Persist one guardrail state transition. Forecast calculations remain
+   * ephemeral; only warning, critical, and recovered transitions are stored.
+   *
+   * Returns true only when a new transition was inserted. Repeated current
+   * state after refresh or restart returns false.
+   */
+  Q_INVOKABLE bool recordGuardrailTransition(const QVariantMap &forecast,
+                                             const QString &transition);
+  Q_INVOKABLE QVariantMap
+  lastGuardrailTransition(const QString &stableId) const;
 
-    /**
-     * Query aggregated cost or token usage per day for the last 365 days.
-     * Mode 0 = Daily Cost, Mode 1 = Tokens (Input + Output).
-     * Returns a map with:
-     * - maxIntensity: highest value across all days
-     * - days: list of { "date": "YYYY-MM-DD", "value": ... }
-     */
-    Q_INVOKABLE QVariantMap getYearlyActivity(int mode) const;
+  /**
+   * Query aggregated cost or token usage per day for the last 365 days.
+   * Mode 0 = Daily Cost, Mode 1 = Tokens (Input + Output).
+   * Returns a map with:
+   * - maxIntensity: highest value across all days
+   * - days: list of { "date": "YYYY-MM-DD", "value": ... }
+   */
+  Q_INVOKABLE QVariantMap getYearlyActivity(int mode) const;
 
-    /**
-     * Query the neutral output_tokens / input_tokens ratio per day for the
-     * last N days across compatible snapshots with positive total input.
-     * Returns a list of maps with: { "date": "YYYY-MM-DD", "value": ... }
-     */
-    Q_INVOKABLE QVariantList getEfficiencySeries(int days) const;
+  /**
+   * Query the neutral output_tokens / input_tokens ratio per day for the
+   * last N days across compatible snapshots with positive total input.
+   * Returns a list of maps with: { "date": "YYYY-MM-DD", "value": ... }
+   */
+  Q_INVOKABLE QVariantList getEfficiencySeries(int days) const;
 
-    /**
-     * Query analyst-friendly summary metrics across all providers for the last N
-     * days. Returns keys including:
-     * - averageDailyCost, currentDailyCost, weekOverWeekPercent,
-     * volatilityPercent
-     * - anomalyCount, anomalies, topDrivers, topModels
-     */
-    Q_INVOKABLE QVariantMap getAnalystOverview(int days = 30) const;
+  /**
+   * Query analyst-friendly summary metrics across all providers for the last N
+   * days. Returns keys including:
+   * - averageDailyCost, currentDailyCost, weekOverWeekPercent,
+   * volatilityPercent
+   * - anomalyCount, anomalies, topDrivers, topModels
+   */
+  Q_INVOKABLE QVariantMap getAnalystOverview(int days = 30) const;
 
-    /**
-     * Build one evidence-bound Analyst snapshot for an exact UTC range.
-     *
-     * This synchronous helper is intended for worker instances and contract
-     * tests. QML must use requestAnalyst() so database work never blocks the UI
-     * thread.
-     */
-    Q_INVOKABLE QVariantMap getAnalystSnapshot(const QDateTime &fromInclusive,
-                                               const QDateTime &toExclusive,
-                                               const QString &currency = QString()) const;
-    Q_INVOKABLE void requestAnalyst(const QString &requestId,
-                                    const QDateTime &fromInclusive,
-                                    const QDateTime &toExclusive,
-                                    const QString &currency = QString());
+  /**
+   * Build one evidence-bound Analyst snapshot for an exact UTC range.
+   *
+   * This synchronous helper is intended for worker instances and contract
+   * tests. QML must use requestAnalyst() so database work never blocks the UI
+   * thread.
+   */
+  Q_INVOKABLE QVariantMap getAnalystSnapshot(
+      const QDateTime &fromInclusive, const QDateTime &toExclusive,
+      const QString &currency = QString()) const;
+  Q_INVOKABLE void requestAnalyst(const QString &requestId,
+                                  const QDateTime &fromInclusive,
+                                  const QDateTime &toExclusive,
+                                  const QString &currency = QString());
 
-    /**
-     * Query usage snapshots for a provider within a time range.
-     * Returns a list of QVariantMap with keys: timestamp, inputTokens,
-     * outputTokens, requestCount, cost, dailyCost, monthlyCost, rlRequests,
-     * rlRequestsRemaining, rlTokens, rlTokensRemaining, costSource, usageSource,
-     * currency, dataQuality.
-     */
-    Q_INVOKABLE QVariantList getSnapshots(const QString &provider,
-                                          const QDateTime &from,
-                                          const QDateTime &to) const;
+  /**
+   * Query usage snapshots for a provider within a time range.
+   * Returns a list of QVariantMap with keys: timestamp, inputTokens,
+   * outputTokens, requestCount, cost, dailyCost, monthlyCost, rlRequests,
+   * rlRequestsRemaining, rlTokens, rlTokensRemaining, costSource, usageSource,
+   * currency, dataQuality.
+   */
+  Q_INVOKABLE QVariantList getSnapshots(const QString &provider,
+                                        const QDateTime &from,
+                                        const QDateTime &to) const;
 
-    /**
-     * Query cost data aggregated by day for a provider.
-     * Returns a list of QVariantMap with keys: date, totalCost, maxDailyCost.
-     */
-    Q_INVOKABLE QVariantList getDailyCosts(const QString &provider,
-                                           const QDateTime &from,
-                                           const QDateTime &to) const;
+  /**
+   * Query cost data aggregated by day for a provider.
+   * Returns a list of QVariantMap with keys: date, totalCost, maxDailyCost.
+   */
+  Q_INVOKABLE QVariantList getDailyCosts(const QString &provider,
+                                         const QDateTime &from,
+                                         const QDateTime &to) const;
 
-    /**
-     * Get summary statistics for a provider over a time range.
-     * Returns a QVariantMap with keys: totalCost, avgDailyCost, maxDailyCost,
-     * totalRequests, peakTokenUsage, snapshotCount.
-     */
-    Q_INVOKABLE QVariantMap getSummary(const QString &provider,
-                                       const QDateTime &from,
-                                       const QDateTime &to) const;
+  /**
+   * Get summary statistics for a provider over a time range.
+   * Returns a QVariantMap with keys: totalCost, avgDailyCost, maxDailyCost,
+   * totalRequests, peakTokenUsage, snapshotCount.
+   */
+  Q_INVOKABLE QVariantMap getSummary(const QString &provider,
+                                     const QDateTime &from,
+                                     const QDateTime &to) const;
 
-    Q_INVOKABLE void requestHistory(const QString &requestId,
-                                    const QString &provider,
-                                    const QDateTime &from,
-                                    const QDateTime &to);
-    Q_INVOKABLE void requestComparison(const QString &requestId,
-                                       const QStringList &names,
-                                       const QDateTime &from,
-                                       const QDateTime &to,
-                                       const QString &source,
-                                       const QString &metric,
-                                       int bucketMinutes = 60);
+  Q_INVOKABLE void requestHistory(const QString &requestId,
+                                  const QString &provider,
+                                  const QDateTime &from, const QDateTime &to);
+  Q_INVOKABLE void requestComparison(const QString &requestId,
+                                     const QStringList &names,
+                                     const QDateTime &from, const QDateTime &to,
+                                     const QString &source,
+                                     const QString &metric,
+                                     int bucketMinutes = 60);
 
-    /**
-     * Discover retained provider and subscription-tool history without
-     * consulting the currently enabled runtime sources.
-     *
-     * Each source contains its stable database identity, source kind,
-     * observation bounds, sample count, and only the metric kinds that have
-     * compatible stored values.
-     */
-    Q_INVOKABLE QVariantList getHistoryCatalog() const;
-    Q_INVOKABLE void requestHistoryCatalog(const QString &requestId);
+  /**
+   * Discover retained provider and subscription-tool history without
+   * consulting the currently enabled runtime sources.
+   *
+   * Each source contains its stable database identity, source kind,
+   * observation bounds, sample count, and only the metric kinds that have
+   * compatible stored values.
+   */
+  Q_INVOKABLE QVariantList getHistoryCatalog() const;
+  Q_INVOKABLE void requestHistoryCatalog(const QString &requestId);
 
-    /**
-     * Query one or more retained sources through the schema-v4 history
-     * contract. Source maps require sourceKind ("provider" or "tool") and
-     * dbName. Optional displayName, historyOnly, and stale fields are copied
-     * into result metadata.
-     *
-     * The result contains ok/error metadata and bounded, gap-preserving
-     * series. Comparisons fail closed when units, semantics, or currencies
-     * are incompatible.
-     */
-    Q_INVOKABLE QVariantMap getHistorySeries(const QVariantList &sources,
-                                             const QDateTime &from,
-                                             const QDateTime &to,
-                                             const QString &metric,
-                                             int bucketMinutes = 60) const;
-    Q_INVOKABLE QString exportSelectedSeries(const QVariantList &series,
-                                               const QString &format,
-                                               const QString &metric,
-                                               const QDateTime &from,
-                                               const QDateTime &to,
-                                               int bucketMinutes) const;
-    Q_INVOKABLE void requestHistorySeries(const QString &requestId,
-                                          const QVariantList &sources,
-                                          const QDateTime &from,
-                                          const QDateTime &to,
-                                          const QString &metric,
-                                          int bucketMinutes = 60);
-
-    /**
-     * Get all providers that have recorded data.
-     */
-    Q_INVOKABLE QStringList getProviders() const;
-
-    /**
-     * Query subscription tool usage snapshots within a time range.
-     * Returns a list of QVariantMap with keys: timestamp, usageCount,
-     * usageLimit, periodType, planTier, limitReached, percentUsed.
-     */
-    Q_INVOKABLE QVariantList getToolSnapshots(const QString &toolName,
-                                              const QDateTime &from,
-                                              const QDateTime &to) const;
-
-    /**
-     * Query aggregated time series for one or more providers.
-     * Returns items with keys: name, points, latestValue, deltaPercent,
-     * sampleCount. Each points entry has: timestamp, value.
-     *
-     * Supported metrics: cost, tokens, requests, rateLimitUsed
-     */
-    Q_INVOKABLE QVariantList getProviderSeries(const QStringList &providers,
-                                               const QDateTime &from,
-                                               const QDateTime &to,
-                                               const QString &metric,
-                                               int bucketMinutes = 60) const;
-
-    /**
-     * Query aggregated time series for one or more subscription tools.
-     * Returns items with keys: name, points, latestValue, deltaPercent,
-     * sampleCount. Each points entry has: timestamp, value.
-     *
-     * Supported metrics: percentUsed, usageCount, remaining
-     */
-    Q_INVOKABLE QVariantList getToolSeries(const QStringList &tools,
+  /**
+   * Query one or more retained sources through the schema-v4 history
+   * contract. Source maps require sourceKind ("provider" or "tool") and
+   * dbName. Optional displayName, historyOnly, and stale fields are copied
+   * into result metadata.
+   *
+   * The result contains ok/error metadata and bounded, gap-preserving
+   * series. Comparisons fail closed when units, semantics, or currencies
+   * are incompatible.
+   */
+  Q_INVOKABLE QVariantMap getHistorySeries(const QVariantList &sources,
                                            const QDateTime &from,
                                            const QDateTime &to,
                                            const QString &metric,
                                            int bucketMinutes = 60) const;
+  Q_INVOKABLE QString exportSelectedSeries(
+      const QVariantList &series, const QString &format, const QString &metric,
+      const QDateTime &from, const QDateTime &to, int bucketMinutes) const;
+  Q_INVOKABLE void
+  requestHistorySeries(const QString &requestId, const QVariantList &sources,
+                       const QDateTime &from, const QDateTime &to,
+                       const QString &metric, int bucketMinutes = 60);
 
-    /**
-     * Get all subscription tool names that have recorded data.
-     */
-    Q_INVOKABLE QStringList getToolNames() const;
+  /**
+   * Get all providers that have recorded data.
+   */
+  Q_INVOKABLE QStringList getProviders() const;
 
-    /**
-     * Export data as CSV for a provider within a time range.
-     */
-    Q_INVOKABLE QString exportCsv(const QString &provider,
-                                  const QDateTime &from,
-                                  const QDateTime &to) const;
+  /**
+   * Query subscription tool usage snapshots within a time range.
+   * Returns a list of QVariantMap with keys: timestamp, usageCount,
+   * usageLimit, periodType, planTier, limitReached, percentUsed.
+   */
+  Q_INVOKABLE QVariantList getToolSnapshots(const QString &toolName,
+                                            const QDateTime &from,
+                                            const QDateTime &to) const;
 
-    /**
-     * Export data as JSON for a provider within a time range.
-     */
-    Q_INVOKABLE QString exportJson(const QString &provider,
-                                   const QDateTime &from,
-                                   const QDateTime &to) const;
+  /**
+   * Query aggregated time series for one or more providers.
+   * Returns items with keys: name, points, latestValue, deltaPercent,
+   * sampleCount. Each points entry has: timestamp, value.
+   *
+   * Supported metrics: cost, tokens, requests, rateLimitUsed
+   */
+  Q_INVOKABLE QVariantList getProviderSeries(const QStringList &providers,
+                                             const QDateTime &from,
+                                             const QDateTime &to,
+                                             const QString &metric,
+                                             int bucketMinutes = 60) const;
 
-    /**
-     * Export all stored provider and subscription-tool history to timestamped
-     * files in the target directory. Supported formats: "json", "csv".
-     * Returns absolute paths written successfully.
-     */
-    Q_INVOKABLE QVariantMap exportAllToDirectory(const QString &dirPath,
-                                                 const QStringList &formats) const;
-    Q_INVOKABLE void
-    requestExportAll(const QString &requestId, const QString &dirPath, const QStringList &formats);
+  /**
+   * Query aggregated time series for one or more subscription tools.
+   * Returns items with keys: name, points, latestValue, deltaPercent,
+   * sampleCount. Each points entry has: timestamp, value.
+   *
+   * Supported metrics: percentUsed, usageCount, remaining
+   */
+  Q_INVOKABLE QVariantList getToolSeries(const QStringList &tools,
+                                         const QDateTime &from,
+                                         const QDateTime &to,
+                                         const QString &metric,
+                                         int bucketMinutes = 60) const;
 
-    /**
-     * Remove data older than retentionDays.
-     */
-    Q_INVOKABLE void pruneOldData();
-    Q_INVOKABLE void requestStorageStatus(const QString &requestId);
-    Q_INVOKABLE void requestPrune(const QString &requestId);
-    QVariantMap storageStatus() const;
-    QVariantMap pruneResult();
+  /**
+   * Get all subscription tool names that have recorded data.
+   */
+  Q_INVOKABLE QStringList getToolNames() const;
 
-    /**
-     * Eagerly initialize the database.
-     * Call early (e.g., Component.onCompleted) to avoid blocking on first write.
-     */
-    Q_INVOKABLE bool init();
+  /**
+   * Export data as CSV for a provider within a time range.
+   */
+  Q_INVOKABLE QString exportCsv(const QString &provider, const QDateTime &from,
+                                const QDateTime &to) const;
 
-    /**
-     * Get the total database size in bytes.
-     */
-    Q_INVOKABLE qint64 databaseSize() const;
+  /**
+   * Export data as JSON for a provider within a time range.
+   */
+  Q_INVOKABLE QString exportJson(const QString &provider, const QDateTime &from,
+                                 const QDateTime &to) const;
+
+  /**
+   * Export all stored provider and subscription-tool history to timestamped
+   * files in the target directory. Supported formats: "json", "csv".
+   * Returns absolute paths written successfully.
+   */
+  Q_INVOKABLE QVariantMap exportAllToDirectory(
+      const QString &dirPath, const QStringList &formats) const;
+  Q_INVOKABLE void requestExportAll(const QString &requestId,
+                                    const QString &dirPath,
+                                    const QStringList &formats);
+
+  /**
+   * Remove data older than retentionDays.
+   */
+  Q_INVOKABLE void pruneOldData();
+  Q_INVOKABLE void requestStorageStatus(const QString &requestId);
+  Q_INVOKABLE void requestPrune(const QString &requestId);
+  QVariantMap storageStatus() const;
+  QVariantMap pruneResult();
+
+  /**
+   * Eagerly initialize the database.
+   * Call early (e.g., Component.onCompleted) to avoid blocking on first write.
+   */
+  Q_INVOKABLE bool init();
+
+  /**
+   * Get the total database size in bytes.
+   */
+  Q_INVOKABLE qint64 databaseSize() const;
 
 Q_SIGNALS:
-    void enabledChanged();
-    void retentionDaysChanged();
-    void pendingWorkerCountChanged();
-    void observationsChanged();
-    void historyReady(const QString &requestId, const QVariantMap &payload);
-    void comparisonReady(const QString &requestId, const QVariantList &series);
-    void historyCatalogReady(const QString &requestId, const QVariantList &sources);
-    void historySeriesReady(const QString &requestId, const QVariantMap &payload);
-    void analystReady(const QString &requestId, const QVariantMap &snapshot);
-    void exportFinished(const QString &requestId, const QVariantMap &result);
-    void maintenanceFinished(const QString &requestId, const QVariantMap &result);
-    void databaseStateChanged();
+  void enabledChanged();
+  void retentionDaysChanged();
+  void pendingWorkerCountChanged();
+  void observationsChanged();
+  void historyReady(const QString &requestId, const QVariantMap &payload);
+  void comparisonReady(const QString &requestId, const QVariantList &series);
+  void historyCatalogReady(const QString &requestId,
+                           const QVariantList &sources);
+  void historySeriesReady(const QString &requestId, const QVariantMap &payload);
+  void analystReady(const QString &requestId, const QVariantMap &snapshot);
+  void exportFinished(const QString &requestId, const QVariantMap &result);
+  void maintenanceFinished(const QString &requestId, const QVariantMap &result);
+  void databaseStateChanged();
 
 private:
-    void initDatabase();
-    void beginWorker();
-    void finishWorker();
-    bool createTables();
-    void requestMaintenance(const QString &requestId, bool prune);
-    void saveOperation(const QString &kind, const QVariantMap &result) const;
-    bool migrateToObservationSchemaV3();
-    bool migrateToObservationSchemaV4();
-    bool migrateToSchemaV5();
-    bool migrateToSchemaV6();
-    bool migrateToSchemaV7();
-    bool recordObservations(const QString &provider,
-                            const QString &model,
-                            qint64 inputTokens,
-                            qint64 outputTokens,
-                            int requestCount,
-                            double cost,
-                            const QString &currency,
-                            const QString &costSource,
-                            const QString &usageSource,
-                            const QString &dataQuality,
-                            const QVariantMap &provenance);
-    void ensureColumnExists(const QString &table, const QString &column, const QString &definition);
+  friend class UsageDatabaseExtendedTest;
 
-    QSqlDatabase m_db;
-    QString m_connectionName;
-    bool m_enabled = true;
-    int m_retentionDays = 90;
-    bool m_initialized = false;
-    QString m_errorKey;
-    QString m_latestHistoryCatalogRequestId;
-    QString m_latestHistorySeriesRequestId;
-    QString m_latestAnalystRequestId;
-    int m_pendingWorkerCount = 0;
+  void initDatabase();
+  void beginWorker();
+  void finishWorker();
+  bool createTables();
+  void requestMaintenance(const QString &requestId, bool prune);
+  void saveOperation(const QString &kind, const QVariantMap &result) const;
+  bool migrateToObservationSchemaV3();
+  bool migrateToObservationSchemaV4();
+  bool migrateToSchemaV5();
+  bool migrateToSchemaV6();
+  bool migrateToSchemaV7();
+  bool recordObservations(const QString &provider, const QString &model,
+                          qint64 inputTokens, qint64 outputTokens,
+                          int requestCount, double cost,
+                          const QString &currency, const QString &costSource,
+                          const QString &usageSource,
+                          const QString &dataQuality,
+                          const QVariantMap &provenance);
+  void ensureColumnExists(const QString &table, const QString &column,
+                          const QString &definition);
 
-    static std::atomic<int> s_instanceCounter;
+  QSqlDatabase m_db;
+  QString m_connectionName;
+  bool m_enabled = true;
+  int m_retentionDays = 90;
+  bool m_initialized = false;
+  QString m_errorKey;
+  QString m_latestHistoryCatalogRequestId;
+  QString m_latestHistorySeriesRequestId;
+  QString m_latestAnalystRequestId;
+  int m_pendingWorkerCount = 0;
 
-    // Write throttling: minimum 60 seconds between writes per provider
-    static constexpr int WRITE_THROTTLE_SECS = 60;
-    QHash<QString, qint64> m_lastWriteTime;        // provider -> epoch seconds
-    QHash<QString, QByteArray> m_lastWrittenState; // complete normalized provider state
+  static std::atomic<int> s_instanceCounter;
+
+  // Write throttling: minimum 60 seconds between writes per provider
+  static constexpr int WRITE_THROTTLE_SECS = 60;
+  QHash<QString, qint64> m_lastWriteTime; // provider -> epoch seconds
+  QHash<QString, QByteArray>
+      m_lastWrittenState; // complete normalized provider state
 };
 
 #endif // USAGEDATABASE_H
