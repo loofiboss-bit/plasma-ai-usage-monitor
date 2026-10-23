@@ -14,6 +14,7 @@
 #include <QMap>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
 #include <QSqlError>
@@ -923,6 +924,17 @@ void UsageDatabase::ensureColumnExists(const QString &table,
                                        const QString &column,
                                        const QString &definition)
 {
+    static const QRegularExpression identifierPattern(QStringLiteral("^[a-zA-Z0-9_]+$"));
+    static const QRegularExpression definitionPattern(QStringLiteral("^[a-zA-Z0-9_ ']+$"));
+
+    if (!identifierPattern.match(table).hasMatch()
+        || !identifierPattern.match(column).hasMatch()
+        || !definitionPattern.match(definition).hasMatch()) {
+        qWarning() << "UsageDatabase: Invalid identifier or column definition in ensureColumnExists:"
+                   << table << column << definition;
+        return;
+    }
+
     QSqlQuery pragma(m_db);
     if (!pragma.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table))) {
         qWarning() << "UsageDatabase: Failed to inspect table schema for" << table
@@ -1812,35 +1824,37 @@ QVariantList UsageDatabase::getHistoryCatalog() const
     }
 
     const QStringList tools = getToolNames();
-    for (const QString &tool : tools) {
+    if (!tools.isEmpty()) {
         QSqlQuery query(m_db);
         query.prepare(
             QStringLiteral("SELECT MIN(timestamp), MAX(timestamp), COUNT(*), "
                            "SUM(CASE WHEN usage_limit > 0 THEN 1 ELSE 0 END) "
                            "FROM subscription_tool_usage WHERE tool_name = ?"));
-        query.addBindValue(tool);
-        if (!query.exec() || !query.next()) {
-            continue;
-        }
+        for (const QString &tool : tools) {
+            query.bindValue(0, tool);
+            if (!query.exec() || !query.next()) {
+                continue;
+            }
 
-        QStringList metrics{QStringLiteral("usageCount")};
-        if (query.value(3).toInt() > 0) {
-            metrics.append(QStringLiteral("percentUsed"));
-            metrics.append(QStringLiteral("remaining"));
-        }
+            QStringList metrics{QStringLiteral("usageCount")};
+            if (query.value(3).toInt() > 0) {
+                metrics.append(QStringLiteral("percentUsed"));
+                metrics.append(QStringLiteral("remaining"));
+            }
 
-        QVariantMap row;
-        row.insert(QStringLiteral("historyId"), QStringLiteral("tool:") + tool);
-        row.insert(QStringLiteral("dbName"), tool);
-        row.insert(QStringLiteral("displayName"), tool);
-        row.insert(QStringLiteral("sourceKind"), QStringLiteral("tool"));
-        row.insert(QStringLiteral("metricKinds"), metrics);
-        row.insert(QStringLiteral("sampleCount"), query.value(2).toInt());
-        row.insert(QStringLiteral("firstObservation"),
-                   parseSnapshotTimestamp(query.value(0).toString()));
-        row.insert(QStringLiteral("lastObservation"),
-                   parseSnapshotTimestamp(query.value(1).toString()));
-        catalog.append(row);
+            QVariantMap row;
+            row.insert(QStringLiteral("historyId"), QStringLiteral("tool:") + tool);
+            row.insert(QStringLiteral("dbName"), tool);
+            row.insert(QStringLiteral("displayName"), tool);
+            row.insert(QStringLiteral("sourceKind"), QStringLiteral("tool"));
+            row.insert(QStringLiteral("metricKinds"), metrics);
+            row.insert(QStringLiteral("sampleCount"), query.value(2).toInt());
+            row.insert(QStringLiteral("firstObservation"),
+                       parseSnapshotTimestamp(query.value(0).toString()));
+            row.insert(QStringLiteral("lastObservation"),
+                       parseSnapshotTimestamp(query.value(1).toString()));
+            catalog.append(row);
+        }
     }
 
     return catalog;
@@ -2352,22 +2366,25 @@ QVariantList UsageDatabase::getProviderSeries(const QStringList &providers,
     }
 
     const int bucketSecs = effectiveBucketSeconds(fromUtc, toUtc, bucketMinutes);
+    const QString fromStr = toDbDateTimeString(fromUtc);
+    const QString toStr = toDbDateTimeString(toUtc);
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT timestamp, cost, input_tokens, output_tokens, request_count, "
+        "rl_requests, rl_requests_remaining, currency "
+        "FROM usage_snapshots "
+        "WHERE provider = ? AND timestamp >= ? AND timestamp <= ? "
+        "ORDER BY timestamp ASC"));
 
     for (const QString &provider : providers) {
         if (provider.isEmpty()) {
             continue;
         }
 
-        QSqlQuery query(m_db);
-        query.prepare(QStringLiteral(
-            "SELECT timestamp, cost, input_tokens, output_tokens, request_count, "
-            "rl_requests, rl_requests_remaining, currency "
-            "FROM usage_snapshots "
-            "WHERE provider = ? AND timestamp >= ? AND timestamp <= ? "
-            "ORDER BY timestamp ASC"));
-        query.addBindValue(provider);
-        query.addBindValue(toDbDateTimeString(fromUtc));
-        query.addBindValue(toDbDateTimeString(toUtc));
+        query.bindValue(0, provider);
+        query.bindValue(1, fromStr);
+        query.bindValue(2, toStr);
 
         if (!query.exec()) {
             qWarning() << "UsageDatabase: getProviderSeries query failed for"
@@ -2465,21 +2482,24 @@ QVariantList UsageDatabase::getToolSeries(const QStringList &tools,
     }
 
     const int bucketSecs = effectiveBucketSeconds(fromUtc, toUtc, bucketMinutes);
+    const QString fromStr = toDbDateTimeString(fromUtc);
+    const QString toStr = toDbDateTimeString(toUtc);
+
+    QSqlQuery query(m_db);
+    query.prepare(QStringLiteral(
+        "SELECT timestamp, usage_count, usage_limit "
+        "FROM subscription_tool_usage "
+        "WHERE tool_name = ? AND timestamp >= ? AND timestamp <= ? "
+        "ORDER BY timestamp ASC"));
 
     for (const QString &tool : tools) {
         if (tool.isEmpty()) {
             continue;
         }
 
-        QSqlQuery query(m_db);
-        query.prepare(QStringLiteral(
-            "SELECT timestamp, usage_count, usage_limit "
-            "FROM subscription_tool_usage "
-            "WHERE tool_name = ? AND timestamp >= ? AND timestamp <= ? "
-            "ORDER BY timestamp ASC"));
-        query.addBindValue(tool);
-        query.addBindValue(toDbDateTimeString(fromUtc));
-        query.addBindValue(toDbDateTimeString(toUtc));
+        query.bindValue(0, tool);
+        query.bindValue(1, fromStr);
+        query.bindValue(2, toStr);
 
         if (!query.exec()) {
             qWarning() << "UsageDatabase: getToolSeries query failed for" << tool
@@ -3121,19 +3141,19 @@ QVariantMap UsageDatabase::pruneResult()
     if (!m_initialized) return operationResult(QStringLiteral("failed"), m_errorKey);
     if (!m_db.transaction()) return operationResult(QStringLiteral("failed"), QStringLiteral("maintenance-busy"));
     const QString cutoff = toDbDateTimeString(QDateTime::currentDateTimeUtc().addDays(-m_retentionDays));
-    const QList<QPair<QString, QString>> tables{
-        {QStringLiteral("usage_snapshots"), QStringLiteral("timestamp")},
-        {QStringLiteral("rate_limit_events"), QStringLiteral("timestamp")},
-        {QStringLiteral("subscription_tool_usage"), QStringLiteral("timestamp")},
-        {QStringLiteral("observations"), QStringLiteral("observed_at_utc")},
-        {QStringLiteral("guardrail_events"), QStringLiteral("observed_at_utc")},
-        {QStringLiteral("estimate_provenance"), QStringLiteral("observed_at_utc")},
-        {QStringLiteral("budget_policy_events"), QStringLiteral("created_at_utc")}
+    const QList<QString> queries{
+        QStringLiteral("DELETE FROM usage_snapshots WHERE datetime(timestamp) < datetime(?)"),
+        QStringLiteral("DELETE FROM rate_limit_events WHERE datetime(timestamp) < datetime(?)"),
+        QStringLiteral("DELETE FROM subscription_tool_usage WHERE datetime(timestamp) < datetime(?)"),
+        QStringLiteral("DELETE FROM observations WHERE datetime(observed_at_utc) < datetime(?)"),
+        QStringLiteral("DELETE FROM guardrail_events WHERE datetime(observed_at_utc) < datetime(?)"),
+        QStringLiteral("DELETE FROM estimate_provenance WHERE datetime(observed_at_utc) < datetime(?)"),
+        QStringLiteral("DELETE FROM budget_policy_events WHERE datetime(created_at_utc) < datetime(?)")
     };
     qint64 deleted = 0;
-    for (const auto &table : tables) {
+    for (const auto &queryStr : queries) {
         QSqlQuery query(m_db);
-        query.prepare(QStringLiteral("DELETE FROM %1 WHERE datetime(%2) < datetime(?)").arg(table.first, table.second));
+        query.prepare(queryStr);
         query.addBindValue(cutoff);
         if (!query.exec()) {
             m_db.rollback();

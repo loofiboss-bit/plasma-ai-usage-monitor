@@ -1703,6 +1703,16 @@ void LocalSessionModel::requestDaily(
     result.error = QStringLiteral("session-query-failed");
     if (!connection.snapshotStarted)
       return result;
+    QSqlQuery query(db);
+    if (!query.prepare(
+            QStringLiteral(
+                "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),"
+                "SUM(e.input_tokens),SUM(e.output_tokens),SUM(e.cache_"
+                "read_tokens),SUM(e.cache_write_tokens) "
+                "FROM local_sessions s JOIN local_usage_events e ON "
+                "e.session_id=s.session_id WHERE ") +
+            eventWhere()))
+      return result;
     for (QDate date = first; date <= last; date = date.addDays(1)) {
       const auto lower =
           qMax(fromUtc.toUTC(), QDateTime(date, QTime(0, 0), zone).toUTC());
@@ -1710,15 +1720,14 @@ void LocalSessionModel::requestDaily(
           toUtc.toUTC(), QDateTime(date.addDays(1), QTime(0, 0), zone).toUTC());
       if (upper <= lower)
         continue;
-      QSqlQuery query(db);
-      query.prepare(QStringLiteral(
-                        "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),"
-                        "SUM(e.input_tokens),SUM(e.output_tokens),SUM(e.cache_"
-                        "read_tokens),SUM(e.cache_write_tokens) "
-                        "FROM local_sessions s JOIN local_usage_events e ON "
-                        "e.session_id=s.session_id WHERE ") +
-                    eventWhere());
-      bindEventFilter(query, storedTool, lower, upper, projectId, modelFilter);
+      query.bindValue(0, storedTool);
+      query.bindValue(1, lower.toString(Qt::ISODateWithMs));
+      query.bindValue(2, upper.toString(Qt::ISODateWithMs));
+      query.bindValue(3, projectId.isEmpty() ? QStringLiteral("") : projectId);
+      query.bindValue(4, projectId.isEmpty() ? QStringLiteral("") : projectId);
+      query.bindValue(5, modelFilter.contains("modelId") ? 1 : 0);
+      query.bindValue(
+          6, modelFilter.value("modelId", QStringLiteral("")).toString());
       if (!query.exec() || !query.next())
         return result;
       QVariantMap row{{"localDate", date.toString(Qt::ISODate)}};
@@ -1728,6 +1737,7 @@ void LocalSessionModel::requestDaily(
       for (int i = 0; i < keys.size(); ++i)
         row.insert(keys[i], query.value(i));
       result.rows.append(row);
+      query.finish();
     }
     result.error.clear();
     return result;

@@ -154,6 +154,7 @@ class UsageDatabaseExtendedTest : public QObject
     Q_OBJECT
 
 private Q_SLOTS:
+    void testEnsureColumnExistsSecurity();
     void testRetentionDaysClamping();
     void testGetProviders();
     void testGetToolNames();
@@ -248,6 +249,40 @@ void UsageDatabaseExtendedTest::testRealLegacyFixtureMigration()
         check.close();
     }
     QSqlDatabase::removeDatabase(secondConnection);
+}
+
+void UsageDatabaseExtendedTest::testEnsureColumnExistsSecurity()
+{
+    QTemporaryDir tmp;
+    QVERIFY(tmp.isValid());
+    qputenv("XDG_DATA_HOME", tmp.path().toUtf8());
+
+    UsageDatabase db;
+    db.init();
+
+    const QStringList columnsBefore = snapshotColumns();
+    QVERIFY(columnsBefore.contains(QStringLiteral("cost_source")));
+
+    // Test valid column addition
+    db.ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("valid_test_col"), QStringLiteral("TEXT DEFAULT 'hello'"));
+    const QStringList columnsAfterValid = snapshotColumns();
+    QVERIFY(columnsAfterValid.contains(QStringLiteral("valid_test_col")));
+
+    // Test SQL injection attempts in table name
+    db.ensureColumnExists(QStringLiteral("usage_snapshots; DROP TABLE usage_snapshots; --"), QStringLiteral("injected_col1"), QStringLiteral("TEXT"));
+
+    // Test SQL injection attempts in column name
+    db.ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("injected_col2; DROP TABLE usage_snapshots; --"), QStringLiteral("TEXT"));
+
+    // Test SQL injection attempts in definition
+    db.ensureColumnExists(QStringLiteral("usage_snapshots"), QStringLiteral("injected_col3"), QStringLiteral("TEXT; DROP TABLE usage_snapshots; --"));
+
+    // Confirm that the table was not dropped and invalid columns were not added
+    const QStringList columnsFinal = snapshotColumns();
+    QVERIFY(columnsFinal.contains(QStringLiteral("cost_source")));
+    QVERIFY(!columnsFinal.contains(QStringLiteral("injected_col1")));
+    QVERIFY(!columnsFinal.contains(QStringLiteral("injected_col2")));
+    QVERIFY(!columnsFinal.contains(QStringLiteral("injected_col3")));
 }
 
 void UsageDatabaseExtendedTest::testRetentionDaysClamping()
