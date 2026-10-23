@@ -1150,6 +1150,14 @@ void LocalSessionModel::requestDaily(const QString &requestId,
     auto db = openDb(connection);
     if (!db.isOpen())
       return rows;
+    QSqlQuery query(db);
+    query.prepare(QStringLiteral(
+        "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),SUM(e.input_"
+        "tokens),SUM(e.output_tokens),SUM(e.cache_read_tokens),SUM(e.cache_"
+        "write_tokens) FROM local_usage_events e JOIN local_sessions s ON "
+        "s.session_id=e.session_id WHERE s.tool_id=? AND "
+        "e.observed_at_utc>=? "
+        "AND e.observed_at_utc<? AND (?='' OR s.project_id=?)"));
     for (QDate date = first; date <= last; date = date.addDays(1)) {
       const QDateTime dayStart(date, QTime(0, 0), zone);
       const QDateTime dayEnd(date.addDays(1), QTime(0, 0), zone);
@@ -1157,19 +1165,11 @@ void LocalSessionModel::requestDaily(const QString &requestId,
       const QDateTime upper = qMin(toUtc.toUTC(), dayEnd.toUTC());
       if (upper <= lower)
         continue;
-      QSqlQuery query(db);
-      query.prepare(QStringLiteral(
-          "SELECT COUNT(DISTINCT s.session_id),COUNT(e.event_id),SUM(e.input_"
-          "tokens),SUM(e.output_tokens),SUM(e.cache_read_tokens),SUM(e.cache_"
-          "write_tokens) FROM local_usage_events e JOIN local_sessions s ON "
-          "s.session_id=e.session_id WHERE s.tool_id=? AND "
-          "e.observed_at_utc>=? "
-          "AND e.observed_at_utc<? AND (?='' OR s.project_id=?)"));
-      query.addBindValue(storedTool);
-      query.addBindValue(lower.toString(Qt::ISODateWithMs));
-      query.addBindValue(upper.toString(Qt::ISODateWithMs));
-      query.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
-      query.addBindValue(projectId.isEmpty() ? QStringLiteral("") : projectId);
+      query.bindValue(0, storedTool);
+      query.bindValue(1, lower.toString(Qt::ISODateWithMs));
+      query.bindValue(2, upper.toString(Qt::ISODateWithMs));
+      query.bindValue(3, projectId.isEmpty() ? QStringLiteral("") : projectId);
+      query.bindValue(4, projectId.isEmpty() ? QStringLiteral("") : projectId);
       if (query.exec() && query.next()) {
         QVariantMap row;
         row.insert("localDate", date.toString(Qt::ISODate));
