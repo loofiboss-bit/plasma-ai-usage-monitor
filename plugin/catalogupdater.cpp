@@ -44,6 +44,214 @@ bool versionAtLeast(const QString &required, const QString &current)
     return currentVersion >= requiredVersion;
 }
 
+bool parseAndVerifyEnvelopeSignature(const QByteArray &envelope,
+                                     QJsonObject &envelopeObject,
+                                     QJsonObject &payload,
+                                     QByteArray &canonicalPayload,
+                                     QString &actualSha,
+                                     QString *diagnostic)
+{
+    if (envelope.size() <= 0 || envelope.size() > 8 * 1024 * 1024) {
+        fail(diagnostic, QStringLiteral("signed catalog envelope exceeds the size limit"));
+        return false;
+    }
+
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(envelope, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        fail(diagnostic, QStringLiteral("signed catalog envelope is invalid JSON"));
+        return false;
+    }
+    envelopeObject = document.object();
+    payload = envelopeObject.value(QStringLiteral("payload")).toObject();
+    if (payload.isEmpty()) {
+        fail(diagnostic, QStringLiteral("signed catalog envelope has no payload"));
+        return false;
+    }
+    if (envelopeObject.value(QStringLiteral("keyId")).toString()
+            != QLatin1String("catalog-ed25519-v1")) {
+        fail(diagnostic, QStringLiteral("signed catalog key id is not trusted"));
+        return false;
+    }
+
+    canonicalPayload = QJsonDocument(payload).toJson(QJsonDocument::Compact);
+    const QByteArray signature = QByteArray::fromBase64(
+        envelopeObject.value(QStringLiteral("signature")).toString().toUtf8());
+    const QString expectedSha = envelopeObject.value(QStringLiteral("sha256")).toString().toLower();
+    actualSha = QString::fromLatin1(
+        QCryptographicHash::hash(canonicalPayload, QCryptographicHash::Sha256).toHex());
+    if (expectedSha.isEmpty() || expectedSha != actualSha
+        || !CatalogUpdateManager::verifyEd25519(canonicalPayload, signature)) {
+        fail(diagnostic, QStringLiteral("signed catalog signature or digest verification failed"));
+        return false;
+    }
+
+    return true;
+}
+
+bool validatePayloadPolicy(const QJsonObject &envelopeObject,
+                           const QJsonObject &payload,
+                           qint64 &sequence,
+                           QString *diagnostic)
+{
+    if (payload.value(QStringLiteral("schemaVersion")).toInt() != 7
+        || payload.value(QStringLiteral("runtimeScraping")).toBool(true) != false) {
+        fail(diagnostic, QStringLiteral("signed catalog schema or runtime policy is invalid"));
+        return false;
+    }
+    sequence = payload.value(QStringLiteral("sequence")).toVariant().toLongLong();
+    if (sequence < 1) {
+        fail(diagnostic, QStringLiteral("signed catalog sequence is invalid"));
+        return false;
+    }
+    if (envelopeObject.value(QStringLiteral("sequence")).toVariant().toLongLong() != sequence) {
+        fail(diagnostic, QStringLiteral("signed catalog envelope sequence does not match payload"));
+        return false;
+    }
+    if (payload.value(QStringLiteral("catalogVersion")).toString().trimmed().isEmpty()
+        || !payload.value(QStringLiteral("providers")).isArray()) {
+        fail(diagnostic, QStringLiteral("signed catalog required fields are invalid"));
+        return false;
+    }
+    if (!isFutureTimestamp(envelopeObject.value(QStringLiteral("expiresAt")).toString())
+        || !isFutureTimestamp(payload.value(QStringLiteral("hardExpiresAt")).toString())) {
+        fail(diagnostic, QStringLiteral("signed catalog expiry is missing or expired"));
+        return false;
+    }
+    QString appVersion = QString::fromLatin1(qgetenv("AIUSAGE_MONITOR_VERSION"));
+#ifdef AIUSAGE_MONITOR_VERSION
+    if (appVersion.isEmpty()) appVersion = QStringLiteral(AIUSAGE_MONITOR_VERSION);
+#endif
+    if (!versionAtLeast(envelopeObject.value(QStringLiteral("minAppVersion")).toString(), appVersion)) {
+        fail(diagnostic, QStringLiteral("signed catalog requires a newer application version"));
+        return false;
+    }
+
+    return true;
+}
+
+bool verifyCacheIntegrityAndSequence(const QString &target,
+                                     qint64 sequence,
+                                     qint64 &currentSequence,
+                                     QByteArray &previousCatalog,
+                                     QByteArray &previousMetadata,
+                                     bool &hadPreviousCatalog,
+                                     bool &hadPreviousMetadata,
+                                     QString *diagnostic)
+{
+    const QString metaPath = target + QStringLiteral(".meta.json");
+    hadPreviousCatalog = QFile::exists(target);
+    hadPreviousMetadata = QFile::exists(metaPath);
+    previousCatalog = [&]() {
+        QFile file(target);
+        return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+    }();
+    previousMetadata = [&]() {
+        QFile file(metaPath);
+        return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
+    }();
+    if (hadPreviousCatalog != hadPreviousMetadata) {
+        fail(diagnostic, QStringLiteral("cached catalog metadata is missing"));
+        return false;
+    }
+    QFile metaFile(metaPath);
+    currentSequence = 0;
+    if (hadPreviousMetadata && metaFile.open(QIODevice::ReadOnly)) {
+        const QByteArray metadataBytes = metaFile.readAll();
+        QJsonParseError metadataError;
+        const QJsonDocument meta = QJsonDocument::fromJson(metadataBytes, &metadataError);
+        if (metadataError.error != QJsonParseError::NoError || !meta.isObject()) {
+            fail(diagnostic, QStringLiteral("cached catalog metadata is invalid"));
+            return false;
+        }
+        currentSequence = meta.object().value(QStringLiteral("sequence")).toVariant().toLongLong();
+        const QString cachedSha = meta.object().value(QStringLiteral("sha256")).toString().toLower();
+        if (currentSequence < 1 || cachedSha.isEmpty()
+            || cachedSha != QString::fromLatin1(QCryptographicHash::hash(
+                previousCatalog, QCryptographicHash::Sha256).toHex())) {
+            fail(diagnostic, QStringLiteral("cached catalog integrity verification failed"));
+            return false;
+        }
+    } else if (hadPreviousMetadata) {
+        fail(diagnostic, QStringLiteral("cached catalog metadata is unreadable"));
+        return false;
+    }
+    if (sequence <= currentSequence) {
+        fail(diagnostic, QStringLiteral("signed catalog sequence is a rollback or duplicate"));
+        return false;
+    }
+
+    return true;
+}
+
+void restoreOrCleanPreviousCatalog(const QString &target,
+                                    const QString &metaPath,
+                                    bool hadPreviousCatalog,
+                                    bool hadPreviousMetadata,
+                                    const QByteArray &previousCatalog,
+                                    const QByteArray &previousMetadata)
+{
+    if (hadPreviousCatalog && hadPreviousMetadata) {
+        QSaveFile restoreCatalog(target);
+        if (restoreCatalog.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            restoreCatalog.write(previousCatalog);
+            restoreCatalog.commit();
+        }
+        QSaveFile restoreMetadata(metaPath);
+        if (restoreMetadata.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+            restoreMetadata.write(previousMetadata);
+            restoreMetadata.commit();
+        }
+    } else {
+        QFile::remove(target);
+        QFile::remove(metaPath);
+    }
+}
+
+bool writeAndActivateCatalog(const QString &target,
+                             qint64 sequence,
+                             const QByteArray &canonicalPayload,
+                             const QString &actualSha,
+                             bool hadPreviousCatalog,
+                             bool hadPreviousMetadata,
+                             const QByteArray &previousCatalog,
+                             const QByteArray &previousMetadata,
+                             QString *diagnostic)
+{
+    const QString metaPath = target + QStringLiteral(".meta.json");
+    QDir().mkpath(QFileInfo(target).absolutePath());
+    QSaveFile catalogFile(target);
+    if (!catalogFile.open(QIODevice::WriteOnly | QIODevice::Truncate)
+        || catalogFile.write(canonicalPayload) != canonicalPayload.size()
+        || !catalogFile.commit()) {
+        fail(diagnostic, QStringLiteral("signed catalog could not be activated atomically"));
+        return false;
+    }
+
+    QSaveFile metadataFile(metaPath);
+    if (!metadataFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        restoreOrCleanPreviousCatalog(target, metaPath, hadPreviousCatalog, hadPreviousMetadata,
+                                       previousCatalog, previousMetadata);
+        fail(diagnostic, QStringLiteral("signed catalog metadata could not be written"));
+        return false;
+    }
+    const QJsonObject metadata{
+        {QStringLiteral("sequence"), sequence},
+        {QStringLiteral("sha256"), actualSha},
+        {QStringLiteral("state"), QStringLiteral("remote_verified")},
+        {QStringLiteral("installedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
+    };
+    const QByteArray metadataBytes = QJsonDocument(metadata).toJson(QJsonDocument::Indented);
+    if (metadataFile.write(metadataBytes) != metadataBytes.size() || !metadataFile.commit()) {
+        restoreOrCleanPreviousCatalog(target, metaPath, hadPreviousCatalog, hadPreviousMetadata,
+                                       previousCatalog, previousMetadata);
+        fail(diagnostic, QStringLiteral("signed catalog metadata could not be activated atomically"));
+        return false;
+    }
+
+    return true;
+}
+
 } // namespace
 
 CatalogUpdateManager::CatalogUpdateManager(QString fileName, QObject *parent)
@@ -146,172 +354,38 @@ QString CatalogUpdateManager::cachePath() const
 
 bool CatalogUpdateManager::installSignedFeed(const QByteArray &envelope, QString *diagnostic)
 {
-    if (envelope.size() <= 0 || envelope.size() > 8 * 1024 * 1024) {
-        fail(diagnostic, QStringLiteral("signed catalog envelope exceeds the size limit"));
+    QJsonObject envelopeObject;
+    QJsonObject payload;
+    QByteArray canonicalPayload;
+    QString actualSha;
+    if (!parseAndVerifyEnvelopeSignature(envelope, envelopeObject, payload, canonicalPayload,
+                                           actualSha, diagnostic)) {
         return false;
     }
 
-    QJsonParseError parseError;
-    const QJsonDocument document = QJsonDocument::fromJson(envelope, &parseError);
-    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
-        fail(diagnostic, QStringLiteral("signed catalog envelope is invalid JSON"));
-        return false;
-    }
-    const QJsonObject envelopeObject = document.object();
-    const QJsonObject payload = envelopeObject.value(QStringLiteral("payload")).toObject();
-    if (payload.isEmpty()) {
-        fail(diagnostic, QStringLiteral("signed catalog envelope has no payload"));
-        return false;
-    }
-    if (envelopeObject.value(QStringLiteral("keyId")).toString()
-            != QLatin1String("catalog-ed25519-v1")) {
-        fail(diagnostic, QStringLiteral("signed catalog key id is not trusted"));
-        return false;
-    }
-
-    const QByteArray canonicalPayload = QJsonDocument(payload).toJson(QJsonDocument::Compact);
-    const QByteArray signature = QByteArray::fromBase64(
-        envelopeObject.value(QStringLiteral("signature")).toString().toUtf8());
-    const QString expectedSha = envelopeObject.value(QStringLiteral("sha256")).toString().toLower();
-    const QString actualSha = QString::fromLatin1(QCryptographicHash::hash(
-        canonicalPayload, QCryptographicHash::Sha256).toHex());
-    if (expectedSha.isEmpty() || expectedSha != actualSha
-        || !verifyEd25519(canonicalPayload, signature)) {
-        fail(diagnostic, QStringLiteral("signed catalog signature or digest verification failed"));
-        return false;
-    }
-
-    if (payload.value(QStringLiteral("schemaVersion")).toInt() != 7
-        || payload.value(QStringLiteral("runtimeScraping")).toBool(true) != false) {
-        fail(diagnostic, QStringLiteral("signed catalog schema or runtime policy is invalid"));
-        return false;
-    }
-    const qint64 sequence = payload.value(QStringLiteral("sequence")).toVariant().toLongLong();
-    if (sequence < 1) {
-        fail(diagnostic, QStringLiteral("signed catalog sequence is invalid"));
-        return false;
-    }
-    if (envelopeObject.value(QStringLiteral("sequence")).toVariant().toLongLong() != sequence) {
-        fail(diagnostic, QStringLiteral("signed catalog envelope sequence does not match payload"));
-        return false;
-    }
-    if (payload.value(QStringLiteral("catalogVersion")).toString().trimmed().isEmpty()
-        || !payload.value(QStringLiteral("providers")).isArray()) {
-        fail(diagnostic, QStringLiteral("signed catalog required fields are invalid"));
-        return false;
-    }
-    if (!isFutureTimestamp(envelopeObject.value(QStringLiteral("expiresAt")).toString())
-        || !isFutureTimestamp(payload.value(QStringLiteral("hardExpiresAt")).toString())) {
-        fail(diagnostic, QStringLiteral("signed catalog expiry is missing or expired"));
-        return false;
-    }
-    QString appVersion = QString::fromLatin1(qgetenv("AIUSAGE_MONITOR_VERSION"));
-#ifdef AIUSAGE_MONITOR_VERSION
-    if (appVersion.isEmpty()) appVersion = QStringLiteral(AIUSAGE_MONITOR_VERSION);
-#endif
-    if (!versionAtLeast(envelopeObject.value(QStringLiteral("minAppVersion")).toString(), appVersion)) {
-        fail(diagnostic, QStringLiteral("signed catalog requires a newer application version"));
+    qint64 sequence = 0;
+    if (!validatePayloadPolicy(envelopeObject, payload, sequence, diagnostic)) {
         return false;
     }
 
     const QString target = cachePath();
-    const QString metaPath = target + QStringLiteral(".meta.json");
-    const bool hadPreviousCatalog = QFile::exists(target);
-    const bool hadPreviousMetadata = QFile::exists(metaPath);
-    const QByteArray previousCatalog = [&]() {
-        QFile file(target);
-        return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
-    }();
-    const QByteArray previousMetadata = [&]() {
-        QFile file(metaPath);
-        return file.open(QIODevice::ReadOnly) ? file.readAll() : QByteArray();
-    }();
-    if (hadPreviousCatalog != hadPreviousMetadata) {
-        fail(diagnostic, QStringLiteral("cached catalog metadata is missing"));
-        return false;
-    }
-    QFile metaFile(metaPath);
     qint64 currentSequence = 0;
-    if (hadPreviousMetadata && metaFile.open(QIODevice::ReadOnly)) {
-        const QByteArray metadataBytes = metaFile.readAll();
-        QJsonParseError metadataError;
-        const QJsonDocument meta = QJsonDocument::fromJson(metadataBytes, &metadataError);
-        if (metadataError.error != QJsonParseError::NoError || !meta.isObject()) {
-            fail(diagnostic, QStringLiteral("cached catalog metadata is invalid"));
-            return false;
-        }
-        currentSequence = meta.object().value(QStringLiteral("sequence")).toVariant().toLongLong();
-        const QString cachedSha = meta.object().value(QStringLiteral("sha256")).toString().toLower();
-        if (currentSequence < 1 || cachedSha.isEmpty()
-            || cachedSha != QString::fromLatin1(QCryptographicHash::hash(
-                previousCatalog, QCryptographicHash::Sha256).toHex())) {
-            fail(diagnostic, QStringLiteral("cached catalog integrity verification failed"));
-            return false;
-        }
-    } else if (hadPreviousMetadata) {
-        fail(diagnostic, QStringLiteral("cached catalog metadata is unreadable"));
-        return false;
-    }
-    if (sequence <= currentSequence) {
-        fail(diagnostic, QStringLiteral("signed catalog sequence is a rollback or duplicate"));
+    QByteArray previousCatalog;
+    QByteArray previousMetadata;
+    bool hadPreviousCatalog = false;
+    bool hadPreviousMetadata = false;
+    if (!verifyCacheIntegrityAndSequence(target, sequence, currentSequence, previousCatalog,
+                                         previousMetadata, hadPreviousCatalog, hadPreviousMetadata,
+                                         diagnostic)) {
         return false;
     }
 
-    QDir().mkpath(QFileInfo(target).absolutePath());
-    QSaveFile catalogFile(target);
-    if (!catalogFile.open(QIODevice::WriteOnly | QIODevice::Truncate)
-        || catalogFile.write(canonicalPayload) != canonicalPayload.size()
-        || !catalogFile.commit()) {
-        fail(diagnostic, QStringLiteral("signed catalog could not be activated atomically"));
+    if (!writeAndActivateCatalog(target, sequence, canonicalPayload, actualSha,
+                                 hadPreviousCatalog, hadPreviousMetadata,
+                                 previousCatalog, previousMetadata, diagnostic)) {
         return false;
     }
 
-    QSaveFile metadataFile(metaPath);
-    if (!metadataFile.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-        if (hadPreviousCatalog && hadPreviousMetadata) {
-            QSaveFile restoreCatalog(target);
-            if (restoreCatalog.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-                restoreCatalog.write(previousCatalog);
-                restoreCatalog.commit();
-            }
-            QSaveFile restoreMetadata(metaPath);
-            if (restoreMetadata.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-                restoreMetadata.write(previousMetadata);
-                restoreMetadata.commit();
-            }
-        } else {
-            QFile::remove(target);
-            QFile::remove(metaPath);
-        }
-        fail(diagnostic, QStringLiteral("signed catalog metadata could not be written"));
-        return false;
-    }
-    const QJsonObject metadata{
-        {QStringLiteral("sequence"), sequence},
-        {QStringLiteral("sha256"), actualSha},
-        {QStringLiteral("state"), QStringLiteral("remote_verified")},
-        {QStringLiteral("installedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODateWithMs)},
-    };
-    const QByteArray metadataBytes = QJsonDocument(metadata).toJson(QJsonDocument::Indented);
-    if (metadataFile.write(metadataBytes) != metadataBytes.size() || !metadataFile.commit()) {
-        if (hadPreviousCatalog && hadPreviousMetadata) {
-            QSaveFile restoreCatalog(target);
-            if (restoreCatalog.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-                restoreCatalog.write(previousCatalog);
-                restoreCatalog.commit();
-            }
-            QSaveFile restoreMetadata(metaPath);
-            if (restoreMetadata.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
-                restoreMetadata.write(previousMetadata);
-                restoreMetadata.commit();
-            }
-        } else {
-            QFile::remove(target);
-            QFile::remove(metaPath);
-        }
-        fail(diagnostic, QStringLiteral("signed catalog metadata could not be activated atomically"));
-        return false;
-    }
     if (diagnostic) diagnostic->clear();
     m_status = QStringLiteral("remote-verified");
     m_diagnostic.clear();
