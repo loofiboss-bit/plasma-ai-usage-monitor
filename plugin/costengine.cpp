@@ -15,6 +15,21 @@ constexpr qint64 kTokenScale = 1'000'000LL;
 
 using WideInt = __int128_t;
 
+// Performance optimization: Fast zero-allocation ASCII digit validation
+// to avoid constructing and compiling QRegularExpression in parseScaled hot loops.
+bool isAllDigits(QStringView str)
+{
+    if (str.isEmpty()) {
+        return false;
+    }
+    for (const QChar ch : str) {
+        if (ch < QLatin1Char('0') || ch > QLatin1Char('9')) {
+            return false;
+        }
+    }
+    return true;
+}
+
 QString wideToString(WideInt value)
 {
     if (value == 0) {
@@ -81,13 +96,12 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
     }
 
     const QString integerPart = parts.first().isEmpty() ? QStringLiteral("0") : parts.first();
-    if (!integerPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!isAllDigits(integerPart)) {
         return 0;
     }
 
     QString fractionalPart = parts.size() == 2 ? parts.at(1) : QString();
-    if (!fractionalPart.isEmpty()
-        && !fractionalPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!fractionalPart.isEmpty() && !isAllDigits(fractionalPart)) {
         return 0;
     }
 
@@ -97,7 +111,12 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
         return 0;
     }
 
-    const int scaleDigits = QString::number(scale).size() - 1;
+    // Performance optimization: calculate scale digits with integer math to avoid
+    // converting scale to QString on every parseScaled call.
+    int scaleDigits = 0;
+    for (qint64 temp = scale; temp >= 10; temp /= 10) {
+        ++scaleDigits;
+    }
     if (fractionalPart.size() > scaleDigits + 1) {
         fractionalPart.truncate(scaleDigits + 1);
     }
