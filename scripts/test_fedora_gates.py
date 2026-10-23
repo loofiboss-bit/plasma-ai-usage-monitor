@@ -7,6 +7,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parent.parent
+CURRENT_VERSION = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
 
 
 class FedoraGateArguments(unittest.TestCase):
@@ -30,7 +31,7 @@ class FedoraGateArguments(unittest.TestCase):
             (fixture / "base.rpm").touch()
             (fixture / "candidate.rpm").touch()
             rpm = fixture / "rpm"
-            rpm.write_text('#!/bin/bash\nif [[ "$*" == *base.rpm* ]]; then echo 24.2.0-1.fc44; else echo 25.0.0-1.fc45; fi\n')
+            rpm.write_text(f'#!/bin/bash\nif [[ "$*" == *base.rpm* ]]; then echo 24.2.0-1.fc44; else echo {CURRENT_VERSION}-1.fc45; fi\n')
             rpm.chmod(0o755)
             podman = fixture / "podman"
             podman.write_text('#!/bin/bash\nprintf "%s\\n" "$@" >> "$GATE_CAPTURE"\n')
@@ -62,7 +63,7 @@ class FedoraGateArguments(unittest.TestCase):
             (fixture / "candidate.rpm").touch()
             (fixture / "os-release").write_text("ID=fedora\nVERSION_ID=45\n")
             rpm = fixture / "rpm"
-            rpm.write_text('#!/bin/bash\nif [[ "$*" == *base.rpm* ]]; then echo 24.2.0-1.fc44; else echo 25.0.0-1.fc45; fi\n')
+            rpm.write_text(f'#!/bin/bash\nif [[ "$*" == *base.rpm* ]]; then echo 24.2.0-1.fc44; else echo {CURRENT_VERSION}-1.fc45; fi\n')
             rpm.chmod(0o755)
             dnf = fixture / "dnf"
             # Stop at the first package command, before any fixture/user writes.
