@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QRandomGenerator>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -28,8 +29,13 @@ bool tableExists(QSqlDatabase &database, const QString &table) {
 
 bool columnExists(QSqlDatabase &database, const QString &table,
                   const QString &column) {
+  static const QRegularExpression rx(
+      QStringLiteral("^[a-zA-Z_][a-zA-Z0-9_]*$"));
+  if (!rx.match(table).hasMatch() || !rx.match(column).hasMatch()) {
+    return false;
+  }
   QSqlQuery query(database);
-  if (!query.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table))) {
+  if (!query.exec(QStringLiteral("PRAGMA table_info(\"%1\")").arg(table))) {
     return false;
   }
   while (query.next()) {
