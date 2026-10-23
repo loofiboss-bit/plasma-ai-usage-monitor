@@ -14,6 +14,7 @@
 #include <QMap>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QRegularExpression>
 #include <QSaveFile>
 #include <QSet>
 #include <QSqlError>
@@ -923,6 +924,17 @@ void UsageDatabase::ensureColumnExists(const QString &table,
                                        const QString &column,
                                        const QString &definition)
 {
+    static const QRegularExpression identifierPattern(QStringLiteral("^[a-zA-Z0-9_]+$"));
+    static const QRegularExpression definitionPattern(QStringLiteral("^[a-zA-Z0-9_ ']+$"));
+
+    if (!identifierPattern.match(table).hasMatch()
+        || !identifierPattern.match(column).hasMatch()
+        || !definitionPattern.match(definition).hasMatch()) {
+        qWarning() << "UsageDatabase: Invalid identifier or column definition in ensureColumnExists:"
+                   << table << column << definition;
+        return;
+    }
+
     QSqlQuery pragma(m_db);
     if (!pragma.exec(QStringLiteral("PRAGMA table_info(%1)").arg(table))) {
         qWarning() << "UsageDatabase: Failed to inspect table schema for" << table
