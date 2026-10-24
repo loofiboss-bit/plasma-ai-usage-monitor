@@ -1,7 +1,6 @@
 #include "costengine.h"
 
 #include <QDateTime>
-#include <QRegularExpression>
 #include <QStringList>
 #include <QtGlobal>
 
@@ -14,6 +13,20 @@ constexpr qint64 kRateScale = 1'000'000'000LL;
 constexpr qint64 kTokenScale = 1'000'000LL;
 
 using WideInt = __int128_t;
+
+// Fast check that a string consists purely of ASCII digits '0'-'9', avoiding regex engine and heap allocations
+bool isAsciiDigits(const QString &str)
+{
+    if (str.isEmpty()) {
+        return false;
+    }
+    for (const QChar c : str) {
+        if (c < QLatin1Char('0') || c > QLatin1Char('9')) {
+            return false;
+        }
+    }
+    return true;
+}
 
 QString wideToString(WideInt value)
 {
@@ -81,13 +94,12 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
     }
 
     const QString integerPart = parts.first().isEmpty() ? QStringLiteral("0") : parts.first();
-    if (!integerPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!isAsciiDigits(integerPart)) {
         return 0;
     }
 
     QString fractionalPart = parts.size() == 2 ? parts.at(1) : QString();
-    if (!fractionalPart.isEmpty()
-        && !fractionalPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!fractionalPart.isEmpty() && !isAsciiDigits(fractionalPart)) {
         return 0;
     }
 
