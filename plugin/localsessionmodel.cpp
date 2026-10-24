@@ -759,7 +759,7 @@ void LocalSessionModel::requestImport() {
         const QString fileId = candidateIds.value(path);
         const int sourceFd =
             ::open(nativePath.constData(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-        struct stat sourceStat{};
+        struct stat sourceStat {};
         if (sourceFd < 0 || ::fstat(sourceFd, &sourceStat) != 0 ||
             !S_ISREG(sourceStat.st_mode)) {
           if (sourceFd >= 0)
@@ -1944,10 +1944,8 @@ QVariantList LocalSessionModel::projectAliases() const {
 bool LocalSessionModel::setProjectAlias(const QString &projectId,
                                         const QString &alias) {
   const QString name = alias.trimmed();
-  if (projectId.size() != 64 ||
-      !QRegularExpression(QStringLiteral("^[0-9a-f]{64}$"))
-           .match(projectId)
-           .hasMatch() ||
+  static const QRegularExpression hex64(QStringLiteral("^[0-9a-f]{64}$"));
+  if (projectId.size() != 64 || !hex64.match(projectId).hasMatch() ||
       name.size() > 80 || alias.contains(QChar::Null))
     return false;
   const QString connection = QStringLiteral("local_sessions_alias_%1")

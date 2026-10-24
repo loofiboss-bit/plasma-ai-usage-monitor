@@ -19,8 +19,9 @@ qint64 number(const QJsonObject &o, const QString &key, bool *present) {
   return static_cast<qint64>(v.toDouble());
 }
 QString safeModel(QString model) {
-  if (model.size() > 96 || !model.contains(QRegularExpression(
-                               QStringLiteral("^[A-Za-z0-9_.:/-]+$"))))
+  static const QRegularExpression pattern(
+      QStringLiteral("^[A-Za-z0-9_.:/-]+$"));
+  if (model.size() > 96 || !pattern.match(model).hasMatch())
     return {};
   return model;
 }
