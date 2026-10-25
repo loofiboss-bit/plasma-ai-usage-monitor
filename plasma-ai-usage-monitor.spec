@@ -16,6 +16,7 @@ BuildRequires:  libplasma-devel
 BuildRequires:  kf6-kwallet-devel
 BuildRequires:  kf6-ki18n-devel
 BuildRequires:  kf6-knotifications-devel
+BuildRequires:  kf6-kconfig-devel
 BuildRequires:  kf6-kcoreaddons-devel
 BuildRequires:  kf6-kcmutils
 BuildRequires:  libappstream-glib
