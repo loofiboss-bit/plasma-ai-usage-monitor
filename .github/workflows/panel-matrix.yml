@@ -4,9 +4,14 @@ on:
   workflow_call:
 permissions:
   contents: read
+concurrency:
+  group: ${{ github.workflow }}-panel-matrix-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   panel-matrix:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     container: fedora:44
     strategy:
       fail-fast: false
@@ -16,7 +21,7 @@ jobs:
     steps:
       - run: dnf install -y git cmake ninja-build gcc-c++ dbus-daemon extra-cmake-modules qt6-qtbase-devel qt6-qtdeclarative-devel libplasma-devel plasma-workspace kf6-kcoreaddons-devel kf6-kpackage-devel kf6-kwallet-devel kf6-ki18n-devel kf6-knotifications-devel openssl-devel protobuf-compiler protobuf-devel python3-PyQt6 xorg-x11-server-Xvfb
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 0 }
+        with: { fetch-depth: 0, persist-credentials: false }
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
       - run: cmake --preset ci && cmake --build --preset ci
       - name: Install isolated capture dependencies
@@ -33,6 +38,7 @@ jobs:
       - name: Upload qualified panel matrix
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
+          retention-days: 14
           name: panel-matrix-${{ github.sha }}-${{ matrix.scale }}-${{ matrix.theme }}
           path: build/panel-matrix/
           if-no-files-found: error
@@ -40,6 +46,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
+          retention-days: 14
           name: panel-matrix-failure-${{ github.sha }}-${{ matrix.scale }}-${{ matrix.theme }}
           path: build/panel-matrix/
           if-no-files-found: ignore

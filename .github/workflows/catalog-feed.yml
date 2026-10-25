@@ -18,15 +18,22 @@ on:
         type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-catalog-feed-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   sign-and-publish:
+    permissions:
+      contents: write
     environment: catalog-feed
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with: { fetch-depth: 1 }
+        with: { fetch-depth: 1, persist-credentials: false }
       - name: Sign the reviewed catalog
         env:
           CATALOG_FEED_SIGNING_KEY: ${{ secrets.CATALOG_FEED_SIGNING_KEY }}
