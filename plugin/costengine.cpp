@@ -1,7 +1,6 @@
 #include "costengine.h"
 
 #include <QDateTime>
-#include <QRegularExpression>
 #include <QStringList>
 #include <QtGlobal>
 
@@ -81,13 +80,27 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
     }
 
     const QString integerPart = parts.first().isEmpty() ? QStringLiteral("0") : parts.first();
-    if (!integerPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+
+    // Fast character inspection replacing dynamic QRegularExpression in hot path.
+    // Avoids heap allocations and PCRE regex compilation per parseScaled invocation.
+    auto isDigits = [](QStringView str) {
+        if (str.isEmpty()) {
+            return false;
+        }
+        for (const QChar c : str) {
+            if (!c.isDigit()) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    if (!isDigits(integerPart)) {
         return 0;
     }
 
     QString fractionalPart = parts.size() == 2 ? parts.at(1) : QString();
-    if (!fractionalPart.isEmpty()
-        && !fractionalPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!fractionalPart.isEmpty() && !isDigits(fractionalPart)) {
         return 0;
     }
 
