@@ -9,7 +9,6 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QLocale>
-#include <QRegularExpression>
 #include <QSet>
 #include <QSqlError>
 #include <QSqlQuery>
@@ -36,6 +35,16 @@ QVariantMap result(bool ok, const QString &error = {},
   return {{QStringLiteral("ok"), ok},
           {QStringLiteral("error"), error},
           {QStringLiteral("policy"), policy}};
+}
+
+bool isIso4217CurrencyCode(const QString &code) {
+  if (code.length() != 3)
+    return false;
+  for (const QChar c : code) {
+    if (c < QLatin1Char('A') || c > QLatin1Char('Z'))
+      return false;
+  }
+  return true;
 }
 } // namespace
 
@@ -261,9 +270,8 @@ QVariantMap BudgetPolicyRepository::normalizedPolicy(const QVariantMap &input,
     message = QStringLiteral("invalid valueClass");
   else if (p.value(QStringLiteral("limitMinor")).toLongLong() <= 0)
     message = QStringLiteral("limitMinor must be positive");
-  else if (!QRegularExpression(QStringLiteral("^[A-Z]{3}$"))
-                .match(p.value(QStringLiteral("currency")).toString())
-                .hasMatch())
+  else if (!isIso4217CurrencyCode(
+               p.value(QStringLiteral("currency")).toString()))
     message = QStringLiteral("currency must be an ISO 4217 code");
   else if (!QStringList{QStringLiteral("calendar_day"),
                         QStringLiteral("iso_week"),

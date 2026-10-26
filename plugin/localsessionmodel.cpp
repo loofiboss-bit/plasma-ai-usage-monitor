@@ -15,7 +15,6 @@
 #include <QLockFile>
 #include <QMessageAuthenticationCode>
 #include <QRandomGenerator>
-#include <QRegularExpression>
 #include <QSaveFile>
 #include <QSqlDatabase>
 #include <QSqlError>
@@ -184,15 +183,24 @@ QString scanCursorPath(const QString &tool, bool changedQueue = false) {
          QStringLiteral("/local-session-cursor-%1%2")
              .arg(name, changedQueue ? QStringLiteral("-changed") : QString());
 }
+bool isValidHex64(const QString &str) {
+  if (str.size() != 64)
+    return false;
+  for (const QChar c : str) {
+    const ushort unicode = c.unicode();
+    if (!((unicode >= '0' && unicode <= '9') ||
+          (unicode >= 'a' && unicode <= 'f')))
+      return false;
+  }
+  return true;
+}
 QString readScanCursor(const QString &tool, bool changedQueue = false) {
   QFile file(scanCursorPath(tool, changedQueue));
   if (!file.open(QIODevice::ReadOnly))
     return {};
   const QByteArray value = file.read(65).trimmed();
-  static const QRegularExpression validId(QStringLiteral("^[a-f0-9]{64}$"));
-  return validId.match(QString::fromLatin1(value)).hasMatch()
-             ? QString::fromLatin1(value)
-             : QString();
+  const QString id = QString::fromLatin1(value);
+  return isValidHex64(id) ? id : QString();
 }
 bool writeScanCursor(const QString &tool, const QString &fileId,
                      bool changedQueue = false) {
@@ -759,7 +767,7 @@ void LocalSessionModel::requestImport() {
         const QString fileId = candidateIds.value(path);
         const int sourceFd =
             ::open(nativePath.constData(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW);
-        struct stat sourceStat{};
+        struct stat sourceStat {};
         if (sourceFd < 0 || ::fstat(sourceFd, &sourceStat) != 0 ||
             !S_ISREG(sourceStat.st_mode)) {
           if (sourceFd >= 0)
@@ -1944,11 +1952,8 @@ QVariantList LocalSessionModel::projectAliases() const {
 bool LocalSessionModel::setProjectAlias(const QString &projectId,
                                         const QString &alias) {
   const QString name = alias.trimmed();
-  if (projectId.size() != 64 ||
-      !QRegularExpression(QStringLiteral("^[0-9a-f]{64}$"))
-           .match(projectId)
-           .hasMatch() ||
-      name.size() > 80 || alias.contains(QChar::Null))
+  if (!isValidHex64(projectId) || name.size() > 80 ||
+      alias.contains(QChar::Null))
     return false;
   const QString connection = QStringLiteral("local_sessions_alias_%1")
                                  .arg(QRandomGenerator::global()->generate());
