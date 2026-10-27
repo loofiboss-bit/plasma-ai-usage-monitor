@@ -1,10 +1,10 @@
 #include "costengine.h"
 
 #include <QDateTime>
-#include <QRegularExpression>
 #include <QStringList>
 #include <QtGlobal>
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -14,6 +14,15 @@ constexpr qint64 kRateScale = 1'000'000'000LL;
 constexpr qint64 kTokenScale = 1'000'000LL;
 
 using WideInt = __int128_t;
+
+// Performance optimization: fast non-allocating check for ASCII digits ('0'-'9').
+// Replaces dynamic QRegularExpression("^\d+$") compilation and execution in parseScaled hot paths.
+bool isDigitsOnly(QStringView str)
+{
+    return !str.isEmpty() && std::all_of(str.cbegin(), str.cend(), [](QChar c) {
+        return c >= QLatin1Char('0') && c <= QLatin1Char('9');
+    });
+}
 
 QString wideToString(WideInt value)
 {
@@ -81,13 +90,12 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
     }
 
     const QString integerPart = parts.first().isEmpty() ? QStringLiteral("0") : parts.first();
-    if (!integerPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!isDigitsOnly(integerPart)) {
         return 0;
     }
 
     QString fractionalPart = parts.size() == 2 ? parts.at(1) : QString();
-    if (!fractionalPart.isEmpty()
-        && !fractionalPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!fractionalPart.isEmpty() && !isDigitsOnly(fractionalPart)) {
         return 0;
     }
 
