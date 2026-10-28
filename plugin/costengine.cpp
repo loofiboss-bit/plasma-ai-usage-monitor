@@ -80,14 +80,17 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
         return 0;
     }
 
+    // Optimization: Reuse static compiled regex to avoid repeated compilation and allocations in hot numeric parsing paths.
+    static const QRegularExpression digitsPattern(QStringLiteral("^\\d+$"));
+
     const QString integerPart = parts.first().isEmpty() ? QStringLiteral("0") : parts.first();
-    if (!integerPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!integerPart.contains(digitsPattern)) {
         return 0;
     }
 
     QString fractionalPart = parts.size() == 2 ? parts.at(1) : QString();
     if (!fractionalPart.isEmpty()
-        && !fractionalPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+        && !fractionalPart.contains(digitsPattern)) {
         return 0;
     }
 
