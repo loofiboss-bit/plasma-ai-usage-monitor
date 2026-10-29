@@ -261,9 +261,10 @@ QVariantMap BudgetPolicyRepository::normalizedPolicy(const QVariantMap &input,
     message = QStringLiteral("invalid valueClass");
   else if (p.value(QStringLiteral("limitMinor")).toLongLong() <= 0)
     message = QStringLiteral("limitMinor must be positive");
-  else if (!QRegularExpression(QStringLiteral("^[A-Z]{3}$"))
-                .match(p.value(QStringLiteral("currency")).toString())
-                .hasMatch())
+  else if (const QString currencyStr = p.value(QStringLiteral("currency")).toString();
+           currencyStr.size() != 3 ||
+           !std::all_of(currencyStr.cbegin(), currencyStr.cend(),
+                        [](QChar c) { return c >= QLatin1Char('A') && c <= QLatin1Char('Z'); }))
     message = QStringLiteral("currency must be an ISO 4217 code");
   else if (!QStringList{QStringLiteral("calendar_day"),
                         QStringLiteral("iso_week"),

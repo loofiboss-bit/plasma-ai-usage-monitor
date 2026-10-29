@@ -1,7 +1,6 @@
 #include "costengine.h"
 
 #include <QDateTime>
-#include <QRegularExpression>
 #include <QStringList>
 #include <QtGlobal>
 
@@ -80,14 +79,27 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
         return 0;
     }
 
+    // Performance optimization: fast character loop avoids constructing and compiling
+    // a QRegularExpression on every call to parseScaled during cost calculations.
+    const auto isOnlyDigits = [](QStringView str) {
+        if (str.isEmpty()) {
+            return false;
+        }
+        for (const QChar c : str) {
+            if (!c.isDigit()) {
+                return false;
+            }
+        }
+        return true;
+    };
+
     const QString integerPart = parts.first().isEmpty() ? QStringLiteral("0") : parts.first();
-    if (!integerPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!isOnlyDigits(integerPart)) {
         return 0;
     }
 
     QString fractionalPart = parts.size() == 2 ? parts.at(1) : QString();
-    if (!fractionalPart.isEmpty()
-        && !fractionalPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!fractionalPart.isEmpty() && !isOnlyDigits(fractionalPart)) {
         return 0;
     }
 
