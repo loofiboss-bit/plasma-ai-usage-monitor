@@ -18,10 +18,22 @@ qint64 number(const QJsonObject &o, const QString &key, bool *present) {
   *present = true;
   return static_cast<qint64>(v.toDouble());
 }
+// Performance optimization: fast character loop avoids constructing and compiling
+// a QRegularExpression on every JSON line processed during session log parsing.
+bool isSafeModelChar(QChar ch) {
+  const char16_t u = ch.unicode();
+  return (u >= 'A' && u <= 'Z') || (u >= 'a' && u <= 'z') ||
+         (u >= '0' && u <= '9') || u == '_' || u == '.' || u == ':' ||
+         u == '/' || u == '-';
+}
+
 QString safeModel(QString model) {
-  if (model.size() > 96 || !model.contains(QRegularExpression(
-                               QStringLiteral("^[A-Za-z0-9_.:/-]+$"))))
+  if (model.isEmpty() || model.size() > 96)
     return {};
+  for (const QChar c : model) {
+    if (!isSafeModelChar(c))
+      return {};
+  }
   return model;
 }
 bool containsUnverifiedLineage(const QJsonValue &value, int depth = 0) {
