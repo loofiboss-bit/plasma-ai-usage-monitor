@@ -2,10 +2,14 @@
 
 #include <QSet>
 
+#include <array>
 #include <cmath>
 #include <limits>
 
 namespace {
+// Table of 10^p for p in [0, 4] to avoid std::pow library call overhead.
+constexpr std::array<double, 5> kPow10 = {1.0, 10.0, 100.0, 1000.0, 10000.0};
+
 const QSet<QString> &twoDigitCurrencies() {
   static const QSet<QString> currencies = [] {
     const QString codes =
@@ -59,7 +63,8 @@ std::optional<qint64> CurrencyMinorUnits::fromMajor(double value,
   const std::optional<int> precision = digits(currency);
   if (!precision || !std::isfinite(value))
     return std::nullopt;
-  const double factor = std::pow(10.0, *precision);
+  const int p = *precision;
+  const double factor = (p >= 0 && p <= 4) ? kPow10[p] : std::pow(10.0, p);
   const double scaled = value * factor;
   if (scaled < static_cast<double>(std::numeric_limits<qint64>::min()) ||
       scaled > static_cast<double>(std::numeric_limits<qint64>::max()))
@@ -72,5 +77,7 @@ std::optional<double> CurrencyMinorUnits::toMajor(qint64 value,
   const std::optional<int> precision = digits(currency);
   if (!precision)
     return std::nullopt;
-  return static_cast<double>(value) / std::pow(10.0, *precision);
+  const int p = *precision;
+  const double factor = (p >= 0 && p <= 4) ? kPow10[p] : std::pow(10.0, p);
+  return static_cast<double>(value) / factor;
 }
