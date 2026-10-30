@@ -34,6 +34,33 @@ QString wideToString(WideInt value)
     return negative ? QStringLiteral("-") + digits : digits;
 }
 
+// Fast check for digit-only string without heap-allocating QRegularExpression.
+// Performance impact: eliminates ~20-60 regex object instantiations per estimate call.
+bool isOnlyDigits(const QString &str)
+{
+    if (str.isEmpty()) {
+        return false;
+    }
+    for (const QChar ch : str) {
+        if (!ch.isDigit()) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// Compute scale exponent (number of decimal digits) without string allocation.
+// Performance impact: avoids QString::number(scale) allocations in hot calculation loops.
+int countScaleDigits(qint64 scale)
+{
+    int digits = 0;
+    while (scale >= 10) {
+        scale /= 10;
+        ++digits;
+    }
+    return digits;
+}
+
 QString trimDecimal(QString value)
 {
     value = value.trimmed();
@@ -81,13 +108,12 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
     }
 
     const QString integerPart = parts.first().isEmpty() ? QStringLiteral("0") : parts.first();
-    if (!integerPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!isOnlyDigits(integerPart)) {
         return 0;
     }
 
     QString fractionalPart = parts.size() == 2 ? parts.at(1) : QString();
-    if (!fractionalPart.isEmpty()
-        && !fractionalPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!fractionalPart.isEmpty() && !isOnlyDigits(fractionalPart)) {
         return 0;
     }
 
@@ -97,7 +123,7 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
         return 0;
     }
 
-    const int scaleDigits = QString::number(scale).size() - 1;
+    const int scaleDigits = countScaleDigits(scale);
     if (fractionalPart.size() > scaleDigits + 1) {
         fractionalPart.truncate(scaleDigits + 1);
     }
@@ -157,7 +183,7 @@ QString scaledToText(WideInt value, qint64 scale)
         value = -value;
     }
     const QString digits = wideToString(value);
-    const int fractionalDigits = QString::number(scale).size() - 1;
+    const int fractionalDigits = countScaleDigits(scale);
     QString padded = digits;
     if (padded.size() <= fractionalDigits) {
         padded.prepend(QString(fractionalDigits + 1 - padded.size(), QLatin1Char('0')));
@@ -216,11 +242,12 @@ QDateTime parseTimestamp(const QVariant &value)
     if (!value.isValid() || value.isNull()) {
         return {};
     }
-    const QDateTime parsed = QDateTime::fromString(value.toString(), Qt::ISODateWithMs);
+    const QString str = value.toString();
+    const QDateTime parsed = QDateTime::fromString(str, Qt::ISODateWithMs);
     if (parsed.isValid()) {
         return parsed.toUTC();
     }
-    return QDateTime::fromString(value.toString(), Qt::ISODate).toUTC();
+    return QDateTime::fromString(str, Qt::ISODate).toUTC();
 }
 
 QVariantMap component(const QString &kind,
