@@ -1,0 +1,3 @@
+## 2026-10-31 - Release Media Manifest Source Tree Check in RPM Gates
+**Learning:** In candidate mode (used during Fedora RPM %check and ctest), `scripts/check_release_media.py` checks `assets/screenshots/v18-media-manifest.json` against `sourceTreeSha256`. When source files in `package`, `plugin`, or `scripts/demo` are modified, `sourceTreeSha256` and `archiveSourceTreeSha256` in `assets/screenshots/v18-media-manifest.json` must be synchronized to match `filesystem_source_tree_sha256()` from `scripts/demo/source_identity.py`.
+**Action:** When optimizing files under `package/`, `plugin/`, or `scripts/demo/`, always recalculate the manifest `sourceTreeSha256` and run `scripts/check_release_media.py` in candidate mode before submitting.
