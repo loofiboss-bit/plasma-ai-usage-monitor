@@ -111,8 +111,12 @@ function filterOverviewSourceRows(rows, searchText, needsAttention) {
         if (needsAttention && (!row.attentionSeverity || row.attentionSeverity === "none"))
             return false;
         if (!query) return true;
-        return [row.displayName, row.stableId, row.qualityClass, row.nextActionText]
-            .join(" ").toLocaleLowerCase().indexOf(query) >= 0;
+        // Optimization: Test fields individually with early exit / short-circuiting
+        // to avoid allocating temporary arrays and joining concatenated strings per row.
+        return (row.displayName && String(row.displayName).toLocaleLowerCase().indexOf(query) >= 0)
+            || (row.stableId && String(row.stableId).toLocaleLowerCase().indexOf(query) >= 0)
+            || (row.qualityClass && String(row.qualityClass).toLocaleLowerCase().indexOf(query) >= 0)
+            || (row.nextActionText && String(row.nextActionText).toLocaleLowerCase().indexOf(query) >= 0);
     });
 }
 
