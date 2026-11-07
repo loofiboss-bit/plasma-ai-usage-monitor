@@ -94,7 +94,17 @@
 
   <releases>
 
-    <release version="26.0.0" date="2026-11-01"/>
+    <release version="26.0.0" date="2026-11-07">
+      <description>
+        <ul>
+          <li>Upgrade to unified AI Control Center with multi-window quota strips, reset countdowns, and local clock reset times.</li>
+          <li>Add quick filter pills (All, Favorites, Needs attention), shared favorites, and fast keyboard shortcuts (Alt+1..3, Escape).</li>
+          <li>Support cross-tool coding-session comparisons (All tools) over completed local calendar periods with token share and cache efficiency.</li>
+          <li>Add actionable notifications: Quota Reset Ready, direct Open Source Details actions, and favorites-scoped warnings.</li>
+          <li>Support mouse-wheel favorite cycling on the compact KDE panel and optimize hot-path query and parsing performance.</li>
+        </ul>
+      </description>
+    </release>
     <release version="25.0.1" date="2026-10-23"/>
     <release version="25.0.0" date="2026-10-23">
       <description>
