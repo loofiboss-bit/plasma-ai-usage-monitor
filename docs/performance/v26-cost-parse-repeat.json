@@ -1,0 +1,49 @@
+{
+  "source": "/tmp/ai-monitor-v26-baseline/plugin/costengine.cpp",
+  "iterations": 10000,
+  "rounds": 8,
+  "compileCommand": [
+    "c++",
+    "-O3",
+    "-DNDEBUG",
+    "-std=c++20",
+    "/tmp/ai-monitor-cost-parse-iuqbdi9r/bench.cpp",
+    "-o",
+    "/tmp/ai-monitor-cost-parse-iuqbdi9r/bench",
+    "-I/usr/include/qt6/QtCore",
+    "-I/usr/include/qt6",
+    "-DQT_CORE_LIB",
+    "-I/usr/lib64/qt6/mkspecs/linux-g++",
+    "-lQt6Core"
+  ],
+  "parity": "parity_cases=810 sink=1565209861260000",
+  "samplesNs": {
+    "regex": [
+      443045882,
+      403497442,
+      409181463,
+      442803288,
+      390812398,
+      370705657,
+      402676133,
+      438486075
+    ],
+    "ascii": [
+      14533926,
+      11666306,
+      11642889,
+      10618937,
+      8366308,
+      7655120,
+      9070778,
+      9618330
+    ]
+  },
+  "medianNs": {
+    "regex": 406339452.5,
+    "ascii": 10118633.5
+  },
+  "improvementPercent": 97.50980776349793,
+  "meetsTenPercentGate": true,
+  "scope": "parseScaled string-rate microbenchmark only"
+}

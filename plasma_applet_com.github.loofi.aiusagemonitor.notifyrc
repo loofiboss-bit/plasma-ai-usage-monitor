@@ -39,6 +39,12 @@ Comment=A previously disconnected provider has reconnected
 Flags=Popup
 Action=Popup
 
+[Event/quotaReset]
+Name=Quota Reset Ready
+Comment=A previously rate-limited quota window has reset and is available again
+Flags=Popup
+Action=Popup
+
 [Event/updateAvailable]
 Name=Update Available
 Comment=A newer version of AI Usage Monitor is available

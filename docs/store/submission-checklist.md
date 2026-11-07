@@ -1,7 +1,7 @@
 # GitHub, KDE Store and COPR submission checklist
 
-Use this checklist for the current version in `VERSION`. For 25.0.0, the
-qualification record is [the release checklist](../release/v25.0.0-checklist.md).
+Use this checklist for the current version in `VERSION`. For 26.0.0, the
+qualification record is [the release checklist](../release/v26.0.0-checklist.md).
 
 ## Prepare the exact candidate
 
@@ -11,23 +11,23 @@ qualification record is [the release checklist](../release/v25.0.0-checklist.md)
 - Keep README, changelog, user guide, generated wiki, AppStream and RPM metadata
   aligned with the release. Generate the wiki with
   `python3 scripts/generate_wiki_docs.py`.
-- Validate all 13 canonical synthetic screenshots with
+- Validate all 14 canonical synthetic screenshots with
   `python3 scripts/check_release_media.py`. Their source identity must match
   the shipped runtime. Keep physical desktop/accessibility limits explicit.
-- Review [Store listing copy](v25.0.0-listing.md) and
-  [release notes](../release/v25.0.0-notes.md).
+- Review [Store listing copy](v26.0.0-listing.md) and
+  [release notes](../release/v26.0.0-notes.md).
 - State that the Store archive contains the frontend and requires the matching
   compiled plugin. Fedora COPR provides both components.
 
 ## Publish
 
 1. Merge the qualified PR into `main` and fetch the resulting commit.
-2. Create an annotated `v25.0.0` tag on that exact `origin/main` commit.
-   Run `bash scripts/verify_exact_tag.sh v25.0.0`, then push the tag.
+2. Create an annotated `v26.0.0` tag on that exact `origin/main` commit.
+   Run `bash scripts/verify_exact_tag.sh v26.0.0`, then push the tag.
 3. Wait for the canonical tag-triggered Release workflow to succeed. Read back
    the published source tarball, plasmoid, SPDX source SBOM, SHA-256 checksums
    and GitHub build provenance before claiming GitHub delivery.
-4. Run `just copr-submit v25.0.0` against the same tag. Verify every enabled
+4. Run `just copr-submit v26.0.0` against the same tag. Verify every enabled
    Fedora target independently, including signed RPM metadata and repository
    publication. A submitted build is not a successful package publication.
 5. Update [KDE Store product 2353976](https://store.kde.org/p/2353976) with the

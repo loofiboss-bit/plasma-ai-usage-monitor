@@ -175,6 +175,7 @@ add_test(NAME localsessionschema COMMAND test_localsessionschema)
 add_executable(test_localsessionmodel
     test_localsessionmodel.cpp
     ${CMAKE_SOURCE_DIR}/plugin/localsessionmodel.cpp
+    ${CMAKE_SOURCE_DIR}/plugin/sessionquery.cpp
     ${CMAKE_SOURCE_DIR}/plugin/localsessionparser.cpp
     ${CMAKE_SOURCE_DIR}/plugin/budgetpolicyschema.cpp
 )

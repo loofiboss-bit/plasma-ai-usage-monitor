@@ -76,6 +76,7 @@ public:
   QHash<int, QByteArray> roleNames() const override;
 
   QVariantMap summary() const;
+  Q_INVOKABLE QVariantMap summaryForSources(const QStringList &stableIds) const;
   QDateTime presentationTime() const;
   void setPresentationTime(const QDateTime &time);
   Q_INVOKABLE void resetPresentationTime();

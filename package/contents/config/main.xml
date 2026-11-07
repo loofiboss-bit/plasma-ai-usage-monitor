@@ -10,9 +10,21 @@
             <default>300</default>
             <label>Default refresh interval in seconds</label>
         </entry>
+        <entry name="favoriteSourceIds" type="StringList">
+            <default></default>
+            <label>Favorite source stable identifiers</label>
+        </entry>
+        <entry name="panelSourceScope" type="String">
+            <default>automatic</default>
+            <label>Panel source scope: automatic, all, source</label>
+        </entry>
+        <entry name="panelSourceId" type="String">
+            <default></default>
+            <label>Explicit panel source stable identifier</label>
+        </entry>
         <entry name="compactDisplayMode" type="String">
             <default>icon</default>
-            <label>What to show in compact mode: icon, attention, lowest-quota, next-reset, actual-spend, active-sources</label>
+            <label>What to show in compact mode: icon, attention, lowest-quota, next-reset, actual-spend, active-sources, session-tokens, session-count</label>
         </entry>
         <entry name="setupWizardCompleted" type="Bool">
             <default>false</default>
@@ -335,6 +347,14 @@
         </entry>
         <entry name="notifyOnReconnect" type="Bool">
             <default>false</default>
+        </entry>
+        <entry name="notifyOnQuotaReset" type="Bool">
+            <default>true</default>
+            <label>Notify when a constrained quota window resets and is ready again</label>
+        </entry>
+        <entry name="favoriteOnlyWarnings" type="Bool">
+            <default>false</default>
+            <label>Limit non-critical warning notifications to favorite sources (critical alerts always notify)</label>
         </entry>
         <entry name="notificationCooldownMinutes" type="Int">
             <default>15</default>

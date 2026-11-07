@@ -57,6 +57,11 @@ ColumnLayout {
 
     // Presentation only; shared filters and requests remain unchanged.
     property string presentationMode: "summary"
+    property var presentationTime: null
+    readonly property string presentationDay: presentationTime
+        ? new Date(presentationTime).toLocaleDateString() : ""
+    property var comparisonRange: ({from: "", to: ""})
+    onPresentationDayChanged: if (visible && presentationMode === "analysis") refresh()
     property bool technicalDetailsExpanded: false
     property int breakdownIndex: 0
     property int historyDisplayIndex: 0
@@ -82,6 +87,7 @@ ColumnLayout {
     readonly property bool hasNextPage: summaryCurrent && !loading && queryErrorText === ""
         && pageOffset + sessionRows.length < Number(summary.sessionCount || 0)
     property int selectedRangeIndex: 1
+    readonly property bool comparisonMode: presentationMode === "analysis" && selectedRangeIndex !== 0
     property int pageOffset: 0
     property string selectedSessionId: ""
     property var projectRows: []
@@ -115,7 +121,7 @@ ColumnLayout {
         + "-" + Math.random().toString(36).slice(2)
     readonly property bool mediaMode: AppInfo.demoMode
         && ["media-coding-sessions", "media-history-sessions",
-            "media-analyst-sessions"].indexOf(AppInfo.smokeView) >= 0
+            "media-analyst-sessions", "media-analyst-comparison"].indexOf(AppInfo.smokeView) >= 0
     readonly property var activeSessionModel: mediaMode
         ? mediaSessionModel : sessionModel
 
@@ -158,8 +164,9 @@ ColumnLayout {
 
     function ensureCustomDates() {
         if (parseLocalDate(customStartDate) && parseLocalDate(customEndDate)) return;
-        var end = new Date();
+        var end = presentationTime ? new Date(presentationTime) : new Date();
         end.setHours(0, 0, 0, 0);
+        if (presentationMode === "analysis") end.setDate(end.getDate() - 1);
         var start = new Date(end.getTime());
         start.setDate(start.getDate() - 6);
         customStartDate = localDateString(start);
@@ -171,9 +178,9 @@ ColumnLayout {
         var through = parseLocalDate(customEndDate);
         if (!from || !through) return "invalid-date";
         if (from > through) return "range-order";
-        var today = new Date();
+        var today = presentationTime ? new Date(presentationTime) : new Date();
         today.setHours(0, 0, 0, 0);
-        if (through > today) return "range-future";
+        if (through > today || (presentationMode === "analysis" && through >= today)) return "range-future";
         var retentionDays = sessionModel && Number(sessionModel.retentionDays) > 0
             ? Math.floor(Number(sessionModel.retentionDays)) : 90;
         var earliest = new Date(today.getTime());
@@ -188,10 +195,16 @@ ColumnLayout {
         if (customRangeErrorKey === "range-order")
             return i18n("The start date must be on or before the end date.");
         if (customRangeErrorKey === "range-future")
-            return i18n("The end date cannot be in the future.");
+            return presentationMode === "analysis"
+                ? i18n("Choose completed days ending before today.")
+                : i18n("The end date cannot be in the future.");
         if (customRangeErrorKey === "range-retention")
             return i18n("Choose dates within the configured history retention period.");
         return "";
+    }
+
+    function customRangeProblemForComparison() {
+        return selectedRangeIndex === 3 ? customRangeProblem() : "";
     }
 
     function customRangeDayCount() {
@@ -205,7 +218,7 @@ ColumnLayout {
     }
 
     function localRange() {
-        var now = new Date();
+        var now = presentationTime ? new Date(presentationTime) : new Date();
         if (selectedRangeIndex === 3) {
             var customFrom = parseLocalDate(customStartDate);
             var customThrough = parseLocalDate(customEndDate);
@@ -219,6 +232,12 @@ ColumnLayout {
                 to: customThrough.getTime() === today.getTime()
                     ? now.toISOString() : customTo.toISOString()
             };
+        }
+        if (comparisonMode) {
+            var end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            var completedFrom = new Date(end.getTime());
+            completedFrom.setDate(completedFrom.getDate() - rangeDays);
+            return { from: completedFrom.toISOString(), to: end.toISOString() };
         }
         var from = new Date(now.getTime());
         from.setHours(0, 0, 0, 0);
@@ -252,7 +271,7 @@ ColumnLayout {
         projectSearch = String(sessionState.projectSearch || "");
         modelSearch = String(sessionState.modelSearch || "");
         historyDisplayIndex = Number(sessionState.historyDisplayIndex) === 1 ? 1 : 0;
-        breakdownIndex = Math.max(0, Math.min(2, Number(sessionState.breakdownIndex || 0)));
+        breakdownIndex = Math.max(0, Math.min(3, Number(sessionState.breakdownIndex || 0)));
         selectedRangeIndex = Math.max(0, Math.min(3,
             Number(sessionState.rangeIndex === undefined
                 ? ([1, 7, 30].indexOf(Number(initialRangeDays)) < 0 ? 1
@@ -273,14 +292,19 @@ ColumnLayout {
     function toolOptions() {
         if (fixedToolId === "codex-cli") return [{ label: i18n("Codex"), value: "codex-cli" }];
         if (fixedToolId === "claude-code") return [{ label: i18n("Claude Code"), value: "claude-code" }];
-        return [
+        var options = [
             { label: i18n("Codex"), value: "codex-cli" },
             { label: i18n("Claude Code"), value: "claude-code" }
         ];
+        if (presentationMode === "analysis")
+            options.push({ label: i18n("All tools"), value: "all" });
+        return options;
     }
 
     function selectedToolEnabled() {
         if (!activeSessionModel) return false;
+        if (activeToolId === "all")
+            return !!activeSessionModel.codexEnabled || !!activeSessionModel.claudeCodeEnabled;
         return activeToolId === "codex-cli"
             ? !!activeSessionModel.codexEnabled : !!activeSessionModel.claudeCodeEnabled;
     }
@@ -295,7 +319,7 @@ ColumnLayout {
         var ordinal = 0;
         for (var i = 0; i < projectRows.length; ++i) {
             var row = projectRows[i] || {};
-            if (row.toolId !== activeToolId) continue;
+            if (activeToolId !== "all" && row.toolId !== activeToolId) continue;
             if (projectMatchesSearch(String(row.alias || "").trim(),
                     i18n("Unnamed project %1", ++ordinal))) ++count;
         }
@@ -307,7 +331,7 @@ ColumnLayout {
         var ordinal = 0;
         for (var i = 0; i < projectRows.length; ++i) {
             var row = projectRows[i] || {};
-            if (row.toolId !== activeToolId) continue;
+            if (activeToolId !== "all" && row.toolId !== activeToolId) continue;
             var anonymous = i18n("Unnamed project %1", ++ordinal);
             var alias = String(row.alias || "").trim();
             if (!projectMatchesSearch(alias, anonymous)
@@ -390,13 +414,14 @@ ColumnLayout {
 
     function drillDown(projectId, modelFilter) {
         persistState();
-        if (selectedRangeIndex === 3) {
+        if (selectedRangeIndex === 3 || comparisonMode) {
+            var selectedRange = localRange();
             sessionHistoryRangeRequested({
                 toolId: activeToolId,
                 projectId: projectId,
                 modelFilter: modelFilter || ({}),
-                startDate: customStartDate,
-                endDate: customEndDate,
+                startDate: localDateString(new Date(selectedRange.from)),
+                endDate: localDateString(new Date(new Date(selectedRange.to).getTime() - 1)),
                 dayDrilldown: false
             });
             return;
@@ -546,6 +571,7 @@ ColumnLayout {
     function loadProjects() {
         if (!activeSessionModel || typeof activeSessionModel.requestProjects !== "function") return;
         if (!selectedToolEnabled()) {
+            projectsRequestId = "";
             projectRows = [];
             return;
         }
@@ -561,6 +587,10 @@ ColumnLayout {
             if (customRangeErrorKey !== "") {
                 ++requestGeneration;
                 pendingQueryIds = [];
+                comparisonRange = ({from: "", to: ""});
+                summaryRequestId = "";
+                sessionsRequestId = "";
+                dailyRequestId = "";
                 loading = false;
                 summaryCurrent = false;
                 sessionRows = [];
@@ -583,6 +613,7 @@ ColumnLayout {
             return;
         }
         var range = localRange();
+        comparisonRange = range;
         var generation = ++requestGeneration;
         summaryRequestId = "session-summary-" + requestPrefix + "-" + generation;
         sessionsRequestId = "session-list-" + requestPrefix + "-" + generation;
@@ -787,7 +818,8 @@ ColumnLayout {
                 model: panel.toolOptions()
                 textRole: "label"
                 valueRole: "value"
-                currentIndex: panel.activeToolId === "claude-code" ? 1 : 0
+                currentIndex: panel.activeToolId === "all" ? 2
+                    : panel.activeToolId === "claude-code" ? 1 : 0
                 Accessible.name: i18n("Session tool")
                 onActivated: {
                     panel.selectedToolId = currentValue;
@@ -798,7 +830,7 @@ ColumnLayout {
                 Layout.fillWidth: true
                 model: panel.presentationMode === "history"
                     ? [i18n("Today"), i18n("7 days"), i18n("30 days"), i18n("Custom")]
-                    : [i18n("Today"), i18n("7 days"), i18n("30 days")]
+                    : [i18n("Today"), i18n("7 completed days"), i18n("30 completed days"), i18n("Custom completed days")]
                 currentIndex: panel.selectedRangeIndex
                 Accessible.name: i18n("Session period")
                 onActivated: {
@@ -808,8 +840,10 @@ ColumnLayout {
                         panel.customRangeErrorKey = panel.customRangeProblem();
                         if (panel.customRangeErrorKey === "")
                             panel.filtersUpdated();
-                        else
+                        else {
                             panel.persistState();
+                            panel.refresh();
+                        }
                     } else {
                         panel.customRangeErrorKey = "";
                         panel.filtersUpdated();
@@ -820,7 +854,7 @@ ColumnLayout {
             RowLayout {
                 objectName: "sessionCustomRange"
                 Layout.fillWidth: true
-                visible: panel.presentationMode === "history"
+                visible: panel.presentationMode !== "summary"
                     && panel.selectedRangeIndex === 3
                 QQC2.TextField {
                     objectName: "sessionCustomStartDate"
@@ -834,8 +868,10 @@ ColumnLayout {
                         panel.customRangeErrorKey = panel.customRangeProblem();
                         if (panel.customRangeErrorKey === "")
                             panel.filtersUpdated();
-                        else
+                        else {
                             panel.persistState();
+                            panel.refresh();
+                        }
                     }
                 }
                 QQC2.TextField {
@@ -850,8 +886,10 @@ ColumnLayout {
                         panel.customRangeErrorKey = panel.customRangeProblem();
                         if (panel.customRangeErrorKey === "")
                             panel.filtersUpdated();
-                        else
+                        else {
                             panel.persistState();
+                            panel.refresh();
+                        }
                     }
                 }
             }
@@ -859,7 +897,7 @@ ColumnLayout {
             PlasmaComponents.Label {
                 objectName: "sessionCustomRangeError"
                 Layout.fillWidth: true
-                visible: panel.presentationMode === "history"
+                visible: panel.presentationMode !== "summary"
                     && panel.selectedRangeIndex === 3
                     && panel.customRangeErrorKey !== ""
                 text: panel.customRangeErrorText()
@@ -870,7 +908,7 @@ ColumnLayout {
 
             PlasmaComponents.Label {
                 Layout.fillWidth: true
-                visible: panel.presentationMode === "history"
+                visible: panel.presentationMode !== "summary"
                     && panel.selectedRangeIndex === 3
                 text: i18n("Available within the configured retention period. Initial local import covers up to 30 days.")
                 color: Kirigami.Theme.disabledTextColor
@@ -989,6 +1027,26 @@ ColumnLayout {
         }
     }
 
+    SessionComparison {
+        Layout.fillWidth: true
+        visible: panel.comparisonMode && panel.selectedToolEnabled()
+        active: visible && panel.visible && panel.customRangeProblemForComparison() === ""
+        sessionModel: panel.activeSessionModel
+        toolId: panel.activeToolId
+        fromUtc: panel.comparisonRange.from
+        toUtc: panel.comparisonRange.to
+        projectId: panel.selectedProjectId
+        modelFilter: panel.selectedModelFilter
+        refreshRevision: panel.requestGeneration
+        breakdownIndex: panel.breakdownIndex
+        projectLabel: panel.projectLabel
+        onScopeRequested: function(projectId, modelFilter) { panel.drillDown(projectId, modelFilter); }
+        onToolScopeRequested: function(toolId) {
+            panel.selectedToolId = toolId;
+            panel.filtersUpdated();
+        }
+    }
+
     SessionSection {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled()
@@ -1059,7 +1117,7 @@ ColumnLayout {
         Layout.fillWidth: true
         visible: panel.selectedToolEnabled() && panel.presentationMode !== "summary"
         model: panel.presentationMode === "analysis"
-            ? [i18n("By day"), i18n("By model"), i18n("By project")]
+            ? [i18n("By day"), i18n("By model"), i18n("By project"), i18n("By tool")]
             : [i18n("Sessions"), i18n("Daily usage")]
         currentIndex: panel.presentationMode === "analysis"
             ? panel.breakdownIndex : panel.historyDisplayIndex

@@ -1,5 +1,6 @@
 #include "budgetpolicyschema.h"
 #include "localsessionmodel.h"
+#include "sessionquery.h"
 
 #include <QDir>
 #include <QElapsedTimer>
@@ -14,7 +15,9 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QTimeZone>
 #include <QTimer>
+#include <algorithm>
 #include <signal.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -99,6 +102,393 @@ public:
 class LocalSessionModelTest : public QObject {
   Q_OBJECT
 private Q_SLOTS:
+  void comparisonUsesGlobalObservedFloorAndCapsBreakdowns() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    const QString connectionName = "comparison-backfill-floor";
+    {
+      auto db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery q(db);
+      QVERIFY(q.exec("INSERT INTO local_sessions "
+                     "VALUES('s','codex','p','2020-01-30T12:00:00.000Z','2020-"
+                     "02-15T12:00:00.000Z','reported','')"));
+      QVERIFY(q.exec(
+          "INSERT INTO local_usage_events "
+          "VALUES('tail','s','2020-01-30T12:00:00.000Z','m',10,2,5,0,1,'')"));
+      QVERIFY(q.exec("INSERT INTO local_usage_events "
+                     "VALUES('current','s','2020-02-15T12:00:00.000Z','m',20,4,"
+                     "10,0,1,'')"));
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    LocalSessionModel model;
+    model.setRetentionDays(3650);
+    QSignalSpy results(&model, &LocalSessionModel::comparisonReady);
+    const auto from =
+        QDateTime::fromString("2020-01-31T00:00:00.000Z", Qt::ISODateWithMs);
+    const auto to = from.addDays(30);
+    model.requestComparison("fresh-backfill", "codex", from, to, "p", "UTC",
+                            {{"modelId", "m"}});
+    QTRY_COMPARE(results.size(), 1);
+    auto result = results.takeFirst()[1].toMap();
+    QCOMPARE(result.value("current").toMap().value("coverage").toString(),
+             "reported");
+    QCOMPARE(result.value("previous").toMap().value("eventCount").toInt(), 1);
+    QCOMPARE(result.value("previous").toMap().value("coverage").toString(),
+             "partial");
+    QCOMPARE(result.value("observedFromUtc").toString(),
+             "2020-01-30T12:00:00.000Z");
+    QCOMPARE(result.value("coverageStartUtc").toString(),
+             "2020-01-30T00:00:00.000Z");
+    QCOMPARE(
+        result.value("previous").toMap().value("coverageReason").toString(),
+        "first-recorded-day");
+    QVERIFY(!result.value("deltas")
+                 .toMap()
+                 .value("totalTokens")
+                 .toMap()
+                 .value("available")
+                 .toBool());
+    {
+      auto db = QSqlDatabase::addDatabase("QSQLITE", connectionName);
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery q(db);
+      QVERIFY(q.exec("INSERT INTO local_sessions "
+                     "VALUES('global','codex','other','2020-01-01T12:00:00."
+                     "000Z','2020-01-01T12:00:00.000Z','reported','')"));
+      QVERIFY(q.exec("INSERT INTO local_usage_events "
+                     "VALUES('global','global','2020-01-01T12:00:00.000Z','"
+                     "other',1,1,0,0,1,'')"));
+      QVERIFY(db.transaction());
+      for (int i = 0; i < 121; ++i) {
+        const QString id =
+            QStringLiteral("item-%1").arg(i, 3, 10, QLatin1Char('0'));
+        q.prepare("INSERT INTO local_sessions "
+                  "VALUES(?,'codex',?,'2020-02-15T12:00:00.000Z','2020-02-"
+                  "15T12:00:00.000Z','reported','')");
+        q.addBindValue(id);
+        q.addBindValue(id);
+        QVERIFY(q.exec());
+        q.prepare("INSERT INTO local_usage_events "
+                  "VALUES(?,?,'2020-02-15T12:00:00.000Z',?,1,1,0,0,1,'')");
+        q.addBindValue(id);
+        q.addBindValue(id);
+        q.addBindValue(id);
+        QVERIFY(q.exec());
+      }
+      QVERIFY(db.commit());
+    }
+    QSqlDatabase::removeDatabase(connectionName);
+    model.requestComparison("global-filter-floor", "codex", from, to, "p",
+                            "UTC", {{"modelId", "m"}});
+    QTRY_COMPARE(results.size(), 1);
+    result = results.takeFirst()[1].toMap();
+    QCOMPARE(result.value("previous").toMap().value("coverage").toString(),
+             "reported");
+    QVERIFY(result.value("deltas")
+                .toMap()
+                .value("totalTokens")
+                .toMap()
+                .value("available")
+                .toBool());
+    model.requestComparison("bounded-breakdowns", "codex", from, to);
+    QTRY_COMPARE(results.size(), 1);
+    result = results.takeFirst()[1].toMap();
+    QCOMPARE(result.value("modelBreakdown").toList().size(), 100);
+    QCOMPARE(result.value("projectBreakdown").toList().size(), 100);
+    QCOMPARE(result.value("modelBreakdownTotalCount").toInt(), 123);
+    QCOMPARE(result.value("projectBreakdownTotalCount").toInt(), 123);
+    QCOMPARE(result.value("modelBreakdown")
+                 .toList()
+                 .first()
+                 .toMap()
+                 .value("modelId")
+                 .toString(),
+             "item-000");
+  }
+
+  void projectionsRespectSnapshotAndPartialImports() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    const QString readerName = "comparison-snapshot-reader";
+    const QString writerName = "comparison-snapshot-writer";
+    {
+      auto writer = QSqlDatabase::addDatabase("QSQLITE", writerName);
+      writer.setDatabaseName(fixture.database);
+      QVERIFY(writer.open());
+      QSqlQuery seed(writer);
+      QVERIFY(seed.exec("PRAGMA journal_mode=WAL"));
+      QVERIFY(seed.exec("INSERT INTO local_sessions "
+                        "VALUES('s','codex','p','2020-01-01T00:00:00.000Z','"
+                        "2020-01-03T00:00:00.000Z','reported','')"));
+      QVERIFY(seed.exec(
+          "INSERT INTO local_usage_events "
+          "VALUES('e','s','2020-01-02T12:00:00.000Z','m',10,2,5,NULL,1,'')"));
+      auto reader = QSqlDatabase::addDatabase("QSQLITE", readerName);
+      reader.setDatabaseName(fixture.database);
+      QVERIFY(reader.open());
+      QVERIFY(reader.transaction());
+      const auto from =
+          QDateTime::fromString("2020-01-02T00:00:00.000Z", Qt::ISODateWithMs);
+      const auto cutoff = from.addDays(-100);
+      QVariantMap first, second;
+      QMap<QString, QVariantMap> models, projects;
+      QVERIFY(SessionQuery::aggregateSessions(
+          reader, "codex", from, from.addDays(1), {}, {}, true, cutoff, first));
+      QVERIFY(seed.exec("UPDATE local_usage_events SET input_tokens=900"));
+      QVERIFY(
+          seed.exec("INSERT INTO local_import_checkpoints(tool_id,coverage) "
+                    "VALUES('codex','partial')"));
+      QVERIFY(SessionQuery::aggregateSessions(
+          reader, "codex", from, from.addDays(1), {}, {}, true, cutoff, second,
+          &models, &projects));
+      QCOMPARE(second.value("inputTokens").toInt(), 10);
+      QCOMPARE(second.value("coverage").toString(), "reported");
+      QCOMPARE(models.value("m").value("inputTokens").toInt(), 10);
+      const auto insights =
+          SessionQuery::insights(second, first, models, projects);
+      QSet<QString> keys;
+      for (const auto &entry : insights)
+        keys.insert(entry.toMap().value("key").toString());
+      QVERIFY(keys.contains("top-model"));
+      QVERIFY(keys.contains("top-project"));
+      QVERIFY(keys.contains("input-share"));
+      QVERIFY(keys.contains("output-share"));
+      QVERIFY(keys.contains("cache-read-share"));
+      QVERIFY(reader.rollback());
+      QVERIFY(SessionQuery::aggregateSessions(reader, "codex", from,
+                                              from.addDays(1), {}, {}, false,
+                                              cutoff, second));
+      QCOMPARE(second.value("inputTokens").toInt(), 900);
+      QCOMPARE(second.value("coverage").toString(), "partial");
+      const auto partialInsights =
+          SessionQuery::insights(second, first, models, projects);
+      QCOMPARE(partialInsights.size(), 1);
+      QVERIFY(!SessionQuery::sessionDeltas(second, first)
+                   .value("inputTokens")
+                   .toMap()
+                   .value("available")
+                   .toBool());
+      QVERIFY(seed.exec("DROP TABLE local_usage_events"));
+      QVERIFY(!SessionQuery::aggregateSessions(reader, "codex", from,
+                                               from.addDays(1), {}, {}, true,
+                                               cutoff, second));
+    }
+    QSqlDatabase::removeDatabase(readerName);
+    QSqlDatabase::removeDatabase(writerName);
+    LocalSessionModel model;
+    QSignalSpy failures(&model, &LocalSessionModel::queryFailed);
+    const auto to =
+        QDateTime::currentDateTimeUtc().date().startOfDay(QTimeZone("UTC"));
+    model.requestActivitySummary("broken-activity", "codex", to.addDays(-1),
+                                 to);
+    model.requestComparison("broken-comparison", "codex", to.addDays(-1), to);
+    QTRY_COMPARE(failures.size(), 2);
+    for (const auto &failure : failures)
+      QCOMPARE(failure[1].toString(), "session-query-failed");
+  }
+
+  void activityAndComparisonDiscardResultsAfterOptOut() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    LocalSessionModel model;
+    QSignalSpy imports(&model, &LocalSessionModel::importFinished);
+    model.setToolEnabled("codex", true);
+    QTRY_VERIFY(!imports.isEmpty());
+    QSignalSpy activity(&model, &LocalSessionModel::activitySummaryReady);
+    QSignalSpy comparison(&model, &LocalSessionModel::comparisonReady);
+    const auto to =
+        QDateTime::currentDateTimeUtc().date().startOfDay(QTimeZone("UTC"));
+    model.requestActivitySummary("stale", "codex", to.addDays(-1), to);
+    model.requestComparison("stale", "codex", to.addDays(-1), to);
+    model.setToolEnabled("codex", false);
+    QTest::qWait(150);
+    QCOMPARE(activity.size(), 0);
+    QCOMPARE(comparison.size(), 0);
+  }
+
+  void activityAndComparisonPreserveObservationCoverage() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    const QString name = QStringLiteral("comparison-seed");
+    {
+      auto db = QSqlDatabase::addDatabase("QSQLITE", name);
+      db.setDatabaseName(fixture.database);
+      QVERIFY(db.open());
+      QSqlQuery q(db);
+      QVERIFY(q.exec("INSERT INTO local_sessions "
+                     "VALUES('s','codex','p','2020-01-01T00:00:00.000Z','2020-"
+                     "01-03T00:00:00.000Z','reported','')"));
+      QVERIFY(q.exec("INSERT INTO local_usage_events "
+                     "VALUES('before','s','2020-01-01T12:00:00.000Z','m',0,0,0,"
+                     "NULL,1,'')"));
+      QVERIFY(q.exec(
+          "INSERT INTO local_usage_events "
+          "VALUES('now','s','2020-01-02T12:00:00.000Z','m',10,2,5,NULL,1,'')"));
+      QVERIFY(q.exec("INSERT INTO local_usage_events "
+                     "VALUES('other','s','2020-01-02T13:00:00.000Z','new',NULL,"
+                     "8,NULL,NULL,1,'')"));
+      QVERIFY(q.exec("INSERT INTO local_usage_events "
+                     "VALUES('boundary','s','2020-01-03T00:00:00.000Z','m',100,"
+                     "20,10,0,1,'')"));
+    }
+    QSqlDatabase::removeDatabase(name);
+    LocalSessionModel model;
+    model.setRetentionDays(3650);
+    const auto from =
+        QDateTime::fromString("2020-01-02T00:00:00.000Z", Qt::ISODateWithMs);
+    const auto to = from.addDays(1);
+    QSignalSpy activity(&model, &LocalSessionModel::activitySummaryReady);
+    QSignalSpy comparisons(&model, &LocalSessionModel::comparisonReady);
+    QSignalSpy failures(&model, &LocalSessionModel::queryFailed);
+    model.requestActivitySummary("activity", "codex-cli", from, to);
+    QTRY_COMPARE(activity.size(), 1);
+    const auto total = activity.first()[1].toMap();
+    QCOMPARE(total.value("eventCount").toInt(), 2);
+    QCOMPARE(total.value("inputTokens").toLongLong(), 10);
+    QCOMPARE(total.value("totalTokens").toLongLong(), 20);
+    QVERIFY(total.value("cacheWriteTokens").isNull());
+    QVERIFY(!total.contains("projectOptions"));
+    QVERIFY(!total.contains("modelBreakdown"));
+    const auto inputCoverage =
+        total.value("categoryCoverage").toMap().value("inputTokens").toMap();
+    QCOMPARE(inputCoverage.value("reportedEventCount").toInt(), 1);
+    QCOMPARE(inputCoverage.value("missingEventCount").toInt(), 1);
+    model.requestComparison("filtered", "codex", from, to, "p", "UTC",
+                            {{"modelId", "m"}});
+    QTRY_COMPARE(comparisons.size(), 1);
+    auto result = comparisons.takeFirst()[1].toMap();
+    QCOMPARE(result.value("current").toMap().value("eventCount").toInt(), 1);
+    const auto delta =
+        result.value("deltas").toMap().value("totalTokens").toMap();
+    QVERIFY(delta.value("available").toBool());
+    QCOMPARE(delta.value("absolute").toLongLong(), 12);
+    QVERIFY(!delta.value("percentAvailable").toBool());
+    QVERIFY(delta.value("percent").isNull());
+    QCOMPARE(delta.value("reason").toString(), "zero-baseline");
+    QVERIFY(!result.value("deltas")
+                 .toMap()
+                 .value("cacheWriteTokens")
+                 .toMap()
+                 .value("available")
+                 .toBool());
+    model.requestComparison("all", "codex", from, to);
+    QTRY_COMPARE(comparisons.size(), 1);
+    result = comparisons.takeFirst()[1].toMap();
+    QCOMPARE(result.value("modelBreakdown").toList().size(), 2);
+    const auto newModel = result.value("modelBreakdown").toList()[1].toMap();
+    QCOMPARE(newModel.value("modelId").toString(), "new");
+    QVERIFY(newModel.value("previous").toMap().value("inputTokens").isNull());
+    QCOMPARE(result.value("deltas")
+                 .toMap()
+                 .value("inputTokens")
+                 .toMap()
+                 .value("reason")
+                 .toString(),
+             "missing-category");
+    model.requestComparison("missing-project", "codex", from, to, "absent");
+    QTRY_COMPARE(comparisons.size(), 1);
+    result = comparisons.takeFirst()[1].toMap();
+    QCOMPARE(result.value("current").toMap().value("coverage").toString(),
+             "unavailable");
+    QVERIFY(result.value("current").toMap().value("inputTokens").isNull());
+    QVERIFY(!result.value("deltas")
+                 .toMap()
+                 .value("eventCount")
+                 .toMap()
+                 .value("available")
+                 .toBool());
+    model.setRetentionDays(1);
+    model.requestComparison("retained", "codex", from, to);
+    QTRY_COMPARE(comparisons.size(), 1);
+    QCOMPARE(comparisons.takeFirst()[1]
+                 .toMap()
+                 .value("current")
+                 .toMap()
+                 .value("coverage")
+                 .toString(),
+             "partial");
+    QCOMPARE(failures.size(), 0);
+  }
+
+  void comparisonUsesCompletedLocalDaysAcrossDst() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    LocalSessionModel model;
+    model.setRetentionDays(3650);
+    QSignalSpy results(&model, &LocalSessionModel::comparisonReady);
+    QSignalSpy failures(&model, &LocalSessionModel::queryFailed);
+    const QTimeZone zone("Europe/Stockholm");
+    for (const auto &date : {QDate(2020, 3, 29), QDate(2020, 10, 25)}) {
+      const auto from = date.startOfDay(zone).toUTC();
+      const auto to = date.addDays(1).startOfDay(zone).toUTC();
+      model.requestComparison("dst", "codex", from, to, {}, "Europe/Stockholm");
+      QTRY_COMPARE(results.size(), 1);
+      const auto result = results.takeFirst()[1].toMap();
+      QCOMPARE(result.value("dayCount").toInt(), 1);
+      QCOMPARE(result.value("previousFromUtc").toString(),
+               date.addDays(-1).startOfDay(zone).toUTC().toString(
+                   Qt::ISODateWithMs));
+      QCOMPARE(result.value("previousToUtc").toString(),
+               from.toString(Qt::ISODateWithMs));
+      QVERIFY(from.secsTo(to) != 86400);
+    }
+    const auto systemZone = QTimeZone::systemTimeZone();
+    const auto localEnd = QDateTime::currentDateTimeUtc()
+                              .toTimeZone(systemZone)
+                              .date()
+                              .startOfDay(systemZone)
+                              .toUTC();
+    const auto localStart = localEnd.toTimeZone(systemZone)
+                                .date()
+                                .addDays(-1)
+                                .startOfDay(systemZone)
+                                .toUTC();
+    model.requestComparison("system-zone", "codex", localStart, localEnd, {},
+                            "");
+    QTRY_COMPARE(results.size(), 1);
+    const auto localResult = results.takeFirst()[1].toMap();
+    QCOMPARE(localResult.value("timeZoneId").toString(),
+             QString::fromUtf8(systemZone.id()));
+    QCOMPARE(localResult.value("fromUtc").toString(),
+             localStart.toString(Qt::ISODateWithMs));
+    const auto today =
+        QDateTime::currentDateTimeUtc().date().startOfDay(QTimeZone("UTC"));
+    model.requestComparison("ongoing", "codex", today, today.addDays(1));
+    model.requestComparison("unaligned", "codex", today.addDays(-1).addSecs(1),
+                            today);
+    model.requestComparison("zone", "codex", today.addDays(-1), today, {},
+                            "invalid");
+    model.requestComparison("model", "codex", today.addDays(-1), today, {},
+                            "UTC", {{"modelId", 1}});
+    QTRY_COMPARE(failures.size(), 4);
+    for (const auto &failure : failures)
+      QCOMPARE(failure[1].toString(), "session-invalid-query");
+  }
+
+  void comparisonAndActivityDiscardResultsAfterClear() {
+    SessionFixture fixture;
+    QVERIFY(fixture.valid);
+    LocalSessionModel model;
+    QSignalSpy activity(&model, &LocalSessionModel::activitySummaryReady);
+    QSignalSpy comparison(&model, &LocalSessionModel::comparisonReady);
+    QSignalSpy cleared(&model, &LocalSessionModel::clearFinished);
+    const auto to =
+        QDateTime::currentDateTimeUtc().date().startOfDay(QTimeZone("UTC"));
+    model.requestActivitySummary("stale", "codex", to.addDays(-1), to);
+    model.requestComparison("stale", "codex", to.addDays(-1), to);
+    model.clearSessions("clear");
+    QTRY_COMPARE(cleared.size(), 1);
+    QTest::qWait(100);
+    QCOMPARE(activity.size(), 0);
+    QCOMPARE(comparison.size(), 0);
+    model.requestActivitySummary("fresh", "codex", to.addDays(-1), to);
+    QTRY_COMPARE(activity.size(), 1);
+    QCOMPARE(activity.first()[0].toString(), "fresh");
+  }
+
   void oversizedRecordsDoNotBlockLaterUsageOrContextReplay() {
     SessionFixture fixture;
     QVERIFY(fixture.valid);
@@ -2315,6 +2705,10 @@ private Q_SLOTS:
         QStringLiteral("2026-10-11T00:00:00.000Z"), Qt::ISODateWithMs);
     QElapsedTimer timer;
     timer.start();
+    QSignalSpy activitySpy(&model, &LocalSessionModel::activitySummaryReady);
+    QSignalSpy comparisonSpy(&model, &LocalSessionModel::comparisonReady);
+    model.requestActivitySummary("perf-activity", "codex", from, to);
+    model.requestComparison("perf-comparison", "codex", from, to);
     model.requestSessions(QStringLiteral("perf-sessions"),
                           QStringLiteral("codex"), from, to, {}, 0, 100,
                           {{"modelId", QStringLiteral("gpt-5-codex")}});
@@ -2325,6 +2719,19 @@ private Q_SLOTS:
       QVERIFY(sessionsSpy.wait(10000));
     if (summarySpy.isEmpty())
       QVERIFY(summarySpy.wait(10000));
+    if (activitySpy.isEmpty())
+      QVERIFY(activitySpy.wait(10000));
+    if (comparisonSpy.isEmpty())
+      QVERIFY(comparisonSpy.wait(10000));
+    QCOMPARE(activitySpy.first()[1].toMap().value("eventCount").toInt(),
+             100000);
+    QCOMPARE(comparisonSpy.first()[1]
+                 .toMap()
+                 .value("current")
+                 .toMap()
+                 .value("eventCount")
+                 .toInt(),
+             100000);
     QCOMPARE(sessionsSpy.takeFirst().at(1).toList().size(), 100);
     QCOMPARE(summarySpy.takeFirst()
                  .at(1)
@@ -2335,6 +2742,63 @@ private Q_SLOTS:
     QVERIFY2(
         timer.elapsed() < 10000,
         qPrintable(QStringLiteral("Queries took %1 ms").arg(timer.elapsed())));
+    if (qEnvironmentVariableIsSet("AI_MONITOR_SESSION_BENCHMARK")) {
+      // ABBA order balances warm-cache and execution-order effects. Measure
+      // completed public async requests against the same already-seeded DB.
+      QList<double> summarySamples, activitySamples;
+      const auto sample = [&](bool lightweight, const QString &id) -> double {
+        auto &spy = lightweight ? activitySpy : summarySpy;
+        spy.clear();
+        QElapsedTimer elapsed;
+        elapsed.start();
+        if (lightweight)
+          model.requestActivitySummary(id, "codex", from, to);
+        else
+          model.requestSummary(id, "codex", from, to);
+        if (spy.isEmpty() && !spy.wait(10000))
+          return -1;
+        if (spy.first()[0].toString() != id ||
+            spy.first()[1].toMap().value("eventCount").toInt() != 100000)
+          return -1;
+        return double(elapsed.nsecsElapsed()) / 1000000.0;
+      };
+      for (int round = 0; round < 7; ++round) {
+        for (int position = 0; position < 4; ++position) {
+          const bool lightweight = position == 1 || position == 2;
+          const double milliseconds =
+              sample(lightweight,
+                     QStringLiteral("abba-%1-%2").arg(round).arg(position));
+          QVERIFY(milliseconds >= 0);
+          (lightweight ? activitySamples : summarySamples).append(milliseconds);
+        }
+      }
+      const auto median = [](QList<double> samples) {
+        std::sort(samples.begin(), samples.end());
+        const auto middle = samples.size() / 2;
+        return (samples[middle - 1] + samples[middle]) / 2.0;
+      };
+      QJsonArray summaryJson, activityJson;
+      for (double value : summarySamples)
+        summaryJson.append(value);
+      for (double value : activitySamples)
+        activityJson.append(value);
+      const auto summaryMedian = median(summarySamples);
+      const auto activityMedian = median(activitySamples);
+      const QJsonObject measurement{
+          {"fixture", "100000-events-1000-sessions-20-projects"},
+          {"order", "ABBA"},
+          {"rounds", 7},
+          {"samplesPerQuery", 14},
+          {"fullSummaryMedianMs", summaryMedian},
+          {"activitySummaryMedianMs", activityMedian},
+          {"reductionPercent",
+           100.0 * (summaryMedian - activityMedian) / summaryMedian},
+          {"fullSummarySamplesMs", summaryJson},
+          {"activitySummarySamplesMs", activityJson}};
+      qInfo().noquote()
+          << "SESSION_METRIC"
+          << QJsonDocument(measurement).toJson(QJsonDocument::Compact);
+    }
     qunsetenv("HOME");
     qunsetenv("XDG_DATA_HOME");
   }
@@ -2627,6 +3091,98 @@ private Q_SLOTS:
              QStringLiteral("partial"));
     if (restartedImport.isEmpty())
       QVERIFY(restartedImport.wait(5000));
+    qunsetenv("HOME");
+    qunsetenv("XDG_DATA_HOME");
+  }
+
+  void crossToolComparisonIncludesToolBreakdownAndShareMetrics() {
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    qunsetenv("CODEX_HOME");
+    qunsetenv("CLAUDE_CONFIG_DIR");
+    qputenv("XDG_DATA_HOME", QFile::encodeName(dir.path()));
+    qputenv("HOME", QFile::encodeName(dir.path()));
+    const QString dataRoot =
+        QStandardPaths::writableLocation(QStandardPaths::GenericDataLocation);
+    QVERIFY(
+        QDir().mkpath(dataRoot + QStringLiteral("/plasma-ai-usage-monitor")));
+    const QString path =
+        dataRoot + QStringLiteral("/plasma-ai-usage-monitor/usage_history.db");
+    const QString connection = QStringLiteral("cross_tool_comparison_seed");
+    auto db = QSqlDatabase::addDatabase(QStringLiteral("QSQLITE"), connection);
+    db.setDatabaseName(path);
+    QVERIFY(db.open());
+    QSqlQuery q(db);
+    QVERIFY(q.exec(QStringLiteral("PRAGMA user_version=8")));
+    QString error;
+    QVERIFY2(BudgetPolicySchema::migrateSessionSchema(db, &error),
+             qPrintable(error));
+    QVERIFY(q.exec(QStringLiteral(
+        "INSERT INTO local_sessions(session_id,tool_id,project_id,started_at_"
+        "utc,last_seen_at_utc) VALUES"
+        "('s-codex','codex','proj-1','2026-10-10T10:00:00.000Z','2026-10-10T10:"
+        "05:00.000Z'),"
+        "('s-claude','claude-code','proj-1','2026-10-10T11:00:00.000Z','2026-"
+        "10-10T11:05:00.000Z')")));
+    QVERIFY(q.exec(QStringLiteral(
+        "INSERT INTO local_usage_events(event_id,session_id,observed_at_utc,"
+        "model_id,input_tokens,output_tokens,cache_read_tokens,"
+        "cache_write_tokens,parser_revision) VALUES"
+        "('e-codex','s-codex','2026-10-10T10:05:00.000Z','gpt-5-codex',600,150,"
+        "300,0,1),"
+        "('e-claude','s-claude','2026-10-10T11:05:00.000Z','claude-sonnet-4-5',"
+        "200,50,50,0,1)")));
+    q.finish();
+    db.close();
+    db = {};
+    QSqlDatabase::removeDatabase(connection);
+
+    LocalSessionModel model;
+    QSignalSpy comparisonSpy(&model, &LocalSessionModel::comparisonReady);
+    const auto from = QDateTime::fromString(
+        QStringLiteral("2026-10-10T00:00:00.000Z"), Qt::ISODateWithMs);
+    const auto to = QDateTime::fromString(
+        QStringLiteral("2026-10-11T00:00:00.000Z"), Qt::ISODateWithMs);
+    model.requestComparison(QStringLiteral("cmp-all"), QStringLiteral("all"),
+                            from, to, {}, QStringLiteral("UTC"));
+    if (comparisonSpy.isEmpty())
+      QVERIFY(comparisonSpy.wait(5000));
+    const QVariantMap result = comparisonSpy.takeFirst().at(1).toMap();
+    QCOMPARE(result.value(QStringLiteral("toolId")).toString(),
+             QStringLiteral("all"));
+    const QVariantList toolBreakdown =
+        result.value(QStringLiteral("toolBreakdown")).toList();
+    QCOMPARE(toolBreakdown.size(), 2);
+    QVariantMap codexTool;
+    for (const QVariant &item : toolBreakdown) {
+      if (item.toMap().value(QStringLiteral("toolId")).toString() ==
+          QStringLiteral("codex-cli")) {
+        codexTool = item.toMap();
+        break;
+      }
+    }
+    QCOMPARE(codexTool.value(QStringLiteral("toolId")).toString(),
+             QStringLiteral("codex-cli"));
+    QCOMPARE(codexTool.value(QStringLiteral("current"))
+                 .toMap()
+                 .value(QStringLiteral("totalTokens"))
+                 .toLongLong(),
+             750);
+    QCOMPARE(codexTool.value(QStringLiteral("sharePercent")).toDouble(), 75.0);
+    QCOMPARE(codexTool.value(QStringLiteral("cacheHitPercent")).toDouble(),
+             50.0);
+
+    bool foundTopToolInsight = false;
+    const QVariantList insights =
+        result.value(QStringLiteral("insights")).toList();
+    for (const QVariant &item : insights) {
+      if (item.toMap().value(QStringLiteral("key")).toString() ==
+          QStringLiteral("top-tool")) {
+        foundTopToolInsight = true;
+        break;
+      }
+    }
+    QVERIFY(foundTopToolInsight);
     qunsetenv("HOME");
     qunsetenv("XDG_DATA_HOME");
   }

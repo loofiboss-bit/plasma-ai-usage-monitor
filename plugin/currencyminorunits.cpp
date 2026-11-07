@@ -59,7 +59,10 @@ std::optional<qint64> CurrencyMinorUnits::fromMajor(double value,
   const std::optional<int> precision = digits(currency);
   if (!precision || !std::isfinite(value))
     return std::nullopt;
-  const double factor = std::pow(10.0, *precision);
+  qint64 intFactor = 1;
+  for (int i = 0; i < *precision; ++i)
+    intFactor *= 10;
+  const double factor = static_cast<double>(intFactor);
   const double scaled = value * factor;
   if (scaled < static_cast<double>(std::numeric_limits<qint64>::min()) ||
       scaled > static_cast<double>(std::numeric_limits<qint64>::max()))
@@ -72,5 +75,8 @@ std::optional<double> CurrencyMinorUnits::toMajor(qint64 value,
   const std::optional<int> precision = digits(currency);
   if (!precision)
     return std::nullopt;
-  return static_cast<double>(value) / std::pow(10.0, *precision);
+  qint64 intFactor = 1;
+  for (int i = 0; i < *precision; ++i)
+    intFactor *= 10;
+  return static_cast<double>(value) / static_cast<double>(intFactor);
 }

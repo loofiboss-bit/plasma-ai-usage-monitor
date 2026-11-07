@@ -20,6 +20,9 @@ TestCase {
         property bool notifyOnBudgetWarning: true
         property bool notifyOnDisconnect: true
         property bool notifyOnReconnect: true
+        property bool notifyOnQuotaReset: true
+        property bool favoriteOnlyWarnings: false
+        property var favoriteSourceIds: []
         property bool notifyOnUpdate: false
         property bool forecastNotificationsEnabled: true
         property int forecastLeadTimeHours: 24
@@ -259,6 +262,9 @@ TestCase {
         fakeConfiguration.notifyOnBudgetWarning = true;
         fakeConfiguration.notifyOnDisconnect = true;
         fakeConfiguration.notifyOnReconnect = true;
+        fakeConfiguration.notifyOnQuotaReset = true;
+        fakeConfiguration.favoriteOnlyWarnings = false;
+        fakeConfiguration.favoriteSourceIds = [];
         fakeConfiguration.warningThreshold = 80;
         fakeConfiguration.criticalThreshold = 95;
         fakeConfiguration.notificationCooldownMinutes = 15;
@@ -552,5 +558,66 @@ TestCase {
         })));
         compare(fakeBudgetPolicyRepository.nextEventId, 2);
         compare(notificationSpy.count, 1);
+    }
+
+    function test_quotaResetTransitionNotifiesWhenConstrainedWindowResets() {
+        var reset = new Date(Date.now() + 60 * 60 * 1000);
+        controller.processSourceRow(sourceRow({
+            stableId: "codex-cli",
+            displayName: "Codex CLI",
+            sourceKind: "local_tool",
+            attentionSeverity: "warning",
+            attentionReasonKey: "quota_warning",
+            percentUsedAvailable: true,
+            percentUsed: 88,
+            quotaWindows: [quota("5h rolling", 12, "actual", reset)]
+        }));
+        compare(notificationSpy.count, 0);
+
+        controller.processSourceRow(sourceRow({
+            stableId: "codex-cli",
+            displayName: "Codex CLI",
+            sourceKind: "local_tool",
+            attentionSeverity: "none",
+            attentionReasonKey: "none",
+            percentUsedAvailable: true,
+            percentUsed: 5,
+            quotaWindows: [quota("5h rolling", 95, "actual", reset)]
+        }));
+        compare(notificationSpy.count, 1);
+        compare(payload(0).type, "quota_reset");
+        compare(payload(0).sourceId, "codex-cli");
+        compare(payload(0).linkText, "Open Source Details");
+        verify(payload(0).message.indexOf("5h rolling") >= 0);
+    }
+
+    function test_favoriteOnlyWarningsSuppressesNonFavoritesButNeverSuppressesCritical() {
+        fakeConfiguration.favoriteOnlyWarnings = true;
+        fakeConfiguration.favoriteSourceIds = ["codex-cli"];
+
+        controller.processSourceRow(sourceRow({ stableId: "openai", displayName: "OpenAI" }));
+        controller.processSourceRow(sourceRow({
+            stableId: "openai",
+            displayName: "OpenAI",
+            attentionSeverity: "warning",
+            attentionReasonKey: "quota_warning",
+            percentUsedAvailable: true,
+            percentUsed: 85,
+            quotaWindows: [quota("Requests", 15, "actual")]
+        }));
+        compare(notificationSpy.count, 0);
+
+        controller.processSourceRow(sourceRow({
+            stableId: "openai",
+            displayName: "OpenAI",
+            attentionSeverity: "critical",
+            attentionReasonKey: "quota_critical",
+            percentUsedAvailable: true,
+            percentUsed: 97,
+            quotaWindows: [quota("Requests", 3, "actual")]
+        }));
+        compare(notificationSpy.count, 1);
+        compare(payload(0).severity, "critical");
+        compare(payload(0).sourceId, "openai");
     }
 }

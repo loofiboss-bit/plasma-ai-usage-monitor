@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [26.0.0] — 2026-11-01
+
+### Added
+
+- Shared favorite sources with a favorites filter and preserved navigation state.
+- Actionable Daily Focus facts and source-scoped Plasma panel presentation.
+- Optional panel metrics for today's reported session tokens and session count.
+- Previous-period comparisons for completed local calendar days, with project
+  and model contributions, token-category coverage and deterministic local insights.
+
+### Changed
+
+- Share lightweight local activity summaries between Overview and panel.
+- Bound compact labels and tooltips; show global warning symbols in text modes.
+- Preserve ASCII numeric validation while removing repeated regex compilation.
+- Qualify an uncommitted candidate against v25 using source identities and isolated runtime measurements.
+
+### Compatibility
+
+- Preserve SQLite schema v9, portable configuration schema v3, session export
+  schema v1, existing panel aliases and independent session consent.
+
 ## [25.0.1] — 2026-10-23
 
 ### Fixed

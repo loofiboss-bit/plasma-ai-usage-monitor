@@ -18,7 +18,8 @@ class LocalSessionModel : public QObject {
   Q_PROPERTY(
       bool claudeCodeEnabled READ claudeCodeEnabled NOTIFY enabledChanged)
   Q_PROPERTY(QString status READ status NOTIFY statusChanged)
-  Q_PROPERTY(QVariantMap importStates READ importStates NOTIFY importStatesChanged)
+  Q_PROPERTY(
+      QVariantMap importStates READ importStates NOTIFY importStatesChanged)
   Q_PROPERTY(
       int pendingWorkerCount READ pendingWorkerCount NOTIFY statusChanged)
   Q_PROPERTY(int retentionDays READ retentionDays WRITE setRetentionDays NOTIFY
@@ -40,6 +41,16 @@ public:
                   const QDateTime &fromUtc, const QDateTime &toUtc,
                   const QString &projectId = {}, int offset = 0,
                   int limit = 100, const QVariantMap &modelFilter = {});
+  Q_INVOKABLE void requestActivitySummary(const QString &requestId,
+                                          const QString &toolId,
+                                          const QDateTime &fromUtc,
+                                          const QDateTime &toUtc);
+  Q_INVOKABLE void
+  requestComparison(const QString &requestId, const QString &toolId,
+                    const QDateTime &fromUtc, const QDateTime &toUtc,
+                    const QString &projectId = {},
+                    const QString &timeZoneId = QStringLiteral("UTC"),
+                    const QVariantMap &modelFilter = {});
   Q_INVOKABLE void requestSummary(const QString &requestId,
                                   const QString &toolId,
                                   const QDateTime &fromUtc,
@@ -72,6 +83,9 @@ signals:
   void importStatesChanged();
   void queryFailed(const QString &requestId, const QString &errorKey);
   void sessionsReady(const QString &requestId, const QVariantList &rows);
+  void activitySummaryReady(const QString &requestId,
+                            const QVariantMap &summary);
+  void comparisonReady(const QString &requestId, const QVariantMap &comparison);
   void summaryReady(const QString &requestId, const QVariantMap &summary);
   void dailyReady(const QString &requestId, const QVariantList &rows);
   void exportReady(const QString &requestId, const QString &errorKey);

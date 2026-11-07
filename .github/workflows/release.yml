@@ -9,7 +9,51 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  fedora-rpm-artifacts:
+    strategy:
+      fail-fast: false
+      matrix:
+        fedora_version: ['44', '45']
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container: fedora:${{ matrix.fedora_version }}
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - run: dnf install -y git rpm-build dnf5-plugins python3 python3-pyqt6 tar gzip
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with: { fetch-depth: 0, persist-credentials: false }
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: bash scripts/verify_exact_tag.sh "$GITHUB_REF_NAME"
+      - name: Install spec build dependencies
+        run: dnf builddep -y plasma-ai-usage-monitor.spec
+      - name: Build and verify exact-tag RPM for Fedora ${{ matrix.fedora_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          rpm_root="$RUNNER_TEMP/rpmbuild"
+          mkdir -p "$rpm_root/SOURCES" dist-rpm
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_source_tarball.sh --output-dir "$rpm_root/SOURCES"
+          rpmbuild -ba --define "_topdir $rpm_root" --define '_smp_mflags -j2' --define '_smp_build_ncpus 2' plasma-ai-usage-monitor.spec
+          source /etc/os-release
+          test "$ID" = fedora && test "$VERSION_ID" = "${{ matrix.fedora_version }}"
+          ! rpm -q plasma-ai-usage-monitor
+          dnf install -y --setopt=localpkg_gpgcheck=False "$rpm_root"/RPMS/*/plasma-ai-usage-monitor-[0-9]*.rpm
+          test "$(rpm -q --qf '%{VERSION}' plasma-ai-usage-monitor)" = "$(cat VERSION)"
+          rpm -V plasma-ai-usage-monitor
+          test -f /usr/share/plasma/plasmoids/com.github.loofi.aiusagemonitor/metadata.json
+          test -f /usr/lib64/qt6/qml/com/github/loofi/aiusagemonitor/libaiusagemonitorplugin.so
+          python3 scripts/smoke_test_installed_qml.py
+          cp "$rpm_root"/RPMS/*/plasma-ai-usage-monitor-[0-9]*.fc${{ matrix.fedora_version }}.*.rpm dist-rpm/
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          retention-days: 7
+          name: fedora-${{ matrix.fedora_version }}-rpm
+          path: dist-rpm/*.rpm
+          if-no-files-found: error
+
   exact-tag-artifacts:
+    needs: fedora-rpm-artifacts
     permissions:
       contents: write
       id-token: write
@@ -28,6 +72,14 @@ jobs:
       - run: mkdir -p dist && SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_source_tarball.sh --output-dir dist
       - run: SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) bash scripts/package_plasmoid.sh --output-dir dist
       - run: python3 scripts/generate_source_sbom.py --tag "$GITHUB_REF_NAME" --output dist/source.spdx.json
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: fedora-44-rpm
+          path: dist/
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
+        with:
+          name: fedora-45-rpm
+          path: dist/
       - run: cd dist && sha256sum * > SHA256SUMS.txt
       - name: Attest exact-tag release artifacts
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2

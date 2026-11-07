@@ -13,7 +13,9 @@ Item {
     property string modelMigrationNotice: ""
     property int pendingSettingsVerificationId: 0
     property string pendingSettingsVerificationSourceId: ""
+    property string pendingNotificationSourceId: ""
     property bool diagnosticsSnapshotScheduled: false
+    signal notificationSourceRequested(string stableId)
     readonly property string runtimeSessionId: Date.now().toString(36) + "-" + Math.random().toString(36).slice(2)
     readonly property string pluginVersion: AppInfo.version
     readonly property string smokeView: AppInfo.smokeView
@@ -27,6 +29,7 @@ Item {
     Components.DailyOverviewState {
         id: tooltipState
         dailyState: root.presentationDailyState
+        favoriteSourceIds: root.favoriteSourceIds
     }
     property bool popupExpanded: false
     // qmllint enable unresolved-type
@@ -49,6 +52,21 @@ Item {
     property alias bedrock: bedrockBackend
     property alias usageDb: usageDatabase
     property alias localSessions: localSessionModel
+    property alias sessionActivity: sessionActivityState
+    readonly property var favoriteSourceIds: Plasmoid.configuration.favoriteSourceIds || []
+    function isFavorite(stableId) { return favoriteSourceIds.indexOf(stableId) >= 0; }
+    function toggleFavorite(stableId) {
+        var ids = Array.from(favoriteSourceIds);
+        var index = ids.indexOf(stableId);
+        if (index >= 0) ids = ids.filter(function(id) { return id !== stableId; });
+        else ids.push(stableId);
+        Plasmoid.configuration.favoriteSourceIds = ids;
+    }
+    Components.SessionActivityState {
+        id: sessionActivityState
+        sessionModel: localSessionModel
+        presentationTime: dailyStateModel.presentationTime
+    }
     property alias refreshScheduler: refreshScheduler
     property alias sourceReadiness: sourceReadinessModel
     property alias dailyState: dailyStateModel
@@ -188,6 +206,15 @@ Item {
             return true;
         }
         return false;
+    }
+
+    function openNotificationSource(stableId) {
+        if (!stableId) return false;
+        pendingNotificationSourceId = stableId;
+        Plasmoid.expanded = true;
+        popupExpanded = true;
+        notificationSourceRequested(stableId);
+        return true;
     }
 
     function settingsVerificationMessage(source) {
@@ -725,6 +752,7 @@ Item {
         webhookNotifier: webhookNotifier
         budgetPolicyRepository: budgetPolicyRepository
         onPolicyRequested: policyId => root.openBudgetPolicy(policyId)
+        onSourceRequested: stableId => root.openNotificationSource(stableId)
     }
 
     RefreshScheduler {

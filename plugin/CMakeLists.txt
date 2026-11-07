@@ -43,6 +43,7 @@ set(aiusagemonitor_SRCS
     analystquery.cpp
     localsessionparser.cpp
     localsessionmodel.cpp
+    sessionquery.cpp
     usagedatabase.cpp
     updatechecker.cpp
     subscriptiontoolbackend.cpp
@@ -107,6 +108,7 @@ set(aiusagemonitor_HDRS
     analystquery.h
     localsessionparser.h
     localsessionmodel.h
+    sessionquery.h
     usagedatabase.h
     clipboardhelper.h
     updatechecker.h

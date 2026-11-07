@@ -14,6 +14,8 @@ KCM.SimpleKCM {
 
     property alias cfg_refreshInterval: refreshSlider.value
     property string cfg_compactDisplayMode: Plasmoid.configuration.compactDisplayMode
+    property string cfg_panelSourceScope: Plasmoid.configuration.panelSourceScope || "automatic"
+    property string cfg_panelSourceId: Plasmoid.configuration.panelSourceId
     property bool cfg_advancedSettingsMode: Plasmoid.configuration.advancedSettingsMode
 
     property int cfg_openaiRefreshInterval: Plasmoid.configuration.openaiRefreshInterval
@@ -39,6 +41,28 @@ KCM.SimpleKCM {
     readonly property var enabledProviders: providerCatalog.providers.filter(function(provider) {
         return !!Plasmoid.configuration[provider.enabledConfigKey];
     })
+
+    readonly property var panelSourceChoices: {
+        var rows = [{id: "", label: i18n("Choose a source")}];
+        var providers = providerCatalog.providers;
+        for (var i = 0; i < providers.length; ++i) {
+            var provider = providers[i];
+            rows.push({id: provider.configKey, label: provider.displayName
+                + (!Plasmoid.configuration[provider.enabledConfigKey] ? i18n(" (disabled)") : "")});
+        }
+        var enabledKeys = {"google-antigravity": "antigravityEnabled", "claude-code": "claudeCodeEnabled",
+            "codex-cli": "codexEnabled", "github-copilot": "copilotEnabled", "cursor": "cursorEnabled",
+            "windsurf": "windsurfEnabled", "jetbrains-ai": "jetbrainsAiEnabled"};
+        var tools = SubscriptionPlanCatalog.tools();
+        for (var t = 0; t < tools.length; ++t) {
+            var tool = tools[t];
+            rows.push({id: tool.key, label: tool.label
+                + (!Plasmoid.configuration[enabledKeys[tool.key]] ? i18n(" (disabled)") : "")});
+        }
+        if (cfg_panelSourceId && !rows.some(function(row) { return row.id === generalPage.cfg_panelSourceId; }))
+            rows.push({id: cfg_panelSourceId, label: i18n("Saved source (unavailable)")});
+        return rows;
+    }
 
     function refreshValue(refreshConfigKey) {
         return generalPage["cfg_" + refreshConfigKey];
@@ -95,7 +119,9 @@ KCM.SimpleKCM {
                 i18n("Lowest live quota"),
                 i18n("Next live reset"),
                 i18n("Actual provider spend"),
-                i18n("Active sources")
+                i18n("Active sources"),
+                i18n("Local tokens today"),
+                i18n("Local sessions today")
             ]
             QQC2.ToolTip.text: i18n("Choose what to display next to the icon in the system panel")
             QQC2.ToolTip.visible: hovered
@@ -110,6 +136,8 @@ KCM.SimpleKCM {
                 case "actual-spend": return 4;
                 case "count":
                 case "active-sources": return 5;
+                case "session-tokens": return 6;
+                case "session-count": return 7;
                 default: return 0;
                 }
             }
@@ -120,11 +148,38 @@ KCM.SimpleKCM {
                 case 3: generalPage.cfg_compactDisplayMode = "next-reset"; break;
                 case 4: generalPage.cfg_compactDisplayMode = "actual-spend"; break;
                 case 5: generalPage.cfg_compactDisplayMode = "active-sources"; break;
+                case 6: generalPage.cfg_compactDisplayMode = "session-tokens"; break;
+                case 7: generalPage.cfg_compactDisplayMode = "session-count"; break;
                 default: generalPage.cfg_compactDisplayMode = "icon"; break;
                 }
             }
         }
 
+        QQC2.ComboBox {
+            Kirigami.FormData.label: i18n("Panel sources:")
+            model: [i18n("Automatic (favorites, otherwise all)"), i18n("All sources"), i18n("One source")]
+            currentIndex: ["automatic", "all", "source"].indexOf(generalPage.cfg_panelSourceScope)
+            onActivated: function(index) { generalPage.cfg_panelSourceScope = ["automatic", "all", "source"][index]; }
+        }
+        QQC2.ComboBox {
+            objectName: "panelSourceSelector"
+            Kirigami.FormData.label: i18n("Source:")
+            visible: generalPage.cfg_panelSourceScope === "source"
+            model: generalPage.panelSourceChoices
+            textRole: "label"
+            valueRole: "id"
+            currentIndex: generalPage.panelSourceChoices.findIndex(function(row) {
+                return row.id === generalPage.cfg_panelSourceId;
+            })
+            onActivated: function(index) { generalPage.cfg_panelSourceId = generalPage.panelSourceChoices[index].id; }
+            Accessible.name: i18n("Panel source")
+        }
+        QQC2.Label {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: i18n("Automatic uses your favorites when configured. Disabled or unavailable favorites remain unavailable; global warnings stay visible.")
+            color: Kirigami.Theme.disabledTextColor
+        }
         QQC2.Switch {
             Kirigami.FormData.label: i18n("Advanced settings:")
             checked: generalPage.cfg_advancedSettingsMode

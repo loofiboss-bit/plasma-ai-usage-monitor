@@ -142,7 +142,10 @@ QtObject {
             "openaiProjectId", "azureDeploymentId", "bedrockRegion",
             "googleTier", "googleveoTier", "browserSyncEnabled",
             "browserSyncBrowser", "browserSyncInterval", "browserSyncProfile"
-        ]);
+        ]).filter(function(key) {
+            // Other settings pages own additional catalog capabilities.
+            return configuration[configProperty(key)] !== undefined;
+        });
     }
 
     function takeSnapshot() {

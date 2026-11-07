@@ -139,4 +139,17 @@ TestCase {
         verify(ConfigPortability.settingsPayload({warningThreshold: 85, prometheusPort: 1024}, keys, current).ok);
     }
 
+    function test_favorite_string_list_and_scope_validation() {
+        var keys = ["favoriteSourceIds", "panelSourceScope", "panelSourceId"];
+        var current = {favoriteSourceIds: [], panelSourceScope: "automatic", panelSourceId: ""};
+        verify(ConfigPortability.settingsPayload({favoriteSourceIds: ["future-source", "codex-cli"],
+            panelSourceScope: "source", panelSourceId: "disabled-source"}, keys, current).ok);
+        var bad = [{favoriteSourceIds: {}}, {favoriteSourceIds: [3]},
+            {favoriteSourceIds: [""]}, {panelSourceScope: "favorites"}, {panelSourceId: 1}];
+        for (var i = 0; i < bad.length; ++i)
+            verify(!ConfigPortability.settingsPayload(bad[i], keys, current).ok);
+        verify(ConfigPortability.settingValueValid("compactDisplayMode", "session-tokens"));
+        verify(ConfigPortability.settingValueValid("compactDisplayMode", "session-count"));
+        verify(ConfigPortability.settingValueValid("compactDisplayMode", "cost"));
+    }
 }

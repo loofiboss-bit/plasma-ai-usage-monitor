@@ -1,10 +1,26 @@
 # Roadmap
 
-**Current release:** 25.0.1, Searchable Session History
+**Current release:** 26.0.0, AI Control Center & Smart Usage Experience
 
-**Last updated:** 2026-10-23
+**Last updated:** 2026-11-07
 
 ## Current release
+
+### 26.0.0 AI Control Center & Smart Usage Experience
+
+- Unified quota overview with shared favorite sources, quick filter pills (*All*, *Favorites*, *Needs attention*), and multi-window quota strips with reset countdowns + local clock times for Codex, Claude Code, Antigravity and API providers.
+- Actionable Daily Focus, keyboard navigation (`Alt+1..3`, `Escape`), bounded panel labels/tooltips with global warnings, and mouse-wheel cycling across favorite sources on the Plasma panel.
+- Source-scoped panel metrics and optional reported session totals for today.
+- Completed-calendar-day session comparisons across *All tools* (`By tool`), projects, models and days with token share (`sharePercent`), cache efficiency (`cacheHitPercent`), category coverage and local insights.
+- Actionable notifications with *Quota Reset Ready* (`quotaReset`), clickable *Open Source Details* actions, relative + clock reset times, and optional *Favorites only for warnings* (critical alerts always pass).
+- Consolidated hot-path performance optimizations and stability improvements (PRs #93–#105).
+- Preserve SQLite v9, configuration schema v3, session export v1 and independent consent.
+
+See the [v26 plan](docs/plans/PLASMA_AI_USAGE_MONITOR_V26_PLAN.md),
+[release notes](docs/release/v26.0.0-notes.md) and
+[qualification checklist](docs/release/v26.0.0-checklist.md).
+
+## Previous releases
 
 ### 25.0.1 RPM Build Dependency Correction
 

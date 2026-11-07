@@ -6,6 +6,8 @@ QtObject {
 
     property var summary: ({})
     property var presentationTime: new Date()
+    property var globalSummary: summary
+    property var activityTotals: ({available: false})
 
     property MetricAvailabilityFormatter formatter: MetricAvailabilityFormatter {}
 
@@ -17,12 +19,12 @@ QtObject {
         };
         var normalized = migration[mode] || mode;
         var supported = ["icon", "attention", "lowest-quota", "next-reset",
-                         "actual-spend", "active-sources", "dailycost", "requests"];
+                         "actual-spend", "active-sources", "dailycost", "requests", "session-tokens", "session-count"];
         return supported.indexOf(normalized) >= 0 ? normalized : "icon";
     }
 
     function statusKey() {
-        var severity = summary.highestSeverity || "none";
+        var severity = globalSummary.highestSeverity || "none";
         if (severity !== "none") return severity;
         if (Number(summary.reportingUsefulSourceCount || 0) > 0) return "healthy";
         if (Number(summary.connectivityOnlySourceCount || 0) > 0) return "connectivity";
@@ -44,6 +46,14 @@ QtObject {
 
     function displayText(mode) {
         var normalized = normalizeMode(mode);
+        if (normalized === "session-tokens" || normalized === "session-count") {
+            if (!activityTotals.available) return formatter.unavailableValue();
+            var value = normalized === "session-count" ? activityTotals.sessionCount : activityTotals.totalTokens;
+            if (typeof value !== "number" || !Number.isFinite(value)) return formatter.unavailableValue();
+            return (normalized === "session-count" ? i18np("%1 session", "%1 sessions", value)
+                : i18n("%1 tokens", value.toLocaleString(Qt.locale(), "f", 0)))
+                + (activityTotals.partial ? i18n(" · partial") : "");
+        }
         if (normalized === "attention") {
             var urgent = summary.mostUrgentSource || {};
             if (urgent.stableId) return urgent.displayName;
@@ -82,19 +92,19 @@ QtObject {
     }
 
     function summaryText() {
-        var enabled = Number(summary.enabledSourceCount || 0);
-        var useful = Number(summary.reportingUsefulSourceCount || 0);
+        var enabled = Number(globalSummary.enabledSourceCount || 0);
+        var useful = Number(globalSummary.reportingUsefulSourceCount || 0);
         var parts = [];
-        var urgent = summary.mostUrgentSource || {};
-        var severity = summary.highestSeverity || "none";
+        var urgent = globalSummary.mostUrgentSource || {};
+        var severity = globalSummary.highestSeverity || "none";
         if (urgent.stableId && (severity === "critical" || severity === "warning")) {
             parts.push(severity === "critical"
                 ? i18n("Critical: %1", urgent.displayName)
                 : i18n("Warning: %1", urgent.displayName));
         }
         parts.push(i18n("%1 of %2 active sources", useful, enabled));
-        var connectivity = Number(summary.connectivityOnlySourceCount || 0);
-        var attention = Number(summary.attentionSourceCount || 0);
+        var connectivity = Number(globalSummary.connectivityOnlySourceCount || 0);
+        var attention = Number(globalSummary.attentionSourceCount || 0);
         if (connectivity > 0)
             parts.push(i18np("%1 connectivity only", "%1 connectivity only", connectivity));
         if (attention > 0)

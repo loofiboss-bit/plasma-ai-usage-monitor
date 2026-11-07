@@ -117,7 +117,7 @@ KCM.SimpleKCM {
     CopilotMonitor { id: copilotDetector; Component.onCompleted: checkToolInstalled() }
 
     readonly property var portableConfigKeys: [
-        "refreshInterval", "compactDisplayMode", "setupWizardCompleted", "setupWizardDismissed",
+        "refreshInterval", "compactDisplayMode", "favoriteSourceIds", "panelSourceScope", "panelSourceId", "setupWizardCompleted", "setupWizardDismissed",
         "setupWizardInProgress", "setupWizardStep", "setupWizardGoal", "setupWizardSourceId", "advancedSettingsMode",
         "settingsVerificationRequestId", "settingsVerificationCompletedRequestId", "settingsVerificationSourceId",
         "settingsVerificationState", "settingsVerificationMessage", "settingsVerificationTimestamp",
@@ -135,7 +135,7 @@ KCM.SimpleKCM {
         "openrouterEnabled", "openrouterModel", "openrouterCustomBaseUrl", "togetherEnabled", "togetherModel",
         "togetherCustomBaseUrl", "cohereEnabled", "cohereModel", "cohereCustomBaseUrl", "googleveoEnabled",
         "googleveoModel", "googleveoTier", "googleveoCustomBaseUrl", "litellmEnabled", "litellmModel", "litellmCustomBaseUrl", "cerebrasEnabled", "cerebrasModel", "cerebrasCustomBaseUrl", "fireworksEnabled", "fireworksModel", "fireworksCustomBaseUrl", "perplexityEnabled", "perplexityModel", "perplexityCustomBaseUrl", "alertsEnabled", "warningThreshold",
-        "criticalThreshold", "notifyOnError", "notifyOnBudgetWarning", "notifyOnDisconnect", "notifyOnReconnect",
+        "criticalThreshold", "notifyOnError", "notifyOnBudgetWarning", "notifyOnDisconnect", "notifyOnReconnect", "notifyOnQuotaReset", "favoriteOnlyWarnings",
         "notificationCooldownMinutes", "dndStartHour", "dndEndHour", "openaiNotificationsEnabled", "anthropicNotificationsEnabled",
         "googleNotificationsEnabled", "mistralNotificationsEnabled", "deepseekNotificationsEnabled", "groqNotificationsEnabled", "xaiNotificationsEnabled",
         "ollamaNotificationsEnabled", "openrouterNotificationsEnabled", "togetherNotificationsEnabled", "cohereNotificationsEnabled", "googleveoNotificationsEnabled",

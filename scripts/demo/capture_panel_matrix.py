@@ -34,7 +34,7 @@ def inner(args):
     services = []
     try:
         run(["dbus-update-activation-environment", "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE"])
-        services.append(subprocess.Popen(["/usr/libexec/at-spi-bus-launcher", "--launch-immediately", "--a11y=1"]))
+        services.append(subprocess.Popen(["/usr/libexec/at-spi-bus-launcher", "--launch-immediately"]))
         time.sleep(1)
         services.append(subprocess.Popen(["/usr/libexec/at-spi2-registryd", "--dbus-name", "org.a11y.atspi.Registry"]))
         plasma = subprocess.Popen(["plasmashell"])

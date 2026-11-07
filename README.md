@@ -16,14 +16,19 @@ KWallet and history stays on your computer.
 [Latest release](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/latest) ·
 [Report a problem](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/issues)
 
-The **25.0.1 release (Searchable Session History)** includes V25's searchable
-local project and model filters, daily and custom date views, consistent session
-summaries, and manual JSON/CSV exports. This patch fixes a missing RPM build-test
-dependency found during COPR publication; session behavior and data formats are
-unchanged. Session import remains optional for each tool. Read the
-[session guide](docs/user-guide/coding-sessions.md),
-[release notes](docs/release/v25.0.1-notes.md), or
-[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v25.0.1).
+The **26.0.0 release (Smart Usage Experience)** upgrades the widget into an AI
+Control Center with multi-window quota strips, quick filter pills, shared
+favorite sources, a personal Daily Focus, source-scoped panel metrics (with
+mouse-wheel favorite cycling), actionable reset and warning notifications, and
+cross-tool local session comparisons. Compare seven or 30 completed calendar
+days with the previous period across all tools or a single tool, inspect
+project, model, day and tool contributions with token share and cache-read
+efficiency, and see exactly which token categories were recorded.
+Session history remains independently optional for each tool. Quotas, actual
+provider spend, estimates and reported local session tokens stay separate.
+Read the [session guide](docs/user-guide/coding-sessions.md),
+[release notes](docs/release/v26.0.0-notes.md), or
+[GitHub Releases](https://github.com/loofiboss-bit/plasma-ai-usage-monitor/releases/tag/v26.0.0).
 
 ![AI Usage Monitor Overview in the Plasma popup](assets/screenshots/overview-popup.png)
 
@@ -34,8 +39,9 @@ Screenshots use deterministic synthetic data.
 Use the [Fedora COPR repository](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/).
 Its package includes both required parts: the Plasma widget and the matching
 compiled Qt plugin. You do not need a separate KDE Store download on Fedora.
-Fedora 44 is the release baseline; check the COPR project's available builds
-for your Fedora version before installing.
+Fedora 44 and Fedora 45 are supported release targets (with Fedora 43 also built
+on COPR); check the COPR project's available builds for your Fedora version
+before installing.
 
 ~~~bash
 sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor
@@ -150,6 +156,7 @@ handled as sensitive files.
 | Coding sessions in Source Detail | ![Codex session detail with reported token categories and project filters](assets/screenshots/coding-sessions-detail.png) |
 | Real history gap | ![History chart with an explicit missing-data gap](assets/screenshots/history-gap.png) |
 | Coding sessions in History | ![Daily coding-session tokens and a filtered session list](assets/screenshots/coding-sessions-history.png) |
+| Session period comparison | ![Completed local periods with token category coverage](assets/screenshots/coding-sessions-comparison.png) |
 | Analyst with sufficient data | ![Analyst snapshot with documented coverage and compatible spend](assets/screenshots/analyst-sufficient.png) |
 | Analyst with insufficient data | ![Analyst explaining unavailable results when samples are insufficient](assets/screenshots/analyst-insufficient.png) |
 | Guided setup | ![Guided first success source selection](assets/screenshots/guided-first-success.png) |

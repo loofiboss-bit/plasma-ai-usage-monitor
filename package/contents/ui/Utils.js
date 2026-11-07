@@ -111,8 +111,21 @@ function filterOverviewSourceRows(rows, searchText, needsAttention) {
         if (needsAttention && (!row.attentionSeverity || row.attentionSeverity === "none"))
             return false;
         if (!query) return true;
-        return [row.displayName, row.stableId, row.qualityClass, row.nextActionText]
-            .join(" ").toLocaleLowerCase().indexOf(query) >= 0;
+        if ((row.displayName && String(row.displayName).toLocaleLowerCase().indexOf(query) >= 0)
+            || (row.stableId && String(row.stableId).toLocaleLowerCase().indexOf(query) >= 0)
+            || (row.qualityClass && String(row.qualityClass).toLocaleLowerCase().indexOf(query) >= 0)
+            || (row.nextActionText && String(row.nextActionText).toLocaleLowerCase().indexOf(query) >= 0)) {
+            return true;
+        }
+        var windows = row.quotaWindows || [];
+        for (var i = 0; i < windows.length; ++i) {
+            var w = windows[i] || {};
+            if ((w.window && String(w.window).toLocaleLowerCase().indexOf(query) >= 0)
+                || (w.kind && String(w.kind).toLocaleLowerCase().indexOf(query) >= 0)) {
+                return true;
+            }
+        }
+        return false;
     });
 }
 

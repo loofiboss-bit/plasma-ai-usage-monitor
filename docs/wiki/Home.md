@@ -43,3 +43,11 @@ package. The KDE Store download requires the matching native plugin.
 ## Before asking for help
 
 Open **Settings → Diagnostics** and check the frontend and native-plugin versions, install layers, database, source readiness, KWallet, and catalogs. The native **Copy support report** action omits endpoint hosts, query strings, account IDs, project IDs, credentials, and KWallet values.
+
+## Personalize daily use
+
+Star sources in Overview or source details. Favorites are shared with the panel
+and appear first without hiding global problems. In General settings choose
+Automatic scope (favorites, or all sources when none are configured), all sources,
+or one source. A selected source without usable data remains unavailable.
+Panel session tokens/counts use the existing per-tool session-history opt-ins.

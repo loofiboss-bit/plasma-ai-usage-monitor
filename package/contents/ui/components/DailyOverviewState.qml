@@ -6,12 +6,15 @@ QtObject {
 
     property var dailyState: null
     property int revision: 0
+    property var favoriteSourceIds: []
+    property var sessionActivity: null
+    readonly property var globalSourceRows: buildSourceRows(false)
     readonly property var presentationTime: dailyState && dailyState.presentationTime
         ? dailyState.presentationTime : new Date()
 
     readonly property var summary: dailyState && dailyState.summary
         ? dailyState.summary : emptySummary()
-    readonly property var sourceRows: buildSourceRows()
+    readonly property var sourceRows: buildSourceRows(true)
     readonly property var attentionRows: filterRows(function(row) {
         return row.attentionSeverity && row.attentionSeverity !== "none";
     })
@@ -20,7 +23,12 @@ QtObject {
     readonly property var balanceRows: qualityRows("balance")
     readonly property var connectivityRows: qualityRows("connectivity_only")
     readonly property var unavailableRows: qualityRows("unavailable")
-    readonly property var topAction: attentionRows.length > 0 ? attentionRows[0] : ({})
+    readonly property var topAction: {
+        var rows = globalSourceRows.filter(function(row) {
+            return row.attentionSeverity && row.attentionSeverity !== "none";
+        });
+        return rows.length ? rows[0] : ({});
+    }
 
     property Connections dailyStateConnections: Connections {
         target: state.dailyState
@@ -59,13 +67,17 @@ QtObject {
         };
     }
 
-    function buildSourceRows() {
+    function buildSourceRows(favoritesFirst) {
         var currentRevision = revision;
         if (!dailyState || typeof dailyState.prioritizedSourceIds !== "function"
                 || typeof dailyState.source !== "function") return [];
         var ids = dailyState.prioritizedSourceIds() || [];
+        if (favoritesFirst) ids = favoriteSourceIds.concat(ids);
         var rows = [];
+        var seen = [];
         for (var i = 0; i < ids.length; i++) {
+            if (seen.indexOf(ids[i]) >= 0) continue;
+            seen.push(ids[i]);
             var row = dailyState.source(ids[i]);
             if (row && row.stableId) rows.push(row);
         }
@@ -95,7 +107,9 @@ QtObject {
             for (var j = 0; j < windows.length; ++j) {
                 var window = windows[j];
                 var remaining = window.percentRemaining;
-                if (window.sourceClass !== "actual"
+                if (window.sourceClass !== "actual" || window.available === false
+                        || window.freshnessState === "stale"
+                        || window.resetAt && new Date(window.resetAt).getTime() <= new Date(presentationTime).getTime()
                         || typeof remaining !== "number"
                         || !Number.isFinite(remaining)
                         || remaining < 0 || remaining > 100) continue;
@@ -106,10 +120,42 @@ QtObject {
         return null;
     }
 
+    function visibleQuotaWindows(row) {
+        if (!row || row.freshnessState === "stale" || row.freshnessState === "never")
+            return [];
+        var windows = row.quotaWindows || [];
+        var result = [];
+        var nowMs = new Date(presentationTime).getTime();
+        for (var i = 0; i < windows.length; ++i) {
+            var w = windows[i] || {};
+            var remaining = Number(w.percentRemaining);
+            if (w.available === false || w.freshnessState === "stale"
+                    || typeof w.percentRemaining !== "number"
+                    || !Number.isFinite(remaining)
+                    || remaining < 0 || remaining > 100)
+                continue;
+            if (w.resetAt && new Date(w.resetAt).getTime() <= nowMs)
+                continue;
+            var label = w.window || w.label || w.kind || i18n("Current");
+            var resetText = w.resetAt ? Utils.formatResetCountdown(w.resetAt, nowMs) : "";
+            result.push({
+                label: label,
+                percentRemaining: Math.round(remaining),
+                percentUsed: Math.round(100 - remaining),
+                sourceClass: w.sourceClass || "actual",
+                resetAt: w.resetAt || null,
+                resetText: resetText
+            });
+            if (result.length >= 3) break;
+        }
+        return result;
+    }
+
     function tooltipText() {
-        var lines = [];
-        for (var i = 0; i < sourceRows.length; ++i) {
-            var row = sourceRows[i];
+        var lines = [summaryText()];
+        var tooltipRows = sourceRows.slice(0, 5);
+        for (var i = 0; i < tooltipRows.length; ++i) {
+            var row = tooltipRows[i];
             var facts = [];
             if (row.freshnessState === "stale") {
                 facts.push(i18n("Stale · refresh this source"));
@@ -163,7 +209,9 @@ QtObject {
             }
             lines.push(i18n("%1: %2", row.displayName || row.stableId, facts.join(i18n(" · "))));
         }
-        return lines.length ? lines.join("\n") : i18n("Click to configure sources");
+        if (globalSourceRows.length > 5)
+            lines.push(i18np("%1 more source", "%1 more sources", globalSourceRows.length - 5));
+        return lines.join("\n");
     }
 
     function summaryText() {
@@ -249,6 +297,23 @@ QtObject {
     function focusFacts() {
         var facts = [];
         var quota = summary.lowestActualRemainingQuota || {};
+        for (var q = 0; q < favoriteSourceIds.length; ++q) {
+            var id = favoriteSourceIds[q];
+            var remaining = lowestLiveQuota(id);
+            if (remaining === null) continue;
+            var row = dailyState.source(id);
+            var windows = row.quotaWindows || [];
+            for (var w = 0; w < windows.length; ++w) {
+                var window = windows[w];
+                if (window.sourceClass === "actual" && window.percentRemaining === remaining
+                        && window.available !== false && window.freshnessState !== "stale") {
+                    quota = {stableId: id, displayName: row.displayName, percentRemaining: remaining,
+                        window: window.window, resetAt: window.resetAt};
+                    break;
+                }
+            }
+            break;
+        }
         if (quota.stableId) {
             var quotaValue = i18n("%1% remaining",
                                   Math.round(Number(quota.percentRemaining)));
@@ -258,26 +323,36 @@ QtObject {
                 icon: "speedometer",
                 value: quotaValue,
                 label: i18n("Live quota · %1 · %2", quota.displayName,
-                            quota.window || i18n("current window"))
+                            quota.window || i18n("current window")),
+                stableId: quota.stableId, actionKey: "review_quota"
             });
         }
+        var spendSummary = summary;
+        if (favoriteSourceIds.length && dailyState && typeof dailyState.summaryForSources === "function") {
+            var favoriteSummary = dailyState.summaryForSources(favoriteSourceIds);
+            if (Utils.formatSpendGroups(favoriteSummary.spendGroups || [], "actual", "day") !== "")
+                spendSummary = favoriteSummary;
+        }
         var actualToday = Utils.formatSpendGroups(
-            summary.spendGroups || [], "actual", "day");
+            spendSummary.spendGroups || [], "actual", "day");
         if (actualToday !== "") {
             facts.push({
                 icon: "wallet-open",
                 value: actualToday,
-                label: i18n("Reported spend · today")
+                label: i18n("Reported spend · today"), actionKey: "review_costs"
             });
         }
-        if (facts.length === 0 && Number(summary.enabledSourceCount || 0) > 0) {
-            facts.push({
-                icon: "network-connect",
-                value: Number(summary.reportingUsefulSourceCount || 0),
-                label: i18n("Reporting sources")
-            });
+        var activityIds = favoriteSourceIds.concat(["codex-cli", "claude-code"]);
+        if (sessionActivity) for (var a = 0; a < activityIds.length; ++a) {
+            var toolId = activityIds[a];
+            var activity = sessionActivity.summaryByTool[toolId];
+            if (!activity || activity.queryFailed) continue;
+            facts.push({icon: "view-history", value: sessionActivity.activityText(toolId),
+                label: i18n("Local activity · today"), stableId: toolId,
+                actionKey: "review_sessions"});
+            break;
         }
-        return facts.slice(0, 2);
+        return facts.slice(0, 3);
     }
 
     function actionLabel(row) {

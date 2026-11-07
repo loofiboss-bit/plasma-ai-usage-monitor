@@ -60,6 +60,55 @@ TestCase {
         database.sessionsReady(panel.sessionsRequestId, rows || []);
         database.dailyReady(panel.dailyRequestId, []);
     }
+    function test_analysis_completed_days_and_drilldown_range() {
+        panel.presentationMode = "analysis";
+        panel.selectedRangeIndex = 1;
+        var range = panel.localRange();
+        var today = new Date();
+        today.setHours(0, 0, 0, 0);
+        compare(new Date(range.to).getTime(), today.getTime());
+        var start = new Date(today.getTime());
+        start.setDate(start.getDate() - 7);
+        compare(new Date(range.from).getTime(), start.getTime());
+        panel.selectedRangeIndex = 3;
+        panel.customStartDate = panel.localDateString(start);
+        panel.customEndDate = panel.localDateString(today);
+        verify(panel.customRangeProblem() !== "");
+    }
+    function test_history_uses_current_time_without_an_injected_clock() {
+        compare(panel.presentationTime, null);
+        var before = Date.now();
+        var range = panel.localRange();
+        verify(Date.parse(range.to) >= before);
+        verify(Date.parse(range.to) <= Date.now());
+    }
+
+    function test_analysis_rollover_updates_snapshot_bounds() {
+        panel.presentationMode = "analysis";
+        panel.presentationTime = new Date(2026, 9, 25, 23, 59);
+        panel.selectedRangeIndex = 1;
+        panel.refresh();
+        compare(new Date(panel.comparisonRange.to).getDate(), 25);
+        panel.presentationTime = new Date(2026, 9, 26, 0, 1);
+        compare(new Date(panel.comparisonRange.to).getDate(), 26);
+        compare(panel.comparisonRange.to, database.ranges.summary.to);
+    }
+
+    function test_invalid_range_rejects_late_rows() {
+        var oldSummary = panel.summaryRequestId;
+        var oldSessions = panel.sessionsRequestId;
+        var oldDaily = panel.dailyRequestId;
+        panel.selectedRangeIndex = 3;
+        panel.customStartDate = "invalid";
+        panel.refresh();
+        database.summaryReady(oldSummary, {sessionCount: 99});
+        database.sessionsReady(oldSessions, [{sessionId: "old"}]);
+        database.dailyReady(oldDaily, [{localDate: "2026-10-01"}]);
+        compare(panel.summaryCurrent, false);
+        compare(panel.sessionRows.length, 0);
+        compare(panel.dailyRows.length, 0);
+    }
+
     function test_pagination_data() {
         return [0, 99, 100, 101, 200].map(function(count) { return {tag: String(count), count: count}; });
     }
@@ -369,7 +418,9 @@ TestCase {
         var oldRequest = panel.summaryRequestId;
         panel.refresh();
         compare(panel.customRangeErrorKey, "range-retention");
-        compare(panel.summaryRequestId, oldRequest);
+        compare(panel.summaryRequestId, "");
+        database.summaryReady(oldRequest, {sessionCount: 99});
+        compare(panel.summaryCurrent, false);
         verify(!panel.loading);
         compare(panel.sessionRows.length, 0);
         verify(!panel.prepareExport("csv"));

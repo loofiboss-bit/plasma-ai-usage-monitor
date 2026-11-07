@@ -17,17 +17,19 @@ QQC2.ScrollView {
     property var monitor: null
     property string sourceSearchText: ""
     property int sourceFilterIndex: 0
-    readonly property string sessionSummaryRequestPrefix: Date.now().toString(36)
-        + "-" + Math.random().toString(36).slice(2)
-    property int sessionSummaryGeneration: 0
-    property var sessionSummaryRequests: ({})
-    property var sessionSummaryLatestByTool: ({})
-    property var sessionSummaryByTool: ({})
     property bool costsExpanded: false
     property var viewState: ({})
     readonly property var visibleSourceRows: filterSourceRows()
-    readonly property var visibleSourceGroups:
-        Utils.groupOverviewSourceRows(visibleSourceRows)
+    readonly property var visibleSourceGroups: {
+        var favorites = visibleSourceRows.filter(function(row) {
+            return overviewState.favoriteSourceIds.indexOf(row.stableId) >= 0;
+        });
+        var other = visibleSourceRows.filter(function(row) {
+            return overviewState.favoriteSourceIds.indexOf(row.stableId) < 0;
+        });
+        return (favorites.length ? [{key: "favorites", label: i18n("Favorites"), rows: favorites}] : [])
+            .concat(Utils.groupOverviewSourceRows(other));
+    }
     signal sourceRequested(string stableId)
     signal actionRequested(string stableId, string actionKey, string sourceKind)
     Accessible.role: Accessible.Pane
@@ -37,6 +39,8 @@ QQC2.ScrollView {
         id: overviewState
         objectName: "overviewState"
         dailyState: overview.monitor.presentationDailyState
+        favoriteSourceIds: overview.monitor.favoriteSourceIds || []
+        sessionActivity: overview.monitor.sessionActivity || null
     }
 
     function restoreSourceFocus(stableId) {
@@ -46,6 +50,8 @@ QQC2.ScrollView {
             if (group && group.restoreSourceFocus(stableId)) return true;
             // qmllint enable missing-property
         }
+        // A removed favorite can leave the saved filter without that source.
+        sourceSearch.forceActiveFocus(Qt.BacktabFocusReason);
         return false;
     }
 
@@ -67,7 +73,7 @@ QQC2.ScrollView {
     function applyViewState() {
         var saved = viewState || ({});
         sourceSearchText = saved.searchText || "";
-        sourceFilterIndex = saved.filterIndex === 1 ? 1 : 0;
+        sourceFilterIndex = [1, 2].indexOf(saved.filterIndex) >= 0 ? saved.filterIndex : 0;
         costsExpanded = !!saved.costsExpanded;
         Qt.callLater(function() {
             // The QML type for ScrollView contentItem is generic; at runtime it is a Flickable.
@@ -85,102 +91,16 @@ QQC2.ScrollView {
     onViewStateChanged: applyViewState()
 
     function filterSourceRows() {
-        return Utils.filterOverviewSourceRows(overviewState.sourceRows,
+        var rows = sourceFilterIndex === 2 ? overviewState.sourceRows.filter(function(row) {
+            return overviewState.favoriteSourceIds.indexOf(row.stableId) >= 0;
+        }) : overviewState.sourceRows;
+        return Utils.filterOverviewSourceRows(rows,
                                               sourceSearchText,
                                               sourceFilterIndex === 1);
     }
 
-    function refreshSessionSummaries() {
-        if (!monitor || !monitor.localSessions) return;
-        var model = monitor.localSessions;
-        var now = new Date();
-        var start = new Date(now.getTime());
-        start.setHours(0, 0, 0, 0);
-        var from = start.toISOString();
-        var to = now.toISOString();
-        var tools = [
-            { id: "codex-cli", enabled: !!model.codexEnabled },
-            { id: "claude-code", enabled: !!model.claudeCodeEnabled }
-        ];
-        // Superseded requests cannot update the current source state.
-        sessionSummaryRequests = ({});
-        for (var i = 0; i < tools.length; ++i) {
-            if (!tools[i].enabled) {
-                var disabledState = Object.assign({}, sessionSummaryByTool);
-                delete disabledState[tools[i].id];
-                sessionSummaryByTool = disabledState;
-                var latestDisabled = Object.assign({}, sessionSummaryLatestByTool);
-                delete latestDisabled[tools[i].id];
-                sessionSummaryLatestByTool = latestDisabled;
-                continue;
-            }
-            var requestId = "overview-session-summary-" + sessionSummaryRequestPrefix
-                + "-" + (++sessionSummaryGeneration);
-            var requests = Object.assign({}, sessionSummaryRequests);
-            requests[requestId] = tools[i].id;
-            sessionSummaryRequests = requests;
-            var latest = Object.assign({}, sessionSummaryLatestByTool);
-            latest[tools[i].id] = requestId;
-            sessionSummaryLatestByTool = latest;
-            model.requestSummary(requestId, tools[i].id, from, to, "");
-        }
-    }
-
     function sessionActivityText(stableId) {
-        if (stableId !== "codex-cli" && stableId !== "claude-code") return "";
-        var model = monitor ? monitor.localSessions : null;
-        if (!model) return "";
-        var enabled = stableId === "codex-cli"
-            ? !!model.codexEnabled : !!model.claudeCodeEnabled;
-        if (!enabled) return "";
-        if (!Object.prototype.hasOwnProperty.call(sessionSummaryByTool, stableId))
-            return i18n("Loading session summary…");
-        var summary = sessionSummaryByTool[stableId] || ({});
-        if (summary.queryFailed) return i18n("Session summary unavailable. It will be retried automatically.");
-        var count = Math.max(0, Number(summary.sessionCount || 0));
-        var lastActivity = Date.parse(summary.lastActivityAtUtc || "");
-        var activityText = Number.isFinite(lastActivity)
-            ? Utils.formatWhen(lastActivity, "relative")
-            : i18n("not observed");
-        var partial = String(summary.coverage || "").indexOf("partial") === 0
-            || summary.importStatus === "error";
-        return i18np("%1 session today", "%1 sessions today", count)
-            + i18n(" · last activity %1", activityText)
-            + (partial
-                ? i18n(" · partial import") : "");
-    }
-
-    function acceptSessionSummary(requestId, summary, failed) {
-        var toolId = sessionSummaryRequests[requestId];
-        if (!toolId) return;
-        var requests = Object.assign({}, sessionSummaryRequests);
-        delete requests[requestId];
-        sessionSummaryRequests = requests;
-        if (sessionSummaryLatestByTool[toolId] !== requestId) return;
-        var next = Object.assign({}, sessionSummaryByTool);
-        next[toolId] = failed ? {queryFailed: true} : summary || {};
-        sessionSummaryByTool = next;
-    }
-
-    Connections {
-        target: overview.monitor ? overview.monitor.localSessions : null
-        enabled: overview.monitor !== null && overview.monitor.localSessions !== null
-        ignoreUnknownSignals: true
-        function onSummaryReady(requestId, summary) {
-            overview.acceptSessionSummary(requestId, summary, false);
-        }
-        function onQueryFailed(requestId, errorKey) {
-            overview.acceptSessionSummary(requestId, {}, true);
-        }
-        function onImportFinished() { overview.refreshSessionSummaries(); }
-        function onEnabledChanged() { overview.refreshSessionSummaries(); }
-    }
-
-    Timer {
-        interval: 60000
-        repeat: true
-        running: overview.visible
-        onTriggered: overview.refreshSessionSummaries()
+        return monitor && monitor.sessionActivity ? monitor.sessionActivity.activityText(stableId) : "";
     }
 
     ColumnLayout {
@@ -194,7 +114,8 @@ QQC2.ScrollView {
             guardrails: overview.monitor.guardrails
             forecastsEnabled: Plasmoid.configuration.forecastUiEnabled
             onActionRequested: function(stableId, actionKey, sourceKind) {
-                overview.actionRequested(stableId, actionKey, sourceKind);
+                if (actionKey === "review_costs") overview.costsExpanded = true;
+                else overview.actionRequested(stableId, actionKey, sourceKind);
             }
         }
 
@@ -290,11 +211,51 @@ QQC2.ScrollView {
                 objectName: "overviewSourceFilter"
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0
-                model: [i18n("All"), i18n("Needs attention")]
+                model: [i18n("All"), i18n("Needs attention"), i18n("Favorites")]
                 currentIndex: overview.sourceFilterIndex
                 Accessible.name: i18n("Filter sources")
                 onActivated: function(index) { overview.sourceFilterIndex = index; }
             }
+        }
+
+        RowLayout {
+            objectName: "overviewQuickFilterBar"
+            Layout.fillWidth: true
+            Layout.leftMargin: Kirigami.Units.smallSpacing
+            Layout.rightMargin: Kirigami.Units.smallSpacing
+            spacing: Kirigami.Units.smallSpacing
+            visible: overviewState.sourceRows.length > 0
+
+            PlasmaComponents.ToolButton {
+                objectName: "overviewQuickFilterAll"
+                text: i18n("All (%1)", overviewState.sourceRows.length)
+                checkable: true
+                checked: overview.sourceFilterIndex === 0
+                activeFocusOnTab: true
+                Accessible.name: text
+                onClicked: overview.sourceFilterIndex = 0
+            }
+            PlasmaComponents.ToolButton {
+                objectName: "overviewQuickFilterFavorites"
+                text: i18n("Favorites (%1)", overviewState.favoriteSourceIds.length)
+                icon.name: "rating"
+                checkable: true
+                checked: overview.sourceFilterIndex === 2
+                activeFocusOnTab: true
+                Accessible.name: text
+                onClicked: overview.sourceFilterIndex = 2
+            }
+            PlasmaComponents.ToolButton {
+                objectName: "overviewQuickFilterAttention"
+                text: i18n("Needs attention (%1)", overviewState.attentionRows.length)
+                icon.name: "dialog-warning"
+                checkable: true
+                checked: overview.sourceFilterIndex === 1
+                activeFocusOnTab: true
+                Accessible.name: text
+                onClicked: overview.sourceFilterIndex = 1
+            }
+            Item { Layout.fillWidth: true }
         }
 
         PlasmaComponents.Label {
@@ -308,6 +269,8 @@ QQC2.ScrollView {
                 ? i18n("No source matches your search and current filter.")
                 : overview.sourceFilterIndex === 1
                 ? i18n("No sources currently need attention.")
+                : overview.sourceFilterIndex === 2
+                ? i18n("No enabled favorites. Add a favorite from a source card or source details.")
                 : i18n("No source matches your search.")
             wrapMode: Text.WordWrap
             color: Kirigami.Theme.disabledTextColor
@@ -355,7 +318,12 @@ QQC2.ScrollView {
                         Layout.leftMargin: Kirigami.Units.smallSpacing
                         Layout.rightMargin: Kirigami.Units.smallSpacing
                         row: modelData
+                        favorite: overviewState.favoriteSourceIds.indexOf(modelData.stableId) >= 0
+                        onFavoriteToggled: function(stableId) { overview.monitor.toggleFavorite(stableId); }
                         sessionActivityText: overview.sessionActivityText(modelData.stableId)
+                        onActionRequested: function(stableId, actionKey, sourceKind) {
+                            overview.actionRequested(stableId, actionKey, sourceKind);
+                        }
                         onSourceRequested: function(stableId) {
                             overview.sourceRequested(stableId);
                         }
@@ -386,6 +354,5 @@ QQC2.ScrollView {
 
     Component.onCompleted: {
         applyViewState();
-        Qt.callLater(refreshSessionSummaries);
     }
 }
