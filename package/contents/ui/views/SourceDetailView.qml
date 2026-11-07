@@ -15,6 +15,7 @@ import "../Utils.js" as Utils
 
 QQC2.ScrollView {
     id: detail
+    implicitWidth: Kirigami.Units.gridUnit * 28
     contentWidth: availableWidth
     QQC2.ScrollBar.horizontal.policy: QQC2.ScrollBar.AlwaysOff
 
@@ -429,6 +430,13 @@ QQC2.ScrollView {
                 activeFocusOnTab: true
                 Accessible.name: i18n("Back to source list")
                 onClicked: detail.backRequested()
+            }
+            PlasmaComponents.ToolButton {
+                objectName: "detailFavoriteToggle"
+                icon.name: detail.monitor && detail.monitor.isFavorite(detail.sourceId) ? "rating" : "rating-unrated"
+                Accessible.name: detail.monitor && detail.monitor.isFavorite(detail.sourceId)
+                    ? i18n("Remove from favorites") : i18n("Add to favorites")
+                onClicked: detail.monitor.toggleFavorite(detail.sourceId)
             }
             ColumnLayout {
                 Layout.fillWidth: true

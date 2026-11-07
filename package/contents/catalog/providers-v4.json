@@ -1,7 +1,7 @@
 {
   "schemaVersion": 7,
   "catalogVersion": "2026.10.23",
-  "release": "25.0.1",
+  "release": "26.0.0",
   "lastReviewed": "2026-10-23",
   "runtimeScraping": false,
   "sequence": 1,
@@ -301,8 +301,8 @@
         "calendar_month",
         "anchored_month"
       ],
-      "capabilityReviewedAt": "2026-08-08",
-      "capabilityReviewExpiresAt": "2026-11-06",
+      "capabilityReviewedAt": "2026-10-23",
+      "capabilityReviewExpiresAt": "2026-11-22",
       "expectedSources": [
         "billing_api",
         "usage_api",
@@ -521,8 +521,8 @@
         "calendar_month",
         "anchored_month"
       ],
-      "capabilityReviewedAt": "2026-08-08",
-      "capabilityReviewExpiresAt": "2026-11-06",
+      "capabilityReviewedAt": "2026-10-23",
+      "capabilityReviewExpiresAt": "2026-11-22",
       "expectedSources": [
         "response_headers",
         "connectivity_probe",
@@ -1774,8 +1774,8 @@
         "calendar_month",
         "anchored_month"
       ],
-      "capabilityReviewedAt": "2026-08-08",
-      "capabilityReviewExpiresAt": "2026-11-06",
+      "capabilityReviewedAt": "2026-10-23",
+      "capabilityReviewExpiresAt": "2026-11-22",
       "expectedSources": [
         "usage_api"
       ],
@@ -2355,8 +2355,8 @@
         "calendar_month",
         "anchored_month"
       ],
-      "capabilityReviewedAt": "2026-08-08",
-      "capabilityReviewExpiresAt": "2026-11-06",
+      "capabilityReviewedAt": "2026-10-23",
+      "capabilityReviewExpiresAt": "2026-11-22",
       "expectedSources": [
         "usage_api"
       ],

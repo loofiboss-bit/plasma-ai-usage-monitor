@@ -59,6 +59,10 @@
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/coding-sessions-history.png</image>
     </screenshot>
     <screenshot>
+      <caption>Completed session periods with explicit token coverage</caption>
+      <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/coding-sessions-comparison.png</image>
+    </screenshot>
+    <screenshot>
       <caption>Analyst snapshot with sufficient compatible history</caption>
       <image type="source">https://raw.githubusercontent.com/loofiboss-bit/plasma-ai-usage-monitor/main/assets/screenshots/analyst-sufficient.png</image>
     </screenshot>
@@ -90,6 +94,7 @@
 
   <releases>
 
+    <release version="26.0.0" date="2026-11-01"/>
     <release version="25.0.1" date="2026-10-23"/>
     <release version="25.0.0" date="2026-10-23">
       <description>

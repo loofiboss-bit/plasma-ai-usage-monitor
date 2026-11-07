@@ -1,0 +1,100 @@
+{
+  "date": "2026-11-05",
+  "platform": "Linux-7.2.15-300.fc45.x86_64-x86_64-with-glibc2.44",
+  "osRelease": "NAME=\"Fedora Linux\"\nVERSION=\"45 (KDE Plasma Desktop Edition)\"\nRELEASE_TYPE=stable\nID=fedora\nVERSION_ID=45\nVERSION_CODENAME=\"\"\nPRETTY_NAME=\"Fedora Linux 45 (KDE Plasma Desktop Edition)\"\nANSI_COLOR=\"0;38;2;60;110;180\"\nLOGO=fedora-logo-icon\nCPE_NAME=\"cpe:/o:fedoraproject:fedora:45\"\nDEFAULT_HOSTNAME=\"fedora\"\nHOME_URL=\"https://fedoraproject.org/\"\nDOCUMENTATION_URL=\"https://docs.fedoraproject.org/en-US/fedora/f45/\"\nSUPPORT_URL=\"https://ask.fedoraproject.org/\"\nBUG_REPORT_URL=\"https://bugzilla.redhat.com/\"\nREDHAT_BUGZILLA_PRODUCT=\"Fedora\"\nREDHAT_BUGZILLA_PRODUCT_VERSION=45\nREDHAT_SUPPORT_PRODUCT=\"Fedora\"\nREDHAT_SUPPORT_PRODUCT_VERSION=45\nSUPPORT_END=2027-12-08\nVARIANT=\"KDE Plasma Desktop Edition\"\nVARIANT_ID=kde\n",
+  "baseline": {
+    "sourceDirectory": "/tmp/ai-monitor-v26-baseline",
+    "commit": "f71d9d685e6830ae59cf63f04daa3bc518923145",
+    "productSha256": "e7e53ea88e3b611f3a48831ce6afed90efac7d17a4afe3c9063c86dcfe2d2224",
+    "productHashVersion": 2,
+    "productHashInputs": [
+      "plugin/**",
+      "package/**",
+      "cmake/**",
+      "assets/**",
+      "CMake*",
+      "VERSION",
+      "*.notifyrc",
+      "*.metainfo.xml"
+    ],
+    "fileCount": 374,
+    "buildConfiguration": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "CMAKE_CXX_COMPILER": "/usr/lib64/ccache/c++",
+      "CMAKE_CXX_FLAGS": "",
+      "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG",
+      "CMAKE_GENERATOR": "Ninja"
+    },
+    "moduleSha256": {
+      "plugin/com/github/loofi/aiusagemonitor/libaiusagemonitorplugin.so": "039aee502fcc7a1559dd8f4b0aa0bdff30d637350163d3366f4374bb7dc98703"
+    }
+  },
+  "candidate": {
+    "sourceDirectory": "/home/loofi/Skrivbord/Loofi Work/plasma-ai-usage-monitor-v26",
+    "commit": "bbb616f24245dc0ab5613f259a5a29dd96156b29",
+    "productSha256": "aa93970e8b392f006fcda014a376ef5a8554c9f07153eb095d808f1e6c27ca7e",
+    "productHashVersion": 2,
+    "productHashInputs": [
+      "plugin/**",
+      "package/**",
+      "cmake/**",
+      "assets/**",
+      "CMake*",
+      "VERSION",
+      "*.notifyrc",
+      "*.metainfo.xml"
+    ],
+    "fileCount": 381,
+    "buildConfiguration": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "CMAKE_CXX_COMPILER": "/usr/lib64/ccache/c++",
+      "CMAKE_CXX_FLAGS": "",
+      "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG",
+      "CMAKE_GENERATOR": "Ninja"
+    },
+    "moduleSha256": {
+      "plugin/com/github/loofi/aiusagemonitor/libaiusagemonitorplugin.so": "08d2498ab2f1a84092922a97577c7139bedb1867c972aca2f29f5d5be405dc43"
+    }
+  },
+  "harness": {
+    "scripts/measure_phase7_panel.py": "f2ff24b2fc9b920054013366cbced99de6c30cd728bd77c0150ffd9aa8597419",
+    "scripts/measure_phase7_runtime.py": "03d051462c90ef91a1a26dfa1af370c5708f59b0b55dd1cb00f924de6be00498",
+    "scripts/tools/measure_panel_runtime.py": "8c344878c60c5789986653cb5f8464c9f34b97d660a4faad07ebf9e005dfffa3",
+    "scripts/demo/measure_panel_accessible.py": "90f36423f9306b32e2ac84e032a938b9d4a4c7a42ffb9b0cfd42c034575a74a1",
+    "scripts/demo/mock_ai_usage_server.py": "0874694a66dcf978ec052357a52f69eea242e9b2d99b8bc7badb2e1c9ad82471",
+    "scripts/demo/showcase_preset.json": "468295c833203fbb8779de720d874c9432f6d6a323f49029fc63f46fbe06ec6e",
+    "scripts/demo/kwin_window_binding_service.py": "0a968025daed0d89a83b8914193aee229f0d2bed46d63077c530c6cbae32e3b8"
+  },
+  "tools": {
+    "plasmashell": {
+      "path": "/usr/bin/plasmashell",
+      "sha256": "6dcf01c93dde1021d283990a724959ba160b53341213c2484c74fdffdb58e78b"
+    },
+    "kwin_wayland": {
+      "path": "/usr/bin/kwin_wayland",
+      "sha256": "7e40cbc95d745fbcaeb19ea037dbf444d3c65bf829678372d6e6e2ad041ef089"
+    },
+    "busctl": {
+      "path": "/usr/bin/busctl",
+      "sha256": "725ebaa6febc35c35f50bcfcd402cc03c0d2b778c0aacab71e2240f3590bf09c"
+    },
+    "dbus-run-session": {
+      "path": "/usr/bin/dbus-run-session",
+      "sha256": "82f4c5be050e3231542b2ba12a6456457820f31da90bff186bda86e4f1a3c98d"
+    },
+    "python3": {
+      "path": "/usr/bin/python3.15",
+      "sha256": "8f9b3657aa73659bdee8d4ff9da604fba390870be227a8c626029c2402cb063c"
+    },
+    "qmake6": {
+      "path": "/usr/bin/qmake6",
+      "sha256": "eb5c962763d88e7390d4e63b6696c1de57b5b666c8abe24ea2e848db3ed45e86"
+    }
+  },
+  "packages": [
+    "qt6-qtbase-6.11.2-3.fc45.x86_64",
+    "plasma-workspace-6.8.2-1.fc45.x86_64",
+    "gcc-c++-16.2.1-3.fc45.x86_64",
+    "protobuf-devel-6.33.5-7.fc45.x86_64"
+  ]
+}

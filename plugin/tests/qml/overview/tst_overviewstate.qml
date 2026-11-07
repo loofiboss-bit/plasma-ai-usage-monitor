@@ -256,4 +256,47 @@ TestCase {
         verify(!available.hasProgress());
         compare(available.valueText(), "Available");
     }
+    function test_favorites_order_deduplicates_without_hiding_global_attention() {
+        var urgent = {stableId: "urgent", displayName: "Urgent", attentionSeverity: "critical"};
+        var favorite = {stableId: "favorite", displayName: "Favorite", attentionSeverity: "none"};
+        var state = createTemporaryObject(dailyOverviewStateComponent, testCase, {
+            dailyState: {summary: {}, prioritizedSourceIds: function() { return ["urgent", "favorite", "urgent"]; },
+                source: function(id) { return id === "urgent" ? urgent : id === "favorite" ? favorite : {}; }},
+            favoriteSourceIds: ["disabled", "favorite", "favorite"]
+        });
+        compare(state.sourceRows.length, 2);
+        compare(state.sourceRows[0].stableId, "favorite");
+        compare(state.topAction.stableId, "urgent");
+        compare(state.globalSourceRows[0].stableId, "urgent");
+        compare(state.focusFacts().length, 0);
+    }
+
+    function test_multiWindowQuotaStripShowsUpToThreeActiveWindowsWithCountdowns() {
+        var resetFuture = new Date(Date.now() + 7200000).toISOString();
+        var card = createTemporaryObject(dailySourceCardComponent, testCase, {
+            row: {
+                displayName: "Codex CLI",
+                stableId: "codex-cli",
+                sourceKind: "local_tool",
+                primaryMetricAvailable: true,
+                primaryMetricValue: 80,
+                primaryMetricUnit: "percent",
+                quotaWindows: [
+                    { window: "5h rolling", percentRemaining: 20, sourceClass: "actual", resetAt: resetFuture },
+                    { window: "Weekly", percentRemaining: 65, sourceClass: "actual", resetAt: resetFuture },
+                    { window: "Code review", percentRemaining: 90, sourceClass: "actual" },
+                    { window: "Extra fourth", percentRemaining: 95, sourceClass: "actual" }
+                ]
+            }
+        });
+        verify(card !== null);
+        var windows = card.extraQuotaWindows();
+        compare(windows.length, 3);
+        compare(windows[0].label, "5h rolling");
+        compare(windows[1].label, "Weekly");
+        compare(windows[2].label, "Code review");
+        verify(windows[0].resetText.indexOf("Resets in") >= 0);
+        var strip = findChild(card, "sourceCardQuotaWindows");
+        verify(strip !== null);
+    }
 }

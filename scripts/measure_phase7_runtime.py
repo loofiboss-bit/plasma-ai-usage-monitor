@@ -56,8 +56,10 @@ def process_stats(pid: int) -> tuple[int, int]:
         if line.startswith("VmRSS:"):
             rss_kib = int(line.split()[1])
             break
-    stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").split()
-    ticks = int(stat[13]) + int(stat[14])
+    stat = (
+        Path(f"/proc/{pid}/stat").read_text(encoding="utf-8").rsplit(")", 1)[1].split()
+    )
+    ticks = int(stat[11]) + int(stat[12])
     return rss_kib, ticks
 
 
@@ -75,8 +77,7 @@ def wait_accessible(target: str, timeout: float, env: dict[str, str]) -> int:
         ],
         env=env,
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         check=False,
     )
     if result.returncode != 0:
@@ -96,9 +97,7 @@ def terminate(process: subprocess.Popen[str]) -> None:
         time.sleep(0.05)
 
 
-def candidate_environment(
-    build_dir: Path, runtime_root: Path
-) -> dict[str, str]:
+def candidate_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]:
     prefix = runtime_root / "prefix"
     subprocess.run(
         ["cmake", "--install", str(build_dir), "--prefix", str(prefix)],
@@ -127,9 +126,7 @@ def candidate_environment(
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--mode", choices=("installed", "candidate"), required=True
-    )
+    parser.add_argument("--mode", choices=("installed", "candidate"), required=True)
     parser.add_argument("--build-dir", type=Path, default=Path("build/release"))
     parser.add_argument(
         "--view", choices=("overview", "history", "analyst"), default="overview"
@@ -217,7 +214,9 @@ def main() -> None:
                     text=True,
                     stdout=subprocess.PIPE,
                     check=False,
-                ).stdout.splitlines()[-1].strip(),
+                )
+                .stdout.splitlines()[-1]
+                .strip(),
             },
             "startup_ms": startup_ms,
             "startup_median_ms": statistics.median(startup_ms),

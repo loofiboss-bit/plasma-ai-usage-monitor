@@ -118,7 +118,15 @@ Rectangle {
                     Layout.fillWidth: true
                     spacing: Kirigami.Units.smallSpacing
 
+                    PlasmaComponents.ToolButton {
+                        visible: !!fact.modelData.actionKey
+                        icon.name: fact.modelData.icon
+                        Accessible.name: fact.modelData.label + " · " + fact.modelData.value
+                        onClicked: focus.actionRequested(fact.modelData.stableId || "",
+                            fact.modelData.actionKey, "")
+                    }
                     Kirigami.Icon {
+                        visible: !fact.modelData.actionKey
                         source: fact.modelData.icon
                         Layout.preferredWidth: Kirigami.Units.iconSizes.small
                         Layout.preferredHeight: width
@@ -133,6 +141,12 @@ Rectangle {
                     PlasmaComponents.Label {
                         text: fact.modelData.value
                         font.bold: true
+                        Layout.fillWidth: true
+                        Layout.minimumWidth: 0
+                        Layout.preferredWidth: Kirigami.Units.gridUnit * 12
+                        Layout.maximumWidth: Kirigami.Units.gridUnit * 20
+                        elide: Text.ElideRight
+                        Accessible.name: fact.modelData.value
                         horizontalAlignment: Text.AlignRight
                     }
                 }
@@ -191,49 +205,7 @@ Rectangle {
     }
 
     function effectiveFacts() {
-        if (!showingRunway) return presentation.focusFacts();
-        if (runwayRisk.kind === "budget_overrun") {
-            return [{
-                icon: runwayRisk.state === "warning"
-                    ? "dialog-warning-symbolic" : "dialog-error-symbolic",
-                value: riskLabel(runwayRisk.state),
-                label: i18n("%1% consumed",
-                            Number(runwayRisk.consumedPercent || 0)
-                                .toLocaleString(Qt.locale(), "f", 0))
-            }, {
-                icon: "wallet-open-symbolic",
-                value: i18n("%1 / %2",
-                            formatBudgetValue(runwayRisk.currentValue),
-                            formatBudgetMinor(runwayRisk.remainingMinor)),
-                label: i18n("Spent / remaining")
-            }, {
-                icon: "chronometer",
-                value: formatBudgetMinor(runwayRisk.safeTodayMinor),
-                label: i18n("Safe today · resets %1",
-                            formatShortDate(runwayRisk.periodEnd))
-            }];
-        }
-        var result = [{
-            icon: runwayRisk.state === "critical"
-                ? "dialog-error-symbolic" : "dialog-warning-symbolic",
-            value: runwayRisk.state === "critical"
-                ? i18n("Critical") : i18n("Warning"),
-            label: runwayRisk.kind === "budget_overrun"
-                ? i18n("Budget pacing") : i18n("Quota runway")
-        }, {
-            icon: "chronometer",
-            value: Utils.formatWhen(runwayRisk.predictedAt, "dateTime"),
-            label: i18n("Predicted event")
-        }, {
-            icon: "documentinfo",
-            value: runwayRisk.evidenceGrade === "strong"
-                ? i18n("Strong") : i18n("Usable"),
-            label: i18n("%1 samples · %2% coverage",
-                        Number(runwayRisk.sampleCount || 0),
-                        Number(runwayRisk.coveragePercent || 0)
-                            .toLocaleString(Qt.locale(), "f", 0))
-        }];
-        return result;
+        return presentation.focusFacts().slice(0, 3);
     }
 
     function riskRank(state) {
@@ -245,49 +217,4 @@ Rectangle {
         }
     }
 
-    function riskLabel(state) {
-        switch (state) {
-        case "exceeded": return i18n("Exceeded");
-        case "critical": return i18n("Critical");
-        case "warning": return i18n("Warning");
-        default: return i18n("Safe");
-        }
-    }
-
-    function formatBudgetValue(value) {
-        var number = Number(value);
-        if (!Number.isFinite(number)) return "\u2014";
-        return i18n("%1 %2", runwayRisk.currency || runwayRisk.unit || "",
-                    number.toLocaleString(Qt.locale(), "f", budgetCurrencyDigits()));
-    }
-
-    function formatBudgetMinor(minor) {
-        var factor = budgetMinorToMajorFactor();
-        if (!Number.isFinite(Number(minor)) || !Number.isFinite(factor))
-            return "\u2014";
-        return formatBudgetValue(Number(minor) * factor);
-    }
-
-    function budgetCurrencyDigits() {
-        var factor = budgetMinorToMajorFactor();
-        if (!Number.isFinite(factor) || factor <= 0) return 2;
-        var ratio = 1 / factor;
-        var digits = Math.round(Math.log(ratio) / Math.LN10);
-        return digits >= 0 && digits <= 4 ? digits : 2;
-    }
-
-    function budgetMinorToMajorFactor() {
-        var spentMinor = Number(runwayRisk.spentMinor || 0);
-        var spentMajor = Number(runwayRisk.currentValue);
-        if (spentMinor > 0 && Number.isFinite(spentMajor))
-            return spentMajor / spentMinor;
-        var limitMinor = spentMinor + Number(runwayRisk.remainingMinor || 0);
-        var limitMajor = Number(runwayRisk.limitValue);
-        return limitMinor > 0 && Number.isFinite(limitMajor)
-            ? limitMajor / limitMinor : NaN;
-    }
-
-    function formatShortDate(value) {
-        return Utils.formatWhen(value, "date") || i18n("unknown");
-    }
 }

@@ -23,6 +23,7 @@ Item {
     property var lastNotificationTimes: ({})
     property var previousSourceStates: ({})
     property string actionPolicyId: ""
+    property string actionSourceId: ""
 
     readonly property string brandedNotificationIcon: "com.github.loofi.aiusagemonitor"
     readonly property string warningNotificationIcon: "dialog-warning"
@@ -30,6 +31,7 @@ Item {
 
     signal notificationPrepared(var payload)
     signal policyRequested(string policyId)
+    signal sourceRequested(string stableId)
 
     Notification {
         id: quotaNotification
@@ -37,6 +39,28 @@ Item {
         eventId: "quotaWarning"
         title: i18n("AI Usage Monitor")
         iconName: notifications.warningNotificationIcon
+        actions: NotificationAction {
+            label: i18n("Open Source Details")
+            onActivated: {
+                if (notifications.actionSourceId.length > 0)
+                    notifications.sourceRequested(notifications.actionSourceId);
+            }
+        }
+    }
+
+    Notification {
+        id: quotaResetNotification
+        componentName: "plasma_applet_com.github.loofi.aiusagemonitor"
+        eventId: "quotaReset"
+        title: i18n("AI Usage Monitor")
+        iconName: notifications.brandedNotificationIcon
+        actions: NotificationAction {
+            label: i18n("Open Source Details")
+            onActivated: {
+                if (notifications.actionSourceId.length > 0)
+                    notifications.sourceRequested(notifications.actionSourceId);
+            }
+        }
     }
 
     Notification {
@@ -53,6 +77,13 @@ Item {
         eventId: "apiError"
         title: i18n("AI Usage Monitor")
         iconName: notifications.errorNotificationIcon
+        actions: NotificationAction {
+            label: i18n("Open Source Details")
+            onActivated: {
+                if (notifications.actionSourceId.length > 0)
+                    notifications.sourceRequested(notifications.actionSourceId);
+            }
+        }
     }
 
     Notification {
@@ -61,6 +92,13 @@ Item {
         eventId: "providerReconnected"
         title: i18n("AI Usage Monitor")
         iconName: notifications.brandedNotificationIcon
+        actions: NotificationAction {
+            label: i18n("Open Source Details")
+            onActivated: {
+                if (notifications.actionSourceId.length > 0)
+                    notifications.sourceRequested(notifications.actionSourceId);
+            }
+        }
     }
 
     Notification {
@@ -185,6 +223,32 @@ Item {
         return parsed.toLocaleString(Qt.locale(), Locale.ShortFormat);
     }
 
+    function quotaResetLabel(resetAt) {
+        var formatted = resetLabel(resetAt);
+        if (formatted === "") {
+            return "";
+        }
+        var parsed = new Date(resetAt);
+        var diffMinutes = Math.round((parsed.getTime() - Date.now()) / 60000);
+        if (diffMinutes > 0) {
+            var hours = Math.floor(diffMinutes / 60);
+            var mins = diffMinutes % 60;
+            var rel = hours > 0
+                ? (mins > 0 ? i18n("%1 h %2 min", hours, mins) : i18n("%1 h", hours))
+                : i18n("%1 min", mins);
+            return i18n("in %1 (%2)", rel, formatted);
+        }
+        return formatted;
+    }
+
+    function suppressedByFavoriteFilter(row, isCritical) {
+        if (isCritical) return false;
+        if (!configuration.favoriteOnlyWarnings) return false;
+        var favorites = configuration.favoriteSourceIds || [];
+        if (!favorites || favorites.length === 0) return false;
+        return favorites.indexOf(row.stableId) < 0;
+    }
+
     function quotaSourceLabel(sourceClass) {
         switch (sourceClass) {
         case "actual":
@@ -224,7 +288,7 @@ Item {
             var name = window.window || window.kind || i18n("Quota window");
             var remaining = Math.round(Number(window.percentRemaining));
             var source = quotaSourceLabel(window.sourceClass);
-            var reset = resetLabel(window.resetAt);
+            var reset = quotaResetLabel(window.resetAt);
             lines.push(reset !== ""
                 ? i18n("%1: %2% remaining (%3), resets %4",
                        name, remaining, source, reset)
@@ -257,6 +321,8 @@ Item {
         switch (type) {
         case "quota":
             return quotaNotification;
+        case "quota_reset":
+            return quotaResetNotification;
         case "budget":
             return budgetNotification;
         case "recovery":
@@ -284,11 +350,14 @@ Item {
         target.urgency = payload.critical
             ? Notification.CriticalUrgency
             : (payload.type === "recovery"
+               || payload.type === "quota_reset"
                || payload.transition === "recovered"
                ? Notification.LowUrgency
                : Notification.NormalUrgency);
         if (payload.contractVersion === "budget-pacing-v2")
             actionPolicyId = payload.policyId || "";
+        if (payload.sourceId)
+            actionSourceId = payload.sourceId;
         target.sendEvent();
         if (payload.type === "guardrail"
                 && webhookNotifier.sendGuardrailEvent) {
@@ -323,7 +392,8 @@ Item {
                 : i18n("%1 quota warning", row.displayName),
             message: quotaMessage(row, windows),
             critical: critical,
-            quotaWindowCount: windows.length
+            quotaWindowCount: windows.length,
+            linkText: i18n("Open Source Details")
         };
     }
 
@@ -358,7 +428,8 @@ Item {
             severity: row.attentionSeverity,
             title: i18n("%1 needs attention", row.displayName),
             message: safeFailureMessage(row),
-            critical: row.attentionSeverity === "critical"
+            critical: row.attentionSeverity === "critical",
+            linkText: i18n("Open Source Details")
         };
     }
 
@@ -385,7 +456,29 @@ Item {
             severity: "none",
             title: i18n("%1 recovered", row.displayName),
             message: i18n("%1 is reporting again.", row.displayName),
-            critical: false
+            critical: false,
+            linkText: i18n("Open Source Details")
+        };
+    }
+
+    function quotaResetPayload(row, previousWindows) {
+        var names = [];
+        for (var i = 0; i < previousWindows.length; i++) {
+            var name = previousWindows[i].window || previousWindows[i].kind || "";
+            if (name !== "" && names.indexOf(name) < 0)
+                names.push(name);
+        }
+        var windowSummary = names.length > 0 ? names.join(", ") : i18n("Quota window");
+        return {
+            type: "quota_reset",
+            eventKey: "daily_quota_reset_" + row.stableId,
+            sourceId: row.stableId,
+            actionKey: "open_source",
+            severity: "none",
+            title: i18n("%1 quota reset ready", row.displayName),
+            message: i18n("%1 (%2) has reset and is ready for use.", row.displayName, windowSummary),
+            critical: false,
+            linkText: i18n("Open Source Details")
         };
     }
 
@@ -420,10 +513,15 @@ Item {
             var failureAllowed = disconnected
                 ? configuration.notifyOnDisconnect
                 : configuration.notifyOnError;
-            return failureAllowed ? deliver(failurePayload(row)) : false;
+            var failure = failurePayload(row);
+            if (suppressedByFavoriteFilter(row, failure.critical))
+                return false;
+            return failureAllowed ? deliver(failure) : false;
         }
         if (row.freshnessState === "stale"
                 || row.attentionReasonKey === "stale_data") {
+            if (suppressedByFavoriteFilter(row, false))
+                return false;
             return configuration.notifyOnError
                 ? deliver(stalePayload(row))
                 : false;
@@ -433,6 +531,9 @@ Item {
                 || row.attentionReasonKey === "quota_warning") {
             var quota = quotaPayload(row);
             if (!quota.eventKey) {
+                return false;
+            }
+            if (suppressedByFavoriteFilter(row, quota.critical)) {
                 return false;
             }
             var quotaDelivered = deliver(quota);
@@ -449,7 +550,19 @@ Item {
                 || row.attentionReasonKey === "budget_warning")
                 && configuration.notifyOnBudgetWarning) {
             var budget = budgetPayload(row);
-            return budget.eventKey ? deliver(budget) : false;
+            if (!budget.eventKey || suppressedByFavoriteFilter(row, budget.critical))
+                return false;
+            return deliver(budget);
+        }
+        var previousWarnWindows = warningQuotaWindows(previous);
+        if (previousWarnWindows.length > 0
+                && row.freshnessState === "fresh"
+                && warningQuotaWindows(row).length === 0
+                && (row.quotaWindows || []).length > 0
+                && configuration.notifyOnQuotaReset !== false) {
+            if (suppressedByFavoriteFilter(row, false))
+                return false;
+            return deliver(quotaResetPayload(row, previousWarnWindows));
         }
         return false;
     }

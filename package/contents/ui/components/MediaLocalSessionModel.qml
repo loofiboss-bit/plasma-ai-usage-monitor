@@ -1,4 +1,5 @@
 import QtQuick
+import com.github.loofi.aiusagemonitor 1.0
 
 QtObject {
     id: mediaModel
@@ -17,6 +18,8 @@ QtObject {
     signal queryFailed(string requestId, string errorKey)
     signal sessionsReady(string requestId, var rows)
     signal summaryReady(string requestId, var summary)
+    signal comparisonReady(string requestId, var comparison)
+    signal activitySummaryReady(string requestId, var summary)
     signal dailyReady(string requestId, var rows)
     signal projectsReady(string requestId, var rows)
     signal exportReady(string requestId, string errorKey)
@@ -34,7 +37,7 @@ QtObject {
         var isClaude = requestedTool === "claude-code";
         var firstModel = isClaude ? "claude-sonnet" : "gpt-5-codex";
         var secondModel = isClaude ? "claude-opus" : "gpt-5-codex-mini";
-        return [
+        var rows = [
             {
                 sessionId: "session-local-01",
                 projectId: "project-plasma",
@@ -101,6 +104,14 @@ QtObject {
                     cacheReadTokens: 0, cacheWriteTokens: 0 }]
             }
         ];
+        if (AppInfo.demoMode && AppInfo.smokeView === "media-analyst-comparison") {
+            rows[2].coverage = "reported";
+            rows.push(Object.assign({}, rows[1], {
+                sessionId: "session-local-previous",
+                startedAtUtc: timeAgo(10, 6), lastSeenAtUtc: timeAgo(10, 4)
+            }));
+        }
+        return rows;
     }
 
     function filteredRows(requestedTool, fromUtc, toUtc, projectId, modelFilter) {
@@ -270,6 +281,45 @@ QtObject {
         result.modelBreakdownTotalCount = result.modelBreakdown.length;
         result.projectBreakdownTotalCount = result.projectBreakdown.length;
         Qt.callLater(function() { mediaModel.summaryReady(requestId, result); });
+    }
+    function periodSummary(requestedTool, fromUtc, toUtc, projectId, modelFilter) {
+        var summary = summaryFor(filteredRows(requestedTool, fromUtc, toUtc, projectId, modelFilter), requestedTool, projectId);
+        summary.fromUtc = fromUtc;
+        summary.toUtc = toUtc;
+        summary.totalTokens = summary.eventCount ? summary.inputTokens + summary.outputTokens : null;
+        summary.categoryCoverage = ({});
+        ["inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "totalTokens"].forEach(function(key) {
+            summary.categoryCoverage[key] = {reportedEventCount: summary.eventCount, missingEventCount: 0,
+                coverage: summary.eventCount ? "reported" : "unavailable"};
+            if (!summary.eventCount) summary[key] = null;
+        });
+        if (!summary.eventCount) summary.coverage = "unavailable";
+        return summary;
+    }
+    function requestActivitySummary(requestId, requestedTool, fromUtc, toUtc) {
+        var result = periodSummary(requestedTool, fromUtc, toUtc, "", {});
+        Qt.callLater(function() { mediaModel.activitySummaryReady(requestId, result); });
+    }
+    function requestComparison(requestId, requestedTool, fromUtc, toUtc, projectId, timeZoneId, modelFilter) {
+        var from = new Date(fromUtc);
+        var to = new Date(toUtc);
+        var days = 0;
+        for (var day = new Date(from.getTime()); day < to; day.setDate(day.getDate() + 1)) ++days;
+        var previousFrom = new Date(from.getTime());
+        previousFrom.setDate(previousFrom.getDate() - days);
+        var current = periodSummary(requestedTool, fromUtc, toUtc, projectId, modelFilter);
+        var previous = periodSummary(requestedTool, previousFrom.toISOString(), fromUtc, projectId, modelFilter);
+        var deltas = {};
+        ["sessionCount", "inputTokens", "outputTokens", "cacheReadTokens", "cacheWriteTokens", "totalTokens"].forEach(function(key) {
+            var available = current.coverage === "reported" && previous.coverage === "reported";
+            deltas[key] = {available: available, absolute: available ? current[key] - previous[key] : null,
+                percentAvailable: available && previous[key] !== 0,
+                percent: available && previous[key] !== 0 ? 100 * (current[key] - previous[key]) / previous[key] : null,
+                reason: available ? (previous[key] === 0 ? "zero-baseline" : "") : "partial-coverage"};
+        });
+        var result = {current: current, previous: previous, deltas: deltas,
+            toolBreakdown: [], modelBreakdown: [], projectBreakdown: [], insights: [], dayCount: days};
+        Qt.callLater(function() { mediaModel.comparisonReady(requestId, result); });
     }
     function requestDaily(requestId, requestedTool, fromUtc, toUtc, projectId, timeZoneId, modelFilter) {
         var result = dailyFor(filteredRows(requestedTool, fromUtc, toUtc, projectId, modelFilter));

@@ -17,7 +17,7 @@ local coding-session history can be used on its own.
 ## Fedora COPR (Fedora only)
 
 Check [available Fedora builds](https://copr.fedorainfracloud.org/coprs/loofitheboss/plasma-ai-usage-monitor/)
-for your release. Fedora 44 is the release baseline. Install the complete package:
+for your release. Fedora 44 and Fedora 45 are supported release targets. Install the complete package:
 
 ~~~bash
 sudo dnf copr enable loofitheboss/plasma-ai-usage-monitor
@@ -36,7 +36,7 @@ sudo dnf upgrade --refresh plasma-ai-usage-monitor
 
 Log out and back in after updating so Plasma loads the new native plugin. In
 **Settings → Diagnostics**, confirm that the frontend and native-plugin
-versions match. V25.0.1 retains V24.2.0 and V25.0.0 settings, aliases, session opt-ins and history;
+versions match. V26.0.0 retains V24.x and V25.x settings, aliases, session opt-ins and history;
 you do not need to delete data or reimport sessions.
 
 Check the installed version:
@@ -69,12 +69,12 @@ If the plugin is missing or mismatched, the widget opens a recovery screen inste
 Use this route on supported Plasma 6 systems when you are not installing the Fedora COPR package:
 
 ~~~bash
-git clone --branch v25.0.1 --depth 1 https://github.com/loofiboss-bit/plasma-ai-usage-monitor.git
+git clone --branch v26.0.0 --depth 1 https://github.com/loofiboss-bit/plasma-ai-usage-monitor.git
 cd plasma-ai-usage-monitor
 ./scripts/install_bootstrap.sh --method source
 ~~~
 
-The tag selects the V25.0.1 release rather than an in-progress development branch.
+The tag selects the V26.0.0 release rather than an in-progress development branch.
 The installer checks dependencies, builds both parts and asks before installing
 system-wide to `/usr` with `sudo`. It also offers to reload Plasma.
 

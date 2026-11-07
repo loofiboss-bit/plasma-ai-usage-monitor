@@ -1,0 +1,70 @@
+{
+  "buildDirectory": "/tmp/ai-monitor-v26-baseline/build/release",
+  "sourceDirectory": "/tmp/ai-monitor-v26-baseline",
+  "runs": 5,
+  "samples": [
+    {
+      "fixtureBytes": 19233433,
+      "importCycles": 1,
+      "importMs": 19854,
+      "rows": 100000,
+      "loadAverage": [
+        5.25439453125,
+        5.82275390625,
+        4.07177734375
+      ],
+      "stderr": ""
+    },
+    {
+      "fixtureBytes": 19233433,
+      "importCycles": 1,
+      "importMs": 25824,
+      "rows": 100000,
+      "loadAverage": [
+        6.73974609375,
+        6.0888671875,
+        4.21484375
+      ],
+      "stderr": ""
+    },
+    {
+      "fixtureBytes": 19233433,
+      "importCycles": 1,
+      "importMs": 23803,
+      "rows": 100000,
+      "loadAverage": [
+        7.78564453125,
+        6.3740234375,
+        4.349609375
+      ],
+      "stderr": ""
+    },
+    {
+      "fixtureBytes": 19233433,
+      "importCycles": 1,
+      "importMs": 21242,
+      "rows": 100000,
+      "loadAverage": [
+        6.57275390625,
+        6.19873046875,
+        4.345703125
+      ],
+      "stderr": ""
+    },
+    {
+      "fixtureBytes": 19233433,
+      "importCycles": 1,
+      "importMs": 20105,
+      "rows": 100000,
+      "loadAverage": [
+        6.18701171875,
+        6.13671875,
+        4.365234375
+      ],
+      "stderr": ""
+    }
+  ],
+  "medianImportMs": 21242,
+  "verifiedRowsPerRun": 100000,
+  "conditions": "Timing starts at setToolEnabled, excludes file generation; includes all bounded import cycles and event-count verification"
+}

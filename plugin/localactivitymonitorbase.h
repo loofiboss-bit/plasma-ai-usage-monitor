@@ -33,6 +33,7 @@ protected:
     void setWatchedPaths(const QStringList &paths);
     void setIgnoredPathSuffixes(const QStringList &suffixes);
     void setDebounceIntervalMs(int intervalMs);
+    void updateWatchHealth(bool incomplete);
 
     QStringList watchedPaths() const;
 
@@ -44,7 +45,6 @@ private:
     void setupWatcher();
     void stopWatching();
     void requestScan();
-    void updateWatchHealth(bool incomplete);
 
     QFileSystemWatcher *m_watcher = nullptr;
     QTimer *m_debounceTimer = nullptr;

@@ -257,6 +257,8 @@ Kirigami.ScrollablePage {
             Layout.fillWidth: true
             visible: analystPage.sessionsMode
             presentationMode: "analysis"
+            presentationTime: analystPage.monitor && analystPage.monitor.dailyState
+                ? analystPage.monitor.dailyState.presentationTime : new Date()
             sessionModel: analystPage.monitor ? analystPage.monitor.localSessions : null
             sessionState: analystPage.sessionState
             onSessionHistoryRequested: function(toolId, projectId, rangeDays, sessionId, pageOffset, modelFilter) {

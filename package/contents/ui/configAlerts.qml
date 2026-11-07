@@ -20,6 +20,8 @@ KCM.SimpleKCM {
     property alias cfg_notifyOnBudgetWarning: budgetNotifySwitch.checked
     property alias cfg_notifyOnDisconnect: disconnectNotifySwitch.checked
     property alias cfg_notifyOnReconnect: reconnectNotifySwitch.checked
+    property alias cfg_notifyOnQuotaReset: quotaResetNotifySwitch.checked
+    property alias cfg_favoriteOnlyWarnings: favoriteOnlyWarningsSwitch.checked
     property alias cfg_notificationCooldownMinutes: cooldownSlider.value
     property alias cfg_automaticUpdateChecks: automaticUpdateChecksSwitch.checked
     property alias cfg_notifyOnUpdate: updateNotifySwitch.checked
@@ -314,6 +316,21 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: i18n("Provider reconnected:")
             enabled: alertsSwitch.checked
             checked: Plasmoid.configuration.notifyOnReconnect
+        }
+
+        QQC2.Switch {
+            id: quotaResetNotifySwitch
+            Kirigami.FormData.label: i18n("Quota reset ready:")
+            enabled: alertsSwitch.checked
+            checked: Plasmoid.configuration.notifyOnQuotaReset
+        }
+
+        QQC2.Switch {
+            id: favoriteOnlyWarningsSwitch
+            Kirigami.FormData.label: i18n("Favorites only for warnings:")
+            enabled: alertsSwitch.checked
+            checked: Plasmoid.configuration.favoriteOnlyWarnings
+            text: i18n("Limit non-critical warnings to starred favorite sources (critical alerts always notify)")
         }
 
         Kirigami.Separator {

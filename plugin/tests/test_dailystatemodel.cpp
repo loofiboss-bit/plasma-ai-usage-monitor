@@ -152,6 +152,7 @@ private Q_SLOTS:
   void staleSnapshotsPrioritizeFreshnessOverCachedQuota();
   void sourceDetailPreservesTypedMetricsAndConcreteAction();
   void normalSourcesSortByReportingQuality();
+  void scopedSummaryPreservesAccountingAndGlobalWarnings();
 };
 
 void DailyStateModelTest::liveClockAcceptsObservationAfterLastTick() {
@@ -1177,6 +1178,36 @@ void DailyStateModelTest::normalSourcesSortByReportingQuality() {
   QCOMPARE(daily.prioritizedSourceIds(),
            QStringList({QStringLiteral("openai"), QStringLiteral("google"),
                         QStringLiteral("anthropic")}));
+}
+
+void DailyStateModelTest::scopedSummaryPreservesAccountingAndGlobalWarnings() {
+  SourceReadinessModel readiness;
+  DailyStateModel daily;
+  DailyProvider first;
+  DailyProvider second;
+  first.makeReady();
+  second.makeReady();
+  first.setDailySpend(0.0, 10.0);
+  second.setDailySpend(10.0, 10.0);
+  readiness.registerProviderBackend("openai", &first);
+  readiness.registerProviderBackend("anthropic", &second);
+  readiness.setSourceEnabled("openai", true);
+  readiness.setSourceEnabled("anthropic", true);
+  daily.registerReadinessModel(&readiness);
+  daily.registerProviderBackend("openai", &first);
+  daily.registerProviderBackend("anthropic", &second);
+  const auto global = daily.summary();
+  QCOMPARE(global.value("highestSeverity").toString(), QStringLiteral("critical"));
+  const auto selected = daily.summaryForSources({"openai", "openai", "unknown"});
+  QCOMPARE(selected.value("enabledSourceCount").toInt(), 1);
+  const auto groups = selected.value("spendGroups").toList();
+  QCOMPARE(groups.size(), 1);
+  QCOMPARE(groups.first().toMap().value("value").toDouble(), 0.0);
+  QCOMPARE(daily.summary(), global);
+  QCOMPARE(daily.summaryForSources({"unknown"}).value("enabledSourceCount").toInt(), 0);
+  readiness.setSourceEnabled("openai", false);
+  QCOMPARE(daily.summaryForSources({"openai"}).value("enabledSourceCount").toInt(), 0);
+  QCOMPARE(daily.summary().value("highestSeverity").toString(), QStringLiteral("critical"));
 }
 
 QTEST_MAIN(DailyStateModelTest)

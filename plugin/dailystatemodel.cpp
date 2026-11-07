@@ -626,6 +626,17 @@ QHash<int, QByteArray> DailyStateModel::roleNames() const {
 }
 
 QVariantMap DailyStateModel::summary() const { return m_summary; }
+
+QVariantMap DailyStateModel::summaryForSources(const QStringList &stableIds) const {
+  // Select from normalized rows so scoped presentation uses the same freshness,
+  // quota provenance and compatible-spend grouping as the global summary.
+  QList<QVariantMap> selected;
+  for (const QVariantMap &row : m_rows) {
+    if (stableIds.contains(row.value(QStringLiteral("stableId")).toString()))
+      selected.append(row);
+  }
+  return buildSummary(selected);
+}
 int DailyStateModel::warningThreshold() const { return m_warningThreshold; }
 int DailyStateModel::criticalThreshold() const { return m_criticalThreshold; }
 

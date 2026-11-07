@@ -5,6 +5,7 @@
 #include <QJsonObject>
 #include <QTemporaryDir>
 
+#include "costengine.h"
 #include "providerpricingcatalog.h"
 #include "subscriptionplancatalog.h"
 
@@ -39,6 +40,7 @@ class CatalogsTest : public QObject
 
 private Q_SLOTS:
     void providerCatalogLoads();
+    void decimalParsingPreservesValidationAndRounding();
     void pricingSchemaV7EstimatesWithoutFalsePrecision();
     void exactCacheWriteAndLifecycleFailuresAreUnavailable();
     void subscriptionCatalogLoads();
@@ -47,6 +49,44 @@ private Q_SLOTS:
     void catalogExpiryIsRecheckedWithoutReloading();
     void invalidCatalogExposesStatus();
 };
+
+void CatalogsTest::decimalParsingPreservesValidationAndRounding()
+{
+    const auto estimate = [](const QString &amount, const QString &quantity = QStringLiteral("1")) {
+        return CostEngine::estimate(
+            {{QStringLiteral("currency"), QStringLiteral("USD")},
+             {QStringLiteral("unit"), QStringLiteral("second")},
+             {QStringLiteral("amount"), amount}},
+            {{QStringLiteral("unitUsage"), QVariantMap{{QStringLiteral("second"), quantity}}}});
+    };
+    const QList<QPair<QString, QString>> valid{
+        {QStringLiteral("1.1234567895"), QStringLiteral("1.12345679")},
+        {QStringLiteral("1.1234567894999"), QStringLiteral("1.123456789")},
+        {QStringLiteral("-1.1234567895"), QStringLiteral("-1.12345679")},
+        {QStringLiteral("1e-6"), QStringLiteral("0.000001")},
+        {QStringLiteral("  +.5  "), QStringLiteral("0.5")},
+        {QStringLiteral("1\n.2"), QStringLiteral("1.2")},
+    };
+    for (const auto &[amount, expected] : valid) {
+        const auto result = estimate(amount);
+        QVERIFY2(result.value(QStringLiteral("available")).toBool(), qPrintable(amount));
+        QCOMPARE(result.value(QStringLiteral("unroundedAmountText")).toString(), expected);
+    }
+    const QStringList invalid{
+        QStringLiteral("1.1234567895x"), QString::fromUtf8("1.1234567895١"),
+        QString::fromUtf8("١.٢"), QString::fromUtf8("１.２"),
+        QStringLiteral("9223372036854775808"), QStringLiteral("-9223372036854775808"),
+        QStringLiteral("1..2"),
+        QStringLiteral("1\n\n.2"), QStringLiteral("1\r\n.2"),
+    };
+    for (const auto &amount : invalid) {
+        QVERIFY2(!estimate(amount).value(QStringLiteral("available")).toBool(), qPrintable(amount));
+    }
+    QVERIFY(!estimate(QStringLiteral("1"), QStringLiteral("-1"))
+                 .value(QStringLiteral("available")).toBool());
+    QVERIFY(!estimate(QStringLiteral("9223372036854775807"))
+                 .value(QStringLiteral("available")).toBool());
+}
 
 void CatalogsTest::pricingSchemaV7EstimatesWithoutFalsePrecision()
 {

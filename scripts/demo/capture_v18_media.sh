@@ -55,7 +55,7 @@ export QT_LOGGING_TO_CONSOLE=1
 dbus-update-activation-environment WAYLAND_DISPLAY XDG_RUNTIME_DIR \
   XDG_CURRENT_DESKTOP XDG_SESSION_TYPE QT_LOGGING_TO_CONSOLE
 
-/usr/libexec/at-spi-bus-launcher --launch-immediately --a11y=1 >/dev/null 2>&1 &
+/usr/libexec/at-spi-bus-launcher --launch-immediately >/dev/null 2>&1 &
 sleep 1
 /usr/libexec/at-spi2-registryd --dbus-name org.a11y.atspi.Registry >/dev/null 2>&1 &
 
@@ -430,7 +430,7 @@ capture_panel() {
     QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1 \
     QT_ACCESSIBILITY=1 \
     bash -c '
-      /usr/libexec/at-spi-bus-launcher --launch-immediately --a11y=1 >/dev/null 2>&1 &
+      /usr/libexec/at-spi-bus-launcher --launch-immediately >/dev/null 2>&1 &
       sleep 1
       /usr/libexec/at-spi2-registryd --dbus-name org.a11y.atspi.Registry >/dev/null 2>&1 &
       kwin_wayland --wayland-display "$WAYLAND_DISPLAY" -s "$1" \
@@ -561,6 +561,7 @@ capture_view media-source-detail source-detail.png 6
 capture_view media-coding-sessions coding-sessions-detail.png 8
 capture_view media-history-gap history-gap.png 10
 capture_view media-history-sessions coding-sessions-history.png 8
+capture_view media-analyst-comparison coding-sessions-comparison.png 8
 capture_view media-analyst-sufficient analyst-sufficient.png 6
 capture_view media-analyst-insufficient analyst-insufficient.png 6
 capture_view onboarding-source guided-first-success.png 6
@@ -604,7 +605,7 @@ ASSETS_JSON="$(
     overview-popup.png attention-state.png source-detail.png history-gap.png \
     analyst-sufficient.png analyst-insufficient.png guided-first-success.png \
     provider-settings.png budget-control.png plugin-recovery.png panel-lowest-quota.png \
-    coding-sessions-detail.png coding-sessions-history.png; do
+    coding-sessions-detail.png coding-sessions-history.png coding-sessions-comparison.png; do
     sha256sum "${OUTPUT_DIR}/${filename}"
   done | jq -Rn '[inputs | split("  ") | {(.[1] | split("/") | last): .[0]}] | add'
 )"
@@ -646,6 +647,7 @@ jq -n \
       "coding-sessions-detail.png": "media-coding-sessions",
       "history-gap.png": "media-history-gap",
       "coding-sessions-history.png": "media-history-sessions",
+      "coding-sessions-comparison.png": "media-analyst-comparison",
       "analyst-sufficient.png": "media-analyst-sufficient",
       "analyst-insufficient.png": "media-analyst-insufficient",
       "guided-first-success.png": "onboarding-source",

@@ -7,6 +7,7 @@ cd "$ROOT_DIR"
 PROJECT=""
 OUTPUT_DIR="${ROOT_DIR}/dist"
 TAG=""
+CHROOTS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -22,6 +23,10 @@ while [[ $# -gt 0 ]]; do
       TAG="${2:-}"
       shift 2
       ;;
+    --chroot)
+      CHROOTS+=("${2:-}")
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1" >&2
       exit 1
@@ -29,8 +34,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ ${#CHROOTS[@]} -eq 0 ]]; then
+  CHROOTS=("fedora-43-x86_64" "fedora-44-x86_64" "fedora-45-x86_64")
+fi
+
 if [[ -z "$PROJECT" ]]; then
-  echo "Usage: $0 --project <owner/project> --tag vX.Y.Z [--output-dir <dir>]" >&2
+  echo "Usage: $0 --project <owner/project> --tag vX.Y.Z [--output-dir <dir>] [--chroot <chroot> ...]" >&2
   exit 1
 fi
 
@@ -61,4 +70,9 @@ if [[ -z "$SRPM_PATH" ]]; then
   exit 1
 fi
 
-copr-cli build "$PROJECT" "$SRPM_PATH"
+CHROOT_ARGS=()
+for chroot in "${CHROOTS[@]}"; do
+  CHROOT_ARGS+=("--chroot" "$chroot")
+done
+
+copr-cli build "${CHROOT_ARGS[@]}" "$PROJECT" "$SRPM_PATH"

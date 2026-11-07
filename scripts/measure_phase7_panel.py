@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Compare exact v17 and candidate panel popup performance in isolated sessions."""
+"""Compare source-identified baseline and candidate panel popup performance in isolated sessions."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import platform
@@ -14,6 +15,7 @@ import socket
 import statistics
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 from pathlib import Path
@@ -24,7 +26,7 @@ from measure_phase7_runtime import candidate_environment
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_RUNS = 20
 DEFAULT_WARMUPS = 3
-POPUP_INSTRUMENTATION = r'''
+POPUP_INSTRUMENTATION = r"""
     Component.onCompleted: {
         console.warn("AI_USAGE_PERF_INSTRUMENTATION_READY");
     }
@@ -62,28 +64,36 @@ POPUP_INSTRUMENTATION = r'''
         )
     }
 
-'''
+"""
 
 ACCESSIBLE_ACTIVATION_INSTRUMENTATION = {
     "contents/ui/main.qml": (
         '            onClicked: root.plasmoid["activated"]()\n',
-        '            onClicked: root.plasmoid["activated"]()\n'
-        '            Accessible.onPressAction: root.plasmoid["activated"]()\n',
+        (
+            '            onClicked: root.plasmoid["activated"]()\n'
+            '            Accessible.onPressAction: root.plasmoid["activated"]()\n'
+        ),
     ),
     "contents/ui/CompactRepresentation.qml": (
         "    onClicked: Plasmoid.activated()\n",
-        "    onClicked: Plasmoid.activated()\n"
-        "    Accessible.onPressAction: Plasmoid.activated()\n",
+        (
+            "    onClicked: Plasmoid.activated()\n"
+            "    Accessible.onPressAction: Plasmoid.activated()\n"
+        ),
     ),
 }
 
 UPDATE_CHECKER_INSTRUMENTATION = (
-    '        currentVersion: (Plasmoid["metaData"]\n'
-    '                         && Plasmoid["metaData"]["version"])\n'
-    '                        ? Plasmoid["metaData"]["version"]\n'
-    '                        : AppInfo.version\n',
-    '        // Phase 0 measurement copy: suppress unrelated release network work.\n'
-    '        currentVersion: ""\n',
+    (
+        '        currentVersion: (Plasmoid["metaData"]\n'
+        '                         && Plasmoid["metaData"]["version"])\n'
+        '                        ? Plasmoid["metaData"]["version"]\n'
+        "                        : AppInfo.version\n"
+    ),
+    (
+        "        // Phase 0 measurement copy: suppress unrelated release network work.\n"
+        '        currentVersion: ""\n'
+    ),
 )
 
 
@@ -130,29 +140,29 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
         wrapper.write_text(
             "#!/usr/bin/env bash\n"
             "set -euo pipefail\n"
-            "a11y_log=\"${AI_USAGE_PHASE0_OUTER_LOG}.a11y\"\n"
+            'a11y_log="${AI_USAGE_PHASE0_OUTER_LOG}.a11y"\n'
             "/usr/libexec/at-spi-bus-launcher --launch-immediately "
-            ">>\"$a11y_log\" 2>&1 &\n"
+            '>>"$a11y_log" 2>&1 &\n'
             "a11y_pid=$!\n"
             "sleep 0.25\n"
             "/usr/libexec/at-spi2-registryd --use-gnome-session "
-            ">>\"$a11y_log\" 2>&1 &\n"
+            '>>"$a11y_log" 2>&1 &\n'
             "a11y_registry_pid=$!\n"
             "sleep 0.25\n"
             "set +e\n"
             "env AI_USAGE_PHASE0_VIRTUAL=1 QT_IM_MODULE= GTK_IM_MODULE= "
             "QT_VIRTUALKEYBOARD_DISABLE=1 " + shlex.join(command) + "\n"
             "status=$?\n"
-            "kill -TERM \"$a11y_registry_pid\" \"$a11y_pid\" "
+            'kill -TERM "$a11y_registry_pid" "$a11y_pid" '
             "2>/dev/null || true\n"
-            "wait \"$a11y_registry_pid\" \"$a11y_pid\" "
+            'wait "$a11y_registry_pid" "$a11y_pid" '
             "2>/dev/null || true\n"
             "for service in org.kde.kded6 org.kde.ActivityManager; do\n"
-            "  pid=$(busctl --user status \"$service\" 2>/dev/null "
+            '  pid=$(busctl --user status "$service" 2>/dev/null '
             "| sed -n 's/^PID=//p' | head -n 1)\n"
-            "  [[ -n \"$pid\" ]] && kill -TERM \"$pid\" 2>/dev/null || true\n"
+            '  [[ -n "$pid" ]] && kill -TERM "$pid" 2>/dev/null || true\n'
             "done\n"
-            "exit \"$status\"\n",
+            'exit "$status"\n',
             encoding="utf-8",
         )
         wrapper.chmod(0o700)
@@ -173,9 +183,7 @@ def run_in_virtual_outer(arguments: list[str]) -> int:
                 "QT_VIRTUALKEYBOARD_DISABLE": "1",
                 "QT_NO_XDG_DESKTOP_PORTAL": "1",
                 "GTK_USE_PORTAL": "0",
-                "AI_USAGE_PHASE0_OUTER_LOG": str(
-                    virtual_root / "outer-kwin.log"
-                ),
+                "AI_USAGE_PHASE0_OUTER_LOG": str(virtual_root / "outer-kwin.log"),
             }
         )
         outer_log = Path(environment["AI_USAGE_PHASE0_OUTER_LOG"])
@@ -247,7 +255,9 @@ def trace_summary(path: Path) -> dict[str, Any]:
             "full_representation_created", "destination_component_loaded"
         ),
         "database_queries_ms": duration("database_init_start", "database_init_end"),
-        "guardrail_queries_ms": duration("guardrail_query_start", "guardrail_query_end"),
+        "guardrail_queries_ms": duration(
+            "guardrail_query_start", "guardrail_query_end"
+        ),
         "chart_preparation_ms": duration(
             "destination_component_loaded", "first_rendered_frame"
         ),
@@ -392,7 +402,7 @@ DBUS_SESSION_BUS_ADDRESS="$OUTER_DBUS_SESSION_BUS_ADDRESS" \
 }
 printf 'AI_USAGE_OUTER_WINDOW_INFO %s\n' "$window_info" >>"$4"
 set +e
-timeout 55s python3 "$3" --request-log "$5" --session-log "$4" \
+timeout "${AI_USAGE_PROBE_TIMEOUT:-55}s" python3 "$3" --request-log "$5" --session-log "$4" \
   --pid "$plasmashell_pid" >"$6" 2>"$7"
 probe_status=$?
 printf 'AI_USAGE_PROBE_EXIT %s\n' "$probe_status" >>"$4"
@@ -403,11 +413,18 @@ exit "$probe_status"
     with session_shell_log.open("w", encoding="utf-8") as session_stream:
         result = subprocess.run(
             [
-                "bash", "-c", inner, "v18-panel",
-                socket_name, panel_script,
-                str(ROOT / "scripts/demo/measure_panel_accessible.py"),
-                str(nested_log), str(request_log), str(measurement_log),
-                str(measurement_error), str(binding_template),
+                "bash",
+                "-c",
+                inner,
+                "v18-panel",
+                socket_name,
+                panel_script,
+                str(ROOT / "scripts/tools/measure_panel_runtime.py"),
+                str(nested_log),
+                str(request_log),
+                str(measurement_log),
+                str(measurement_error),
+                str(binding_template),
                 str(binding_script),
                 str(ROOT / "scripts/demo/kwin_window_binding_service.py"),
             ],
@@ -416,7 +433,7 @@ exit "$probe_status"
             text=True,
             stdout=session_stream,
             stderr=subprocess.STDOUT,
-            timeout=120,
+            timeout=120 + 2 * int(env.get("AI_USAGE_IDLE_SECONDS", "0")),
             check=False,
         )
     if result.returncode != 0 or not measurement_log.exists():
@@ -431,9 +448,7 @@ exit "$probe_status"
             if measurement_error_text:
                 detail += "\n" + measurement_error_text
         if measurement_log.exists():
-            measurement_output = measurement_log.read_text(
-                encoding="utf-8"
-            ).strip()
+            measurement_output = measurement_log.read_text(encoding="utf-8").strip()
             if measurement_output:
                 detail += "\nProbe stdout:\n" + measurement_output
         if nested_log.exists():
@@ -465,9 +480,10 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
         encoding="utf-8",
     )
     plasmoid_root = main_qml.parents[2]
-    for relative_path, (target, replacement) in (
-        ACCESSIBLE_ACTIVATION_INSTRUMENTATION.items()
-    ):
+    for relative_path, (
+        target,
+        replacement,
+    ) in ACCESSIBLE_ACTIVATION_INSTRUMENTATION.items():
         qml_path = plasmoid_root / relative_path
         qml_source = qml_path.read_text(encoding="utf-8")
         if qml_source.count(target) != 1 or "Accessible.onPressAction" in qml_source:
@@ -490,10 +506,10 @@ def installed_environment(build_dir: Path, runtime_root: Path) -> dict[str, str]
     )
     env.update(
         {
-            "OUTER_WAYLAND_DISPLAY": os.environ.get(
-                "WAYLAND_DISPLAY", "wayland-0"
+            "OUTER_WAYLAND_DISPLAY": os.environ.get("WAYLAND_DISPLAY", "wayland-0"),
+            "OUTER_DBUS_SESSION_BUS_ADDRESS": os.environ.get(
+                "DBUS_SESSION_BUS_ADDRESS", ""
             ),
-            "OUTER_DBUS_SESSION_BUS_ADDRESS": os.environ.get("DBUS_SESSION_BUS_ADDRESS", ""),
             "PLASMA_AI_MONITOR_DEMO": "1",
             "AIUSAGE_MONITOR_CATALOG_DIR": str(
                 runtime_root
@@ -535,15 +551,11 @@ def run_sample(
     )
     try:
         sample_env = dict(env)
-        sample_env["PLASMA_AI_MONITOR_DEMO_BASE_URL"] = (
-            f"http://127.0.0.1:{port}"
-        )
+        sample_env["PLASMA_AI_MONITOR_DEMO_BASE_URL"] = f"http://127.0.0.1:{port}"
         time.sleep(0.25)
         if server.poll() is not None:
             raise RuntimeError("Mock server failed to start")
-        result = run_panel_session(
-            sample_env, sample_root, request_log, trace_path
-        )
+        result = run_panel_session(sample_env, sample_root, request_log, trace_path)
         result.update(
             {
                 "variant": variant,
@@ -574,28 +586,185 @@ def summarize(name: str, samples: list[dict[str, Any]]) -> dict[str, Any]:
         "warm_ms": warm,
         "warm_median_ms": statistics.median(warm),
         "warm_p95_ms": percentile95(warm),
-        "startup_network_requests": [item["startup_network_requests"] for item in samples],
-        "fresh_popup_network_requests": [item["fresh_popup_network_requests"] for item in samples],
+        "startup_network_requests": [
+            item["startup_network_requests"] for item in samples
+        ],
+        "fresh_popup_network_requests": [
+            item["fresh_popup_network_requests"] for item in samples
+        ],
+    }
+
+
+def harness_identity() -> dict[str, str]:
+    paths = (
+        "scripts/measure_phase7_panel.py",
+        "scripts/measure_phase7_runtime.py",
+        "scripts/tools/measure_panel_runtime.py",
+        "scripts/demo/measure_panel_accessible.py",
+        "scripts/demo/mock_ai_usage_server.py",
+        "scripts/demo/showcase_preset.json",
+        "scripts/demo/kwin_window_binding_service.py",
+    )
+    return {
+        name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in paths
+    }
+
+
+def reference_product_hash(commit: str) -> str:
+    """Verify a baseline source tree against Git content, not its marker file."""
+    archive = subprocess.check_output(["git", "archive", commit], cwd=ROOT)
+    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as stream:
+        entries = {item.name: item for item in stream.getmembers() if item.isfile()}
+        paths = sorted(
+            name
+            for name in entries
+            if name.split("/", 1)[0] in {"plugin", "package", "cmake", "assets"}
+        )
+        paths += sorted(
+            name
+            for name in entries
+            if "/" not in name
+            and (
+                name.startswith("CMake")
+                or name == "VERSION"
+                or name.endswith((".notifyrc", ".metainfo.xml"))
+            )
+        )
+        digest = hashlib.sha256()
+        for name in paths:
+            digest.update(name.encode() + b"\0")
+            digest.update(stream.extractfile(entries[name]).read())
+    return digest.hexdigest()
+
+
+def source_identity(build_dir: Path) -> dict[str, Any]:
+    """Hash product inputs, including uncommitted and untracked source files."""
+    cache = (build_dir / "CMakeCache.txt").read_text(encoding="utf-8")
+    source = Path(
+        next(
+            line.split("=", 1)[1]
+            for line in cache.splitlines()
+            if line.startswith("CMAKE_HOME_DIRECTORY:INTERNAL=")
+        )
+    )
+    paths = sorted(
+        path
+        for prefix in ("plugin", "package", "cmake", "assets")
+        if (source / prefix).exists()
+        for path in (source / prefix).rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts
+    )
+    paths += sorted(
+        path
+        for path in source.iterdir()
+        if path.is_file()
+        and (
+            path.name.startswith("CMake")
+            or path.name == "VERSION"
+            or path.name.endswith((".notifyrc", ".metainfo.xml"))
+        )
+    )
+    digest = hashlib.sha256()
+    for path in paths:
+        if path.is_file():
+            digest.update(str(path.relative_to(source)).encode() + b"\0")
+            digest.update(path.read_bytes())
+    git = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        check=False,
+        cwd=source,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+    )
+    # git-archive trees carry an explicit immutable baseline identity.
+    archived = source / ".measurement-commit"
+    commit = archived.read_text().strip() if archived.exists() else git.stdout.strip()
+    build_configuration = {}
+    for line in cache.splitlines():
+        if line.startswith(
+            (
+                "CMAKE_BUILD_TYPE:",
+                "CMAKE_CXX_FLAGS:",
+                "CMAKE_CXX_FLAGS_RELEASE:",
+                "CMAKE_CXX_COMPILER:",
+                "CMAKE_GENERATOR:",
+            )
+        ):
+            key, value = line.split("=", 1)
+            build_configuration[key.split(":", 1)[0]] = value
+    modules = sorted(build_dir.rglob("libaiusagemonitorplugin.so"))
+    return {
+        "sourceDirectory": str(source),
+        "commit": commit,
+        "productSha256": digest.hexdigest(),
+        "productHashVersion": 2,
+        "productHashInputs": [
+            "plugin/**",
+            "package/**",
+            "cmake/**",
+            "assets/**",
+            "CMake*",
+            "VERSION",
+            "*.notifyrc",
+            "*.metainfo.xml",
+        ],
+        "fileCount": len(paths),
+        "buildConfiguration": build_configuration,
+        "moduleSha256": {
+            str(path.relative_to(build_dir)): hashlib.sha256(
+                path.read_bytes()
+            ).hexdigest()
+            for path in modules
+        },
     }
 
 
 def main() -> None:
-    if os.environ.get("AI_USAGE_PHASE0_VIRTUAL") != "1":
+    if os.environ.get("AI_USAGE_PHASE0_VIRTUAL") != "1" and not any(
+        arg in {"-h", "--help"} for arg in sys.argv[1:]
+    ):
         raise SystemExit(run_in_virtual_outer(sys.argv[1:]))
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--baseline-build-dir", type=Path, required=True)
-    parser.add_argument("--candidate-build-dir", type=Path, required=True)
+    parser.add_argument("--candidate-build-dir", type=Path)
+    parser.add_argument(
+        "--variant", choices=("baseline", "candidate", "both"), default="both"
+    )
+    parser.add_argument("--idle-seconds", type=int, default=0)
     parser.add_argument("--runs", type=int, default=DEFAULT_RUNS)
     parser.add_argument("--warmups", type=int, default=DEFAULT_WARMUPS)
     parser.add_argument("--output", type=Path)
     parser.add_argument("--baseline-commit", required=True)
-    parser.add_argument("--candidate-commit", required=True)
+    parser.add_argument("--candidate-commit", default="HEAD")
     args = parser.parse_args()
     if args.runs < 1 or args.warmups < 0:
         parser.error("--runs must be positive and --warmups non-negative")
-    missing = [name for name in ("bash", "busctl", "dbus-run-session", "kwin_wayland", "plasmashell", "rg", "rpm", "sed", "setsid", "timeout") if shutil.which(name) is None]
-    missing += [str(path) for path in (Path("/usr/libexec/at-spi-bus-launcher"), Path("/usr/libexec/at-spi2-registryd")) if not path.is_file()]
+    missing = [
+        name
+        for name in (
+            "bash",
+            "busctl",
+            "dbus-run-session",
+            "kwin_wayland",
+            "plasmashell",
+            "rg",
+            "rpm",
+            "sed",
+            "setsid",
+            "timeout",
+        )
+        if shutil.which(name) is None
+    ]
+    missing += [
+        str(path)
+        for path in (
+            Path("/usr/libexec/at-spi-bus-launcher"),
+            Path("/usr/libexec/at-spi2-registryd"),
+        )
+        if not path.is_file()
+    ]
     if missing:
         parser.error("Missing commands: " + ", ".join(missing))
 
@@ -613,31 +782,42 @@ def main() -> None:
         stdout=subprocess.PIPE,
         check=True,
     ).stdout.strip()
-    tagged_v17_commit = subprocess.run(
-        ["git", "rev-parse", "v17.0.0^{commit}"],
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        check=True,
-    ).stdout.strip()
-    current_commit = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=ROOT,
-        text=True,
-        stdout=subprocess.PIPE,
-        check=True,
-    ).stdout.strip()
-    if baseline_commit != tagged_v17_commit:
-        parser.error("baseline commit must resolve to the exact annotated v17.0.0 tag")
-    if candidate_commit != current_commit:
-        parser.error("candidate commit must resolve to the current clean checkout")
-    if subprocess.run(
-        ["git", "status", "--porcelain"], cwd=ROOT,
-        text=True, stdout=subprocess.PIPE, check=True,
-    ).stdout:
-        parser.error("candidate checkout must be clean before final ABBA measurement")
+    if args.variant != "baseline" and args.candidate_build_dir is None:
+        parser.error("--candidate-build-dir is required for candidate measurement")
+    if args.idle_seconds < 0:
+        parser.error("--idle-seconds must be non-negative")
+    if args.idle_seconds and args.variant == "both":
+        parser.error(
+            "long idle profiles require --variant baseline or candidate; fresh-popup ABBA must use --idle-seconds 0"
+        )
+    variants = ("baseline", "candidate") if args.variant == "both" else (args.variant,)
+    build_directories = {"baseline": args.baseline_build_dir}
+    if args.candidate_build_dir is not None:
+        build_directories["candidate"] = args.candidate_build_dir
+    harness_before = harness_identity()
+    sources_before = {
+        name: source_identity(build_directories[name]) for name in variants
+    }
+    if "baseline" in variants:
+        if sources_before["baseline"]["commit"] != baseline_commit:
+            parser.error("baseline build source must match --baseline-commit")
+        if sources_before["baseline"]["productSha256"] != reference_product_hash(
+            baseline_commit
+        ):
+            parser.error(
+                "baseline product source differs from the requested Git commit"
+            )
+    if (
+        "candidate" in variants
+        and sources_before["candidate"]["commit"] != candidate_commit
+    ):
+        parser.error("candidate build source HEAD must match --candidate-commit")
+    os.environ["AI_USAGE_IDLE_SECONDS"] = str(args.idle_seconds)
+    os.environ["AI_USAGE_PROBE_TIMEOUT"] = str(55 + 2 * args.idle_seconds)
 
-    boot_id = Path("/proc/sys/kernel/random/boot_id").read_text(encoding="utf-8").strip()
+    boot_id = (
+        Path("/proc/sys/kernel/random/boot_id").read_text(encoding="utf-8").strip()
+    )
     measured: dict[str, list[dict[str, Any]]] = {"baseline": [], "candidate": []}
     warmup_samples: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
@@ -651,12 +831,8 @@ def main() -> None:
             "candidate": comparison_root / "candidate",
         }
         environments = {
-            "baseline": installed_environment(
-                args.baseline_build_dir, variant_roots["baseline"]
-            ),
-            "candidate": installed_environment(
-                args.candidate_build_dir, variant_roots["candidate"]
-            ),
+            name: installed_environment(build_directories[name], variant_roots[name])
+            for name in variants
         }
         total = args.warmups + args.runs
         for index in range(total):
@@ -666,12 +842,10 @@ def main() -> None:
                 else ("candidate", "baseline")
             )
             for variant in order:
+                if variant not in variants:
+                    continue
                 sequence.append(variant)
-                sample_root = (
-                    variant_roots[variant]
-                    / "samples"
-                    / f"sample-{index:02d}"
-                )
+                sample_root = variant_roots[variant] / "samples" / f"sample-{index:02d}"
                 try:
                     item = run_sample(
                         variant,
@@ -684,7 +858,7 @@ def main() -> None:
                         warmup_samples.append(item)
                     else:
                         measured[variant].append(item)
-                except Exception as error:  # invalid samples remain evidence
+                except Exception as error:  # noqa: BLE001 - invalid samples remain evidence
                     errors.append(
                         {
                             "variant": variant,
@@ -693,15 +867,53 @@ def main() -> None:
                         }
                     )
 
-    valid = not errors and all(len(rows) == args.runs for rows in measured.values())
+    sources_after = {
+        name: source_identity(build_directories[name]) for name in variants
+    }
+    harness_after = harness_identity()
+    valid = (
+        not errors
+        and harness_before == harness_after
+        and sources_before == sources_after
+        and all(len(measured[name]) == args.runs for name in variants)
+    )
     result: dict[str, Any] = {
-        "schema": 2,
+        "schema": 3,
+        "harnessBefore": harness_before,
+        "harnessAfter": harness_after,
+        "harnessStable": harness_before == harness_after,
+        "sourcesBefore": sources_before,
+        "sourcesAfter": sources_after,
+        "sourceStable": sources_before == sources_after,
+        "idleSecondsPerState": args.idle_seconds,
         "valid": valid,
+        "measurementComplete": valid,
+        "acceptanceEvaluated": valid and args.variant == "both",
+        "acceptanceScope": "comparative popup gates"
+        if args.variant == "both"
+        else "measurement validity only",
         "bootId": boot_id,
         "outerSession": os.environ.get("XDG_SESSION_ID", ""),
         "environment": {
             "platform": platform.platform(),
-            "plasma": "plasma-workspace " + subprocess.run(
+            "osRelease": Path("/etc/os-release").read_text(encoding="utf-8"),
+            "packages": subprocess.run(
+                [
+                    "rpm",
+                    "-q",
+                    "qt6-qtbase",
+                    "plasma-workspace",
+                    "gcc-c++",
+                    "protobuf-devel",
+                ],
+                text=True,
+                stdout=subprocess.PIPE,
+                check=False,
+            ).stdout.splitlines(),
+            "cpuCount": os.cpu_count(),
+            "loadAverageAtCompletion": os.getloadavg(),
+            "plasma": "plasma-workspace "
+            + subprocess.run(
                 ["rpm", "-q", "--qf", "%{VERSION}-%{RELEASE}", "plasma-workspace"],
                 text=True,
                 stdout=subprocess.PIPE,
@@ -712,15 +924,12 @@ def main() -> None:
         "instrumentationSha256": hashlib.sha256(
             (
                 POPUP_INSTRUMENTATION
-                + json.dumps(
-                    ACCESSIBLE_ACTIVATION_INSTRUMENTATION, sort_keys=True
-                )
+                + json.dumps(ACCESSIBLE_ACTIVATION_INSTRUMENTATION, sort_keys=True)
                 + json.dumps(UPDATE_CHECKER_INSTRUMENTATION)
             ).encode()
         ).hexdigest(),
         "buildDirectories": {
-            "baseline": str(args.baseline_build_dir.resolve()),
-            "candidate": str(args.candidate_build_dir.resolve()),
+            name: str(build_directories[name].resolve()) for name in variants
         },
         "runs": args.runs,
         "warmups": args.warmups,
@@ -729,7 +938,10 @@ def main() -> None:
         "warmupSamples": warmup_samples,
         "errors": errors,
     }
-    if valid:
+    if valid and args.variant != "both":
+        result[args.variant] = summarize(args.variant, measured[args.variant])
+        result["passed"] = True
+    elif valid:
         baseline = summarize("baseline", measured["baseline"])
         candidate = summarize("candidate", measured["candidate"])
         gates = {
@@ -737,8 +949,10 @@ def main() -> None:
             "warm_median_max_125": candidate["warm_median_ms"] <= 125,
             "first_p95_max_180": candidate["first_p95_ms"] <= 180,
             "warm_p95_max_180": candidate["warm_p95_ms"] <= 180,
-            "first_no_regression": candidate["first_median_ms"] <= baseline["first_median_ms"],
-            "warm_no_regression": candidate["warm_median_ms"] <= baseline["warm_median_ms"],
+            "first_no_regression": candidate["first_median_ms"]
+            <= baseline["first_median_ms"],
+            "warm_no_regression": candidate["warm_median_ms"]
+            <= baseline["warm_median_ms"],
             "fresh_popup_zero_network": all(
                 value == 0
                 for value in candidate["fresh_popup_network_requests"]
@@ -761,7 +975,14 @@ def main() -> None:
                 for item in candidate["samples"]
             ),
         }
-        result.update({"baseline": baseline, "candidate": candidate, "gates": gates, "passed": all(gates.values())})
+        result.update(
+            {
+                "baseline": baseline,
+                "candidate": candidate,
+                "gates": gates,
+                "passed": all(gates.values()),
+            }
+        )
     else:
         result["passed"] = False
     rendered = json.dumps(result, indent=2) + "\n"

@@ -10,10 +10,10 @@ MouseArea {
     id: compactRoot
 
     readonly property real textModeWidth: compactModeIcon.Layout.preferredWidth
-        + compactContent.columnSpacing + compactDailyValue.implicitWidth
+        + compactContent.columnSpacing + Math.min(compactDailyValue.implicitWidth, Kirigami.Units.gridUnit * 12)
     readonly property bool verticalPanel: Plasmoid.formFactor === PlasmaCore.Types.Vertical
     implicitWidth: displayMode === "icon"
-        ? Math.max(Kirigami.Units.iconSizes.small, height) : textModeWidth
+        ? Math.max(Kirigami.Units.iconSizes.small, height) : verticalPanel ? Kirigami.Units.gridUnit * 5 : textModeWidth
     implicitHeight: verticalPanel && displayMode !== "icon"
         ? compactModeIcon.Layout.preferredHeight + compactContent.rowSpacing
             + compactDailyValue.implicitHeight
@@ -21,7 +21,7 @@ MouseArea {
     Layout.fillWidth: verticalPanel
     Layout.minimumWidth: verticalPanel ? Kirigami.Units.iconSizes.small : implicitWidth
     Layout.preferredWidth: implicitWidth
-    Layout.maximumWidth: verticalPanel ? Number.POSITIVE_INFINITY : implicitWidth
+    Layout.maximumWidth: verticalPanel ? Kirigami.Units.gridUnit * 5 : implicitWidth
     Layout.minimumHeight: verticalPanel ? implicitHeight : Kirigami.Units.iconSizes.small
     Layout.preferredHeight: implicitHeight
 
@@ -29,13 +29,32 @@ MouseArea {
     readonly property url brandedIconSource: Qt.resolvedUrl("../icons/logo.png")
     readonly property var providers: compactRoot.monitor.allProviders ?? []
     readonly property var subscriptionTools: compactRoot.monitor.allSubscriptionTools ?? []
+    property int favoriteCycleIndex: -1
 
+    readonly property var panelSourceIds: {
+        var scope = Plasmoid.configuration.panelSourceScope || "automatic";
+        if (scope === "all") return null;
+        if (scope === "source") return [Plasmoid.configuration.panelSourceId || ""];
+        var favorites = compactRoot.monitor.favoriteSourceIds || [];
+        if (favoriteCycleIndex >= 0 && favoriteCycleIndex < favorites.length)
+            return [favorites[favoriteCycleIndex]];
+        return favorites.length ? favorites : null;
+    }
+    readonly property var scopedSummary: {
+        var daily = monitor.presentationDailyState;
+        var revision = daily ? daily.summary : ({});
+        if (panelSourceIds === null) return revision;
+        return daily && typeof daily.summaryForSources === "function"
+            ? daily.summaryForSources(panelSourceIds) : ({});
+    }
     Components.CompactMetricState {
         id: compactState
         presentationTime: compactRoot.monitor.dailyState.presentationTime
-        summary: compactRoot.monitor.presentationDailyState
-                 && compactRoot.monitor.presentationDailyState.summary
+        summary: compactRoot.scopedSummary
+        globalSummary: compactRoot.monitor.presentationDailyState
             ? compactRoot.monitor.presentationDailyState.summary : ({})
+        activityTotals: compactRoot.monitor.sessionActivity
+            ? compactRoot.monitor.sessionActivity.scopedTotals(compactRoot.panelSourceIds) : ({available: false})
     }
 
     readonly property string displayMode: compactState.normalizeMode(
@@ -58,6 +77,17 @@ MouseArea {
     Accessible.name: i18n("AI Usage Monitor: %1", accessibleText())
     hoverEnabled: true
     onClicked: Plasmoid.activated()
+    onWheel: function(wheel) {
+        var scope = Plasmoid.configuration.panelSourceScope || "automatic";
+        var favorites = compactRoot.monitor.favoriteSourceIds || [];
+        if (scope !== "automatic" || favorites.length < 2) return;
+        var step = wheel.angleDelta.y < 0 ? 1 : -1;
+        var next = compactRoot.favoriteCycleIndex + step;
+        if (next >= favorites.length) next = -1;
+        else if (next < -1) next = favorites.length - 1;
+        compactRoot.favoriteCycleIndex = next;
+        wheel.accepted = true;
+    }
     activeFocusOnTab: true
     Keys.onSpacePressed: Plasmoid.activated()
     Keys.onReturnPressed: Plasmoid.activated()
@@ -109,6 +139,15 @@ MouseArea {
             Layout.preferredWidth: Kirigami.Units.iconSizes.small
             Layout.preferredHeight: width
             Layout.alignment: Qt.AlignHCenter
+            PlasmaComponents.Label {
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                visible: compactRoot.statusKey === "critical" || compactRoot.statusKey === "warning"
+                text: "!"
+                font.bold: true
+                color: compactRoot.statusColor()
+                Accessible.ignored: true
+            }
         }
 
         PlasmaComponents.Label {
@@ -151,8 +190,18 @@ MouseArea {
         return compactState.displayText(displayMode);
     }
 
+    function selectedSourceName() {
+        var daily = monitor.presentationDailyState;
+        var row = daily && typeof daily.source === "function"
+            ? daily.source(Plasmoid.configuration.panelSourceId) : ({});
+        return row.displayName || i18n("Selected source unavailable");
+    }
+
     function accessibleText() {
         if (displayMode === "icon") return compactState.summaryText();
-        return displayText() + ". " + compactState.summaryText();
+        return displayText() + ". " + compactState.summaryText()
+            + ". " + (Plasmoid.configuration.panelSourceScope === "source"
+                ? i18n("Source: %1", selectedSourceName())
+                : panelSourceIds !== null ? i18n("Favorites") : i18n("All sources"));
     }
 }

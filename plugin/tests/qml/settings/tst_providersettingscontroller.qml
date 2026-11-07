@@ -223,6 +223,18 @@ TestCase {
         controller.takeSnapshot();
     }
 
+    function test_discardLeavesSettingsOwnedByOtherPagesUntouched() {
+        testCase.descriptors = testCase.descriptors.map(function(row) {
+            return Object.assign({}, row, {notificationsConfigKey: "externalNotifications"});
+        });
+        controller.takeSnapshot();
+        verify(controller.trackedKeys().indexOf("externalNotifications") < 0);
+        controller.setValue("openaiEnabled", true);
+        controller.discardChanges();
+        compare(fakeConfiguration.cfg_openaiEnabled, false);
+        verify(!controller.dirty);
+    }
+
     function test_sourcesAreGroupedThenSortedByName() {
         compare(controller.visibleSources.length, 5);
         compare(controller.visibleSources[0].configKey, "codex-cli");

@@ -1,6 +1,6 @@
 # Coding sessions and projects
 
-V25 can keep a local history of reported token usage from Codex and Claude
+V26 can keep a local history of reported token usage from Codex and Claude
 Code. This is separate from the tools' quota cards: session tokens describe
 what the local tool recorded, and are not a subscription percentage, bill, or
 productivity measure.
@@ -189,3 +189,22 @@ schema v1. Existing history, local aliases, independent import opt-ins and
 settings are retained; no new database migration or reimport is required.
 Older saved view state without a model choice opens with **All models**.
 Missing view-mode and model-search fields default to Sessions and an empty search.
+
+## Compare completed periods
+
+Open **Insights → Coding sessions** to compare the last seven completed local
+calendar days with the preceding seven. Select 30 completed days or Custom
+completed days for another interval. Choose Today for current activity separately.
+The same tool, project and exact model filters apply to both comparison periods.
+Project/model drill-down opens the same completed dates in History.
+
+The comparison shows recorded input/output tokens, cache reads/writes and
+sessions with activity, plus reported/missing category counts. Cache is already
+included in input: total tokens means input plus output. An empty period does
+not prove zero usage. Missing categories, incomplete imports and retention gaps
+suppress derived comparisons rather than inventing values. A recorded zero
+baseline supports an absolute change but no percentage. Thirty-day comparisons
+need sufficient retained history; enabling history does not backfill 60 days.
+
+Local insights describe recorded usage and model/project contributions, not
+productivity, subscription quota or billing. No external AI service is used.

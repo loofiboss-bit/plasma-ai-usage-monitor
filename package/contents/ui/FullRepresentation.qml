@@ -43,7 +43,7 @@ Item {
             modelFilter: AppInfo.demoMode && AppInfo.smokeView === "media-history-sessions"
                 ? {modelId: "gpt-5-codex"} : ({}) }),
         analyst: ({
-            analystMode: false,
+            analystMode: AppInfo.demoMode && AppInfo.smokeView === "media-analyst-comparison",
             toolId: "codex-cli", rangeIndex: 1
         })
     })
@@ -59,6 +59,60 @@ Item {
     function resumeGuidedSetup() {
         Plasmoid.configuration.setupWizardDismissed = false;
         Plasmoid.configuration.setupWizardInProgress = true;
+    }
+
+    function openSourceDetail(stableId) {
+        if (!stableId) return;
+        captureCurrentViewState();
+        detailSourceId = String(stableId);
+        returnFocusSourceId = String(stableId);
+        sourceDetailVisible = true;
+    }
+
+    Shortcut {
+        sequence: "Alt+1"
+        enabled: !fullRoot.showGuidedSetup
+        onActivated: {
+            fullRoot.captureCurrentViewState();
+            fullRoot.sourceDetailVisible = false;
+            fullRoot.destination = 0;
+        }
+    }
+    Shortcut {
+        sequence: "Alt+2"
+        enabled: !fullRoot.showGuidedSetup
+        onActivated: {
+            fullRoot.captureCurrentViewState();
+            fullRoot.sourceDetailVisible = false;
+            fullRoot.destination = 1;
+        }
+    }
+    Shortcut {
+        sequence: "Alt+3"
+        enabled: !fullRoot.showGuidedSetup
+        onActivated: {
+            fullRoot.captureCurrentViewState();
+            fullRoot.sourceDetailVisible = false;
+            fullRoot.destination = 2;
+        }
+    }
+    Shortcut {
+        sequence: "Escape"
+        enabled: fullRoot.sourceDetailVisible
+        onActivated: {
+            fullRoot.sourceDetailVisible = false;
+            fullRoot.destination = 0;
+        }
+    }
+
+    Connections {
+        target: fullRoot.monitor
+        ignoreUnknownSignals: true
+        function onNotificationSourceRequested(stableId) {
+            fullRoot.openSourceDetail(stableId);
+            if (fullRoot.monitor && fullRoot.monitor.pendingNotificationSourceId === stableId)
+                fullRoot.monitor.pendingNotificationSourceId = "";
+        }
     }
 
     function captureCurrentViewState() {
@@ -407,6 +461,14 @@ Item {
                 fullRoot.destination = 0;
             }
             function onActionRequested(stableId, actionKey, sourceKind) {
+                if (actionKey === "review_sessions") {
+                    var now = new Date(fullRoot.monitor.dailyState.presentationTime);
+                    var day = now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0")
+                        + "-" + String(now.getDate()).padStart(2, "0");
+                    fullRoot.routeToSessionHistoryRange({toolId: stableId,
+                        startDate: day, endDate: day, dayDrilldown: true});
+                    return;
+                }
                 if (actionKey === "review_quota" || actionKey === "review_runway") {
                     fullRoot.captureCurrentViewState();
                     fullRoot.detailSourceId = stableId;
@@ -472,6 +534,13 @@ Item {
         Qt.callLater(function() {
             AppInfo.performanceMark("first_rendered_frame");
         });
+        if (fullRoot.monitor && fullRoot.monitor.pendingNotificationSourceId) {
+            var pendingId = fullRoot.monitor.pendingNotificationSourceId;
+            fullRoot.monitor.pendingNotificationSourceId = "";
+            Qt.callLater(function() {
+                fullRoot.openSourceDetail(pendingId);
+            });
+        }
         if (AppInfo.smokeView === "settings"
                 || AppInfo.smokeView === "budget-settings") {
             Qt.callLater(function() {

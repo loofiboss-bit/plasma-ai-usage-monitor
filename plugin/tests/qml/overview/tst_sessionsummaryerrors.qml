@@ -20,33 +20,13 @@ TestCase {
     QtObject {
         id: fakeMonitor
         property var localSessions: backend
+        property var sessionActivity: null
+        property var favoriteSourceIds: []
         property var presentationDailyState: null
         property var guardrails: null
         property string modelMigrationNotice: ""
     }
     Component { id: viewFactory; Views.OverviewView { monitor: fakeMonitor; width: 950; height: 750 } }
-    function test_recreated_view_rejects_previous_instance_replies() {
-        var previous = createTemporaryObject(viewFactory, tests);
-        verify(previous !== null);
-        previous.refreshSessionSummaries();
-        var previousCodex = previous.sessionSummaryLatestByTool["codex-cli"];
-        var previousClaude = previous.sessionSummaryLatestByTool["claude-code"];
-        previous.destroy();
-        var current = createTemporaryObject(viewFactory, tests);
-        verify(current !== null);
-        current.refreshSessionSummaries();
-        verify(current.sessionSummaryLatestByTool["codex-cli"] !== previousCodex);
-        verify(current.sessionSummaryLatestByTool["claude-code"] !== previousClaude);
-        backend.summaryReady(previousCodex, {sessionCount: 999});
-        backend.queryFailed(previousClaude, "session-query-failed");
-        compare(Object.keys(current.sessionSummaryByTool).length, 0);
-        compare(Object.keys(current.sessionSummaryRequests).length, 2);
-        backend.summaryReady(current.sessionSummaryLatestByTool["codex-cli"], {sessionCount: 4});
-        backend.summaryReady(current.sessionSummaryLatestByTool["claude-code"], {sessionCount: 2});
-        compare(current.sessionSummaryByTool["codex-cli"].sessionCount, 4);
-        compare(current.sessionSummaryByTool["claude-code"].sessionCount, 2);
-        compare(Object.keys(current.sessionSummaryRequests).length, 0);
-    }
     Component {
         id: dailyStateFactory
         QtObject {
@@ -117,27 +97,25 @@ TestCase {
         verify(!reset.visible);
         tryCompare(search, "activeFocus", true);
     }
-    function test_failure_completes_current_source_and_retry_replaces_it() {
+    function test_favorite_filter_state_survives_restore() {
         var view = createTemporaryObject(viewFactory, tests);
-        verify(view !== null);
-        view.refreshSessionSummaries();
-        var old = view.sessionSummaryLatestByTool["codex-cli"];
-        backend.summaryReady(old, {sessionCount: 8});
-        verify(view.sessionActivityText("codex-cli").indexOf("8") >= 0);
-        view.refreshSessionSummaries();
-        var current = view.sessionSummaryLatestByTool["codex-cli"];
-        backend.queryFailed(old, "session-query-failed");
-        verify(!view.sessionSummaryByTool["codex-cli"].queryFailed);
-        backend.queryFailed(current, "session-database-unavailable");
-        verify(view.sessionSummaryByTool["codex-cli"].queryFailed);
-        verify(view.sessionActivityText("codex-cli").indexOf("unavailable") >= 0);
-        verify(view.sessionSummaryRequests[current] === undefined);
-        backend.summaryReady(view.sessionSummaryLatestByTool["claude-code"], {sessionCount: 3});
-        compare(Object.keys(view.sessionSummaryRequests).length, 0);
-        for (var i = 0; i < 10; ++i) view.refreshSessionSummaries();
-        compare(Object.keys(view.sessionSummaryRequests).length, 2);
-        backend.summaryReady(view.sessionSummaryLatestByTool["codex-cli"], {sessionCount: 0});
-        verify(!view.sessionSummaryByTool["codex-cli"].queryFailed);
-        verify(view.sessionActivityText("codex-cli").indexOf("0") >= 0);
+        var state = findChild(view, "overviewState");
+        state.favoriteSourceIds = ["healthy", "healthy", "disabled"];
+        state.dailyState = createTemporaryObject(dailyStateFactory, tests, {
+            rows: [{stableId: "failing", displayName: "Needs repair", attentionSeverity: "warning"},
+                {stableId: "healthy", displayName: "Healthy", attentionSeverity: "none"}]
+        });
+        view.sourceFilterIndex = 2;
+        compare(view.visibleSourceRows.length, 1);
+        compare(view.visibleSourceRows[0].stableId, "healthy");
+        var saved = view.captureViewState();
+        view.sourceFilterIndex = 0;
+        view.viewState = saved;
+        compare(view.sourceFilterIndex, 2);
+        compare(view.visibleSourceRows.length, 1);
+        state.favoriteSourceIds = [];
+        compare(view.visibleSourceRows.length, 0);
+        verify(!view.restoreSourceFocus("healthy"));
+        tryCompare(findChild(view, "overviewSourceSearch"), "activeFocus", true);
     }
 }

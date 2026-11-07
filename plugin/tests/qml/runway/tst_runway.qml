@@ -24,9 +24,10 @@ TestCase {
     QtObject {
         id: presentation
         property var topAction: ({})
+        property var dailyFacts: []
         function headline() { return "Current source state"; }
         function explanation() { return "Current state explanation"; }
-        function focusFacts() { return []; }
+        function focusFacts() { return dailyFacts; }
         function actionLabel(row) { return row.stableId ? "Fix current issue" : ""; }
         function actionIcon(row) { return "configure"; }
     }
@@ -81,6 +82,7 @@ TestCase {
 
     function init() {
         presentation.topAction = ({});
+        presentation.dailyFacts = [];
         guardrails.forecasts = [];
     }
 
@@ -133,7 +135,7 @@ TestCase {
         compare(focus.effectiveActionRow.stableId, "openai");
         compare(focus.effectiveActionRow.nextActionKey, "review_runway");
         compare(focus.headlineText(), "Quota runway needs attention");
-        compare(focus.effectiveFacts().length, 3);
+        compare(focus.effectiveFacts().length, 0);
     }
 
     function test_narrowAndWideCardsKeepAccessibleStateText() {
@@ -173,8 +175,8 @@ TestCase {
         compare(focus.runwayRisk.sourceId, "anthropic");
         compare(focus.headlineText(), "Budget policy exceeded");
         compare(focus.effectiveActionLabel(), "Review budget");
-        compare(focus.effectiveFacts().length, 3);
-        verify(focus.effectiveFacts()[1].label.indexOf("remaining") >= 0);
+        compare(focus.effectiveFacts().length, 0);
+        // Forecast action stays global; daily facts remain the presentation facts.
 
         var card = createTemporaryObject(runwayCardComponent, testCase, {
             forecast: budget,
@@ -184,5 +186,20 @@ TestCase {
         compare(card.stateLabel(), "Exceeded");
         verify(card.summaryText().indexOf("reached or exceeded") >= 0);
         verify(card.formatMinor(8000).indexOf("80") >= 0);
+    }
+    function test_forecast_does_not_replace_actionable_daily_facts() {
+        guardrails.forecasts = [forecast("critical")];
+        presentation.dailyFacts = [
+            {icon: "speedometer", label: "Live quota", value: "20%", actionKey: "review_quota"},
+            {icon: "wallet-open", label: "Today", value: "USD 2", actionKey: "review_costs"},
+            {icon: "view-history", label: "Local activity", value: "1 session", actionKey: "review_sessions"},
+            {label: "Overflow", value: "Hidden"}
+        ];
+        var focus = createTemporaryObject(dailyFocusComponent, testCase, {
+            presentation: presentation, guardrails: guardrails
+        });
+        compare(focus.effectiveFacts().length, 3);
+        compare(focus.effectiveFacts()[0].actionKey, "review_quota");
+        compare(focus.effectiveActionRow.nextActionKey, "review_runway");
     }
 }

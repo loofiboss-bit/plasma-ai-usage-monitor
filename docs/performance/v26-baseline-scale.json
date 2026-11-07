@@ -1,0 +1,228 @@
+{
+  "schema": 1,
+  "buildDirectory": "/tmp/ai-monitor-v26-baseline/build/release",
+  "runs": 5,
+  "conditions": "Release fixture test wall time includes fixture seeding/assertions; phase7 metrics time queries only",
+  "fixtures": {
+    "historyAnalyst100k": {
+      "samples": [
+        {
+          "wallMs": 2001.172,
+          "returnCode": 0,
+          "stdout": "********* Start testing of Phase7PerformanceTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : Phase7PerformanceTest::initTestCase()\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=1000 history_ms=8 analyst_ms=35 history_budget_ms=150 analyst_budget_ms=250\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=10000 history_ms=80 analyst_ms=64 history_budget_ms=500 analyst_budget_ms=700\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=100000 history_ms=785 analyst_ms=405 history_budget_ms=2000 analyst_budget_ms=1000\nPASS   : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets()\nPASS   : Phase7PerformanceTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 1982ms\n********* Finished testing of Phase7PerformanceTest *********\n",
+          "stderr": "",
+          "queryMetrics": [
+            {
+              "rows": "1000",
+              "history_ms": "8",
+              "analyst_ms": "35",
+              "history_budget_ms": "150",
+              "analyst_budget_ms": "250"
+            },
+            {
+              "rows": "10000",
+              "history_ms": "80",
+              "analyst_ms": "64",
+              "history_budget_ms": "500",
+              "analyst_budget_ms": "700"
+            },
+            {
+              "rows": "100000",
+              "history_ms": "785",
+              "analyst_ms": "405",
+              "history_budget_ms": "2000",
+              "analyst_budget_ms": "1000"
+            }
+          ]
+        },
+        {
+          "wallMs": 5144.664,
+          "returnCode": 1,
+          "stdout": "********* Start testing of Phase7PerformanceTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : Phase7PerformanceTest::initTestCase()\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=1000 history_ms=15 analyst_ms=68 history_budget_ms=150 analyst_budget_ms=250\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=10000 history_ms=165 analyst_ms=157 history_budget_ms=500 analyst_budget_ms=700\nFAIL!  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() 'analystElapsed <= budget.analystMilliseconds' returned FALSE. (Phase 7 Analyst 100000-row budget exceeded: 1832 ms > 1000 ms)\n   Loc: [/tmp/ai-monitor-v26-baseline/plugin/tests/test_phase7_performance.cpp(146)]\nPASS   : Phase7PerformanceTest::cleanupTestCase()\nTotals: 2 passed, 1 failed, 0 skipped, 0 blacklisted, 5109ms\n********* Finished testing of Phase7PerformanceTest *********\n",
+          "stderr": "",
+          "queryMetrics": [
+            {
+              "rows": "1000",
+              "history_ms": "15",
+              "analyst_ms": "68",
+              "history_budget_ms": "150",
+              "analyst_budget_ms": "250"
+            },
+            {
+              "rows": "10000",
+              "history_ms": "165",
+              "analyst_ms": "157",
+              "history_budget_ms": "500",
+              "analyst_budget_ms": "700"
+            }
+          ]
+        },
+        {
+          "wallMs": 5524.611,
+          "returnCode": 1,
+          "stdout": "********* Start testing of Phase7PerformanceTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : Phase7PerformanceTest::initTestCase()\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=1000 history_ms=27 analyst_ms=103 history_budget_ms=150 analyst_budget_ms=250\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=10000 history_ms=256 analyst_ms=212 history_budget_ms=500 analyst_budget_ms=700\nFAIL!  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() 'historyElapsed <= budget.historyMilliseconds' returned FALSE. (Phase 7 history 100000-row budget exceeded: 2996 ms > 2000 ms)\n   Loc: [/tmp/ai-monitor-v26-baseline/plugin/tests/test_phase7_performance.cpp(133)]\nPASS   : Phase7PerformanceTest::cleanupTestCase()\nTotals: 2 passed, 1 failed, 0 skipped, 0 blacklisted, 5484ms\n********* Finished testing of Phase7PerformanceTest *********\n",
+          "stderr": "",
+          "queryMetrics": [
+            {
+              "rows": "1000",
+              "history_ms": "27",
+              "analyst_ms": "103",
+              "history_budget_ms": "150",
+              "analyst_budget_ms": "250"
+            },
+            {
+              "rows": "10000",
+              "history_ms": "256",
+              "analyst_ms": "212",
+              "history_budget_ms": "500",
+              "analyst_budget_ms": "700"
+            }
+          ]
+        },
+        {
+          "wallMs": 3664.286,
+          "returnCode": 0,
+          "stdout": "********* Start testing of Phase7PerformanceTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : Phase7PerformanceTest::initTestCase()\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=1000 history_ms=15 analyst_ms=60 history_budget_ms=150 analyst_budget_ms=250\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=10000 history_ms=140 analyst_ms=111 history_budget_ms=500 analyst_budget_ms=700\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=100000 history_ms=1176 analyst_ms=635 history_budget_ms=2000 analyst_budget_ms=1000\nPASS   : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets()\nPASS   : Phase7PerformanceTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 3638ms\n********* Finished testing of Phase7PerformanceTest *********\n",
+          "stderr": "",
+          "queryMetrics": [
+            {
+              "rows": "1000",
+              "history_ms": "15",
+              "analyst_ms": "60",
+              "history_budget_ms": "150",
+              "analyst_budget_ms": "250"
+            },
+            {
+              "rows": "10000",
+              "history_ms": "140",
+              "analyst_ms": "111",
+              "history_budget_ms": "500",
+              "analyst_budget_ms": "700"
+            },
+            {
+              "rows": "100000",
+              "history_ms": "1176",
+              "analyst_ms": "635",
+              "history_budget_ms": "2000",
+              "analyst_budget_ms": "1000"
+            }
+          ]
+        },
+        {
+          "wallMs": 3239.034,
+          "returnCode": 0,
+          "stdout": "********* Start testing of Phase7PerformanceTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : Phase7PerformanceTest::initTestCase()\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=1000 history_ms=12 analyst_ms=46 history_budget_ms=150 analyst_budget_ms=250\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=10000 history_ms=115 analyst_ms=86 history_budget_ms=500 analyst_budget_ms=700\nQINFO  : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets() PHASE7_METRIC rows=100000 history_ms=1395 analyst_ms=587 history_budget_ms=2000 analyst_budget_ms=1000\nPASS   : Phase7PerformanceTest::databaseQueriesMeetReleaseBudgets()\nPASS   : Phase7PerformanceTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 3218ms\n********* Finished testing of Phase7PerformanceTest *********\n",
+          "stderr": "",
+          "queryMetrics": [
+            {
+              "rows": "1000",
+              "history_ms": "12",
+              "analyst_ms": "46",
+              "history_budget_ms": "150",
+              "analyst_budget_ms": "250"
+            },
+            {
+              "rows": "10000",
+              "history_ms": "115",
+              "analyst_ms": "86",
+              "history_budget_ms": "500",
+              "analyst_budget_ms": "700"
+            },
+            {
+              "rows": "100000",
+              "history_ms": "1395",
+              "analyst_ms": "587",
+              "history_budget_ms": "2000",
+              "analyst_budget_ms": "1000"
+            }
+          ]
+        }
+      ],
+      "medianWallMs": 3664.286,
+      "passed": false
+    },
+    "sessionQueries100k": {
+      "samples": [
+        {
+          "wallMs": 953.895,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::queriesHandleOneHundredThousandUsageEvents()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 946ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        },
+        {
+          "wallMs": 875.019,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::queriesHandleOneHundredThousandUsageEvents()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 867ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        },
+        {
+          "wallMs": 926.962,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::queriesHandleOneHundredThousandUsageEvents()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 919ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        },
+        {
+          "wallMs": 895.41,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::queriesHandleOneHundredThousandUsageEvents()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 885ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        },
+        {
+          "wallMs": 1016.586,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::queriesHandleOneHundredThousandUsageEvents()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 1008ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        }
+      ],
+      "medianWallMs": 926.962,
+      "passed": true
+    },
+    "sessionExport100k": {
+      "samples": [
+        {
+          "wallMs": 4332.169,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::streamsOneHundredThousandExportEventsAtomically()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 4309ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        },
+        {
+          "wallMs": 4529.724,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::streamsOneHundredThousandExportEventsAtomically()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 4510ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        },
+        {
+          "wallMs": 5427.886,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::streamsOneHundredThousandExportEventsAtomically()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 5405ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        },
+        {
+          "wallMs": 6261.386,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::streamsOneHundredThousandExportEventsAtomically()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 6233ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        },
+        {
+          "wallMs": 5988.325,
+          "returnCode": 0,
+          "stdout": "********* Start testing of LocalSessionModelTest *********\nConfig: Using QtTest library 6.11.2, Qt 6.11.2 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 16.2.1 20260819 (Red Hat 16.2.1-2)), fedora 44\nPASS   : LocalSessionModelTest::initTestCase()\nPASS   : LocalSessionModelTest::streamsOneHundredThousandExportEventsAtomically()\nPASS   : LocalSessionModelTest::cleanupTestCase()\nTotals: 3 passed, 0 failed, 0 skipped, 0 blacklisted, 5964ms\n********* Finished testing of LocalSessionModelTest *********\n",
+          "stderr": "",
+          "queryMetrics": []
+        }
+      ],
+      "medianWallMs": 5427.886,
+      "passed": true
+    }
+  },
+  "passed": false
+}

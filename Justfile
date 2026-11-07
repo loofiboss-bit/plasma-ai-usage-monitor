@@ -132,7 +132,7 @@ phase7-check: build-debug
 fedora44-check:
     bash scripts/fedora44_check.sh
 
-# Fedora KDE 45 prerelease environment validation
+# Fedora KDE 45 release environment validation
 fedora45-check:
     bash scripts/fedora44_check.sh 45
 

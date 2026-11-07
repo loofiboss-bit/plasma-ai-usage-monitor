@@ -97,6 +97,11 @@ function schemaV3Payload(configData, portableKeys, currentSettings) {
 }
 
 function settingValueValid(key, value) {
+    if (key === "favoriteSourceIds")
+        return Array.isArray(value) && value.every(function(id) {
+            return typeof id === "string" && id.trim().length > 0;
+        });
+    if (key === "panelSourceId") return typeof value === "string";
     var ranges = {
         refreshInterval: [60, 1800], warningThreshold: [50, 95],
         criticalThreshold: [60, 100], budgetWarningPercent: [1, 100],
@@ -107,7 +112,8 @@ function settingValueValid(key, value) {
         analystIntensityMode: [0, 1], browserSyncBrowser: [0, 3], copilotResetDay: [1, 28]
     };
     var choices = {
-        compactDisplayMode: ["icon", "attention", "lowest-quota", "next-reset", "actual-spend", "active-sources"],
+        compactDisplayMode: ["icon", "attention", "lowest-quota", "next-reset", "actual-spend", "active-sources", "dailycost", "requests", "count", "critical", "cost", "session-tokens", "session-count"],
+        panelSourceScope: ["automatic", "all", "source"],
         autoExportFormat: ["both", "json", "csv"],
         copilotBillingMode: ["auto", "premium_requests_legacy", "ai_credits_usage_based"],
         googleTier: ["free", "paid"], googleveoTier: ["free", "paid"]

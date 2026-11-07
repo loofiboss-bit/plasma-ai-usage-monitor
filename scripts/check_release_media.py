@@ -42,6 +42,7 @@ REQUIRED = (
     "panel-lowest-quota.png",
     "coding-sessions-detail.png",
     "coding-sessions-history.png",
+    "coding-sessions-comparison.png",
 )
 SCENARIOS = {
     "overview-popup.png": "media-overview",
@@ -57,6 +58,7 @@ SCENARIOS = {
     "panel-lowest-quota.png": "media-panel",
     "coding-sessions-detail.png": "media-coding-sessions",
     "coding-sessions-history.png": "media-history-sessions",
+    "coding-sessions-comparison.png": "media-analyst-comparison",
 }
 
 

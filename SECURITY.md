@@ -20,8 +20,8 @@ The project aims to acknowledge reports within 48 hours. Fix timing depends on s
 
 | Release line | Security updates |
 | --- | --- |
-| 25.x | Supported |
-| 24.x and older | Upgrade to the current published release |
+| 26.x | Supported |
+| 25.x and older | Upgrade to the current published release |
 
 25.0.0 currently describes supported candidate source, not a published package.
 Until publication, 24.2.0 remains the current published release and its security

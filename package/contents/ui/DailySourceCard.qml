@@ -12,6 +12,8 @@ QQC2.ItemDelegate {
 
     required property var row
     property string sessionActivityText: ""
+    property bool favorite: false
+    signal favoriteToggled(string stableId)
     signal actionRequested(string stableId, string actionKey, string sourceKind)
     signal sourceRequested(string stableId)
 
@@ -38,6 +40,15 @@ QQC2.ItemDelegate {
     contentItem: RowLayout {
         spacing: Kirigami.Units.mediumSpacing
 
+        PlasmaComponents.ToolButton {
+            objectName: "sourceFavoriteToggle"
+            icon.name: card.favorite ? "rating" : "rating-unrated"
+            checkable: true
+            checked: card.favorite
+            Accessible.name: card.favorite ? i18n("Remove %1 from favorites", card.row.displayName)
+                : i18n("Add %1 to favorites", card.row.displayName)
+            onClicked: card.favoriteToggled(card.row.stableId)
+        }
         Kirigami.Icon {
             objectName: "sourceLogo"
             source: card.logoSource()
@@ -83,6 +94,62 @@ QQC2.ItemDelegate {
                     color: Kirigami.Theme.disabledTextColor
                     font.pointSize: Kirigami.Theme.smallFont.pointSize
                     wrapMode: Text.WordWrap
+                }
+
+                ColumnLayout {
+                    objectName: "sourceCardQuotaWindows"
+                    Layout.fillWidth: true
+                    Layout.topMargin: Kirigami.Units.smallSpacing / 2
+                    spacing: Kirigami.Units.smallSpacing / 2
+                    visible: card.extraQuotaWindows().length > 0
+
+                    Repeater {
+                        model: card.extraQuotaWindows()
+
+                        RowLayout {
+                            id: quotaWindowItem
+                            required property var modelData
+                            Layout.fillWidth: true
+                            spacing: Kirigami.Units.smallSpacing
+
+                            PlasmaComponents.Label {
+                                text: quotaWindowItem.modelData.label
+                                color: Kirigami.Theme.disabledTextColor
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                elide: Text.ElideRight
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 5
+                                Layout.minimumWidth: Kirigami.Units.gridUnit * 3
+                            }
+
+                            Rectangle {
+                                Layout.preferredWidth: Kirigami.Units.gridUnit * 3.5
+                                Layout.preferredHeight: Math.max(4, Math.round(Kirigami.Units.smallSpacing * 1.2))
+                                radius: height / 2
+                                color: Qt.alpha(Kirigami.Theme.textColor, 0.15)
+
+                                Rectangle {
+                                    width: Math.round(parent.width * Math.max(0, Math.min(100, quotaWindowItem.modelData.percentRemaining)) / 100)
+                                    height: parent.height
+                                    radius: parent.radius
+                                    color: quotaWindowItem.modelData.percentRemaining <= 10
+                                        ? Kirigami.Theme.negativeTextColor
+                                        : quotaWindowItem.modelData.percentRemaining <= 25
+                                          ? Kirigami.Theme.neutralTextColor
+                                          : Kirigami.Theme.positiveTextColor
+                                }
+                            }
+
+                            PlasmaComponents.Label {
+                                Layout.fillWidth: true
+                                text: quotaWindowItem.modelData.resetText !== ""
+                                    ? i18n("%1% · %2", quotaWindowItem.modelData.percentRemaining, quotaWindowItem.modelData.resetText)
+                                    : i18n("%1% left", quotaWindowItem.modelData.percentRemaining)
+                                color: Kirigami.Theme.disabledTextColor
+                                font.pointSize: Kirigami.Theme.smallFont.pointSize
+                                elide: Text.ElideRight
+                            }
+                        }
+                    }
                 }
             }
 
@@ -265,5 +332,28 @@ QQC2.ItemDelegate {
             return i18n("Stale · %1", period);
         }
         return period;
+    }
+
+    function extraQuotaWindows() {
+        if (!row || row.freshnessState === "stale" || row.freshnessState === "never")
+            return [];
+        var windows = row.quotaWindows || [];
+        var valid = [];
+        for (var i = 0; i < windows.length; ++i) {
+            var w = windows[i] || {};
+            var remaining = Number(w.percentRemaining);
+            if (w.available === false || w.freshnessState === "stale"
+                    || typeof w.percentRemaining !== "number"
+                    || !Number.isFinite(remaining)
+                    || remaining < 0 || remaining > 100)
+                continue;
+            valid.push({
+                label: w.window || w.label || w.kind || i18n("Window"),
+                percentRemaining: Math.round(remaining),
+                resetText: w.resetAt ? Utils.formatResetCountdown(w.resetAt) : ""
+            });
+            if (valid.length >= 3) break;
+        }
+        return valid.length > 1 ? valid : [];
     }
 }

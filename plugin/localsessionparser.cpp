@@ -19,9 +19,16 @@ qint64 number(const QJsonObject &o, const QString &key, bool *present) {
   return static_cast<qint64>(v.toDouble());
 }
 QString safeModel(QString model) {
-  if (model.size() > 96 || !model.contains(QRegularExpression(
-                               QStringLiteral("^[A-Za-z0-9_.:/-]+$"))))
+  if (model.isEmpty() || model.size() > 96)
     return {};
+  for (QChar ch : model) {
+    const ushort u = ch.unicode();
+    const bool valid = (u >= 'A' && u <= 'Z') || (u >= 'a' && u <= 'z') ||
+                       (u >= '0' && u <= '9') || u == '_' || u == '.' ||
+                       u == ':' || u == '/' || u == '-';
+    if (!valid)
+      return {};
+  }
   return model;
 }
 bool containsUnverifiedLineage(const QJsonValue &value, int depth = 0) {

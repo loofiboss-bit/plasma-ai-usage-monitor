@@ -1,8 +1,8 @@
 #include "costengine.h"
 
 #include <QDateTime>
-#include <QRegularExpression>
 #include <QStringList>
+#include <QStringView>
 #include <QtGlobal>
 
 #include <cmath>
@@ -48,6 +48,31 @@ QString trimDecimal(QString value)
     return value;
 }
 
+bool asciiDigits(const QString &value)
+{
+    // Match the previous ^\d+$ validation, including its final LF allowance.
+    const auto length = value.size() - (value.endsWith(QLatin1Char('\n')) ? 1 : 0);
+    if (length == 0) {
+        return false;
+    }
+    for (QChar digit : QStringView(value).left(length)) {
+        if (digit < QLatin1Char('0') || digit > QLatin1Char('9')) {
+            return false;
+        }
+    }
+    return true;
+}
+
+int countScaleDigits(qint64 scale)
+{
+    int digits = 0;
+    while (scale >= 10) {
+        scale /= 10;
+        ++digits;
+    }
+    return digits;
+}
+
 WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
 {
     *ok = false;
@@ -81,13 +106,13 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
     }
 
     const QString integerPart = parts.first().isEmpty() ? QStringLiteral("0") : parts.first();
-    if (!integerPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+    if (!asciiDigits(integerPart)) {
         return 0;
     }
 
     QString fractionalPart = parts.size() == 2 ? parts.at(1) : QString();
     if (!fractionalPart.isEmpty()
-        && !fractionalPart.contains(QRegularExpression(QStringLiteral("^\\d+$")))) {
+        && !asciiDigits(fractionalPart)) {
         return 0;
     }
 
@@ -97,7 +122,7 @@ WideInt parseScaled(const QVariant &value, qint64 scale, bool *ok)
         return 0;
     }
 
-    const int scaleDigits = QString::number(scale).size() - 1;
+    const int scaleDigits = countScaleDigits(scale);
     if (fractionalPart.size() > scaleDigits + 1) {
         fractionalPart.truncate(scaleDigits + 1);
     }
@@ -157,7 +182,7 @@ QString scaledToText(WideInt value, qint64 scale)
         value = -value;
     }
     const QString digits = wideToString(value);
-    const int fractionalDigits = QString::number(scale).size() - 1;
+    const int fractionalDigits = countScaleDigits(scale);
     QString padded = digits;
     if (padded.size() <= fractionalDigits) {
         padded.prepend(QString(fractionalDigits + 1 - padded.size(), QLatin1Char('0')));

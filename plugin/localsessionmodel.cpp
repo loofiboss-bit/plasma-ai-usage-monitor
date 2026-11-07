@@ -1,6 +1,7 @@
 #include "localsessionmodel.h"
 #include "budgetpolicyschema.h"
 #include "localsessionparser.h"
+#include "sessionquery.h"
 
 #include <QCryptographicHash>
 #include <QDateTime>
@@ -104,29 +105,20 @@ struct SessionQueryResult {
   QString error;
 };
 bool validSessionQuery(const QString &tool, const QDateTime &from,
-                       const QDateTime &to, const QVariantMap &filter) {
+                       const QDateTime &to, const QVariantMap &filter,
+                       bool allowAll = false) {
   return (tool == QLatin1String("codex") ||
-          tool == QLatin1String("claude-code")) &&
+          tool == QLatin1String("claude-code") ||
+          (allowAll && tool == QLatin1String("all"))) &&
          from.isValid() && to.isValid() && from < to &&
          (!filter.contains("modelId") ||
           filter.value("modelId").metaType().id() == QMetaType::QString);
 }
-QString eventWhere() {
-  return QStringLiteral(" s.tool_id=? AND e.observed_at_utc>=? AND "
-                        "e.observed_at_utc<? AND (?='' OR s.project_id=?) "
-                        "AND (?=0 OR e.model_id=?) ");
-}
-void bindEventFilter(QSqlQuery &query, const QString &tool,
-                     const QDateTime &from, const QDateTime &to,
-                     const QString &project, const QVariantMap &filter) {
-  query.addBindValue(tool);
-  query.addBindValue(from.toUTC().toString(Qt::ISODateWithMs));
-  query.addBindValue(to.toUTC().toString(Qt::ISODateWithMs));
-  query.addBindValue(project.isEmpty() ? QStringLiteral("") : project);
-  query.addBindValue(project.isEmpty() ? QStringLiteral("") : project);
-  query.addBindValue(filter.contains("modelId") ? 1 : 0);
-  query.addBindValue(filter.value("modelId", QStringLiteral("")).toString());
-}
+using SessionQuery::aggregateSessions;
+using SessionQuery::bindEventFilter;
+using SessionQuery::comparisonRows;
+using SessionQuery::eventWhere;
+using SessionQuery::sessionDeltas;
 bool recordToolCoverage(QSqlDatabase &db, const QString &tool, bool partial) {
   QSqlQuery query(db);
   query.prepare(QStringLiteral(
@@ -1423,7 +1415,7 @@ void LocalSessionModel::requestSessions(
           });
   watcher->setFuture(QtConcurrent::run([=]() {
     SessionQueryResult result;
-    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter)) {
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter, true)) {
       result.error = QStringLiteral("session-invalid-query");
       return result;
     }
@@ -1500,6 +1492,194 @@ void LocalSessionModel::requestSessions(
   }));
 }
 
+void LocalSessionModel::requestActivitySummary(const QString &requestId,
+                                               const QString &toolId,
+                                               const QDateTime &fromUtc,
+                                               const QDateTime &toUtc) {
+  const QString tool = canonicalTool(toolId);
+  const bool enabled =
+      tool == QLatin1String("codex") ? m_codexEnabled : m_claudeEnabled;
+  const auto generation = m_generation;
+  const auto retentionCutoff =
+      QDateTime::currentDateTimeUtc().addDays(-m_retentionDays);
+  auto *watcher = new QFutureWatcher<SessionQueryResult>(this);
+  connect(watcher, &QFutureWatcher<SessionQueryResult>::finished, this,
+          [this, watcher, requestId, generation]() {
+            const auto result = watcher->result();
+            watcher->deleteLater();
+            if (generation != m_generation)
+              return;
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit activitySummaryReady(requestId, result.summary);
+          });
+  watcher->setFuture(QtConcurrent::run([=]() {
+    SessionQueryResult result;
+    if (!validSessionQuery(tool, fromUtc, toUtc, {})) {
+      result.error = QStringLiteral("session-invalid-query");
+      return result;
+    }
+    SessionConnection connection(QStringLiteral("local_sessions_activity_"));
+    if (!connection.db.isOpen())
+      result.error = QStringLiteral("session-database-unavailable");
+    else if (!connection.snapshotStarted ||
+             !aggregateSessions(connection.db, tool, fromUtc, toUtc, {}, {},
+                                enabled, retentionCutoff, result.summary))
+      result.error = QStringLiteral("session-query-failed");
+    return result;
+  }));
+}
+
+void LocalSessionModel::requestComparison(
+    const QString &requestId, const QString &toolId, const QDateTime &fromUtc,
+    const QDateTime &toUtc, const QString &projectId, const QString &timeZoneId,
+    const QVariantMap &modelFilter) {
+  const QString tool = canonicalTool(toolId);
+  const QTimeZone zone = timeZoneId.isEmpty() ? QTimeZone::systemTimeZone()
+                                              : QTimeZone(timeZoneId.toUtf8());
+  const auto now = QDateTime::currentDateTimeUtc();
+  const auto retentionCutoff = now.addDays(-m_retentionDays);
+  const bool enabled =
+      tool == QLatin1String("all")
+          ? (m_codexEnabled || m_claudeEnabled)
+          : (tool == QLatin1String("codex") ? m_codexEnabled : m_claudeEnabled);
+  const auto generation = m_generation;
+  auto *watcher = new QFutureWatcher<SessionQueryResult>(this);
+  connect(watcher, &QFutureWatcher<SessionQueryResult>::finished, this,
+          [this, watcher, requestId, generation]() {
+            const auto result = watcher->result();
+            watcher->deleteLater();
+            if (generation != m_generation)
+              return;
+            if (!result.error.isEmpty())
+              emit queryFailed(requestId, result.error);
+            else
+              emit comparisonReady(requestId, result.summary);
+          });
+  watcher->setFuture(QtConcurrent::run([=]() {
+    SessionQueryResult result;
+    if (!validSessionQuery(tool, fromUtc, toUtc, modelFilter, true) ||
+        !zone.isValid()) {
+      result.error = QStringLiteral("session-invalid-query");
+      return result;
+    }
+    const auto first = fromUtc.toTimeZone(zone).date();
+    const auto end = toUtc.toTimeZone(zone).date();
+    const auto dayCount = first.daysTo(end);
+    const auto previousFrom = first.addDays(-dayCount).startOfDay(zone).toUTC();
+    if (dayCount < 1 || dayCount > 3650 || !previousFrom.isValid() ||
+        first.startOfDay(zone) != fromUtc || end.startOfDay(zone) != toUtc ||
+        toUtc > now.toTimeZone(zone).date().startOfDay(zone)) {
+      result.error = QStringLiteral("session-invalid-query");
+      return result;
+    }
+    SessionConnection connection(QStringLiteral("local_sessions_comparison_"));
+    if (!connection.db.isOpen()) {
+      result.error = QStringLiteral("session-database-unavailable");
+      return result;
+    }
+    result.error = QStringLiteral("session-query-failed");
+    if (!connection.snapshotStarted)
+      return result;
+    // A wide configured retention does not prove that the initial limited
+    // backfill covered earlier days. Establish the observed-history floor
+    // globally for the tool, independently of project/model filters, in the
+    // same snapshot as both period aggregates.
+    QSqlQuery earliest(connection.db);
+    if (tool == QLatin1String("all")) {
+      earliest.prepare(QStringLiteral(
+          "SELECT MIN(e.observed_at_utc) FROM local_usage_events e JOIN "
+          "local_sessions s ON s.session_id=e.session_id"));
+    } else {
+      earliest.prepare(QStringLiteral(
+          "SELECT MIN(e.observed_at_utc) FROM local_usage_events e JOIN "
+          "local_sessions s ON s.session_id=e.session_id WHERE s.tool_id=?"));
+      earliest.addBindValue(tool);
+    }
+    if (!earliest.exec() || !earliest.next())
+      return result;
+    const auto observedFrom =
+        QDateTime::fromString(earliest.value(0).toString(), Qt::ISODateWithMs);
+    const auto observedDay =
+        observedFrom.isValid()
+            ? observedFrom.toTimeZone(zone).date().startOfDay(zone).toUTC()
+            : QDateTime();
+    const auto coverageStart =
+        observedDay.isValid() && observedDay > retentionCutoff
+            ? observedDay
+            : retentionCutoff;
+    const QString coverageStartReason =
+        observedDay.isValid() && observedDay > retentionCutoff
+            ? QStringLiteral("first-recorded-day")
+            : QStringLiteral("retention");
+    QVariantMap current, previous;
+    QMap<QString, QVariantMap> currentModels, previousModels, currentProjects,
+        previousProjects, currentTools, previousTools;
+    if (!aggregateSessions(connection.db, tool, fromUtc, toUtc, projectId,
+                           modelFilter, enabled, coverageStart, current,
+                           &currentModels, &currentProjects, &currentTools) ||
+        !aggregateSessions(connection.db, tool, previousFrom, fromUtc,
+                           projectId, modelFilter, enabled, coverageStart,
+                           previous, &previousModels, &previousProjects,
+                           &previousTools))
+      return result;
+    const auto annotateCoverage = [&](QVariantMap &period,
+                                      const QDateTime &from) {
+      period.insert("observedFromUtc",
+                    observedFrom.isValid()
+                        ? observedFrom.toUTC().toString(Qt::ISODateWithMs)
+                        : QString());
+      period.insert("coverageStartUtc",
+                    coverageStart.toString(Qt::ISODateWithMs));
+      period.insert("coverageStartReason", coverageStartReason);
+      period.insert("coverageReason",
+                    from < coverageStart ? coverageStartReason
+                    : period.value("coverage") == QStringLiteral("partial")
+                        ? QStringLiteral("partial-history")
+                        : period.value("coverage").toString());
+    };
+    annotateCoverage(current, fromUtc);
+    annotateCoverage(previous, previousFrom);
+    int modelCount = 0, projectCount = 0, toolCount = 0;
+    const auto modelRows =
+        comparisonRows(currentModels, previousModels, QStringLiteral("modelId"),
+                       current, previous, &modelCount);
+    const auto projectRows = comparisonRows(currentProjects, previousProjects,
+                                            QStringLiteral("projectId"),
+                                            current, previous, &projectCount);
+    const auto toolRows = comparisonRows(currentTools, previousTools,
+                                         QStringLiteral("toolId"),
+                                         current, previous, &toolCount);
+    const auto deltas = sessionDeltas(current, previous);
+    const auto insights = SessionQuery::insights(
+        current, previous, currentModels, currentProjects, currentTools);
+    result.summary =
+        QVariantMap{{"toolId", current.value("toolId")},
+                    {"current", current},
+                    {"previous", previous},
+                    {"deltas", deltas},
+                    {"toolBreakdown", toolRows},
+                    {"toolBreakdownTotalCount", toolCount},
+                    {"modelBreakdown", modelRows},
+                    {"modelBreakdownTotalCount", modelCount},
+                    {"projectBreakdown", projectRows},
+                    {"projectBreakdownTotalCount", projectCount},
+                    {"observedFromUtc", current.value("observedFromUtc")},
+                    {"coverageStartUtc", current.value("coverageStartUtc")},
+                    {"coverageStartReason", coverageStartReason},
+                    {"insights", insights},
+                    {"fromUtc", current.value("fromUtc")},
+                    {"toUtc", current.value("toUtc")},
+                    {"previousFromUtc", previous.value("fromUtc")},
+                    {"previousToUtc", previous.value("toUtc")},
+                    {"timeZoneId", QString::fromUtf8(zone.id())},
+                    {"dayCount", dayCount}};
+    result.error.clear();
+    return result;
+  }));
+}
+
 void LocalSessionModel::requestSummary(const QString &requestId,
                                        const QString &toolId,
                                        const QDateTime &fromUtc,
@@ -1508,7 +1688,10 @@ void LocalSessionModel::requestSummary(const QString &requestId,
                                        const QVariantMap &modelFilter) {
   const QString storedTool = canonicalTool(toolId);
   const bool enabled =
-      storedTool == QLatin1String("codex") ? m_codexEnabled : m_claudeEnabled;
+      storedTool == QLatin1String("all")
+          ? (m_codexEnabled || m_claudeEnabled)
+          : (storedTool == QLatin1String("codex") ? m_codexEnabled
+                                                  : m_claudeEnabled);
   auto *watcher = new QFutureWatcher<SessionQueryResult>(this);
   connect(watcher, &QFutureWatcher<SessionQueryResult>::finished, this,
           [this, watcher, requestId]() {
@@ -1521,7 +1704,7 @@ void LocalSessionModel::requestSummary(const QString &requestId,
           });
   watcher->setFuture(QtConcurrent::run([=]() {
     SessionQueryResult result;
-    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter)) {
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter, true)) {
       result.error = QStringLiteral("session-invalid-query");
       return result;
     }
@@ -1561,13 +1744,23 @@ void LocalSessionModel::requestSummary(const QString &requestId,
     if (!query.value(0).toInt())
       summary.insert("coverage", QStringLiteral("unavailable"));
     QSqlQuery checkpoint(db);
-    checkpoint.prepare(QStringLiteral(
-        "SELECT coverage FROM local_import_checkpoints WHERE tool_id=?"));
-    checkpoint.addBindValue(storedTool);
+    if (storedTool == QLatin1String("all")) {
+      checkpoint.prepare(QStringLiteral(
+          "SELECT coverage FROM local_import_checkpoints"));
+    } else {
+      checkpoint.prepare(QStringLiteral(
+          "SELECT coverage FROM local_import_checkpoints WHERE tool_id=?"));
+      checkpoint.addBindValue(storedTool);
+    }
     if (!checkpoint.exec())
       return result;
-    const QString coverage = checkpoint.next() ? checkpoint.value(0).toString()
-                                               : QStringLiteral("unknown");
+    QString coverage = QStringLiteral("unknown");
+    while (checkpoint.next()) {
+      const QString cov = checkpoint.value(0).toString();
+      if (cov == QLatin1String("partial") ||
+          coverage == QLatin1String("unknown"))
+        coverage = cov;
+    }
     summary.insert("toolCoverage", coverage);
     summary.insert("toolEnabled", enabled);
     summary.insert("importStatus",
@@ -1688,7 +1881,7 @@ void LocalSessionModel::requestDaily(
     SessionQueryResult result;
     const QDate first = fromUtc.toTimeZone(zone).date();
     const QDate last = toUtc.addMSecs(-1).toTimeZone(zone).date();
-    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter) ||
+    if (!validSessionQuery(storedTool, fromUtc, toUtc, modelFilter, true) ||
         !zone.isValid() || !first.isValid() || !last.isValid() ||
         first.daysTo(last) > 3650) {
       result.error = QStringLiteral("session-invalid-query");
@@ -1713,6 +1906,10 @@ void LocalSessionModel::requestDaily(
                 "e.session_id=s.session_id WHERE ") +
             eventWhere()))
       return result;
+    const QString toolFilter =
+        (storedTool.isEmpty() || storedTool == QLatin1String("all"))
+            ? QStringLiteral("")
+            : storedTool;
     for (QDate date = first; date <= last; date = date.addDays(1)) {
       const auto lower =
           qMax(fromUtc.toUTC(), QDateTime(date, QTime(0, 0), zone).toUTC());
@@ -1720,14 +1917,15 @@ void LocalSessionModel::requestDaily(
           toUtc.toUTC(), QDateTime(date.addDays(1), QTime(0, 0), zone).toUTC());
       if (upper <= lower)
         continue;
-      query.bindValue(0, storedTool);
-      query.bindValue(1, lower.toString(Qt::ISODateWithMs));
-      query.bindValue(2, upper.toString(Qt::ISODateWithMs));
-      query.bindValue(3, projectId.isEmpty() ? QStringLiteral("") : projectId);
+      query.bindValue(0, toolFilter);
+      query.bindValue(1, toolFilter);
+      query.bindValue(2, lower.toString(Qt::ISODateWithMs));
+      query.bindValue(3, upper.toString(Qt::ISODateWithMs));
       query.bindValue(4, projectId.isEmpty() ? QStringLiteral("") : projectId);
-      query.bindValue(5, modelFilter.contains("modelId") ? 1 : 0);
+      query.bindValue(5, projectId.isEmpty() ? QStringLiteral("") : projectId);
+      query.bindValue(6, modelFilter.contains("modelId") ? 1 : 0);
       query.bindValue(
-          6, modelFilter.value("modelId", QStringLiteral("")).toString());
+          7, modelFilter.value("modelId", QStringLiteral("")).toString());
       if (!query.exec() || !query.next())
         return result;
       QVariantMap row{{"localDate", date.toString(Qt::ISODate)}};

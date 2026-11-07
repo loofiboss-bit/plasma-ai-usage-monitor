@@ -1,7 +1,10 @@
 #include <QtTest>
 #include <QSignalSpy>
+#include <QTemporaryDir>
+#include <QFile>
 
 #include "subscriptiontoolbackend.h"
+#include "localactivitymonitorbase.h"
 
 /**
  * Minimal concrete subclass for testing SubscriptionToolBackend's non-virtual logic.
@@ -52,6 +55,35 @@ private:
     bool m_hasSecondary;
 };
 
+class TestLocalActivityMonitor : public LocalActivityMonitorBase
+{
+    Q_OBJECT
+public:
+    explicit TestLocalActivityMonitor(QObject *parent = nullptr)
+        : LocalActivityMonitorBase(parent)
+    {}
+
+    QString toolName() const override { return QStringLiteral("TestLocalMonitor"); }
+    QString iconName() const override { return QStringLiteral("test-icon"); }
+    QString toolColor() const override { return QStringLiteral("#00FF00"); }
+    QString periodLabel() const override { return QStringLiteral("monthly"); }
+    QStringList availablePlans() const override { return {QStringLiteral("Free"), QStringLiteral("Pro")}; }
+    int defaultLimitForPlan(const QString &plan) const override {
+        return plan == QStringLiteral("Pro") ? 500 : 100;
+    }
+
+    using LocalActivityMonitorBase::setDebounceIntervalMs;
+    using LocalActivityMonitorBase::setIgnoredPathSuffixes;
+    using LocalActivityMonitorBase::setInstallExecutableNames;
+    using LocalActivityMonitorBase::setInstallPaths;
+    using LocalActivityMonitorBase::setWatchedPaths;
+    using LocalActivityMonitorBase::updateWatchHealth;
+    using LocalActivityMonitorBase::watchedPaths;
+
+protected:
+    UsagePeriod primaryPeriodType() const override { return Monthly; }
+};
+
 class SubscriptionToolBackendTest : public QObject
 {
     Q_OBJECT
@@ -77,6 +109,7 @@ private Q_SLOTS:
   void testDefaultLimitForPlan();
   void testTimeUntilResetFormat();
   void testQuotaWindowsAndNotify();
+  void testLocalActivityMonitorLifecycle();
 };
 
 void SubscriptionToolBackendTest::testAutomaticSyncRetryPolicy() {
@@ -375,6 +408,30 @@ void SubscriptionToolBackendTest::testQuotaWindowsAndNotify()
     QCOMPARE(first.value(QStringLiteral("badge")).toString(), QStringLiteral("Custom"));
     QCOMPARE(first.value(QStringLiteral("used")).toInt(), 4);
     QCOMPARE(first.value(QStringLiteral("limit")).toInt(), 10);
+}
+
+void SubscriptionToolBackendTest::testLocalActivityMonitorLifecycle()
+{
+    QTemporaryDir tempDir;
+    QVERIFY(tempDir.isValid());
+
+    const QString watchedDir = tempDir.filePath(QStringLiteral("watched"));
+    QVERIFY(QDir().mkpath(watchedDir));
+
+    TestLocalActivityMonitor monitor;
+    monitor.setInstallPaths({watchedDir});
+    monitor.setWatchedPaths({watchedDir});
+    monitor.setIgnoredPathSuffixes({QStringLiteral(".tmp")});
+    monitor.setDebounceIntervalMs(10);
+
+    QCOMPARE(monitor.watchedPaths(), QStringList{watchedDir});
+    monitor.checkToolInstalled();
+    QVERIFY(monitor.isInstalled());
+
+    monitor.updateWatchHealth(true);
+    QCOMPARE(monitor.watchDiagnosticCode(), QStringLiteral("watch_incomplete"));
+    monitor.updateWatchHealth(false);
+    QCOMPARE(monitor.watchDiagnosticCode(), QString());
 }
 
 QTEST_MAIN(SubscriptionToolBackendTest)

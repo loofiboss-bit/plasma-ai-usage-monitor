@@ -1,0 +1,49 @@
+{
+  "source": "/home/loofi/Skrivbord/Loofi Work/plasma-ai-usage-monitor-v26/plugin/costengine.cpp",
+  "iterations": 10000,
+  "rounds": 8,
+  "compileCommand": [
+    "c++",
+    "-O3",
+    "-DNDEBUG",
+    "-std=c++20",
+    "/tmp/ai-monitor-cost-parse-kcx9wcnx/bench.cpp",
+    "-o",
+    "/tmp/ai-monitor-cost-parse-kcx9wcnx/bench",
+    "-I/usr/include/qt6/QtCore",
+    "-I/usr/include/qt6",
+    "-DQT_CORE_LIB",
+    "-I/usr/lib64/qt6/mkspecs/linux-g++",
+    "-lQt6Core"
+  ],
+  "parity": "parity_cases=804 sink=1565209861260000",
+  "samplesNs": {
+    "regex": [
+      411892860,
+      398968826,
+      412952180,
+      423757552,
+      436861355,
+      427723002,
+      426061897,
+      440017957
+    ],
+    "ascii": [
+      10082746,
+      9910376,
+      8762519,
+      9100127,
+      10376559,
+      10575529,
+      9934585,
+      9981501
+    ]
+  },
+  "medianNs": {
+    "regex": 424909724.5,
+    "ascii": 9958043.0
+  },
+  "improvementPercent": 97.65643325491837,
+  "meetsTenPercentGate": true,
+  "scope": "parseScaled string-rate microbenchmark only"
+}
